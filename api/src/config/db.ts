@@ -2,12 +2,18 @@ import mongoose from "mongoose";
 import { env } from "./env.js";
 
 export const connectDB = async (): Promise<void> => {
+  if (!env.mongoUrl) {
+    console.error("MONGO_URL is required to connect to MongoDB");
+    process.exit(1);
+  }
+
   try {
     await mongoose.connect(env.mongoUrl);
     console.log("MongoDB connected successfully");
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
-    console.error("MongoDB Connection Failed:", errorMessage);
+    const message = error instanceof Error ? error.message : "Unknown MongoDB connection error";
+
+    console.error("MongoDB connection failed:", message);
     process.exit(1);
   }
 }
