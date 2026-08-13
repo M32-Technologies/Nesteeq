@@ -1,21 +1,27 @@
+import "dotenv/config";
+
 import app from "./app.js";
-import dotenv from "dotenv"
-dotenv.config();
 import { connectDB } from "./config/db.js";
+import { connectAuthDB } from "./config/auth-db.js";
+import { env } from "./config/env.js";
 
-const PORT = process.env.PORT
-const startServer = async () => {
+const startServer = async (): Promise<void> => {
     try {
-        await connectDB()
+        await connectDB();
+        await connectAuthDB();
 
-        app.listen(PORT, () => {
-            console.log(`server running in ${PORT}`)
-        })
+        app.listen(env.port, () => {
+            console.log(`Server running on port ${env.port}`);
+        });
     } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+        const errorMessage =
+            error instanceof Error
+                ? error.message
+                : "An unknown error occurred";
+
         console.error("Server startup failed:", errorMessage);
         process.exit(1);
     }
-}
+};
 
-startServer()   
+startServer();
