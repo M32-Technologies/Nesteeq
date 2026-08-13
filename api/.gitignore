@@ -4,7 +4,6 @@ dist/
 .env.*
 !.env.example
 
-# Logs
 logs
 *.log
 npm-debug.log*
@@ -13,11 +12,8 @@ yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
 
-# Optional npm cache directory
 .npm
 
-# Optional eslint cache
 .eslintcache
 
-# macOS
 .DS_Store
