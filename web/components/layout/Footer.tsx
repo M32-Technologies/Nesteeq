@@ -24,7 +24,13 @@ export default function Footer() {
           <div className="max-w-[350px]">
             <Link href="/" className="inline-flex items-center gap-2.5">
               <div className="flex h-8 w-8 items-center justify-center">
-                <Image src="/logo.png" alt="Nesteeq Logo" width={32} height={32} className="object-contain" />
+                <Image
+                  src="/logo.png"
+                  alt="Nesteeq Logo"
+                  width={32}
+                  height={32}
+                  className="h-8 w-8 object-contain"
+                />
               </div>
 
               <span className="text-xl font-bold tracking-[-0.03em] text-[var(--ink)]">
