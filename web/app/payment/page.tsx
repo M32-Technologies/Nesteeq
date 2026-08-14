@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type ApartmentData = {
   _id?: string;
@@ -165,6 +165,12 @@ type VerifyPaymentResponse = {
   };
 };
 
+type ApartmentResponse = {
+  success: boolean;
+  apartment?: ApartmentData;
+  data?: ApartmentData;
+};
+
 type ApiErrorResponse = {
   success?: boolean;
   message?: string;
@@ -276,18 +282,6 @@ const getCheckoutPlanId = (
   return isCheckoutPlanId(planId)
     ? planId
     : "MONTHLY";
-};
-
-const getStoredApartmentId = (
-  apartment: ApartmentData
-) => {
-  return (
-    apartment.apartmentId ||
-    apartment._id ||
-    apartment.id ||
-    sessionStorage.getItem("nesteeqApartmentId") ||
-    ""
-  );
 };
 
 const buildApiErrorMessage = (
@@ -404,6 +398,8 @@ const loadRazorpayScript = (): Promise<boolean> => {
 
 export default function PaymentPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const apartmentId = searchParams.get("apartmentId");
 
   const [apartment, setApartment] =
     useState<ApartmentData | null>(null);
@@ -422,25 +418,77 @@ export default function PaymentPage() {
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      try {
-        const savedApartment =
-          sessionStorage.getItem(
-            "nesteeqOnboarding"
+      const loadApartment = async () => {
+        try {
+          if (!apartmentId) {
+            setApartment(null);
+            return;
+          }
+
+          const apartmentResponse = await fetch(
+            `${BACKEND_API_BASE_URL}/api/apartments/${apartmentId}`,
+            {
+              credentials: "include",
+            }
           );
 
+          const apartmentResult =
+            await readApiJson<
+              ApartmentResponse | ApiErrorResponse
+            >(
+              apartmentResponse,
+              "Backend returned an invalid apartment response"
+            );
+
+          if (!apartmentResponse.ok) {
+            throw new Error(
+              buildApiErrorMessage(
+                apartmentResult,
+                "Unable to load apartment"
+              )
+            );
+          }
+
+          const loadedApartment =
+            "apartment" in apartmentResult &&
+            apartmentResult.apartment
+              ? apartmentResult.apartment
+              : "data" in apartmentResult
+                ? apartmentResult.data
+                : null;
+
+          if (loadedApartment) {
+            setApartment({
+              ...loadedApartment,
+              _id:
+                loadedApartment._id ||
+                apartmentId,
+              apartmentId,
+            });
+          }
+        } catch (error) {
+          console.error(
+            "Failed to read checkout data:",
+            error
+          );
+        }
+      };
+
+      void loadApartment();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [apartmentId]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      try {
         const savedPlan =
           sessionStorage.getItem(
             "nesteeqSelectedPlan"
           );
-
-        if (savedApartment) {
-          const parsedApartment =
-            JSON.parse(
-              savedApartment
-            ) as ApartmentData;
-
-          setApartment(parsedApartment);
-        }
 
         if (savedPlan) {
           const parsedPlan =
@@ -640,10 +688,9 @@ export default function PaymentPage() {
       return;
     }
 
-    const apartmentId =
-      getStoredApartmentId(apartment);
+    const currentApartmentId = apartmentId;
 
-    if (!apartmentId) {
+    if (!currentApartmentId) {
       setPaymentError(
         "Apartment must be saved before payment. Please complete onboarding again."
       );
@@ -696,7 +743,7 @@ export default function PaymentPage() {
           credentials: "include",
 
           body: JSON.stringify({
-            apartmentId,
+            apartmentId: currentApartmentId,
             planId: checkoutPlanId,
           }),
         }

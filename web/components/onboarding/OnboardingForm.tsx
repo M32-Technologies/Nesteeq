@@ -435,20 +435,12 @@ export default function OnboardingForm() {
     setSubmitError("");
 
     try {
-      let setupRequestId =
-        sessionStorage.getItem(
-          "nesteeqOnboardingSetupRequestId"
-        );
+      const setupRequestId = createSetupRequestId();
 
-      if (!setupRequestId) {
-        setupRequestId =
-          createSetupRequestId();
-
-        sessionStorage.setItem(
-          "nesteeqOnboardingSetupRequestId",
-          setupRequestId
-        );
-      }
+      sessionStorage.setItem(
+        "nesteeqOnboardingSetupRequestId",
+        setupRequestId
+      );
 
       const response = await fetch(
         `${API_BASE_URL}/api/apartments`,
@@ -502,40 +494,10 @@ export default function OnboardingForm() {
         );
       }
 
-      const storedApartment = {
-        ...formData,
-        ...apartment,
-        _id: apartmentId,
-        apartmentId,
-        totalUnits: String(
-          apartment?.totalUnits ??
-            formData.totalUnits
-        ),
-        totalFloors: String(
-          apartment?.totalFloors ??
-            formData.totalFloors
-        ),
-        totalBlocks: String(
-          apartment?.totalBlocks ??
-            formData.totalBlocks
-        ),
-        parkingSlots: String(
-          apartment?.parkingSlots ??
-            formData.parkingSlots
-        ),
-        contactNumber:
-          apartment?.contactNumber ||
-          formData.contactNumber,
-        emergencyNumber:
-          apartment?.emergencyNumber ||
-          formData.emergencyNumber,
-      };
-
       setCompletedStep(3);
 
-      sessionStorage.setItem(
-        "nesteeqOnboarding",
-        JSON.stringify(storedApartment)
+      sessionStorage.removeItem(
+        "nesteeqOnboarding"
       );
 
       sessionStorage.setItem(
@@ -543,7 +505,7 @@ export default function OnboardingForm() {
         apartmentId
       );
 
-      router.push("/payment");
+      router.push(`/payment?apartmentId=${apartmentId}`);
     } catch (error) {
       setSubmitError(
         getNetworkErrorMessage(
