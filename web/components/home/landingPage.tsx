@@ -97,7 +97,7 @@ export default function HomePage() {
                 alt="Modern apartment building"
                 fill
                 priority
-                sizes="100vw"
+                sizes="(max-width: 1023px) calc(100vw - 40px), 0px"
                 className="relative z-10 object-contain object-bottom"
               />
             </motion.div>

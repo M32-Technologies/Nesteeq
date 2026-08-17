@@ -1,5 +1,6 @@
 import { z } from "zod";
 const phoneRegex = /^\+?[1-9]\d{7,14}$/;
+const normalizePhone = (value: string) => value.replace(/[\s()-]/g, "");
 
 export const registerSchema = z.object({
     fullName: z
@@ -19,16 +20,11 @@ export const registerSchema = z.object({
         .string()
         .trim()
         .min(1, "Phone number is required")
-        .regex(phoneRegex, "Enter a valid phone number with country code"),
-
-    password: z
-        .string()
-        .min(8, "Password must be at least 8 characters")
-        .max(72, "Password is too long") 
-        .regex(/[a-z]/, "Password must include a lowercase letter")
-        .regex(/[A-Z]/, "Password must include an uppercase letter")
-        .regex(/[0-9]/, "Password must include a number")
-        .regex(/[^a-zA-Z0-9]/, "Password must include a special character"),
+        .transform(normalizePhone)
+        .refine(
+            (value) => phoneRegex.test(value),
+            "Enter a valid phone number with country code",
+        ),
 });
 
 export type RegisterFormValues = z.infer<typeof registerSchema>;
