@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { QueryProvider } from "@/app/provider";
 import { Toaster } from "sonner";
 import "./globals.css";
 export const metadata: Metadata = {
@@ -10,7 +11,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html>
       <body>
-        {children}
+        <QueryProvider>{children}</QueryProvider>
         <Toaster richColors position="top-right" duration={3000}/>
       </body>
     </html>

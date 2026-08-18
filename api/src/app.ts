@@ -6,6 +6,8 @@ import { auth } from "./lib/auth.js";
 import cors from "cors"
 import { env } from "./config/env.js";
 
+import SubscriptionsRoute from "../src/modules/subscription/subscription.routes.js"
+
 const app = express()
 app.use(cors({
   origin : env.webUrl,
@@ -17,12 +19,7 @@ app.all("/api/auth/*splat", toNodeHandler(auth))
 app.use(cookieParser());
 app.use(express.json())
 
-app.get("/health", (_req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "API is healthy",
-  });
-});
+app.use("/api/v1" , SubscriptionsRoute)
 
 app.use(notFoundHandler);
 app.use(errorHandler);

@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Menu, X } from "lucide-react";
+import { ArrowRight, LogOut, Menu, UserCircle, X } from "lucide-react";
+import { signOut, useSession } from "@/lib/auth-client";
 
 const navItems = [
   { label: "Home", href: "/" },
@@ -15,9 +16,21 @@ const navItems = [
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { data: session, isPending } = useSession();
 
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const user = session?.user;
+  const userName = user?.name || user?.email || "Profile";
+  const userInitial = userName.charAt(0).toUpperCase();
+
+  const handleSignOut = async () => {
+    await signOut();
+    setIsMenuOpen(false);
+    router.push("/");
+    router.refresh();
+  };
 
   useEffect(() => {
     let scrolled = false;
@@ -90,20 +103,44 @@ export default function Navbar() {
         </div>
 
         <div className="hidden items-center gap-2 lg:flex">
-          <Link
-            href="/login"
-            className="rounded-full px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-black/[0.04]"
-          >
-            Log in
-          </Link>
+          {isPending ? (
+            <div className="h-10 w-40 animate-pulse rounded-full bg-black/[0.06]" />
+          ) : user ? (
+            <>
+              <div className="flex h-10 items-center gap-2 rounded-full border border-black/[0.08] bg-white px-3 text-sm font-semibold text-[var(--ink)]">
+                <span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--brand)] text-xs text-white">
+                  {userInitial}
+                </span>
+                <span className="max-w-32 truncate">{userName}</span>
+              </div>
 
-          <Link
-            href="/register"
-            className="group flex h-10 items-center gap-2 rounded-full bg-[var(--brand)] px-5 text-sm font-semibold text-white transition hover:bg-[var(--brand-hover)]"
-          >
-            Get started
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-          </Link>
+              <button
+                type="button"
+                onClick={() => void handleSignOut()}
+                className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--ink)] transition hover:bg-black/[0.04]"
+                aria-label="Sign out"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="rounded-full px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-black/[0.04]"
+              >
+                Log in
+              </Link>
+
+              <Link
+                href="/register"
+                className="group flex h-10 items-center gap-2 rounded-full bg-[var(--brand)] px-5 text-sm font-semibold text-white transition hover:bg-[var(--brand-hover)]"
+              >
+                Get started
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+              </Link>
+            </>
+          )}
         </div>
 
         <button
@@ -139,24 +176,44 @@ export default function Navbar() {
                 ))}
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <Link
-                  href="/login"
-                  onClick={() => setIsMenuOpen(false)}
-                  className="flex h-11 items-center justify-center rounded-full border border-black/[0.08] text-sm font-semibold"
-                >
-                  Log in
-                </Link>
+              {isPending ? (
+                <div className="mt-4 h-11 animate-pulse rounded-full bg-black/[0.06]" />
+              ) : user ? (
+                <div className="mt-4 space-y-3">
+                  <div className="flex h-11 items-center gap-2 rounded-full border border-black/[0.08] px-3 text-sm font-semibold text-[var(--ink)]">
+                    <UserCircle className="h-5 w-5 text-[var(--brand)]" />
+                    <span className="truncate">{userName}</span>
+                  </div>
 
-                <Link
-                  href="/register"
-                  onClick={() => setIsMenuOpen(false)}
-                  className="flex h-11 items-center justify-center gap-2 rounded-full bg-[var(--brand)] text-sm font-semibold text-white"
-                >
-                  Get started
-                  <ArrowRight size={15} />
-                </Link>
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleSignOut()}
+                    className="flex h-11 w-full items-center justify-center gap-2 rounded-full border border-black/[0.08] text-sm font-semibold"
+                  >
+                    <LogOut size={15} />
+                    Sign out
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <Link
+                    href="/login"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="flex h-11 items-center justify-center rounded-full border border-black/[0.08] text-sm font-semibold"
+                  >
+                    Log in
+                  </Link>
+
+                  <Link
+                    href="/register"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="flex h-11 items-center justify-center gap-2 rounded-full bg-[var(--brand)] text-sm font-semibold text-white"
+                  >
+                    Get started
+                    <ArrowRight size={15} />
+                  </Link>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
