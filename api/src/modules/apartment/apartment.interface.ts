@@ -13,6 +13,7 @@ export interface IBlock {
 
 export interface IApartment {
   name: string;
+  email: string;
   state: string;
   city: string;
   address: string;

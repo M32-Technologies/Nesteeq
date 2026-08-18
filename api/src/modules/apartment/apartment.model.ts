@@ -1,51 +1,7 @@
 import mongoose, { Schema } from "mongoose";
 
-import type {
-  IApartment,
-  IBlock,
-  IFlat,
-} from "./apartment.interface.js";
-
-const flatSchema = new Schema<IFlat>(
-  {
-    flatNumber: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    floor: {
-      type: Number,
-      required: true,
-    },
-  },
-  {
-    _id: false,
-  }
-);
-
-const blockSchema = new Schema<IBlock>(
-  {
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    floors: {
-      type: Number,
-      required: true,
-    },
-
-    flats: {
-      type: [flatSchema],
-      default: [],
-    },
-  },
-  {
-    _id: false,
-  }
-);
+import type { IApartment } from "./apartment.interface.js";
+import { blockSchema } from "./block.model.js";
 
 const apartmentSchema = new Schema<IApartment>(
   {
@@ -53,6 +9,13 @@ const apartmentSchema = new Schema<IApartment>(
       type: String,
       required: true,
       trim: true,
+    },
+
+    email: {
+      type: String,
+      required: true,
+      trim: true,
+      lowercase: true,
     },
 
     state: {

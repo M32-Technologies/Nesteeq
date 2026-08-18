@@ -8,6 +8,7 @@ import {
 
 import {
   createSubscriptionSchema,
+  getApartmentSubscriptionSchema,
   verifySubscriptionPaymentSchema,
 } from "./subscription.schema.js";
 
@@ -15,10 +16,22 @@ import { zodValidate } from "../../middlewares/zodValidate.js";
 
 const router = Router();
 
-router.post("/", zodValidate(createSubscriptionSchema), createSubscription);
+router.post(
+  "/",
+  zodValidate(createSubscriptionSchema),
+  createSubscription
+);
 
-router.post("/verify-payment", zodValidate(verifySubscriptionPaymentSchema), verifySubscriptionPayment);
+router.post(
+  "/verify-payment",
+  zodValidate(verifySubscriptionPaymentSchema),
+  verifySubscriptionPayment
+);
 
-router.get("/apartment/:apartmentId", getApartmentSubscription);
+router.get(
+  "/apartment/:apartmentId",
+  zodValidate(getApartmentSubscriptionSchema),
+  getApartmentSubscription
+);
 
 export default router;

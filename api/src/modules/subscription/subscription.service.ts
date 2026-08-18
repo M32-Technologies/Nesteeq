@@ -1,5 +1,3 @@
-import crypto from "crypto";
-
 import { Apartment } from "../apartment/apartment.model.js";
 import Payment from "../payment/payment.model.js";
 import { getSubscriptionPlan } from "./subscription.config.js";
@@ -7,12 +5,17 @@ import Subscription from "./subscription.model.js";
 
 import { AppError } from "../../utils/AppError.js";
 import {
+  calculateEndDate,
+  calculateInclusiveGST,
+  isRazorpaySignatureValid,
+  toPaise,
+  type DurationUnit,
+} from "../../utils/billing.js";
+import {
   razorpay,
   razorpayKeySecret,
   razorpayPublicKey,
 } from "../../config/razorpay.js";
-
-type DurationUnit = "days" | "months" | "years";
 
 interface CreateSubscriptionInput {
   apartmentId: string;
@@ -25,59 +28,6 @@ interface VerifyPaymentInput {
   razorpayPaymentId: string;
   razorpaySignature: string;
 }
-
-const calculateEndDate = (
-  startDate: Date,
-  durationValue: number,
-  durationUnit: DurationUnit
-) => {
-  const endDate = new Date(startDate);
-
-  if (durationUnit === "days") {
-    endDate.setDate(endDate.getDate() + durationValue);
-  }
-
-  if (durationUnit === "months") {
-    endDate.setMonth(endDate.getMonth() + durationValue);
-  }
-
-  if (durationUnit === "years") {
-    endDate.setFullYear(endDate.getFullYear() + durationValue);
-  }
-
-  return endDate;
-};
-
-const roundAmount = (amount: number) => {
-  return Number(amount.toFixed(2));
-};
-
-const calculateInclusiveGST = (
-  totalAmount: number,
-  gstRate = 18
-) => {
-  const subtotalAmount = roundAmount(
-    totalAmount / (1 + gstRate / 100)
-  );
-  const taxAmount = roundAmount(
-    totalAmount - subtotalAmount
-  );
-  const cgstAmount = roundAmount(
-    taxAmount / 2
-  );
-  const sgstAmount = roundAmount(
-    taxAmount - cgstAmount
-  );
-
-  return {
-    subtotalAmount,
-    cgstAmount,
-    sgstAmount,
-    igstAmount: 0,
-    taxAmount,
-    totalAmount: roundAmount(totalAmount),
-  };
-};
 
 export const createSubscriptionService = async ({
   apartmentId,
@@ -171,10 +121,8 @@ export const createSubscriptionService = async ({
   }
 
 
-  const amountInPaise = Math.round(plan.price * 100);
-
   const razorpayOrder = await razorpay.orders.create({
-    amount: amountInPaise,
+    amount: toPaise(plan.price),
     currency: "INR",
     receipt: `sub_${Date.now()}`,
     notes: {
@@ -289,14 +237,14 @@ export const verifySubscriptionPaymentService = async ({
     );
   }
 
-  const generatedSignature = crypto
-    .createHmac("sha256", razorpayKeySecret)
-    .update(
-      `${subscription.razorpayOrderId}|${razorpayPaymentId}`
-    )
-    .digest("hex");
+  const isValidSignature = isRazorpaySignatureValid({
+    razorpayOrderId: subscription.razorpayOrderId,
+    razorpayPaymentId,
+    razorpaySignature,
+    razorpayKeySecret,
+  });
 
-  if (generatedSignature !== razorpaySignature) {
+  if (!isValidSignature) {
     subscription.paymentStatus = "failed";
 
     await subscription.save();

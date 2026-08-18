@@ -5,6 +5,7 @@ import type { IBlock } from "./apartment.interface.js";
 
 type ApartmentData = {
   name: string;
+  email: string;
   state: string;
   city: string;
   address: string;
@@ -30,6 +31,26 @@ const isDuplicateKeyError = (
     "code" in error &&
     (error as { code?: number }).code === 11000
   );
+};
+
+const updateApartmentBlocks = async (
+  apartmentId: string,
+  blocks: BlockData[]
+) => {
+  const apartment = await Apartment.findByIdAndUpdate(
+    apartmentId,
+    { blocks },
+    {
+      new: true,
+      runValidators: true,
+    }
+  );
+
+  if (!apartment) {
+    throw new AppError("Apartment not found", 404);
+  }
+
+  return apartment;
 };
 
 export const createApartmentService = async (
@@ -71,44 +92,14 @@ export const addBlocksService = async (
   apartmentId: string,
   blocks: BlockData[]
 ) => {
-  const apartment = await Apartment.findByIdAndUpdate(
-    apartmentId,
-    {
-      blocks,
-    },
-    {
-      new: true,
-      runValidators: true,
-    }
-  );
-
-  if (!apartment) {
-    throw new AppError("Apartment not found", 404);
-  }
-
-  return apartment;
+  return updateApartmentBlocks(apartmentId, blocks);
 };
 
 export const addFlatsService = async (
   apartmentId: string,
   blocks: BlockData[]
 ) => {
-  const apartment = await Apartment.findByIdAndUpdate(
-    apartmentId,
-    {
-      blocks,
-    },
-    {
-      new: true,
-      runValidators: true,
-    }
-  );
-
-  if (!apartment) {
-    throw new AppError("Apartment not found", 404);
-  }
-
-  return apartment;
+  return updateApartmentBlocks(apartmentId, blocks);
 };
 
 export const getApartmentService = async (

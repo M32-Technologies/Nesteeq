@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+const mongoIdSchema = z
+  .string()
+  .regex(/^[0-9a-fA-F]{24}$/, "Invalid MongoDB ID");
+
 const flatSchema = z.object({
   flatNumber: z
     .string()
@@ -48,6 +52,11 @@ export const createApartmentSchema = z.object({
       .string()
       .trim()
       .min(2, "Name is required"),
+
+    email: z
+      .string()
+      .trim()
+      .email("Enter a valid email address"),
 
     state: z
       .string()
@@ -102,7 +111,17 @@ export const createApartmentSchema = z.object({
   }),
 });
 
+export const apartmentIdParamSchema = z.object({
+  params: z.object({
+    id: mongoIdSchema,
+  }),
+});
+
 export const updateBlocksSchema = z.object({
+  params: z.object({
+    id: mongoIdSchema,
+  }),
+
   body: z.object({
     blocks: z
       .array(blockOnlySchema)
@@ -111,6 +130,10 @@ export const updateBlocksSchema = z.object({
 });
 
 export const updateFlatsSchema = z.object({
+  params: z.object({
+    id: mongoIdSchema,
+  }),
+
   body: z.object({
     blocks: z
       .array(blockWithFlatsSchema)

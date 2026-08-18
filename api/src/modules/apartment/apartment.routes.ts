@@ -8,6 +8,7 @@ import {
 } from "./apartment.controller.js";
 
 import {
+  apartmentIdParamSchema,
   createApartmentSchema,
   updateBlocksSchema,
   updateFlatsSchema,
@@ -18,7 +19,7 @@ import { zodValidate } from "../../middlewares/zodValidate.js";
 const router = Router();
 
 router.post("/", zodValidate(createApartmentSchema), createApartment);
-router.get("/:id", getApartment);
+router.get("/:id", zodValidate(apartmentIdParamSchema), getApartment);
 router.patch("/:id/blocks", zodValidate(updateBlocksSchema), addBlocks);
 router.patch("/:id/flats", zodValidate(updateFlatsSchema), addFlats);
 

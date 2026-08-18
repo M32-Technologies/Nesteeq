@@ -16,10 +16,24 @@ import { zodValidate } from "../../middlewares/zodValidate.js";
 
 const router = Router();
 
-router.post("/", zodValidate(createPaymentOrderSchema), createPaymentOrder);
+router.post(
+  "/",
+  zodValidate(createPaymentOrderSchema),
+  createPaymentOrder
+);
 
-router.post("/checkout-order", zodValidate(createCheckoutOrderSchema), createCheckoutOrder);
+router.post(
+  "/checkout-order",
+  zodValidate(createCheckoutOrderSchema),
+  createCheckoutOrder
+);
 
-router.post("/verify-checkout", zodValidate(verifyCheckoutPaymentSchema), verifyCheckoutPayment);
+router.post(
+  "/verify-checkout",
+  zodValidate(verifyCheckoutPaymentSchema),
+  verifyCheckoutPayment
+);
+
+
 
 export default router;

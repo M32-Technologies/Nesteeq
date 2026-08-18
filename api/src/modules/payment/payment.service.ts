@@ -1,4 +1,3 @@
-import crypto from "crypto";
 import { Apartment } from "../apartment/apartment.model.js";
 import { getSubscriptionPlan } from "../subscription/subscription.config.js";
 import Subscription from "../subscription/subscription.model.js";
@@ -9,24 +8,24 @@ import {
   razorpayKeySecret,
   razorpayPublicKey,
 } from "../../config/razorpay.js";
+import {
+  calculateEndDate,
+  calculateInclusiveGST,
+  isRazorpaySignatureValid,
+  toPaise,
+  type TaxBreakdown,
+} from "../../utils/billing.js";
 import { AppError } from "../../utils/AppError.js";
 
 import type { PaymentType } from "./payment.interface.js";
+
+export { calculateInclusiveGST } from "../../utils/billing.js";
 
 interface CreatePaymentOrderInput {
   userId: string;
   apartmentId: string;
   referenceId: string;
   paymentType: PaymentType;
-  totalAmount: number;
-}
-
-interface TaxBreakdown {
-  subtotalAmount: number;
-  cgstAmount: number;
-  sgstAmount: number;
-  igstAmount: number;
-  taxAmount: number;
   totalAmount: number;
 }
 
@@ -47,62 +46,6 @@ export type TestPlanId =
   | "MONTHLY"
   | "HALF_YEARLY"
   | "YEARLY";
-
-const roundAmount = (amount: number) => {
-  return Number(amount.toFixed(2));
-};
-
-export const calculateInclusiveGST = (
-  totalAmount: number,
-  gstRate = 18
-): TaxBreakdown => {
-  const subtotalAmount = roundAmount(
-    totalAmount / (1 + gstRate / 100)
-  );
-
-  const taxAmount = roundAmount(
-    totalAmount - subtotalAmount
-  );
-
-  const cgstAmount = roundAmount(
-    taxAmount / 2
-  );
-
-  const sgstAmount = roundAmount(
-    taxAmount - cgstAmount
-  );
-
-  return {
-    subtotalAmount,
-    cgstAmount,
-    sgstAmount,
-    igstAmount: 0,
-    taxAmount,
-    totalAmount: roundAmount(totalAmount),
-  };
-};
-
-const calculateSubscriptionEndDate = (
-  startDate: Date,
-  durationValue: number,
-  durationUnit: "days" | "months" | "years"
-) => {
-  const endDate = new Date(startDate);
-
-  if (durationUnit === "days") {
-    endDate.setDate(endDate.getDate() + durationValue);
-  }
-
-  if (durationUnit === "months") {
-    endDate.setMonth(endDate.getMonth() + durationValue);
-  }
-
-  if (durationUnit === "years") {
-    endDate.setFullYear(endDate.getFullYear() + durationValue);
-  }
-
-  return endDate;
-};
 
 const buildPaymentPayload = ({
   apartmentId,
@@ -141,8 +84,6 @@ const buildPaymentPayload = ({
   return payload;
 };
 
-
-
 export const createPaymentOrderService = async ({
   userId,
   apartmentId,
@@ -162,7 +103,7 @@ export const createPaymentOrderService = async ({
 
   const razorpayOrder =
     await razorpay.orders.create({
-      amount: Math.round(totalAmount * 100),
+      amount: toPaise(totalAmount),
 
       currency: "INR",
 
@@ -176,38 +117,16 @@ export const createPaymentOrderService = async ({
       },
     });
 
-  const payment = await Payment.create({
-    userId,
-    apartmentId,
-
-    paymentType,
-    referenceId,
-
-    subtotalAmount:
-      taxBreakdown.subtotalAmount,
-
-    cgstAmount:
-      taxBreakdown.cgstAmount,
-
-    sgstAmount:
-      taxBreakdown.sgstAmount,
-
-    igstAmount:
-      taxBreakdown.igstAmount,
-
-    taxAmount:
-      taxBreakdown.taxAmount,
-
-    amount:
-      taxBreakdown.totalAmount,
-
-    currency: "INR",
-
-    status: "PENDING",
-
-    razorpayOrderId:
-      razorpayOrder.id,
-  });
+  const payment = await Payment.create(
+    buildPaymentPayload({
+      apartmentId,
+      userId,
+      referenceId,
+      paymentType,
+      taxBreakdown,
+      razorpayOrderId: razorpayOrder.id,
+    })
+  );
 
   return {
     paymentId: payment._id,
@@ -364,7 +283,7 @@ export const createCheckoutOrderService = async ({
 
       orderId: existingPayment.razorpayOrderId,
 
-      amount: Math.round(existingPayment.amount * 100),
+      amount: toPaise(existingPayment.amount),
 
       currency: existingPayment.currency,
 
@@ -380,7 +299,7 @@ export const createCheckoutOrderService = async ({
 
   const razorpayOrder =
     await razorpay.orders.create({
-      amount: Math.round(plan.price * 100),
+      amount: toPaise(plan.price),
 
       currency: "INR",
 
@@ -492,7 +411,7 @@ export const verifyCheckoutPaymentService =
           payment.razorpayPaymentId ||
           razorpayPaymentId,
 
-        amount: Math.round(payment.amount * 100),
+        amount: toPaise(payment.amount),
 
         currency: payment.currency,
 
@@ -516,37 +435,12 @@ export const verifyCheckoutPaymentService =
       );
     }
 
-    const signatureBody =
-      `${razorpayOrderId}|${razorpayPaymentId}`;
-
-    const expectedSignature =
-      crypto
-        .createHmac(
-          "sha256",
-          razorpayKeySecret
-        )
-        .update(signatureBody)
-        .digest("hex");
-
-    const expectedBuffer =
-      Buffer.from(
-        expectedSignature,
-        "utf8"
-      );
-
-    const receivedBuffer =
-      Buffer.from(
-        razorpaySignature,
-        "utf8"
-      );
-
-    const isValid =
-      expectedBuffer.length ===
-        receivedBuffer.length &&
-      crypto.timingSafeEqual(
-        expectedBuffer,
-        receivedBuffer
-      );
+    const isValid = isRazorpaySignatureValid({
+      razorpayOrderId,
+      razorpayPaymentId,
+      razorpaySignature,
+      razorpayKeySecret,
+    });
 
     if (!isValid) {
       if (payment.status === "PENDING") {
@@ -596,7 +490,7 @@ export const verifyCheckoutPaymentService =
         subscription.startDate = startDate;
         subscription.endDate =
           subscription.endDate ||
-          calculateSubscriptionEndDate(
+          calculateEndDate(
             startDate,
             subscription.durationValue,
             subscription.durationUnit

@@ -34,3 +34,9 @@ export const verifySubscriptionPaymentSchema = z.object({
       .min(1, "Razorpay signature is required"),
   }),
 });
+
+export const getApartmentSubscriptionSchema = z.object({
+  params: z.object({
+    apartmentId: mongoIdSchema,
+  }),
+});
