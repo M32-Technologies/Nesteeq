@@ -1,7 +1,7 @@
 "use client";
 
-import FeatureSection from "@/components/features/FeatureSection";
-import FinalCTA from "@/components/home/FinalCTA";
+import FeatureSection from "@/features/landing/features/FeatureSection";
+import FinalCTA from "@/features/landing/home/FinalCTA";
 
 import { motion } from "framer-motion";
 import {
