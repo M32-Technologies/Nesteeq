@@ -1,0 +1,398 @@
+import {
+  BarChart3,
+  Bell,
+  Building2,
+  CalendarDays,
+  Car,
+  CircleDollarSign,
+  ClipboardList,
+  LayoutDashboard,
+  MessageSquareWarning,
+  QrCode,
+  ReceiptText,
+  Settings,
+  ShieldCheck,
+  UserRound,
+  UserRoundCog,
+  Users,
+  WalletCards,
+  Wrench,
+} from "lucide-react"
+
+import type { LucideIcon } from "lucide-react"
+
+export type DashboardRole =
+  | "super_admin"
+  | "property_manager"
+  | "treasurer"
+  | "facility_manager"
+  | "security_staff"
+  | "maintenance_technician"
+  | "resident"
+
+export type NavigationItem = {
+  title: string
+  href: string
+  icon: LucideIcon
+}
+
+export type NavigationSection = {
+  title: string
+  items: NavigationItem[]
+}
+
+export const DEFAULT_DASHBOARD_ROLE: DashboardRole = "resident"
+
+export const dashboardRoleLabels: Record<DashboardRole, string> = {
+  super_admin: "Super Admin",
+  property_manager: "Property Manager",
+  treasurer: "Treasurer",
+  facility_manager: "Facility Manager",
+  security_staff: "Security Staff",
+  maintenance_technician: "Maintenance Technician",
+  resident: "Resident",
+}
+
+export const sidebarNavigation: Record<
+  DashboardRole,
+  NavigationSection[]
+> = {
+  super_admin: [
+    {
+      title: "Management",
+      items: [
+        {
+          title: "Dashboard",
+          href: "/dashboard",
+          icon: LayoutDashboard,
+        },
+        {
+          title: "Apartments",
+          href: "/dashboard/apartments",
+          icon: Building2,
+        },
+        {
+          title: "Users",
+          href: "/dashboard/users",
+          icon: Users,
+        },
+        {
+          title: "Staff",
+          href: "/dashboard/staff",
+          icon: UserRoundCog,
+        },
+      ],
+    },
+    {
+      title: "System",
+      items: [
+        {
+          title: "Reports",
+          href: "/dashboard/reports",
+          icon: BarChart3,
+        },
+        {
+          title: "Notifications",
+          href: "/dashboard/notifications",
+          icon: Bell,
+        },
+        {
+          title: "Settings",
+          href: "/dashboard/settings",
+          icon: Settings,
+        },
+      ],
+    },
+  ],
+
+  property_manager: [
+    {
+      title: "Management",
+      items: [
+        {
+          title: "Dashboard",
+          href: "/dashboard",
+          icon: LayoutDashboard,
+        },
+        {
+          title: "Property",
+          href: "/dashboard/property",
+          icon: Building2,
+        },
+        {
+          title: "Residents",
+          href: "/dashboard/residents",
+          icon: Users,
+        },
+        {
+          title: "Staff",
+          href: "/dashboard/staff",
+          icon: UserRoundCog,
+        },
+      ],
+    },
+    {
+      title: "Operations",
+      items: [
+        {
+          title: "Complaints",
+          href: "/dashboard/complaints",
+          icon: MessageSquareWarning,
+        },
+        {
+          title: "Maintenance",
+          href: "/dashboard/maintenance",
+          icon: Wrench,
+        },
+        {
+          title: "Visitors",
+          href: "/dashboard/visitors",
+          icon: QrCode,
+        },
+        {
+          title: "Parking",
+          href: "/dashboard/parking",
+          icon: Car,
+        },
+      ],
+    },
+    {
+      title: "Reports",
+      items: [
+        {
+          title: "Analytics",
+          href: "/dashboard/reports",
+          icon: BarChart3,
+        },
+        {
+          title: "Announcements",
+          href: "/dashboard/announcements",
+          icon: Bell,
+        },
+      ],
+    },
+  ],
+
+  treasurer: [
+    {
+      title: "Finance",
+      items: [
+        {
+          title: "Dashboard",
+          href: "/dashboard",
+          icon: LayoutDashboard,
+        },
+        {
+          title: "Bills",
+          href: "/dashboard/bills",
+          icon: ReceiptText,
+        },
+        {
+          title: "Payments",
+          href: "/dashboard/payments",
+          icon: WalletCards,
+        },
+        {
+          title: "Outstanding Dues",
+          href: "/dashboard/dues",
+          icon: CircleDollarSign,
+        },
+        {
+          title: "Reports",
+          href: "/dashboard/reports",
+          icon: BarChart3,
+        },
+      ],
+    },
+  ],
+
+  facility_manager: [
+    {
+      title: "Operations",
+      items: [
+        {
+          title: "Dashboard",
+          href: "/dashboard",
+          icon: LayoutDashboard,
+        },
+        {
+          title: "Complaints",
+          href: "/dashboard/complaints",
+          icon: MessageSquareWarning,
+        },
+        {
+          title: "Maintenance",
+          href: "/dashboard/maintenance",
+          icon: Wrench,
+        },
+        {
+          title: "Technicians",
+          href: "/dashboard/technicians",
+          icon: UserRoundCog,
+        },
+        {
+          title: "Schedule",
+          href: "/dashboard/schedule",
+          icon: CalendarDays,
+        },
+        {
+          title: "Reports",
+          href: "/dashboard/reports",
+          icon: BarChart3,
+        },
+      ],
+    },
+  ],
+
+  security_staff: [
+    {
+      title: "Security",
+      items: [
+        {
+          title: "Dashboard",
+          href: "/dashboard",
+          icon: LayoutDashboard,
+        },
+        {
+          title: "Visitors",
+          href: "/dashboard/visitors",
+          icon: Users,
+        },
+        {
+          title: "QR Scanner",
+          href: "/dashboard/scanner",
+          icon: QrCode,
+        },
+        {
+          title: "Entry Records",
+          href: "/dashboard/entry-records",
+          icon: ClipboardList,
+        },
+        {
+          title: "Parking",
+          href: "/dashboard/parking",
+          icon: Car,
+        },
+        {
+          title: "Security",
+          href: "/dashboard/security",
+          icon: ShieldCheck,
+        },
+      ],
+    },
+  ],
+
+  maintenance_technician: [
+    {
+      title: "Work",
+      items: [
+        {
+          title: "Dashboard",
+          href: "/dashboard",
+          icon: LayoutDashboard,
+        },
+        {
+          title: "Assigned Jobs",
+          href: "/dashboard/jobs",
+          icon: Wrench,
+        },
+        {
+          title: "Completed Jobs",
+          href: "/dashboard/completed",
+          icon: ClipboardList,
+        },
+        {
+          title: "Schedule",
+          href: "/dashboard/schedule",
+          icon: CalendarDays,
+        },
+      ],
+    },
+  ],
+
+  resident: [
+    {
+      title: "My Apartment",
+      items: [
+        {
+          title: "Dashboard",
+          href: "/dashboard",
+          icon: LayoutDashboard,
+        },
+        {
+          title: "My Flat",
+          href: "/dashboard/my-flat",
+          icon: Building2,
+        },
+        {
+          title: "Complaints",
+          href: "/dashboard/complaints",
+          icon: MessageSquareWarning,
+        },
+        {
+          title: "Bills",
+          href: "/dashboard/bills",
+          icon: ReceiptText,
+        },
+        {
+          title: "Payments",
+          href: "/dashboard/payments",
+          icon: WalletCards,
+        },
+      ],
+    },
+    {
+      title: "Community",
+      items: [
+        {
+          title: "Visitors",
+          href: "/dashboard/visitors",
+          icon: QrCode,
+        },
+        {
+          title: "Parking",
+          href: "/dashboard/parking",
+          icon: Car,
+        },
+        {
+          title: "Announcements",
+          href: "/dashboard/announcements",
+          icon: Bell,
+        },
+        {
+          title: "Profile",
+          href: "/dashboard/profile",
+          icon: UserRound,
+        },
+      ],
+    },
+  ],
+}
+
+export function normalizeDashboardRole(role?: string | null): DashboardRole {
+  const normalizedRole = role
+    ?.trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_") as DashboardRole | undefined
+
+  if (normalizedRole && normalizedRole in sidebarNavigation) {
+    return normalizedRole
+  }
+
+  const compactRole = normalizedRole?.replace(/_/g, "")
+  const roleAliases: Record<string, DashboardRole> = {
+    superadmin: "super_admin",
+    propertymanager: "property_manager",
+    treasurer: "treasurer",
+    facilitymanager: "facility_manager",
+    securitystaff: "security_staff",
+    maintenancetechnician: "maintenance_technician",
+    resident: "resident",
+  }
+
+  if (compactRole && compactRole in roleAliases) {
+    return roleAliases[compactRole]
+  }
+
+  return DEFAULT_DASHBOARD_ROLE
+}
