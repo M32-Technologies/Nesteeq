@@ -1,0 +1,7 @@
+export type UserRole =  | "super_admin"
+  | "property_manager"
+  | "treasurer"
+  | "facility_manager"
+  | "security_staff"
+  | "maintenance_technician"
+  | "resident"

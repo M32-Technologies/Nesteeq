@@ -14,6 +14,8 @@ import { signOut } from "@/lib/auth-client"
 
 import {
   dashboardRoleLabels,
+  getDashboardItemHref,
+  getDashboardRoleRouteSegment,
   sidebarNavigation,
   type DashboardRole,
 } from "../config/sidebar-navigation"
@@ -37,6 +39,7 @@ export default function DashboardSidebar({
 
   const navigation = sidebarNavigation[role]
   const roleLabel = dashboardRoleLabels[role]
+  const roleHomePath = `/${getDashboardRoleRouteSegment(role)}`
 
   const handleSignOut = async () => {
     await signOut()
@@ -56,6 +59,7 @@ export default function DashboardSidebar({
   return (
     <aside
       className="
+        peer/sidebar
         group/sidebar
 
         fixed
@@ -206,16 +210,17 @@ export default function DashboardSidebar({
               <div className="space-y-[4px]">
                 {section.items.map((item) => {
                   const Icon = item.icon
+                  const href = getDashboardItemHref(role, item.href)
 
                   const isActive =
-                    pathname === item.href ||
-                    (item.href !== "/dashboard" &&
-                      pathname.startsWith(`${item.href}/`))
+                    pathname === href ||
+                    (href !== roleHomePath &&
+                      pathname.startsWith(`${href}/`))
 
                   return (
                     <Link
-                      key={item.href}
-                      href={item.href}
+                      key={href}
+                      href={href}
                       title={item.title}
                       className={`
                         relative

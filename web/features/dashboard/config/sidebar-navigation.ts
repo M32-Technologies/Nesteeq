@@ -53,6 +53,16 @@ export const dashboardRoleLabels: Record<DashboardRole, string> = {
   resident: "Resident",
 }
 
+export const dashboardRoleRouteSegments: Record<DashboardRole, string> = {
+  super_admin: "super-admin",
+  property_manager: "property-manager",
+  treasurer: "treasurer",
+  facility_manager: "facility-manager",
+  security_staff: "security",
+  maintenance_technician: "maintenance-technician",
+  resident: "resident",
+}
+
 export const sidebarNavigation: Record<
   DashboardRole,
   NavigationSection[]
@@ -120,8 +130,8 @@ export const sidebarNavigation: Record<
           icon: Building2,
         },
         {
-          title: "Residents",
-          href: "/dashboard/residents",
+          title: "Users",
+          href: "/dashboard/users",
           icon: Users,
         },
         {
@@ -395,4 +405,45 @@ export function normalizeDashboardRole(role?: string | null): DashboardRole {
   }
 
   return DEFAULT_DASHBOARD_ROLE
+}
+
+export function getDashboardRoleRouteSegment(role: DashboardRole) {
+  return dashboardRoleRouteSegments[role]
+}
+
+export function getDashboardRoleFromRouteSegment(segment: string) {
+  const match = Object.entries(dashboardRoleRouteSegments).find(
+    ([, routeSegment]) => routeSegment === segment
+  )
+
+  return (match?.[0] as DashboardRole | undefined) ?? null
+}
+
+export function getDashboardItemHref(role: DashboardRole, href: string) {
+  const rolePath = `/${getDashboardRoleRouteSegment(role)}`
+
+  if (href === "/dashboard") {
+    return rolePath
+  }
+
+  if (href.startsWith("/dashboard/")) {
+    return `${rolePath}${href.slice("/dashboard".length)}`
+  }
+
+  return href
+}
+
+export function getDashboardNavigationItemByPath(
+  role: DashboardRole,
+  pathname: string
+) {
+  for (const section of sidebarNavigation[role]) {
+    for (const item of section.items) {
+      if (getDashboardItemHref(role, item.href) === pathname) {
+        return item
+      }
+    }
+  }
+
+  return null
 }
