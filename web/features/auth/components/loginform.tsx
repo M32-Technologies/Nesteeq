@@ -11,6 +11,10 @@ import { toast } from "sonner"
 
 import { authClient } from "@/lib/auth-client"
 import {
+  getDashboardRoleRouteSegment,
+  normalizeDashboardRole,
+} from "@/features/dashboard/config/sidebar-navigation"
+import {
   loginSchema,
   type LoginFormValues,
 } from "../schemas/login"
@@ -72,10 +76,13 @@ function LoginForm() {
     reset({ email })
   }
 
-  const handleLoginSuccess = () => {
+  const handleLoginSuccess = async () => {
     toast.success("Welcome back to Nesteeq.")
 
-    router.push("/")
+    const { data } = await authClient.getSession()
+    const role = normalizeDashboardRole(data?.user?.role)
+
+    router.push(`/${getDashboardRoleRouteSegment(role)}`)
     router.refresh()
   }
 
