@@ -53,6 +53,16 @@ export const dashboardRoleLabels: Record<DashboardRole, string> = {
   resident: "Resident",
 }
 
+export const dashboardRoleRouteSegments: Record<DashboardRole, string> = {
+  super_admin: "super-admin",
+  property_manager: "property-manager",
+  treasurer: "treasurer",
+  facility_manager: "facility-manager",
+  security_staff: "security",
+  maintenance_technician: "maintenance-technician",
+  resident: "resident",
+}
+
 export const sidebarNavigation: Record<
   DashboardRole,
   NavigationSection[]
@@ -120,8 +130,8 @@ export const sidebarNavigation: Record<
           icon: Building2,
         },
         {
-          title: "Residents",
-          href: "/dashboard/residents",
+          title: "Users",
+          href: "/dashboard/users",
           icon: Users,
         },
         {
@@ -174,37 +184,47 @@ export const sidebarNavigation: Record<
   ],
 
   treasurer: [
-    {
-      title: "Finance",
-      items: [
-        {
-          title: "Dashboard",
-          href: "/dashboard",
-          icon: LayoutDashboard,
-        },
-        {
-          title: "Bills",
-          href: "/dashboard/bills",
-          icon: ReceiptText,
-        },
-        {
-          title: "Payments",
-          href: "/dashboard/payments",
-          icon: WalletCards,
-        },
-        {
-          title: "Outstanding Dues",
-          href: "/dashboard/dues",
-          icon: CircleDollarSign,
-        },
-        {
-          title: "Reports",
-          href: "/dashboard/reports",
-          icon: BarChart3,
-        },
-      ],
-    },
-  ],
+  {
+    title: "Finance",
+    items: [
+      {
+        title: "Dashboard",
+        href: "/dashboard",
+        icon: LayoutDashboard,
+      },
+      {
+        title: "Billing",
+        href: "/dashboard/billing",
+        icon: ReceiptText,
+      },
+      {
+        title: "Payments",
+        href: "/dashboard/payments",
+        icon: WalletCards,
+      },
+      {
+        title: "Expenses",
+        href: "/dashboard/expenses",
+        icon: CircleDollarSign,
+      },
+      {
+        title: "Wallet",
+        href: "/dashboard/wallet",
+        icon: WalletCards,
+      },
+      {
+        title: "Audit Trail",
+        href: "/dashboard/audit",
+        icon: ClipboardList,
+      },
+      {
+        title: "Reports",
+        href: "/dashboard/reports",
+        icon: BarChart3,
+      },
+    ],
+  },
+],
 
   facility_manager: [
     {
@@ -395,4 +415,45 @@ export function normalizeDashboardRole(role?: string | null): DashboardRole {
   }
 
   return DEFAULT_DASHBOARD_ROLE
+}
+
+export function getDashboardRoleRouteSegment(role: DashboardRole) {
+  return dashboardRoleRouteSegments[role]
+}
+
+export function getDashboardRoleFromRouteSegment(segment: string) {
+  const match = Object.entries(dashboardRoleRouteSegments).find(
+    ([, routeSegment]) => routeSegment === segment
+  )
+
+  return (match?.[0] as DashboardRole | undefined) ?? null
+}
+
+export function getDashboardItemHref(role: DashboardRole, href: string) {
+  const rolePath = `/${getDashboardRoleRouteSegment(role)}`
+
+  if (href === "/dashboard") {
+    return rolePath
+  }
+
+  if (href.startsWith("/dashboard/")) {
+    return `${rolePath}${href.slice("/dashboard".length)}`
+  }
+
+  return href
+}
+
+export function getDashboardNavigationItemByPath(
+  role: DashboardRole,
+  pathname: string
+) {
+  for (const section of sidebarNavigation[role]) {
+    for (const item of section.items) {
+      if (getDashboardItemHref(role, item.href) === pathname) {
+        return item
+      }
+    }
+  }
+
+  return null
 }

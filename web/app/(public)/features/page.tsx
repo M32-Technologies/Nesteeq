@@ -1,4 +1,4 @@
-import FeaturesPage from "@/components/features/FeaturesPage";
+import FeaturesPage from "@/features/landing/features/FeaturesPage";
 
 export default function Page() {
   return <FeaturesPage/>;

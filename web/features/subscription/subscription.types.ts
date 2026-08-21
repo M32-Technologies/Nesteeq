@@ -1,7 +1,4 @@
-export type SubscriptionPlanType =
-  | "MONTHLY"
-  | "SIX_MONTHS"
-  | "YEARLY";
+export type SubscriptionPlanType =| "MONTHLY" | "SIX_MONTHS" | "YEARLY";
 
 export interface SubscriptionFreeTrial {
   enabled: boolean;
@@ -10,23 +7,14 @@ export interface SubscriptionFreeTrial {
 
 export interface SubscriptionPlan {
   _id: string;
-
   planName: string;
-
   price: number;
-
   planType: SubscriptionPlanType;
-
   durationMonths: number;
-
   features: string[];
-
   freeTrial: SubscriptionFreeTrial;
-
   isActive: boolean;
-
   createdAt: string;
-
   updatedAt: string;
 }
 

@@ -3,11 +3,11 @@
 import DashboardShowcase from "./DashboardShowcase";
 import CommunityLoop from "./CommunityLoop";
 import ProblemStatement from "./ProblemStatement";
-import FeaturesSection from "@/components/home/FeaturesSection";
-import HowItWorksSection from "@/components/home/HowItWorksSection";
-import AudienceSection from "@/components/home/AudienceSection";
-import PricingPreview from "@/components/home/PricingPreview";
-import FinalCTA from "@/components/home/FinalCTA";
+import FeaturesSection from "@/features/landing/home/FeaturesSection";
+import HowItWorksSection from "@/features/landing/home/HowItWorksSection";
+import AudienceSection from "@/features/landing/home/AudienceSection";
+import PricingPreview from "@/features/landing/home/PricingPreview";
+import FinalCTA from "@/features/landing/home/FinalCTA";
 import ApartmentImage from "@/public/images/home/hero-apartment.png";
 
 import { motion } from "framer-motion";
@@ -16,6 +16,9 @@ import Image from "next/image";
 import Link from "next/link";
 
 export default function HomePage() {
+
+  
+
   return (
     <>
       <main id="home" className="bg-white">

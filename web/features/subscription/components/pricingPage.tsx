@@ -81,7 +81,7 @@ export default function PricingPage() {
   return (
     <main className="min-h-screen bg-white">
       <section className="mx-auto max-w-[1240px] px-5 pb-24 pt-14 sm:px-8 sm:pt-16 lg:px-10 lg:pt-20">
-        {/* Hero */}
+        
         <motion.div
           initial={{
             opacity: 0,
@@ -124,7 +124,7 @@ export default function PricingPage() {
           </p>
         </motion.div>
 
-        {/* Loading */}
+        
         {isPending && (
           <div className="mt-12 grid items-stretch gap-5 lg:grid-cols-3">
             {Array.from({
@@ -157,7 +157,6 @@ export default function PricingPage() {
           </div>
         )}
 
-        {/* Error */}
         {!isPending && isError && (
           <div className="mx-auto mt-12 max-w-md rounded-2xl border border-[#e1e7e4] bg-[#fafbfa] px-7 py-8 text-center">
             <RefreshCw className="mx-auto size-5 text-[#07584F]" />
@@ -188,7 +187,6 @@ export default function PricingPage() {
           </div>
         )}
 
-        {/* Plans */}
         {!isPending &&
           !isError &&
           plans.length > 0 && (

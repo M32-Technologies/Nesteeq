@@ -19,11 +19,13 @@ export default function Navbar() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
 
+  const [hasMounted, setHasMounted] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const user = session?.user;
   const userName = user?.name || user?.email || "Profile";
   const userInitial = userName.charAt(0).toUpperCase();
+  const isAuthLoading = !hasMounted || isPending;
 
   const handleSignOut = async () => {
     await signOut();
@@ -33,6 +35,8 @@ export default function Navbar() {
   };
 
   useEffect(() => {
+    setHasMounted(true);
+
     let scrolled = false;
     let frame = 0;
 
@@ -103,7 +107,7 @@ export default function Navbar() {
         </div>
 
         <div className="hidden items-center gap-2 lg:flex">
-          {isPending ? (
+          {isAuthLoading ? (
             <div className="h-10 w-40 animate-pulse rounded-full bg-black/[0.06]" />
           ) : user ? (
             <>
@@ -176,7 +180,7 @@ export default function Navbar() {
                 ))}
               </div>
 
-              {isPending ? (
+              {isAuthLoading ? (
                 <div className="mt-4 h-11 animate-pulse rounded-full bg-black/[0.06]" />
               ) : user ? (
                 <div className="mt-4 space-y-3">
