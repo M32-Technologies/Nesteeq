@@ -3,10 +3,14 @@ import { Invite } from "./invitation.model.js"
 import { Resident } from "../resident/resident.model.js"
 import { Staff } from "../staff/staff.model.js"
 import { Flat } from "../flat/flat.model.js"
+import { Block } from "../block/block.model.js"
 import {
+  type BulkInviteRow,
+  type BulkInviteRowResult,
   type CreateResidentInviteInput,
   type CreateStaffInviteInput,
   type GetInvitationsQuery,
+  bulkInviteRowSchema,
 } from "./invitation.validation.js"
 import {
   INVITE_MANAGEMENT_ROLES,
@@ -25,8 +29,17 @@ import { emailService } from "../../services/EmailService.js"
 import { env } from "../../config/env.js"
 import { AppError } from "../../utils/AppError.js"
 import { getAuthDB } from "../../config/auth-db.js"
+import { parseInviteWorkbook } from "../../utils/excel/resident-parser.js"
 
 const INVITE_EXPIRY_DAYS = 7
+
+const getMaintenanceTypeForRole = (
+  role: StaffInviteRole,
+  maintenanceType?: string | null,
+) =>
+  role === "maintenance_technician"
+    ? maintenanceType?.trim() || null
+    : null
 
 export const createResidentInvite = async (
   data: CreateResidentInviteInput,
@@ -117,7 +130,7 @@ export const createResidentInvite = async (
   await emailService.sendResidentInvite(email, {
     name: invite.fullName,
     apartmentName: "your apartment community",
-    inviteLink: `${env.webUrl}/accept-invite?token=${encodeURIComponent(
+    inviteLink: `${env.webUrl}/login?inviteToken=${encodeURIComponent(
       rawToken,
     )}`,
   })
@@ -187,6 +200,10 @@ export const createStaffInvite = async (
   }
 
   const { rawToken, tokenHash } = generateInviteToken()
+  const maintenanceType = getMaintenanceTypeForRole(
+    data.role as StaffInviteRole,
+    data.maintenanceType,
+  )
   const invite = await Invite.create({
     email,
     fullName: data.fullName.trim(),
@@ -194,6 +211,7 @@ export const createStaffInvite = async (
     apartmentId: apartmentObjectId,
     flatId: null,
     role: data.role,
+    maintenanceType,
     tokenHash,
     status: "pending",
     invitedBy,
@@ -205,7 +223,7 @@ export const createStaffInvite = async (
   await emailService.sendResidentInvite(email, {
     name: invite.fullName,
     apartmentName: "your apartment community",
-    inviteLink: `${env.webUrl}/accept-invite?token=${encodeURIComponent(
+    inviteLink: `${env.webUrl}/login?inviteToken=${encodeURIComponent(
       rawToken,
     )}`,
   })
@@ -216,6 +234,7 @@ export const createStaffInvite = async (
     fullName: invite.fullName,
     phoneNumber: invite.phoneNumber,
     role: invite.role,
+    maintenanceType: invite.maintenanceType,
     status: invite.status,
     expiresAt: invite.expiresAt,
     createdAt: invite.createdAt,
@@ -256,6 +275,8 @@ export const getInvitations = async (
 
   if (query.role) {
     filter.role = query.role
+  } else if (query.inviteType === "residents") {
+    filter.role = { $in: [...RESIDENT_INVITE_ROLES] }
   }
 
   if (query.search) {
@@ -327,11 +348,11 @@ export const validateInvitation = async (rawToken: string) => {
   const flat =
     invite.flatId
       ? await Flat.findOne({
-          _id: invite.flatId,
-          apartmentId: invite.apartmentId,
-        })
-          .select("_id flatNumber")
-          .lean()
+        _id: invite.flatId,
+        apartmentId: invite.apartmentId,
+      })
+        .select("_id flatNumber")
+        .lean()
       : null
 
   return {
@@ -339,14 +360,15 @@ export const validateInvitation = async (rawToken: string) => {
     email: invite.email,
     fullName: invite.fullName,
     role: invite.role,
+    maintenanceType: invite.maintenanceType,
     apartment: {
       id: invite.apartmentId.toString(),
     },
     flat: flat
       ? {
-          id: flat._id.toString(),
-          flatNumber: flat.flatNumber,
-        }
+        id: flat._id.toString(),
+        flatNumber: flat.flatNumber,
+      }
       : null,
     expiresAt: invite.expiresAt,
   }
@@ -488,6 +510,10 @@ export const acceptInvitation = async (
             apartmentId: invite.apartmentId,
             userId: authenticatedUser.id,
             role: staffRole,
+            maintenanceType: getMaintenanceTypeForRole(
+              staffRole,
+              invite.maintenanceType,
+            ),
             phone: invite.phoneNumber,
             status: "active",
             joinedAt: new Date(),
@@ -505,23 +531,23 @@ export const acceptInvitation = async (
       { id: authenticatedUser.id },
       invite.flatId
         ? {
-            $set: {
-              role: invite.role,
-              apartmentId: invite.apartmentId.toString(),
-              flatId: invite.flatId.toString(),
-              phone: invite.phoneNumber ?? null,
-            },
-          }
-        : {
-            $set: {
-              role: invite.role,
-              apartmentId: invite.apartmentId.toString(),
-              phone: invite.phoneNumber ?? null,
-            },
-            $unset: {
-              flatId: "",
-            },
+          $set: {
+            role: invite.role,
+            apartmentId: invite.apartmentId.toString(),
+            flatId: invite.flatId.toString(),
+            phone: invite.phoneNumber ?? null,
           },
+        }
+        : {
+          $set: {
+            role: invite.role,
+            apartmentId: invite.apartmentId.toString(),
+            phone: invite.phoneNumber ?? null,
+          },
+          $unset: {
+            flatId: "",
+          },
+        },
       { session },
     )
 
@@ -591,7 +617,7 @@ export const resendInvitation = async (
   await emailService.sendResidentInvite(invite.email, {
     name: invite.fullName,
     apartmentName: "your apartment community",
-    inviteLink: `${env.webUrl}/accept-invite?token=${encodeURIComponent(
+    inviteLink: `${env.webUrl}/login?inviteToken=${encodeURIComponent(
       rawToken,
     )}`,
   })
@@ -652,5 +678,201 @@ export const revokeInvitation = async (
     id: invite._id.toString(),
     status: invite.status as InviteStatus,
     revokedAt: invite.revokedAt,
+  }
+}
+
+export const bulkCreateResidentInvites = async (
+  fileBuffer: Buffer,
+  apartmentId: string,
+  invitedBy: string,
+) => {
+  if (!Types.ObjectId.isValid(apartmentId)) {
+    throw new AppError("Apartment id must be a valid id", 400)
+  }
+
+  const parsedRows = await parseInviteWorkbook(fileBuffer)
+
+  if (parsedRows.length === 0) {
+    throw new AppError("The uploaded file has no rows to process", 400)
+  }
+
+  if (parsedRows.length > 500) {
+    throw new AppError("A single upload can contain at most 500 rows", 400)
+  }
+
+  const apartmentObjectId = new Types.ObjectId(apartmentId)
+  const validRows: BulkInviteRow[] = []
+  const results: BulkInviteRowResult[] = []
+
+  for (const rawRow of parsedRows) {
+    const parsed = bulkInviteRowSchema.safeParse(rawRow)
+
+    if (!parsed.success) {
+      results.push({
+        row: rawRow.rowNumber,
+        email: rawRow.email ?? "",
+        status: "failed",
+        reason: parsed.error.issues
+          .map((issue) => issue.message)
+          .join(", "),
+      })
+
+      continue
+    }
+
+    validRows.push(parsed.data)
+  }
+
+  const blockNames = [
+    ...new Set(validRows.map((row) => row.block)),
+  ]
+
+  const blocks = blockNames.length
+    ? await Block.find({
+      apartmentId: apartmentObjectId,
+      blockname: { $in: blockNames },
+    })
+      .select("_id blockname")
+      .lean()
+    : []
+
+  const blockByName = new Map(
+    blocks.map((block) => [block.blockname, block._id])
+  )
+
+  const flatQueries = validRows
+    .map((row) => {
+      const blockId = blockByName.get(row.block)
+
+      if (!blockId) {
+        return null
+      }
+
+      return {
+        blockId,
+        flatNumber: row.flatNumber,
+      }
+    })
+    .filter((query): query is { blockId: Types.ObjectId; flatNumber: string } =>
+      Boolean(query)
+    )
+
+  const flatQueryKeys = new Set<string>()
+  const uniqueFlatQueries = flatQueries.filter((query) => {
+    const key = `${query.blockId.toString()}::${query.flatNumber}`
+
+    if (flatQueryKeys.has(key)) {
+      return false
+    }
+
+    flatQueryKeys.add(key)
+    return true
+  })
+
+  const flats = uniqueFlatQueries.length
+    ? await Flat.find({
+      apartmentId: apartmentObjectId,
+      $or: uniqueFlatQueries,
+    })
+      .select("_id blockId flatNumber")
+      .lean()
+    : []
+
+  const flatByKey = new Map(
+    flats.map((flat) => [
+      `${flat.blockId.toString()}::${flat.flatNumber}`,
+      flat._id,
+    ])
+  )
+
+  const seenInvites = new Set<string>()
+
+  for (const row of validRows) {
+    const blockId = blockByName.get(row.block)
+
+    if (!blockId) {
+      results.push({
+        row: row.rowNumber,
+        email: row.email,
+        status: "failed",
+        reason: `Block "${row.block}" not found`,
+      })
+
+      continue
+    }
+
+    const flatKey = `${blockId.toString()}::${row.flatNumber}`
+    const flatId = flatByKey.get(flatKey)
+
+    if (!flatId) {
+      results.push({
+        row: row.rowNumber,
+        email: row.email,
+        status: "failed",
+        reason: `Flat "${row.flatNumber}" not found in block "${row.block}"`,
+      })
+
+      continue
+    }
+
+    const inviteKey = `${row.email}:${row.role}`
+
+    if (seenInvites.has(inviteKey)) {
+      results.push({
+        row: row.rowNumber,
+        email: row.email,
+        status: "skipped",
+        reason: "Duplicate invitation in uploaded file",
+      })
+
+      continue
+    }
+
+    seenInvites.add(inviteKey)
+
+    try {
+      await createResidentInvite(
+        {
+          email: row.email,
+          fullName: row.fullName,
+          phoneNumber: row.phoneNumber ?? null,
+          role: row.role,
+          flatId: flatId.toString(),
+        },
+        apartmentId,
+        invitedBy,
+      )
+
+      results.push({
+        row: row.rowNumber,
+        email: row.email,
+        status: "created",
+      })
+    } catch (error) {
+      const reason = error instanceof AppError
+        ? error.message
+        : "Could not create invitation"
+
+      results.push({
+        row: row.rowNumber,
+        email: row.email,
+        status: "failed",
+        reason,
+      })
+    }
+  }
+
+  results.sort((first, second) => first.row - second.row)
+
+  const created = results.filter((result) => result.status === "created").length
+  const skipped = results.filter((result) => result.status === "skipped").length
+  const failed = results.filter((result) => result.status === "failed").length
+
+  return {
+    total: parsedRows.length,
+    created,
+    skipped,
+    failed,
+    results,
   }
 }

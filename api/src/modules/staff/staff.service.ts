@@ -97,6 +97,7 @@ export const getStaff = async (
         emailVerified: user?.emailVerified ?? false,
         image: user?.image ?? null,
         role: member.role,
+        maintenanceType: member.maintenanceType ?? null,
         phone: member.phone ?? user?.phone ?? null,
         status: member.status,
         joinedAt: member.joinedAt,
@@ -157,6 +158,7 @@ export const getStaffDetails = async (
     emailVerified: user?.emailVerified ?? false,
     image: user?.image ?? null,
     role: staff.role,
+    maintenanceType: staff.maintenanceType ?? null,
     phone: staff.phone ?? user?.phone ?? null,
     status: staff.status,
     joinedAt: staff.joinedAt,
@@ -222,7 +224,7 @@ export const updateStaffDetails = async (
     _id: new Types.ObjectId(staffId),
     apartmentId: new Types.ObjectId(apartmentId),
   })
-
+  
   if (!staff) {
     throw new AppError("Staff not found", 404)
   }
@@ -236,6 +238,21 @@ export const updateStaffDetails = async (
     }
 
     staff.role = data.role as (typeof STAFF_ROLES)[number]
+  }
+
+  if (data.maintenanceType !== undefined) {
+    const maintenanceType = data.maintenanceType
+
+    if (maintenanceType !== null && typeof maintenanceType !== "string") {
+      throw new AppError("Maintenance type must be a string or null", 400)
+    }
+
+    staff.maintenanceType =
+      staff.role === "maintenance_technician"
+        ? maintenanceType?.trim() || null
+        : null
+  } else if (staff.role !== "maintenance_technician") {
+    staff.maintenanceType = null
   }
 
   if (data.phone !== undefined) {

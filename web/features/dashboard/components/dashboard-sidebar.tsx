@@ -240,7 +240,7 @@ export default function DashboardSidebar({
                         ${
                           isActive
                             ? "bg-[#16477C] text-white"
-                            : "text-[#97A9BD] hover:bg-white/[0.07] hover:text-white"
+                            : "text-[#C3D2E3] hover:bg-white/[0.07] hover:text-white"
                         }
                       `}
                     >
@@ -325,7 +325,7 @@ export default function DashboardSidebar({
                             ${
                               isActive
                                 ? "text-white/60"
-                                : "text-[#62758B]"
+                                : "text-[#AFC0D2]"
                             }
                           `}
                         />
@@ -366,7 +366,7 @@ export default function DashboardSidebar({
 
               rounded-xl
 
-              text-[#91A3B7]
+              text-[#C3D2E3]
 
               transition-colors
               duration-200
@@ -420,7 +420,7 @@ export default function DashboardSidebar({
 
               rounded-xl
 
-              text-[#91A3B7]
+              text-[#C3D2E3]
 
               transition-colors
               duration-200
@@ -595,7 +595,7 @@ export default function DashboardSidebar({
 
                 rounded-lg
 
-                text-[#8295AA]
+                text-[#C3D2E3]
 
                 transition-colors
                 duration-200

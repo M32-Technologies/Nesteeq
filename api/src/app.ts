@@ -10,6 +10,8 @@ import SubscriptionsRoute from "../src/modules/subscription/subscription.routes.
 import ResidentRoute from "../src/modules/resident/resident.routes.js"
 import InvitationRoute from "../src/modules/invitation/invitation.routes.js"
 import StaffRoute from "../src/modules/staff/staff.routes.js"
+import BlockRoute from "../src/modules/block/block.routes.js"
+import FlatRoute from "../src/modules/flat/flat.routes.js"
 const app = express()
 app.use(cors({
   origin : env.webUrl,
@@ -25,6 +27,8 @@ app.use("/api/v1" , SubscriptionsRoute)
 app.use("/api/v1/residents" , ResidentRoute)
 app.use("/api/v1/invitations" , InvitationRoute)
 app.use("/api/v1/staff" , StaffRoute)
+app.use("/api/v1/blocks" , BlockRoute)
+app.use("/api/v1/flats" , FlatRoute)
 
 app.use(notFoundHandler);
 app.use(errorHandler);

@@ -32,7 +32,7 @@ export type InviteManagementRole = (typeof INVITE_MANAGEMENT_ROLES)[number]
 export type InvitationFilter = {
   apartmentId: Types.ObjectId
   status?: InviteStatus
-  role?: InviteRole
+  role?: InviteRole | { $in: InviteRole[] }
   expiresAt?: { $gt?: Date; $lte?: Date }
   $or?: Array<Record<string, unknown>>
   $and?: Array<Record<string, unknown>>

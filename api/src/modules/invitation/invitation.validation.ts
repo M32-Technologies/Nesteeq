@@ -5,8 +5,8 @@ import {
   INVITE_STATUSES,
   RESIDENT_INVITE_ROLES,
   STAFF_INVITE_ROLES,
+  type ResidentInviteRole,
 } from "./invitation.types.js"
-
 
 const objectIdSchema = (fieldName: string) =>
   z
@@ -18,6 +18,17 @@ const objectIdSchema = (fieldName: string) =>
 
 const emailSchema = z.email("Invalid email address")
   .transform((value) => value.toLowerCase())
+
+const bulkRoleSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .refine((value) => value === "owner" || value === "tenant", {
+    message: "Role must be owner or tenant for bulk upload",
+  })
+  .transform((value): ResidentInviteRole =>
+    value === "tenant" ? "resident" : "owner"
+  )
 
 const tokenParamSchema = z.object({
   token: z.string().trim().min(1, "Invitation token is required"),
@@ -44,37 +55,48 @@ export const createStaffInviteBodySchema = z.object({
   email: emailSchema,
   phoneNumber: z.string().trim().optional().nullable(),
   role: z.enum(STAFF_INVITE_ROLES),
+  maintenanceType: z
+    .string()
+    .trim()
+    .max(80, "Maintenance type must be at most 80 characters")
+    .transform((value) => value || null)
+    .optional()
+    .nullable(),
 })
 
 export const getInvitationsQueryObjectSchema = z.object({
   status: z.enum(INVITE_STATUSES).optional(),
   role: z.enum(INVITE_ROLES).optional(),
+  inviteType: z.enum(["residents"]).optional(),
   search: z.string().trim().max(100).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
 })
 
-
-
-
 export const bulkInviteRowSchema = z.object({
-  rowNumber: z.number(),
-  fullName: z.string().trim().min(1, "Full name is required"),
-  email: z.email("Invalid email"),
-  phoneNumber: z.string().trim().optional().nullable(),
+  rowNumber: z.number().int().positive(),
+  fullName: z.string().trim().min(2, "Full name is required").max(100),
+  email: emailSchema,
+  phoneNumber: z
+    .string()
+    .trim()
+    .transform((value) => value || null)
+    .optional()
+    .nullable(),
   block: z.string().trim().min(1, "Block is required"),
   flatNumber: z.string().trim().min(1, "Flat number is required"),
-  role: z.enum(RESIDENT_INVITE_ROLES, {message: "Role must be owner or tenant for bulk upload",}),
-});
+  role: bulkRoleSchema,
+})
 
-export type BulkInviteRow = z.infer<typeof bulkInviteRowSchema>;
+export type BulkInviteRow = z.infer<typeof bulkInviteRowSchema>
 
 export type BulkInviteRowResult = {
-  row: number;
-  email: string;
-  status: "created" | "skipped" | "failed";
-  reason?: string;
-};
+  row: number
+  email: string
+  status: "created" | "skipped" | "failed"
+  reason?: string
+}
+
 export const createResidentInviteSchema = z.object({
   body: createResidentInviteBodySchema,
 })

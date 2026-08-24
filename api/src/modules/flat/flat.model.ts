@@ -1,4 +1,4 @@
-import mongoose, { Schema } from 'mongoose';
+import mongoose, { model, Schema } from 'mongoose';
 import { IFlat } from './flat.schema.js';
 
 const flatSchema = new Schema<IFlat>(
@@ -46,4 +46,4 @@ const flatSchema = new Schema<IFlat>(
 
 flatSchema.index({ blockId: 1, flatNumber: 1 }, { unique: true });
 
-export const Flat = mongoose.model<IFlat>('Flat', flatSchema);
+export const Flat = model<IFlat>('Flat', flatSchema);

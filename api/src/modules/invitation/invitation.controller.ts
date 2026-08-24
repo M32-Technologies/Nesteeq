@@ -11,6 +11,7 @@ import {
   resendInvitation,
   revokeInvitation,
   validateInvitation,
+  bulkCreateResidentInvites
 } from "./invitation.service.js"
 
 import type { GetInvitationsQuery } from "./invitation.validation.js"
@@ -136,7 +137,7 @@ export const resendInvitationHandler = catchAsync(
 
     if (!user.apartmentId) {
       throw new AppError(
-        "Apartment context is required",
+        "Apartment  is required",
         400
       )
     }
@@ -161,7 +162,7 @@ export const revokeInvitationHandler = catchAsync(
 
     if (!user.apartmentId) {
       throw new AppError(
-        "Apartment context is required",
+        "Apartment is required",
         400
       )
     }
@@ -195,5 +196,18 @@ export const getResidentExcelTemplate = catchAsync(
     )
 
     await workbook.xlsx.write(res)
+  }
+)
+
+export const bulkCreateInvitationsHandler = catchAsync(
+  async (req: Request, res: Response) => {
+    const apartmentId = req.user?.apartmentId!
+    const invitedId = req.user?.id!
+    if (!req.file) {
+      throw new AppError("A file is required", 400)
+    }
+    const result = await bulkCreateResidentInvites(req.file?.buffer, apartmentId, invitedId)
+
+    res.status(200).json({ success: true, data: result })
   }
 )

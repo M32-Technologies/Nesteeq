@@ -43,6 +43,11 @@ const inviteSchema = new Schema(
       required: true,
       index: true,
     },
+    maintenanceType: {
+      type: String,
+      default: null,
+      trim: true,
+    },
     flatId: {
       type: Schema.Types.ObjectId,
       ref: "Flat",

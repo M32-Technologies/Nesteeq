@@ -56,12 +56,52 @@ export const getResident = async (data: ResidentListQuery, apartmentId: string) 
             .populate("flatId")
             .skip(Skip)
             .limit(Limit)
-            .sort({ createdAt: -1 }),
+            .sort({ createdAt: -1 })
+            .lean(),
         Resident.countDocuments(filter),
     ]);
 
+    const users = await getAuthDB()
+        .collection("user")
+        .find({
+            id: { $in: residents.map((resident) => resident.userId).filter(Boolean) },
+        })
+        .project({
+            _id: 0,
+            id: 1,
+            name: 1,
+            email: 1,
+            emailVerified: 1,
+            image: 1,
+            role: 1,
+            phone: 1,
+        })
+        .toArray();
+
+    const usersById = new Map(users.map((user) => [user.id, user]));
+
     return {
-        residents,
+        residents: residents.map((resident) => {
+            const user = resident.userId ? usersById.get(resident.userId) : null;
+
+            return {
+                id: resident._id.toString(),
+                apartmentId: resident.apartmentId.toString(),
+                userId: resident.userId,
+                name: user?.name ?? "Unknown user",
+                email: user?.email ?? null,
+                emailVerified: user?.emailVerified ?? false,
+                image: user?.image ?? null,
+                role: user?.role ?? resident.residentType,
+                residentType: resident.residentType,
+                phone: resident.phoneNumber ?? user?.phone ?? null,
+                status: resident.status,
+                flat: resident.flatId,
+                joinedAt: resident.joinedAt,
+                createdAt: resident.createdAt,
+                updatedAt: resident.updatedAt,
+            };
+        }),
         page: Page,
         limit: Limit,
         totalPages: Math.ceil(totalCount / Limit),
@@ -172,7 +212,7 @@ export const updateResidentDetails = async (
     if (!apartmentId) {
         throw new AppError("Apartment id is required", 400);
     }
-
+    
     if (!Types.ObjectId.isValid(residentId)) {
         throw new AppError("Resident id must be a valid id", 400);
     }
@@ -185,7 +225,7 @@ export const updateResidentDetails = async (
         _id: new Types.ObjectId(residentId),
         apartmentId,
     });
-
+    
     if (!resident) {
         throw new AppError("Resident not found", 404);
     }

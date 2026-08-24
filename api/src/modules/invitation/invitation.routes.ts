@@ -12,7 +12,8 @@ import {
   resendInvitationHandler,
   revokeInvitationHandler,
   validateInvitationHandler,
-  getResidentExcelTemplate
+  getResidentExcelTemplate ,
+  bulkCreateInvitationsHandler
 } from "./invitation.controller.js"
 import {
   acceptInvitationParamSchema,
@@ -22,7 +23,7 @@ import {
   invitationIdParamSchema,
   validateInvitationParamSchema,
 } from "./invitation.validation.js"
-
+import { uploadInviteFile } from "../../middlewares/uplode.js"
 const router = express.Router()
 
 const managerOnly = requireRole("property_manager")
@@ -41,5 +42,5 @@ router.patch("/:id/revoke", protect, managerOnly, zodValidate(invitationIdParamS
 // excel importing means buik 
 
 router.get("/residents/template" ,getResidentExcelTemplate)
-
+router.post("/residents/bulk-invite" , protect , uploadInviteFile, bulkCreateInvitationsHandler  )
 export default router 

@@ -21,10 +21,6 @@ const staffSchema = new Schema(
       required: true,
       index: true,
     },
-
-    /**
-     * Better Auth user ID.
-     */
     userId: {
       type: String,
       required: true,
@@ -36,6 +32,12 @@ const staffSchema = new Schema(
       enum: STAFF_ROLES,
       required: true,
       index: true,
+    },
+
+    maintenanceType: {
+      type: String,
+      default: null,
+      trim: true,
     },
 
     phone: {
@@ -61,11 +63,6 @@ const staffSchema = new Schema(
     timestamps: true,
   }
 )
-
-/**
- * A user can only have one staff membership
- * inside the same apartment.
- */
 staffSchema.index(
   {
     apartmentId: 1,
@@ -76,12 +73,6 @@ staffSchema.index(
   }
 )
 
-/**
- * Useful for:
- * - getting all staff in an apartment
- * - filtering staff by role
- * - filtering active/inactive staff
- */
 staffSchema.index({
   apartmentId: 1,
   role: 1,
