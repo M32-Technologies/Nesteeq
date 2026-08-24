@@ -84,7 +84,7 @@ export const auth = betterAuth({
   ],
   user: {
     additionalFields: {
-      role: { type: "string", required: true, defaultValue: "RESIDENT" },
+      role: { type: "string", required: true, defaultValue: "resident" },
       phone: { type: "string", required: false },
       apartmentId: { type: "string", required: false },
       flatId: { type: "string", required: false },

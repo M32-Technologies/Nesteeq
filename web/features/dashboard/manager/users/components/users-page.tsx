@@ -2,15 +2,11 @@
 
 import { useMemo, useState } from "react"
 
-import {
-  mockUsers,
-  mockUserStats,
-} from "../data/mock.data"
-
 import type {
   ResidentStatus,
   ResidentType,
 } from "../types/users"
+import { useResidentsQuery } from "../queries/user.querie"
 
 import UsersHeader from "./users-header"
 import UsersStats from "./users-stats"
@@ -29,35 +25,60 @@ export default function UsersPage() {
     "all" | ResidentStatus
   >("all")
 
+  const residentParams = useMemo(
+    () => ({
+      search: search.trim() || undefined,
+      residentType:
+        type === "all" ? undefined : type,
+      blockId:
+        block !== "all" && isMongoObjectId(block)
+          ? block
+          : undefined,
+      status:
+        status === "all" ? undefined : status,
+      page: 1,
+      limit: 10,
+    }),
+    [search, type, block, status]
+  )
+
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+  } = useResidentsQuery(residentParams)
+
+  const users = data?.residents ?? []
+
   const filteredUsers = useMemo(() => {
-    const query = search.trim().toLowerCase()
+    if (
+      block === "all" ||
+      isMongoObjectId(block)
+    ) {
+      return users
+    }
 
-    return mockUsers.filter((user) => {
-      const matchesSearch =
-        !query ||
-        user.name.toLowerCase().includes(query) ||
-        user.email.toLowerCase().includes(query) ||
-        user.phone.toLowerCase().includes(query) ||
-        user.flat.toLowerCase().includes(query)
+    return users.filter(
+      (user) => user.block === block
+    )
+  }, [block, users])
 
-      const matchesType =
-        type === "all" || user.type === type
-
-      const matchesBlock =
-        block === "all" || user.block === block
-
-      const matchesStatus =
-        status === "all" ||
-        user.status === status
-
-      return (
-        matchesSearch &&
-        matchesType &&
-        matchesBlock &&
-        matchesStatus
-      )
-    })
-  }, [search, type, block, status])
+  const stats = useMemo(
+    () => ({
+      totalResidents: data?.totalCount ?? 0,
+      owners: users.filter(
+        (user) => user.type === "owner"
+      ).length,
+      tenants: users.filter(
+        (user) => user.type === "tenant"
+      ).length,
+      pendingInvites: users.filter(
+        (user) => user.status === "pending"
+      ).length,
+    }),
+    [data?.totalCount, users]
+  )
 
   return (
     <div
@@ -76,7 +97,7 @@ export default function UsersPage() {
         <UsersHeader />
 
         <div className="mt-6">
-          <UsersStats stats={mockUserStats} />
+          <UsersStats stats={stats} />
         </div>
 
         <div
@@ -101,9 +122,37 @@ export default function UsersPage() {
             onStatusChange={setStatus}
           />
 
-          <UsersTable users={filteredUsers} />
+          {isLoading ? (
+            <StateMessage message="Loading residents..." />
+          ) : isError ? (
+            <StateMessage
+              message={
+                error instanceof Error
+                  ? error.message
+                  : "Failed to load residents"
+              }
+            />
+          ) : (
+            <UsersTable users={filteredUsers} />
+          )}
         </div>
       </div>
     </div>
   )
+}
+
+function StateMessage({
+  message,
+}: {
+  message: string
+}) {
+  return (
+    <div className="flex min-h-[280px] items-center justify-center px-6 text-center text-sm font-medium text-[#64748B]">
+      {message}
+    </div>
+  )
+}
+
+function isMongoObjectId(value: string) {
+  return /^[a-f\d]{24}$/i.test(value)
 }

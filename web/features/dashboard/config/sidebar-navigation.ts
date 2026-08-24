@@ -33,7 +33,7 @@ export type DashboardRole =
 export type NavigationItem = {
   title: string
   href: string
-  icon: LucideIcon
+  icon: LucideIcon  
 }
 
 export type NavigationSection = {

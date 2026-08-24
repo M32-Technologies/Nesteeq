@@ -1,7 +1,6 @@
 import {
   Schema,
   model,
-  models,
   type InferSchemaType,
 } from "mongoose"
 
@@ -13,10 +12,9 @@ const residentSchema = new Schema(
       required: true,
       index: true,
     },
-
     userId: {
       type: String,
-      required: true,
+      default: null,
       index: true,
     },
 
@@ -26,28 +24,30 @@ const residentSchema = new Schema(
       required: true,
       index: true,
     },
-
     residentType: {
       type: String,
-      enum: ["owner", "tenant", "resident"],
+      enum: ["owner", "resident"],
       required: true,
+      index: true,
     },
 
-    phone: {
+    phoneNumber: {
       type: String,
       default: null,
+      trim: true,
     },
 
     status: {
       type: String,
-      enum: ["active", "inactive"],
-      default: "active",
+      enum: ["active", "pending", "inactive"],
+      default: "pending",
       required: true,
+      index: true,
     },
 
     joinedAt: {
       type: Date,
-      default: Date.now,
+      default: null,
     },
   },
   {
@@ -55,6 +55,13 @@ const residentSchema = new Schema(
   }
 )
 
+/**
+ * One authenticated user should only have one resident
+ * membership inside the same apartment.
+ *
+ * Important:
+ * only enforce this when userId actually exists.
+ */
 residentSchema.index(
   {
     apartmentId: 1,
@@ -62,10 +69,23 @@ residentSchema.index(
   },
   {
     unique: true,
+    partialFilterExpression: {
+      userId: {
+        $type: "string",
+      },
+    },
   }
 )
 
-export type Resident =
-  InferSchemaType<typeof residentSchema>
+/**
+ * Useful when finding everyone attached to a flat.
+ */
+residentSchema.index({
+  apartmentId: 1,
+  flatId: 1,
+  status: 1,
+})
 
-export const ResidentModel = models.Resident || model("Resident", residentSchema)
+export type ResidentDocument = InferSchemaType<typeof residentSchema>
+
+export const Resident =  model("Resident", residentSchema)
