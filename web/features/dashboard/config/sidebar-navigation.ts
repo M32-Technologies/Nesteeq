@@ -392,7 +392,7 @@ export function normalizeDashboardRole(role?: string | null): DashboardRole {
   const compactRole = normalizedRole?.replace(/_/g, "")
   const roleAliases: Record<string, DashboardRole> = {
     superadmin: "super_admin",
-    propertymanager: "property_manager",
+    propertwhymanager: "property_manager",
     treasurer: "treasurer",
     facilitymanager: "facility_manager",
     securitystaff: "security_staff",

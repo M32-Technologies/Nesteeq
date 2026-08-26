@@ -28,7 +28,10 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const inviteToken =
-    searchParams.get("token") ?? searchParams.get("invite")
+    searchParams.get("inviteToken") ??
+    searchParams.get("token") ??
+    searchParams.get("invite")
+  const fromPricing = searchParams.get("from") === "pricing"
 
   const [step, setStep] = useState<LoginStep>("email")
   const [email, setEmail] = useState("")
@@ -113,7 +116,12 @@ function LoginForm() {
 
     const role = normalizeDashboardRole(acceptedRole ?? data?.user?.role)
 
-    router.push(`/${getDashboardRoleRouteSegment(role)}`)
+    if (fromPricing) {
+      router.push("/pricing")
+    } else {
+      router.push(`/${getDashboardRoleRouteSegment(role)}`)
+    }
+
     router.refresh()
   }
 
@@ -273,6 +281,7 @@ function LoginForm() {
                 >
                   <LoginOtpStep
                     email={email}
+                    name={inviteData?.fullName}
                     onChangeEmail={handleChangeEmail}
                     onSuccess={handleLoginSuccess}
                   />

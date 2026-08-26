@@ -12,6 +12,7 @@ import InvitationRoute from "../src/modules/invitation/invitation.routes.js"
 import StaffRoute from "../src/modules/staff/staff.routes.js"
 import BlockRoute from "../src/modules/block/block.routes.js"
 import FlatRoute from "../src/modules/flat/flat.routes.js"
+import ApartmentRoute from "../src/modules/apartment/apartment.routes.js"
 const app = express()
 app.use(cors({
   origin : env.webUrl,
@@ -23,6 +24,7 @@ app.all("/api/auth/*splat", toNodeHandler(auth))
 app.use(cookieParser());
 app.use(express.json())
 
+app.use("/api/v1/apartment", ApartmentRoute )
 app.use("/api/v1" , SubscriptionsRoute)
 app.use("/api/v1/residents" , ResidentRoute)
 app.use("/api/v1/invitations" , InvitationRoute)

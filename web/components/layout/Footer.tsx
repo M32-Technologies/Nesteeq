@@ -44,7 +44,7 @@ export default function Footer() {
             </p>
 
             <Link
-              href="/register"
+              href="/pricing"
               className="group mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--brand)]"
             >
               Get started

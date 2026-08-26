@@ -146,30 +146,18 @@ export default function InviteUsersPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-600">
-        <Link href="/property-manager" className="hover:text-slate-950">
-          Dashboard
-        </Link>
-        <span>/</span>
-        <Link href="/property-manager/users" className="hover:text-slate-950">
-          Users
-        </Link>
-        <span>/</span>
-        <span className="text-slate-950">Invite Users</span>
-      </div>
-
-      <div className="space-y-5">
+    <div className="mx-auto max-w-6xl space-y-4 p-4">
+      <div className="space-y-4">
         <Link
           href="/property-manager/users"
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft size={15} />
           Back to Users
         </Link>
 
         <div>
-          <h1 className="text-[28px] font-semibold leading-tight text-slate-950">
+          <h1 className="text-2xl font-semibold leading-tight text-slate-950">
             Invite Users
           </h1>
           <p className="mt-1 text-sm font-medium text-slate-600">
@@ -185,7 +173,7 @@ export default function InviteUsersPage() {
             role="tab"
             aria-selected={activeTab === "single"}
             onClick={() => setActiveTab("single")}
-            className={`inline-flex h-12 min-w-[180px] items-center justify-center gap-2 rounded-t-lg border border-b-0 px-5 text-sm font-semibold transition ${
+            className={`inline-flex h-10 min-w-[150px] items-center justify-center gap-2 rounded-t-lg border border-b-0 px-4 text-sm font-semibold transition ${
               activeTab === "single"
                 ? "border-slate-200 bg-white text-[#0F5F45] shadow-sm"
                 : "border-transparent text-slate-700 hover:bg-white hover:text-slate-950"
@@ -200,7 +188,7 @@ export default function InviteUsersPage() {
             role="tab"
             aria-selected={activeTab === "bulk"}
             onClick={() => setActiveTab("bulk")}
-            className={`inline-flex h-12 min-w-[180px] items-center justify-center gap-2 rounded-t-lg border border-b-0 px-5 text-sm font-semibold transition ${
+            className={`inline-flex h-10 min-w-[150px] items-center justify-center gap-2 rounded-t-lg border border-b-0 px-4 text-sm font-semibold transition ${
               activeTab === "bulk"
                 ? "border-slate-200 bg-white text-[#0F5F45] shadow-sm"
                 : "border-transparent text-slate-700 hover:bg-white hover:text-slate-950"
@@ -213,20 +201,20 @@ export default function InviteUsersPage() {
       </div>
 
       {activeTab === "single" ? (
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_440px]">
-          <form onSubmit={submitSingleInvite} className="space-y-5">
-            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <form onSubmit={submitSingleInvite} className="space-y-4">
+            <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
               <SectionTitle
-                icon={<Users size={20} />}
+                icon={<Users size={18} />}
                 title="Personal Information"
                 description="Basic details for the person receiving the invitation."
               />
 
-              <div className="mt-6 space-y-5">
+              <div className="mt-4 space-y-4">
                 <Field label="Full Name" required>
                   <div className="relative">
                     <UserRound
-                      size={17}
+                      size={16}
                       className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500"
                     />
                     <input
@@ -239,11 +227,11 @@ export default function InviteUsersPage() {
                   </div>
                 </Field>
 
-                <div className="grid gap-5 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-2">
                   <Field label="Email Address" required>
                     <div className="relative">
                       <Mail
-                        size={17}
+                        size={16}
                         className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500"
                       />
                       <input
@@ -259,7 +247,7 @@ export default function InviteUsersPage() {
                   <Field label="Phone Number">
                     <div className="relative">
                       <Phone
-                        size={17}
+                        size={16}
                         className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500"
                       />
                       <input
@@ -277,14 +265,14 @@ export default function InviteUsersPage() {
               </div>
             </section>
 
-            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
               <SectionTitle
-                icon={<Building2 size={20} />}
+                icon={<Building2 size={18} />}
                 title="Residence Information"
                 description="Assign the invitee to a flat and resident type."
               />
 
-              <div className="mt-6 space-y-5">
+              <div className="mt-4 space-y-4">
                 <Field label="Resident Type" required>
                   <SelectWrap>
                     <select
@@ -301,7 +289,7 @@ export default function InviteUsersPage() {
                   </SelectWrap>
                 </Field>
 
-                <div className="grid gap-5 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-2">
                   <Field label="Block" required>
                     <SelectWrap>
                       <select
@@ -354,10 +342,10 @@ export default function InviteUsersPage() {
               </div>
             </section>
 
-            <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:justify-between">
+            <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:justify-between">
               <Link
                 href="/property-manager/users"
-                className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-300 px-6 text-sm font-semibold text-slate-800 transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 px-5 text-sm font-semibold text-slate-800 transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
               >
                 Cancel
               </Link>
@@ -365,7 +353,7 @@ export default function InviteUsersPage() {
               <button
                 type="submit"
                 disabled={createInvite.isPending}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#0F5F45] px-7 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0B4D38] disabled:cursor-not-allowed disabled:opacity-70"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0F5F45] px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0B4D38] disabled:cursor-not-allowed disabled:opacity-70"
               >
                 <Send size={16} />
                 {createInvite.isPending ? "Sending..." : "Send Invitation"}
@@ -376,25 +364,25 @@ export default function InviteUsersPage() {
           <InviteHelpPanel />
         </div>
       ) : (
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_440px]">
-          <form onSubmit={submitBulkInvite} className="space-y-5">
-            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <form onSubmit={submitBulkInvite} className="space-y-4">
+            <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
               <SectionTitle
-                icon={<FileSpreadsheet size={20} />}
+                icon={<FileSpreadsheet size={18} />}
                 title="Bulk Upload"
                 description="Upload the resident invitation Excel file."
               />
 
-              <div className="mt-6 grid gap-4 md:grid-cols-[1fr_auto]">
-                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center">
-                  <Upload className="mx-auto text-slate-500" size={28} />
-                  <p className="mt-3 text-sm font-semibold text-slate-900">
+              <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto]">
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center">
+                  <Upload className="mx-auto text-slate-500" size={24} />
+                  <p className="mt-2 text-sm font-semibold text-slate-900">
                     {file ? file.name : "Choose an .xlsx file"}
                   </p>
                   <p className="mt-1 text-xs font-medium text-slate-600">
                     Maximum upload size is 5 MB.
                   </p>
-                  <label className="mt-4 inline-flex h-10 cursor-pointer items-center justify-center rounded-lg bg-[#0F5F45] px-4 text-sm font-semibold text-white transition hover:bg-[#0B4D38]">
+                  <label className="mt-3 inline-flex h-9 cursor-pointer items-center justify-center rounded-lg bg-[#0F5F45] px-4 text-sm font-semibold text-white transition hover:bg-[#0B4D38]">
                     Select File
                     <input
                       type="file"
@@ -409,7 +397,7 @@ export default function InviteUsersPage() {
                   type="button"
                   onClick={handleTemplateDownload}
                   disabled={downloadTemplate.isPending}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70 md:self-start"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70 md:self-start"
                 >
                   <Download size={16} />
                   {downloadTemplate.isPending ? "Downloading..." : "Download Template"}
@@ -419,10 +407,10 @@ export default function InviteUsersPage() {
 
             {bulkResult ? <BulkResultPanel result={bulkResult} /> : null}
 
-            <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:justify-between">
+            <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:justify-between">
               <Link
                 href="/property-manager/users"
-                className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-300 px-6 text-sm font-semibold text-slate-800 transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 px-5 text-sm font-semibold text-slate-800 transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
               >
                 Cancel
               </Link>
@@ -430,7 +418,7 @@ export default function InviteUsersPage() {
               <button
                 type="submit"
                 disabled={bulkInvite.isPending}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#0F5F45] px-7 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0B4D38] disabled:cursor-not-allowed disabled:opacity-70"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0F5F45] px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0B4D38] disabled:cursor-not-allowed disabled:opacity-70"
               >
                 <Upload size={16} />
                 {bulkInvite.isPending ? "Uploading..." : "Upload Invitations"}
@@ -446,10 +434,10 @@ export default function InviteUsersPage() {
 }
 
 const inputClassName =
-  "h-11 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-500 focus:border-[#0F5F45] focus:ring-2 focus:ring-[#0F5F45]/10"
+  "h-10 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-500 focus:border-[#0F5F45] focus:ring-2 focus:ring-[#0F5F45]/10"
 
 const selectClassName =
-  "h-11 w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 pr-10 text-sm font-medium text-slate-900 outline-none transition focus:border-[#0F5F45] focus:ring-2 focus:ring-[#0F5F45]/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
+  "h-10 w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 pr-10 text-sm font-medium text-slate-900 outline-none transition focus:border-[#0F5F45] focus:ring-2 focus:ring-[#0F5F45]/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
 
 function SectionTitle({
   icon,
@@ -461,13 +449,15 @@ function SectionTitle({
   description: string
 }) {
   return (
-    <div className="flex items-center gap-4">
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#0F5F45] text-white">
+    <div className="flex items-center gap-3">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0F5F45] text-white">
         {icon}
       </div>
       <div>
-        <h2 className="text-base font-semibold text-slate-950">{title}</h2>
-        <p className="mt-1 text-sm font-medium text-slate-600">{description}</p>
+        <h2 className="text-sm font-semibold text-slate-950">{title}</h2>
+        <p className="mt-0.5 text-xs font-medium text-slate-600">
+          {description}
+        </p>
       </div>
     </div>
   )
@@ -484,7 +474,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-semibold text-slate-900">
+      <span className="mb-1.5 block text-sm font-semibold text-slate-900">
         {label}
         {required ? <span className="text-red-600"> *</span> : null}
       </span>
@@ -507,17 +497,17 @@ function SelectWrap({ children }: { children: ReactNode }) {
 
 function InviteHelpPanel() {
   return (
-    <aside className="space-y-5">
-      <section className="rounded-lg border border-blue-200 bg-blue-50 p-5 shadow-sm">
+    <aside className="space-y-4">
+      <section className="rounded-lg border border-blue-200 bg-blue-50 p-4 shadow-sm">
         <div className="flex items-start gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
-            <Info size={17} />
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
+            <Info size={15} />
           </div>
           <div>
             <h3 className="text-sm font-semibold text-slate-950">
               How Invitation Works
             </h3>
-            <div className="mt-4 space-y-3 text-sm font-medium leading-6 text-slate-700">
+            <div className="mt-3 space-y-2 text-xs font-medium leading-5 text-slate-700">
               <p>An invitation email will be sent to the email address provided.</p>
               <p>The user can accept the invitation and set up their account.</p>
               <HelpItem>User will receive an email invitation</HelpItem>
@@ -528,16 +518,16 @@ function InviteHelpPanel() {
         </div>
       </section>
 
-      <section className="rounded-lg border border-amber-200 bg-white p-5 shadow-sm">
+      <section className="rounded-lg border border-amber-200 bg-white p-4 shadow-sm">
         <div className="flex items-start gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white">
-            <AlertCircle size={17} />
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white">
+            <AlertCircle size={15} />
           </div>
           <div>
             <h3 className="text-sm font-semibold text-slate-950">
               Important Notes
             </h3>
-            <ul className="mt-4 list-disc space-y-2 pl-4 text-sm font-medium text-slate-700">
+            <ul className="mt-3 list-disc space-y-1.5 pl-4 text-xs font-medium text-slate-700">
               <li>Use a correct and active email address</li>
               <li>Each invite is only for Owner or Tenant</li>
               <li>You can resend pending invitations later</li>
@@ -551,17 +541,17 @@ function InviteHelpPanel() {
 
 function BulkHelpPanel() {
   return (
-    <aside className="space-y-5">
-      <section className="rounded-lg border border-blue-200 bg-blue-50 p-5 shadow-sm">
+    <aside className="space-y-4">
+      <section className="rounded-lg border border-blue-200 bg-blue-50 p-4 shadow-sm">
         <div className="flex items-start gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
-            <Info size={17} />
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
+            <Info size={15} />
           </div>
           <div>
             <h3 className="text-sm font-semibold text-slate-950">
               Bulk Upload Rules
             </h3>
-            <div className="mt-4 space-y-3 text-sm font-medium leading-6 text-slate-700">
+            <div className="mt-3 space-y-2 text-xs font-medium leading-5 text-slate-700">
               <HelpItem>Download the Excel template first</HelpItem>
               <HelpItem>Use only Owner or Tenant as the role</HelpItem>
               <HelpItem>Upload one .xlsx file at a time</HelpItem>
@@ -576,7 +566,7 @@ function BulkHelpPanel() {
 function HelpItem({ children }: { children: ReactNode }) {
   return (
     <div className="flex items-center gap-2">
-      <CheckCircle2 size={16} className="shrink-0 text-blue-600" />
+      <CheckCircle2 size={14} className="shrink-0 text-blue-600" />
       <span>{children}</span>
     </div>
   )
@@ -584,9 +574,9 @@ function HelpItem({ children }: { children: ReactNode }) {
 
 function BulkResultPanel({ result }: { result: BulkInviteResult }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-base font-semibold text-slate-950">Upload Result</h2>
-      <div className="mt-4 grid gap-3 sm:grid-cols-4">
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <h2 className="text-sm font-semibold text-slate-950">Upload Result</h2>
+      <div className="mt-3 grid gap-3 sm:grid-cols-4">
         <ResultStat label="Total" value={result.total} />
         <ResultStat label="Created" value={result.created} />
         <ResultStat label="Skipped" value={result.skipped} />
@@ -594,7 +584,7 @@ function BulkResultPanel({ result }: { result: BulkInviteResult }) {
       </div>
 
       {result.results.length > 0 ? (
-        <div className="mt-5 max-h-[260px] overflow-auto rounded-lg border border-slate-200">
+        <div className="mt-4 max-h-[240px] overflow-auto rounded-lg border border-slate-200">
           <table className="w-full min-w-[640px] border-collapse text-sm">
             <thead className="bg-slate-50">
               <tr>
@@ -639,9 +629,9 @@ function BulkResultPanel({ result }: { result: BulkInviteResult }) {
 
 function ResultStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
       <p className="text-xs font-semibold uppercase text-slate-600">{label}</p>
-      <p className="mt-1 text-xl font-semibold text-slate-950">{value}</p>
+      <p className="mt-1 text-lg font-semibold text-slate-950">{value}</p>
     </div>
   )
 }
