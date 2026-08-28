@@ -15,6 +15,8 @@ const brevoSenderName = (
   process.env.BREVO_SENDER_NAME ||
   "Nesteeq"
 ).trim();
+const razorPayKeyId = (process.env.RAZORPAY_KEY_ID || "").trim();
+const razorPaySecret = (process.env.RAZORPAY_KEY_SECRET || "").trim();
 
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? "development",
@@ -26,4 +28,6 @@ export const env = {
   brevoApiKey,
   brevoSenderEmail,
   brevoSenderName,
+  razorPayKeyId,
+  razorPaySecret
 };

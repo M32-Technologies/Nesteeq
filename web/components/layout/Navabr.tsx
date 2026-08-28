@@ -35,8 +35,6 @@ export default function Navbar() {
   };
 
   useEffect(() => {
-    setHasMounted(true);
-
     let scrolled = false;
     let frame = 0;
 
@@ -54,7 +52,10 @@ export default function Navbar() {
       }
     };
 
-    frame = window.requestAnimationFrame(handleScroll);
+    frame = window.requestAnimationFrame(() => {
+      setHasMounted(true);
+      handleScroll();
+    });
     window.addEventListener("scroll", handleScroll, { passive: true });
 
     return () => {
@@ -137,7 +138,7 @@ export default function Navbar() {
               </Link>
 
               <Link
-                href="/register"
+                href="/pricing"
                 className="group flex h-10 items-center gap-2 rounded-full bg-[var(--brand)] px-5 text-sm font-semibold text-white transition hover:bg-[var(--brand-hover)]"
               >
                 Get started
@@ -209,7 +210,7 @@ export default function Navbar() {
                   </Link>
 
                   <Link
-                    href="/register"
+                    href="/pricing"
                     onClick={() => setIsMenuOpen(false)}
                     className="flex h-11 items-center justify-center gap-2 rounded-full bg-[var(--brand)] text-sm font-semibold text-white"
                   >
