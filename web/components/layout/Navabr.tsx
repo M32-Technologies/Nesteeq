@@ -35,9 +35,8 @@ export default function Navbar() {
   };
 
   useEffect(() => {
-    setHasMounted(true);
-
     let scrolled = false;
+    const mountFrame = window.requestAnimationFrame(() => setHasMounted(true));
     let frame = 0;
 
     const handleScroll = () => {
@@ -58,6 +57,7 @@ export default function Navbar() {
     window.addEventListener("scroll", handleScroll, { passive: true });
 
     return () => {
+      window.cancelAnimationFrame(mountFrame);
       window.cancelAnimationFrame(frame);
       window.removeEventListener("scroll", handleScroll);
     };

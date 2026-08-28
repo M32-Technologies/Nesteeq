@@ -27,11 +27,13 @@ export const complaintStatuses = [
 ] as const;
 
 export const complaintApprovalStatuses = ["APPROVED", "REJECTED"] as const;
+export const residentConfirmationStatuses = ["PENDING", "CONFIRMED"] as const;
 
 export type ComplaintCategory = (typeof complaintCategories)[number];
 export type ComplaintPriority = (typeof complaintPriorities)[number];
 export type ComplaintStatus = (typeof complaintStatuses)[number];
 export type ComplaintApprovalStatus = (typeof complaintApprovalStatuses)[number];
+export type ResidentConfirmationStatus = (typeof residentConfirmationStatuses)[number];
 
 const complaintRemarkSchema = new Schema(
   {
@@ -103,6 +105,37 @@ const approvalDetailsSchema = new Schema(
       default: null,
     },
     rejectionReason: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+      default: null,
+    },
+  },
+  { _id: false }
+);
+
+const residentConfirmationSchema = new Schema(
+  {
+    status: {
+      type: String,
+      enum: [...residentConfirmationStatuses],
+      default: null,
+      index: true,
+    },
+    requestedAt: {
+      type: Date,
+      default: null,
+    },
+    confirmedBy: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    confirmedAt: {
+      type: Date,
+      default: null,
+    },
+    remarks: {
       type: String,
       trim: true,
       maxlength: 1000,
@@ -201,6 +234,10 @@ const complaintSchema = new Schema(
     },
     approvalDetails: {
       type: approvalDetailsSchema,
+      default: null,
+    },
+    residentConfirmation: {
+      type: residentConfirmationSchema,
       default: null,
     },
     cancelledBy: {

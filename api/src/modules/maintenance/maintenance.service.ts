@@ -2,6 +2,7 @@ import { ObjectId, type Filter } from "mongodb";
 import { Types, type UpdateQuery } from "mongoose";
 import { getAuthDB } from "../../config/auth-db.js";
 import { AppError } from "../../utils/AppError.js";
+import { createAlert } from "../alert/alert.service.js";
 import {
   Complaint,
   complaintStatuses,
@@ -10,12 +11,14 @@ import {
 } from "../complaint/complaint.model.js";
 import {
   Maintenance,
+  type MaintenanceCostStatus,
   maintenanceStatuses,
   type MaintenanceDocument,
   type MaintenanceStatus,
 } from "./maintenance.model.js";
 import type {
   ApproveMaintenanceInput,
+  ApproveMaintenanceCostInput,
   AssignMaintenanceInput,
   CancelMaintenanceInput,
   CloseMaintenanceInput,
@@ -23,6 +26,7 @@ import type {
   CreateMaintenanceInput,
   GetMaintenanceQuery,
   RejectMaintenanceInput,
+  RejectMaintenanceCostInput,
   StartMaintenanceInput,
   UpdateMaintenanceInput,
   UpdateMaintenanceProgressInput,
@@ -334,7 +338,11 @@ const assertManagerCanManageApartment = (
 
   const managerApartmentId = normalizeOptionalString(user.apartmentId);
 
-  if (!globalManagementRoles.has(role) && managerApartmentId && apartmentId !== managerApartmentId) {
+  if (!globalManagementRoles.has(role) && !managerApartmentId) {
+    throw new AppError("Management user must be linked to an apartment", 403);
+  }
+
+  if (!globalManagementRoles.has(role) && apartmentId !== managerApartmentId) {
     throw new AppError("You do not have permission to manage maintenance for this apartment", 403);
   }
 };
@@ -493,6 +501,10 @@ const applySharedFilters = (
   if (query.complaint) {
     filter.complaint = query.complaint;
   }
+
+  if (query.costStatus) {
+    filter["costReview.status"] = query.costStatus;
+  }
 };
 
 const applyManagerFilters = (
@@ -503,7 +515,11 @@ const applyManagerFilters = (
   const role = normalizeRole(user.role);
   const managerApartmentId = normalizeOptionalString(user.apartmentId);
 
-  if (!globalManagementRoles.has(role) && managerApartmentId) {
+  if (!globalManagementRoles.has(role)) {
+    if (!managerApartmentId) {
+      throw new AppError("Management user must be linked to an apartment", 403);
+    }
+
     if (query.apartment && query.apartment !== managerApartmentId) {
       throw new AppError("You do not have permission to view maintenance for this apartment", 403);
     }
@@ -642,6 +658,20 @@ export const createMaintenance = async (
     complaintSet,
     createComplaintRemark(data.remarks, user)
   );
+
+  if (assignedStaff) {
+    await createAlert({
+      apartment: maintenance.apartment,
+      recipientUserId: assignedStaff,
+      type: "TASK_ASSIGNED",
+      severity: maintenance.priority === "URGENT" ? "WARNING" : "INFO",
+      title: "Maintenance work assigned",
+      message: `${maintenance.title} has been assigned to you.`,
+      relatedResourceType: "maintenance",
+      relatedResourceId: String(maintenance._id),
+      createdBy: user.id,
+    });
+  }
 
   return maintenance;
 };
@@ -792,6 +822,18 @@ export const assignMaintenance = async (
   }
 
   await syncComplaintFromMaintenance(updatedMaintenance, complaintSet, user, data.remarks);
+
+  await createAlert({
+    apartment: updatedMaintenance.apartment,
+    recipientUserId: staffId,
+    type: "TASK_ASSIGNED",
+    severity: updatedMaintenance.priority === "URGENT" ? "WARNING" : "INFO",
+    title: "Maintenance work assigned",
+    message: `${updatedMaintenance.title} has been assigned to you.`,
+    relatedResourceType: "maintenance",
+    relatedResourceId: maintenanceId,
+    createdBy: user.id,
+  });
 
   return updatedMaintenance;
 };
@@ -983,6 +1025,18 @@ export const updateMaintenanceProgress = async (
     );
   }
 
+  await createAlert({
+    apartment: updatedMaintenance.apartment,
+    recipientRole: "FACILITY_MANAGER",
+    type: "MAINTENANCE_STATUS_UPDATED",
+    severity: nextStatus === "ON_HOLD" ? "WARNING" : "INFO",
+    title: "Maintenance progress updated",
+    message: `${updatedMaintenance.title} was updated to ${nextStatus.toLowerCase().replace("_", " ")}.`,
+    relatedResourceType: "maintenance",
+    relatedResourceId: maintenanceId,
+    createdBy: user.id,
+  });
+
   return updatedMaintenance;
 };
 
@@ -1024,6 +1078,18 @@ export const completeMaintenance = async (
 
   if (data.finalCost !== undefined) {
     set.finalCost = data.finalCost;
+    set.costReview = {
+      status: "SUBMITTED" satisfies MaintenanceCostStatus,
+      submittedAmount: data.finalCost,
+      submittedBy: user.id,
+      submittedAt: now,
+      reviewedBy: null,
+      reviewedAt: null,
+      remarks: null,
+      rejectionReason: null,
+      forwardedToRole: null,
+      forwardedAt: null,
+    };
   }
 
   const workNote = createNote(data.workNotes ?? data.remarks, user);
@@ -1047,6 +1113,21 @@ export const completeMaintenance = async (
   }
 
   await syncComplaintFromMaintenance(updatedMaintenance, complaintSet, user, data.remarks);
+
+  await createAlert({
+    apartment: updatedMaintenance.apartment,
+    recipientRole: "FACILITY_MANAGER",
+    type: data.finalCost !== undefined ? "COST_SUBMITTED" : "WORK_COMPLETED",
+    severity: "INFO",
+    title: data.finalCost !== undefined ? "Maintenance cost submitted" : "Maintenance work completed",
+    message:
+      data.finalCost !== undefined
+        ? `${updatedMaintenance.title} was completed with a submitted cost.`
+        : `${updatedMaintenance.title} was submitted for review.`,
+    relatedResourceType: "maintenance",
+    relatedResourceId: maintenanceId,
+    createdBy: user.id,
+  });
 
   return updatedMaintenance;
 };
@@ -1099,10 +1180,44 @@ export const approveMaintenance = async (
         remarks: data.remarks ?? null,
         rejectionReason: null,
       },
+      residentConfirmation: {
+        status: "PENDING",
+        requestedAt: now,
+        confirmedBy: null,
+        confirmedAt: null,
+        remarks: null,
+      },
     },
     user,
     data.remarks
   );
+
+  await Promise.all([
+    createAlert({
+      apartment: updatedMaintenance.apartment,
+      recipientUserId: updatedMaintenance.resident,
+      type: "RESIDENT_CONFIRMATION_REQUESTED",
+      severity: "INFO",
+      title: "Maintenance work ready for confirmation",
+      message: `${updatedMaintenance.title} has been approved and is waiting for your confirmation.`,
+      relatedResourceType: "maintenance",
+      relatedResourceId: maintenanceId,
+      createdBy: user.id,
+    }),
+    updatedMaintenance.assignedStaff
+      ? createAlert({
+          apartment: updatedMaintenance.apartment,
+          recipientUserId: updatedMaintenance.assignedStaff,
+          type: "WORK_COMPLETED",
+          severity: "SUCCESS",
+          title: "Maintenance work approved",
+          message: `${updatedMaintenance.title} was approved by the Facility Manager.`,
+          relatedResourceType: "maintenance",
+          relatedResourceId: maintenanceId,
+          createdBy: user.id,
+        })
+      : Promise.resolve(),
+  ]);
 
   return updatedMaintenance;
 };
@@ -1159,6 +1274,20 @@ export const rejectMaintenance = async (
     user,
     data.reason
   );
+
+  if (updatedMaintenance.assignedStaff) {
+    await createAlert({
+      apartment: updatedMaintenance.apartment,
+      recipientUserId: updatedMaintenance.assignedStaff,
+      type: "MAINTENANCE_STATUS_UPDATED",
+      severity: "WARNING",
+      title: "Maintenance work rejected",
+      message: `${updatedMaintenance.title} needs more work: ${data.reason}`,
+      relatedResourceType: "maintenance",
+      relatedResourceId: maintenanceId,
+      createdBy: user.id,
+    });
+  }
 
   return updatedMaintenance;
 };
@@ -1245,16 +1374,149 @@ export const closeMaintenance = async (
     managerRemark ? { managerRemarks: managerRemark } : undefined
   );
 
-  await syncComplaintFromMaintenance(
-    updatedMaintenance,
+  const relatedComplaint = await Complaint.findById(getMongoId(updatedMaintenance.complaint));
+
+  if (relatedComplaint?.residentConfirmation?.status === "CONFIRMED") {
+    await syncComplaintFromMaintenance(
+      updatedMaintenance,
+      {
+        status: "CLOSED",
+        closedBy: user.id,
+        closedAt: now,
+      },
+      user,
+      data.remarks
+    );
+  }
+
+  return updatedMaintenance;
+};
+
+export const approveMaintenanceCost = async (
+  maintenanceId: string,
+  data: ApproveMaintenanceCostInput,
+  user: AuthenticatedMaintenanceUser
+) => {
+  await ensureCurrentUserExists(user);
+
+  const maintenance = await getMaintenanceOrThrow(maintenanceId);
+  assertManagerCanManageMaintenance(user, maintenance);
+
+  const costStatus = maintenance.costReview?.status ?? "NOT_SUBMITTED";
+
+  if (costStatus !== "SUBMITTED") {
+    throw new AppError("Only submitted maintenance costs can be approved", 400);
+  }
+
+  const submittedAmount = maintenance.costReview?.submittedAmount ?? maintenance.finalCost;
+
+  if (submittedAmount === null || submittedAmount === undefined) {
+    throw new AppError("Submitted cost amount is missing", 400);
+  }
+
+  const now = new Date();
+  const managerRemark = createNote(data.remarks, user);
+  const updatedMaintenance = await updateMaintenanceDocument(
+    maintenanceId,
     {
-      status: "CLOSED",
-      closedBy: user.id,
-      closedAt: now,
+      costReview: {
+        status: "APPROVED",
+        submittedAmount,
+        submittedBy: maintenance.costReview?.submittedBy ?? maintenance.assignedStaff ?? null,
+        submittedAt: maintenance.costReview?.submittedAt ?? maintenance.completedAt ?? now,
+        reviewedBy: user.id,
+        reviewedAt: now,
+        remarks: data.remarks ?? null,
+        rejectionReason: null,
+        forwardedToRole: "TREASURER",
+        forwardedAt: now,
+      },
+      updatedBy: user.id,
     },
-    user,
-    data.remarks
+    managerRemark ? { managerRemarks: managerRemark } : undefined
   );
+
+  await Promise.all([
+    createAlert({
+      apartment: updatedMaintenance.apartment,
+      recipientRole: "TREASURER",
+      type: "COST_APPROVED",
+      severity: "INFO",
+      title: "Maintenance charge approved",
+      message: `${updatedMaintenance.title} has an approved maintenance charge ready for financial processing.`,
+      relatedResourceType: "maintenance",
+      relatedResourceId: maintenanceId,
+      createdBy: user.id,
+    }),
+    updatedMaintenance.assignedStaff
+      ? createAlert({
+          apartment: updatedMaintenance.apartment,
+          recipientUserId: updatedMaintenance.assignedStaff,
+          type: "COST_APPROVED",
+          severity: "SUCCESS",
+          title: "Submitted cost approved",
+          message: `${updatedMaintenance.title} cost was approved by the Facility Manager.`,
+          relatedResourceType: "maintenance",
+          relatedResourceId: maintenanceId,
+          createdBy: user.id,
+        })
+      : Promise.resolve(),
+  ]);
+
+  return updatedMaintenance;
+};
+
+export const rejectMaintenanceCost = async (
+  maintenanceId: string,
+  data: RejectMaintenanceCostInput,
+  user: AuthenticatedMaintenanceUser
+) => {
+  await ensureCurrentUserExists(user);
+
+  const maintenance = await getMaintenanceOrThrow(maintenanceId);
+  assertManagerCanManageMaintenance(user, maintenance);
+
+  const costStatus = maintenance.costReview?.status ?? "NOT_SUBMITTED";
+
+  if (costStatus !== "SUBMITTED") {
+    throw new AppError("Only submitted maintenance costs can be rejected", 400);
+  }
+
+  const now = new Date();
+  const managerRemark = createNote(data.reason, user);
+  const updatedMaintenance = await updateMaintenanceDocument(
+    maintenanceId,
+    {
+      costReview: {
+        status: "REJECTED",
+        submittedAmount: maintenance.costReview?.submittedAmount ?? maintenance.finalCost ?? null,
+        submittedBy: maintenance.costReview?.submittedBy ?? maintenance.assignedStaff ?? null,
+        submittedAt: maintenance.costReview?.submittedAt ?? maintenance.completedAt ?? now,
+        reviewedBy: user.id,
+        reviewedAt: now,
+        remarks: data.remarks ?? null,
+        rejectionReason: data.reason,
+        forwardedToRole: null,
+        forwardedAt: null,
+      },
+      updatedBy: user.id,
+    },
+    managerRemark ? { managerRemarks: managerRemark } : undefined
+  );
+
+  if (updatedMaintenance.assignedStaff) {
+    await createAlert({
+      apartment: updatedMaintenance.apartment,
+      recipientUserId: updatedMaintenance.assignedStaff,
+      type: "COST_REJECTED",
+      severity: "WARNING",
+      title: "Submitted cost rejected",
+      message: `${updatedMaintenance.title} cost was rejected: ${data.reason}`,
+      relatedResourceType: "maintenance",
+      relatedResourceId: maintenanceId,
+      createdBy: user.id,
+    });
+  }
 
   return updatedMaintenance;
 };

@@ -7,6 +7,7 @@ import {
   assignComplaintHandler,
   cancelComplaintHandler,
   completeComplaintWorkHandler,
+  confirmComplaintResolutionHandler,
   createComplaintHandler,
   getComplaintByIdHandler,
   getComplaintsHandler,
@@ -19,6 +20,7 @@ import {
   assignComplaintSchema,
   cancelComplaintSchema,
   completeComplaintWorkSchema,
+  confirmComplaintResolutionSchema,
   createComplaintSchema,
   getComplaintByIdSchema,
   getComplaintsSchema,
@@ -127,6 +129,13 @@ router.patch(
   authorize(...residentAndManagementRoles),
   zodValidate(cancelComplaintSchema),
   cancelComplaintHandler
+);
+
+router.patch(
+  "/complaints/:id/confirm-resolution",
+  authorize(...residentRoles),
+  zodValidate(confirmComplaintResolutionSchema),
+  confirmComplaintResolutionHandler
 );
 
 export default router;

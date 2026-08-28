@@ -6,6 +6,7 @@ import {
   assignComplaint,
   cancelComplaint,
   completeComplaintWork,
+  confirmComplaintResolution,
   createComplaint,
   getComplaintById,
   getComplaints,
@@ -18,6 +19,7 @@ import type {
   ApproveComplaintInput,
   AssignComplaintInput,
   CancelComplaintInput,
+  ConfirmComplaintResolutionInput,
   CompleteComplaintWorkInput,
   ComplaintIdParams,
   CreateComplaintInput,
@@ -170,6 +172,20 @@ export const cancelComplaintHandler = catchAsync(async (req: Request, res: Respo
   res.status(200).json({
     success: true,
     message: "Complaint cancelled successfully",
+    data: result,
+  });
+});
+
+export const confirmComplaintResolutionHandler = catchAsync(async (req: Request, res: Response) => {
+  const result = await confirmComplaintResolution(
+    getComplaintId(req),
+    req.body as ConfirmComplaintResolutionInput,
+    getAuthenticatedUser(req)
+  );
+
+  res.status(200).json({
+    success: true,
+    message: "Complaint resolution confirmed",
     data: result,
   });
 });

@@ -2,6 +2,7 @@ import { ObjectId, type Filter } from "mongodb";
 import { Types, type UpdateQuery } from "mongoose";
 import { getAuthDB } from "../../config/auth-db.js";
 import { AppError } from "../../utils/AppError.js";
+import { createAlert } from "../alert/alert.service.js";
 import {
   Complaint,
   complaintStatuses,
@@ -12,6 +13,7 @@ import type {
   ApproveComplaintInput,
   AssignComplaintInput,
   CancelComplaintInput,
+  ConfirmComplaintResolutionInput,
   CompleteComplaintWorkInput,
   CreateComplaintInput,
   GetComplaintsQuery,
@@ -204,7 +206,11 @@ const assertManagerCanManageComplaint = (
 
   const managerApartmentId = normalizeOptionalString(user.apartmentId);
 
-  if (!globalManagementRoles.has(role) && managerApartmentId && complaint.apartment !== managerApartmentId) {
+  if (!globalManagementRoles.has(role) && !managerApartmentId) {
+    throw new AppError("Management user must be linked to an apartment", 403);
+  }
+
+  if (!globalManagementRoles.has(role) && complaint.apartment !== managerApartmentId) {
     throw new AppError("You do not have permission to manage this complaint", 403);
   }
 };
@@ -325,7 +331,12 @@ const applyManagerFilters = (
   const role = normalizeRole(user.role);
   const managerApartmentId = normalizeOptionalString(user.apartmentId);
 
-  if (!globalManagementRoles.has(role) && managerApartmentId) {
+  if (!globalManagementRoles.has(role)) {
+    if (!managerApartmentId) {
+      filter._id = { $in: [] };
+      return;
+    }
+
     if (query.apartment && query.apartment !== managerApartmentId) {
       throw new AppError("You do not have permission to view complaints for this apartment", 403);
     }
@@ -365,7 +376,7 @@ export const createComplaint = async (
     throw new AppError("Resident must be linked to an apartment and flat before creating a complaint", 400);
   }
 
-  return Complaint.create({
+  const complaint = await Complaint.create({
     resident: user.id,
     apartment,
     flat,
@@ -375,6 +386,20 @@ export const createComplaint = async (
     priority: data.priority,
     status: "PENDING",
   });
+
+  await createAlert({
+    apartment,
+    recipientRole: "FACILITY_MANAGER",
+    type: "NEW_COMPLAINT",
+    severity: data.priority === "URGENT" || data.priority === "HIGH" ? "WARNING" : "INFO",
+    title: "New resident complaint",
+    message: `${data.title} was submitted for ${data.category.toLowerCase()} review.`,
+    relatedResourceType: "complaint",
+    relatedResourceId: String(complaint._id),
+    createdBy: user.id,
+  });
+
+  return complaint;
 };
 
 export const getComplaints = async (
@@ -524,7 +549,21 @@ export const assignComplaint = async (
     set.estimatedCost = data.estimatedCost;
   }
 
-  return updateComplaintDocument(complaintId, set, createRemark(data.remarks, user));
+  const updatedComplaint = await updateComplaintDocument(complaintId, set, createRemark(data.remarks, user));
+
+  await createAlert({
+    apartment: updatedComplaint.apartment,
+    recipientUserId: staffId,
+    type: "TASK_ASSIGNED",
+    severity: updatedComplaint.priority === "URGENT" ? "WARNING" : "INFO",
+    title: "Complaint assigned",
+    message: `${updatedComplaint.title} has been assigned to you.`,
+    relatedResourceType: "complaint",
+    relatedResourceId: complaintId,
+    createdBy: user.id,
+  });
+
+  return updatedComplaint;
 };
 
 export const updateComplaintStatus = async (
@@ -562,6 +601,13 @@ export const updateComplaintStatus = async (
 
     if (nextStatus === "ASSIGNED" && !complaint.assignedStaff) {
       throw new AppError("Assign staff before moving complaint to ASSIGNED", 400);
+    }
+
+    if (
+      nextStatus === "CLOSED" &&
+      complaint.residentConfirmation?.status !== "CONFIRMED"
+    ) {
+      throw new AppError("Resident confirmation is required before closing this complaint", 400);
     }
   } else {
     throw new AppError("You do not have permission to update complaint status", 403);
@@ -609,7 +655,24 @@ export const completeComplaintWork = async (
     set.finalCost = data.finalCost;
   }
 
-  return updateComplaintDocument(complaintId, set, createRemark(data.remarks, user));
+  const updatedComplaint = await updateComplaintDocument(complaintId, set, createRemark(data.remarks, user));
+
+  await createAlert({
+    apartment: updatedComplaint.apartment,
+    recipientRole: "FACILITY_MANAGER",
+    type: data.finalCost !== undefined ? "COST_SUBMITTED" : "WORK_COMPLETED",
+    severity: "INFO",
+    title: data.finalCost !== undefined ? "Complaint cost submitted" : "Complaint work completed",
+    message:
+      data.finalCost !== undefined
+        ? `${updatedComplaint.title} was completed with a submitted cost.`
+        : `${updatedComplaint.title} was submitted for review.`,
+    relatedResourceType: "complaint",
+    relatedResourceId: complaintId,
+    createdBy: user.id,
+  });
+
+  return updatedComplaint;
 };
 
 export const approveComplaint = async (
@@ -638,9 +701,45 @@ export const approveComplaint = async (
       remarks: data.remarks ?? null,
       rejectionReason: null,
     },
+    residentConfirmation: {
+      status: "PENDING",
+      requestedAt: new Date(),
+      confirmedBy: null,
+      confirmedAt: null,
+      remarks: null,
+    },
   };
 
-  return updateComplaintDocument(complaintId, set, createRemark(data.remarks, user));
+  const updatedComplaint = await updateComplaintDocument(complaintId, set, createRemark(data.remarks, user));
+
+  await Promise.all([
+    createAlert({
+      apartment: updatedComplaint.apartment,
+      recipientUserId: updatedComplaint.resident,
+      type: "RESIDENT_CONFIRMATION_REQUESTED",
+      severity: "INFO",
+      title: "Complaint ready for confirmation",
+      message: `${updatedComplaint.title} has been approved and is waiting for your confirmation.`,
+      relatedResourceType: "complaint",
+      relatedResourceId: complaintId,
+      createdBy: user.id,
+    }),
+    updatedComplaint.assignedStaff
+      ? createAlert({
+          apartment: updatedComplaint.apartment,
+          recipientUserId: updatedComplaint.assignedStaff,
+          type: "WORK_COMPLETED",
+          severity: "SUCCESS",
+          title: "Complaint work approved",
+          message: `${updatedComplaint.title} was approved by the Facility Manager.`,
+          relatedResourceType: "complaint",
+          relatedResourceId: complaintId,
+          createdBy: user.id,
+        })
+      : Promise.resolve(),
+  ]);
+
+  return updatedComplaint;
 };
 
 export const rejectComplaint = async (
@@ -671,7 +770,23 @@ export const rejectComplaint = async (
     },
   };
 
-  return updateComplaintDocument(complaintId, set, createRemark(data.reason, user));
+  const updatedComplaint = await updateComplaintDocument(complaintId, set, createRemark(data.reason, user));
+
+  if (updatedComplaint.assignedStaff) {
+    await createAlert({
+      apartment: updatedComplaint.apartment,
+      recipientUserId: updatedComplaint.assignedStaff,
+      type: "MAINTENANCE_STATUS_UPDATED",
+      severity: "WARNING",
+      title: "Complaint work rejected",
+      message: `${updatedComplaint.title} needs more work: ${data.reason}`,
+      relatedResourceType: "complaint",
+      relatedResourceId: complaintId,
+      createdBy: user.id,
+    });
+  }
+
+  return updatedComplaint;
 };
 
 export const cancelComplaint = async (
@@ -708,4 +823,65 @@ export const cancelComplaint = async (
   };
 
   return updateComplaintDocument(complaintId, set, createRemark(data.reason, user));
+};
+
+export const confirmComplaintResolution = async (
+  complaintId: string,
+  data: ConfirmComplaintResolutionInput,
+  user: AuthenticatedComplaintUser
+) => {
+  await ensureCurrentUserExists(user);
+
+  const complaint = await getComplaintOrThrow(complaintId);
+  const role = normalizeRole(user.role);
+
+  if (!residentRoles.has(role)) {
+    throw new AppError("Only the resident can confirm complaint resolution", 403);
+  }
+
+  if (!sameId(complaint.resident, user.id)) {
+    throw new AppError("You can only confirm your own complaint", 403);
+  }
+
+  const currentStatus = getComplaintStatus(complaint);
+
+  if (currentStatus === "CLOSED" && complaint.residentConfirmation?.status === "CONFIRMED") {
+    return complaint;
+  }
+
+  if (currentStatus !== "APPROVED") {
+    throw new AppError("Only approved complaints can be confirmed", 400);
+  }
+
+  const now = new Date();
+  const updatedComplaint = await updateComplaintDocument(
+    complaintId,
+    {
+      status: "CLOSED",
+      residentConfirmation: {
+        status: "CONFIRMED",
+        requestedAt: complaint.residentConfirmation?.requestedAt ?? now,
+        confirmedBy: user.id,
+        confirmedAt: now,
+        remarks: data.remarks ?? null,
+      },
+      closedBy: user.id,
+      closedAt: now,
+    },
+    createRemark(data.remarks ?? "Resident confirmed resolution", user)
+  );
+
+  await createAlert({
+    apartment: updatedComplaint.apartment,
+    recipientRole: "FACILITY_MANAGER",
+    type: "RESIDENT_CONFIRMATION_RECEIVED",
+    severity: "SUCCESS",
+    title: "Resident confirmed resolution",
+    message: `${updatedComplaint.title} was confirmed and closed by the resident.`,
+    relatedResourceType: "complaint",
+    relatedResourceId: complaintId,
+    createdBy: user.id,
+  });
+
+  return updatedComplaint;
 };

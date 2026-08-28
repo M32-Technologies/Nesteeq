@@ -3,6 +3,7 @@ import { AppError } from "../../utils/AppError.js";
 import { catchAsync } from "../../utils/catchAsync.js";
 import {
   approveMaintenance,
+  approveMaintenanceCost,
   assignMaintenance,
   cancelMaintenance,
   closeMaintenance,
@@ -11,6 +12,7 @@ import {
   getMaintenance,
   getMaintenanceById,
   rejectMaintenance,
+  rejectMaintenanceCost,
   startMaintenance,
   updateMaintenance,
   updateMaintenanceProgress,
@@ -19,6 +21,7 @@ import {
 } from "./maintenance.service.js";
 import type {
   ApproveMaintenanceInput,
+  ApproveMaintenanceCostInput,
   AssignMaintenanceInput,
   CancelMaintenanceInput,
   CloseMaintenanceInput,
@@ -27,6 +30,7 @@ import type {
   GetMaintenanceQuery,
   MaintenanceIdParams,
   RejectMaintenanceInput,
+  RejectMaintenanceCostInput,
   StartMaintenanceInput,
   UpdateMaintenanceInput,
   UpdateMaintenanceProgressInput,
@@ -183,6 +187,20 @@ export const approveMaintenanceHandler = catchAsync(async (req: Request, res: Re
   });
 });
 
+export const approveMaintenanceCostHandler = catchAsync(async (req: Request, res: Response) => {
+  const result = await approveMaintenanceCost(
+    getMaintenanceId(req),
+    req.body as ApproveMaintenanceCostInput,
+    getAuthenticatedUser(req)
+  );
+
+  res.status(200).json({
+    success: true,
+    message: "Maintenance cost approved and forwarded for financial processing",
+    data: result,
+  });
+});
+
 export const rejectMaintenanceHandler = catchAsync(async (req: Request, res: Response) => {
   const result = await rejectMaintenance(
     getMaintenanceId(req),
@@ -193,6 +211,20 @@ export const rejectMaintenanceHandler = catchAsync(async (req: Request, res: Res
   res.status(200).json({
     success: true,
     message: "Maintenance rejected successfully",
+    data: result,
+  });
+});
+
+export const rejectMaintenanceCostHandler = catchAsync(async (req: Request, res: Response) => {
+  const result = await rejectMaintenanceCost(
+    getMaintenanceId(req),
+    req.body as RejectMaintenanceCostInput,
+    getAuthenticatedUser(req)
+  );
+
+  res.status(200).json({
+    success: true,
+    message: "Maintenance cost rejected",
     data: result,
   });
 });

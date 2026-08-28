@@ -3,7 +3,10 @@ import {
   complaintCategories,
   complaintPriorities,
 } from "../complaint/complaint.model.js";
-import { maintenanceStatuses } from "./maintenance.model.js";
+import {
+  maintenanceCostStatuses,
+  maintenanceStatuses,
+} from "./maintenance.model.js";
 
 const objectIdSchema = (entity: string) =>
   z
@@ -145,6 +148,19 @@ export const closeMaintenanceBodySchema = z
   })
   .strict();
 
+export const approveMaintenanceCostBodySchema = z
+  .object({
+    remarks: nonEmptyText("Cost approval remarks", 1000).optional(),
+  })
+  .strict();
+
+export const rejectMaintenanceCostBodySchema = z
+  .object({
+    reason: nonEmptyText("Cost rejection reason", 1000),
+    remarks: nonEmptyText("Remarks", 1000).optional(),
+  })
+  .strict();
+
 export const getMaintenanceQuerySchema = z
   .object({
     status: z.enum(maintenanceStatuses).optional(),
@@ -155,6 +171,7 @@ export const getMaintenanceQuerySchema = z
     flat: z.string().trim().min(1, "Flat ID cannot be empty").optional(),
     resident: userIdSchema.optional(),
     assignedStaff: userIdSchema.optional(),
+    costStatus: z.enum(maintenanceCostStatuses).optional(),
     page: z.coerce.number().int("Page must be a whole number").min(1).default(1),
     limit: z.coerce.number().int("Limit must be a whole number").min(1).max(100).default(20),
   })
@@ -222,6 +239,16 @@ export const closeMaintenanceSchema = z.object({
   body: closeMaintenanceBodySchema,
 });
 
+export const approveMaintenanceCostSchema = z.object({
+  params: maintenanceIdParamsSchema,
+  body: approveMaintenanceCostBodySchema,
+});
+
+export const rejectMaintenanceCostSchema = z.object({
+  params: maintenanceIdParamsSchema,
+  body: rejectMaintenanceCostBodySchema,
+});
+
 export type MaintenanceIdParams = z.infer<typeof maintenanceIdParamsSchema>;
 export type CreateMaintenanceInput = z.infer<typeof createMaintenanceBodySchema>;
 export type UpdateMaintenanceInput = z.infer<typeof updateMaintenanceBodySchema>;
@@ -234,4 +261,6 @@ export type ApproveMaintenanceInput = z.infer<typeof approveMaintenanceBodySchem
 export type RejectMaintenanceInput = z.infer<typeof rejectMaintenanceBodySchema>;
 export type CancelMaintenanceInput = z.infer<typeof cancelMaintenanceBodySchema>;
 export type CloseMaintenanceInput = z.infer<typeof closeMaintenanceBodySchema>;
+export type ApproveMaintenanceCostInput = z.infer<typeof approveMaintenanceCostBodySchema>;
+export type RejectMaintenanceCostInput = z.infer<typeof rejectMaintenanceCostBodySchema>;
 export type GetMaintenanceQuery = z.infer<typeof getMaintenanceQuerySchema>;

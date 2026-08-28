@@ -4,6 +4,7 @@ import { protect } from "../../middlewares/authMiddleware.js";
 import { zodValidate } from "../../middlewares/zodValidate.js";
 import {
   approveMaintenanceHandler,
+  approveMaintenanceCostHandler,
   assignMaintenanceHandler,
   cancelMaintenanceHandler,
   closeMaintenanceHandler,
@@ -12,6 +13,7 @@ import {
   getMaintenanceByIdHandler,
   getMaintenanceHandler,
   rejectMaintenanceHandler,
+  rejectMaintenanceCostHandler,
   startMaintenanceHandler,
   updateMaintenanceHandler,
   updateMaintenanceProgressHandler,
@@ -19,6 +21,7 @@ import {
 } from "./maintenance.controller.js";
 import {
   approveMaintenanceSchema,
+  approveMaintenanceCostSchema,
   assignMaintenanceSchema,
   cancelMaintenanceSchema,
   closeMaintenanceSchema,
@@ -27,6 +30,7 @@ import {
   getMaintenanceByIdSchema,
   getMaintenanceSchema,
   rejectMaintenanceSchema,
+  rejectMaintenanceCostSchema,
   startMaintenanceSchema,
   updateMaintenanceProgressSchema,
   updateMaintenanceSchema,
@@ -139,6 +143,20 @@ router.patch(
   authorize(...managementRoles),
   zodValidate(rejectMaintenanceSchema),
   rejectMaintenanceHandler
+);
+
+router.patch(
+  "/maintenance/:id/cost/approve",
+  authorize(...managementRoles),
+  zodValidate(approveMaintenanceCostSchema),
+  approveMaintenanceCostHandler
+);
+
+router.patch(
+  "/maintenance/:id/cost/reject",
+  authorize(...managementRoles),
+  zodValidate(rejectMaintenanceCostSchema),
+  rejectMaintenanceCostHandler
 );
 
 router.patch(

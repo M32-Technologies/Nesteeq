@@ -18,11 +18,18 @@ export const maintenanceStatuses = [
 ] as const;
 
 export const maintenanceApprovalStatuses = ["APPROVED", "REJECTED"] as const;
+export const maintenanceCostStatuses = [
+  "NOT_SUBMITTED",
+  "SUBMITTED",
+  "APPROVED",
+  "REJECTED",
+] as const;
 
 export type MaintenanceCategory = (typeof complaintCategories)[number];
 export type MaintenancePriority = (typeof complaintPriorities)[number];
 export type MaintenanceStatus = (typeof maintenanceStatuses)[number];
 export type MaintenanceApprovalStatus = (typeof maintenanceApprovalStatuses)[number];
+export type MaintenanceCostStatus = (typeof maintenanceCostStatuses)[number];
 
 const maintenanceNoteSchema = new Schema(
   {
@@ -146,6 +153,62 @@ const maintenanceApprovalSchema = new Schema(
   { _id: false }
 );
 
+const maintenanceCostReviewSchema = new Schema(
+  {
+    status: {
+      type: String,
+      enum: [...maintenanceCostStatuses],
+      default: "NOT_SUBMITTED",
+      index: true,
+    },
+    submittedAmount: {
+      type: Number,
+      min: 0,
+      default: null,
+    },
+    submittedBy: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    submittedAt: {
+      type: Date,
+      default: null,
+    },
+    reviewedBy: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    reviewedAt: {
+      type: Date,
+      default: null,
+    },
+    remarks: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+      default: null,
+    },
+    rejectionReason: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+      default: null,
+    },
+    forwardedToRole: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    forwardedAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  { _id: false }
+);
+
 const maintenanceSchema = new Schema(
   {
     complaint: {
@@ -258,6 +321,10 @@ const maintenanceSchema = new Schema(
     approvalDetails: {
       type: maintenanceApprovalSchema,
       default: null,
+    },
+    costReview: {
+      type: maintenanceCostReviewSchema,
+      default: () => ({ status: "NOT_SUBMITTED" }),
     },
     cancellationReason: {
       type: String,

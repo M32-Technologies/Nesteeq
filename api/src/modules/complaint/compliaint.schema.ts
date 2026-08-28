@@ -119,6 +119,12 @@ export const cancelComplaintBodySchema = z
   })
   .strict();
 
+export const confirmComplaintResolutionBodySchema = z
+  .object({
+    remarks: nonEmptyText("Confirmation remarks", 1000).optional(),
+  })
+  .strict();
+
 export const getComplaintsQuerySchema = z
   .object({
     status: z.enum(complaintStatuses).optional(),
@@ -180,6 +186,11 @@ export const cancelComplaintSchema = z.object({
   body: cancelComplaintBodySchema,
 });
 
+export const confirmComplaintResolutionSchema = z.object({
+  params: complaintIdParamsSchema,
+  body: confirmComplaintResolutionBodySchema,
+});
+
 export type ComplaintIdParams = z.infer<typeof complaintIdParamsSchema>;
 export type CreateComplaintInput = z.infer<typeof createComplaintBodySchema>;
 export type UpdateComplaintInput = z.infer<typeof updateComplaintBodySchema>;
@@ -189,4 +200,5 @@ export type CompleteComplaintWorkInput = z.infer<typeof completeComplaintWorkBod
 export type ApproveComplaintInput = z.infer<typeof approveComplaintBodySchema>;
 export type RejectComplaintInput = z.infer<typeof rejectComplaintBodySchema>;
 export type CancelComplaintInput = z.infer<typeof cancelComplaintBodySchema>;
+export type ConfirmComplaintResolutionInput = z.infer<typeof confirmComplaintResolutionBodySchema>;
 export type GetComplaintsQuery = z.infer<typeof getComplaintsQuerySchema>;

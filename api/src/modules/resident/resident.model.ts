@@ -1,7 +1,6 @@
-import {
+import mongoose, {
   Schema,
   model,
-  models,
   type InferSchemaType,
 } from "mongoose"
 
@@ -68,4 +67,5 @@ residentSchema.index(
 export type Resident =
   InferSchemaType<typeof residentSchema>
 
-export const ResidentModel = models.Resident || model("Resident", residentSchema)
+export const ResidentModel =
+  mongoose.models.Resident || model("Resident", residentSchema)
