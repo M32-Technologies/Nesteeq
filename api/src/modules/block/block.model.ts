@@ -14,6 +14,22 @@ const blockSchema = new Schema(
             required: true,
             trim: true,
         },
+        code: {
+            type: String,
+            required: true,
+            trim: true,
+            uppercase: true
+        },
+        totalFloors: {
+            type: Number,
+            required: true,
+            min: 1,
+        },
+        status: {
+            type: String,
+            enum: ["active", "inactive"],
+            default: "active"
+        }
     },
     {
         timestamps: true,
@@ -23,11 +39,11 @@ const blockSchema = new Schema(
 blockSchema.index(
     {
         apartmentId: 1,
-        blockname: 1,
+        code: 1
     },
     {
         unique: true,
     }
 )
 
-export const Block = model("Block",blockSchema)
+export const Block = model("Block", blockSchema)

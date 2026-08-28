@@ -1,4 +1,4 @@
-export type SubscriptionPlanType =| "MONTHLY" | "SIX_MONTHS" | "YEARLY";
+export type SubscriptionPlanType = | "MONTHLY" | "SIX_MONTHS" | "YEARLY";
 
 export interface SubscriptionFreeTrial {
   enabled: boolean;
@@ -26,3 +26,29 @@ export interface ApiResponse<T> {
 
 export type SubscriptionPlansResponse =
   ApiResponse<SubscriptionPlan[]>;
+
+export interface CreateSubscriptionResult {
+  subscriptionId: string;
+  razorpayKeyId: string;
+  dbSubscriptionId: string;
+}
+
+export type CreateSubscriptionResponse =
+  ApiResponse<CreateSubscriptionResult>;
+
+export interface VerifySubscriptionPaymentInput {
+  razorpay_payment_id: string;
+  razorpay_subscription_id: string;
+  razorpay_signature: string;
+}
+
+export interface VerifySubscriptionPaymentResult {
+  verified: boolean;
+  subscriptionId: string;
+  razorpaySubscriptionId: string;
+  razorpayPaymentId: string;
+  status: string;
+}
+
+export type VerifySubscriptionPaymentResponse =
+  ApiResponse<VerifySubscriptionPaymentResult>;

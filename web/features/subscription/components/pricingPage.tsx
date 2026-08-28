@@ -37,7 +37,7 @@ const getPricePeriod = (durationMonths: number) => {
 
 export default function PricingPage() {
   const router = useRouter();
-  const { data: session, isPending: isSessionPending  } = useSession();
+  const { data: session, isPending: isSessionPending } = useSession();
   const {
     data: plans = [],
     isPending,
@@ -200,7 +200,7 @@ export default function PricingPage() {
                       delay: index * 0.05,
                     }}
                     className={[
-                      "relative flex h-full min-h-[650px] flex-col rounded-[26px] border p-7 sm:p-8",
+                      "relative flex h-full min-h-[620px] flex-col rounded-[26px] border p-7 sm:p-8",
                       "transition-all duration-300",
 
                       isPopular
@@ -231,7 +231,7 @@ export default function PricingPage() {
                     </div>
 
                     {/* Price - aligned */}
-                    <div className="mt-5 min-h-[106px]">
+                    <div className="mt-4 min-h-[100px]">
                       <div className="flex items-end gap-2">
                         <span className="text-[42px] font-semibold leading-none tracking-[-0.05em] text-[#043B35]">
                           ₹{formatPrice(plan.price)}
@@ -258,7 +258,7 @@ export default function PricingPage() {
                       </div>
                     </div>
 
-                    <div className="my-6 h-px bg-[#e3e9e6]" />
+                    <div className="my-5 h-px bg-[#e3e9e6]" />
 
                     {/* Features */}
                     <div className="flex-1">

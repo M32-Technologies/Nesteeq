@@ -10,9 +10,10 @@ export const subscriptionPlanBodySchema = z.object({
         .number()
         .min(0, "Price cannot be negative"),
 
-    planType: z.enum(["MONTHLY", "SIX_MONTHS", "YEARLY"] , {
-        error : "Plan type is required"
+    planType: z.enum(["MONTHLY", "SIX_MONTHS", "YEARLY"], {
+        error: "Plan type is required"
     }),
+
     durationMonths: z
         .number()
         .int("Duration must be a whole number")
@@ -40,11 +41,22 @@ export const subscriptionPlanBodySchema = z.object({
         )
         .default({ enabled: false, days: 0 }),
 
+    razorpayPlanId: z
+        .string()
+        .trim()
+        .min(1, "Razorpay plan id is required"),
+
     isActive: z.boolean().default(true),
 });
 
 export const subscriptionPlanSchema = z.object({
     body: subscriptionPlanBodySchema,
+});
+
+export const createSubscriptionSchema = z.object({
+    body: z.object({
+        planId: z.string().trim().min(1, "Plan id is required"),
+    }),
 });
 
 export type SubscriptionPlanInput = z.infer<typeof subscriptionPlanBodySchema>;

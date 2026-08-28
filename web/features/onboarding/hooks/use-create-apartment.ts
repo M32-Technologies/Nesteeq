@@ -1,6 +1,6 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
-import { createApartment } from "../api/apartment.api";
+import { createApartment, getPendingApartment } from "../api/apartment.api";
 
 export const useCreateApartment = () => {
   return useMutation({
@@ -8,3 +8,13 @@ export const useCreateApartment = () => {
   });
 };
 
+export const usePendingApartment = (enabled: boolean) => {
+  return useQuery({
+    queryKey: ["pending-apartment"],
+    queryFn: getPendingApartment,
+    enabled,
+    staleTime: 30 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
+  });
+};

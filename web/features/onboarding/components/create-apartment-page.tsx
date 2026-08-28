@@ -14,7 +14,7 @@ import {
   MapPin,
   Phone,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, type FieldError } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -25,7 +25,16 @@ import {
   type CreateApartmentFormValues,
   type CreateApartmentInput,
 } from "../schemas/create-apartment";
-import { useCreateApartment } from "../hooks/use-create-apartment";
+import {
+  useCreateApartment,
+  usePendingApartment,
+} from "../hooks/use-create-apartment";
+import type { CreatedApartment } from "../api/apartment.api";
+import {
+  refreshAuthSessionFromDatabase,
+  useSubscriptionPlans,
+} from "@/features/subscription/subscription.query";
+import PaymentSection from "@/features/subscription/components/payment-section";
 
 const steps = [
   {
@@ -63,16 +72,35 @@ function getErrorMessage(error?: FieldError) {
 
 export default function CreateApartmentPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const planId = searchParams.get("planId");
   const { data: session, isPending: isSessionPending } = useSession();
   const createApartmentMutation = useCreateApartment();
   const [stepIndex, setStepIndex] = useState(0);
-  const [createdName, setCreatedName] = useState("");
+  const [createdApartment, setCreatedApartment] =
+    useState<CreatedApartment | null>(null);
+  const shouldLoadPendingApartment = Boolean(
+    session?.user && planId && !createdApartment,
+  );
+  const {
+    data: pendingApartment = null,
+    isPending: isPendingApartmentLoading,
+  } = usePendingApartment(shouldLoadPendingApartment);
+  const {
+    data: plans = [],
+    isPending: isPlansPending,
+    isError: isPlansError,
+  } = useSubscriptionPlans();
 
   const userEmail = session?.user?.email ?? "";
   const userPhone = session?.user?.phone ?? "";
   const currentStep = steps[stepIndex];
   const isLastStep = stepIndex === steps.length - 1;
-  const isComplete = createApartmentMutation.isSuccess;
+  const selectedPlan = plans.find((plan) => plan._id === planId);
+  const isPlanUnavailable = Boolean(planId) && !isPlansPending && !selectedPlan;
+  const isPlanReady = Boolean(selectedPlan);
+  const paymentApartment = createdApartment ?? pendingApartment;
+  const isComplete = Boolean(paymentApartment);
 
   const defaultValues = useMemo<CreateApartmentFormValues>(
     () => ({
@@ -123,9 +151,16 @@ export default function CreateApartmentPage() {
   useEffect(() => {
     if (!isSessionPending && !session?.user) {
       toast.error("Please sign in to create your apartment.");
-      router.push("/login");
+      router.push("/login?from=pricing");
     }
   }, [isSessionPending, router, session?.user]);
+
+  useEffect(() => {
+    if (!planId) {
+      toast.error("Please select a subscription plan first.");
+      router.push("/pricing");
+    }
+  }, [planId, router]);
 
   const goNext = async () => {
     const isValid = await trigger(currentStep.fields, {
@@ -142,6 +177,11 @@ export default function CreateApartmentPage() {
   };
 
   const submitApartment = async (values: CreateApartmentFormValues) => {
+    if (!isPlanReady) {
+      toast.error("Selected plan is not available. Please choose a plan.");
+      return;
+    }
+
     const isValid = await trigger(currentStep.fields, {
       shouldFocus: true,
     });
@@ -163,7 +203,8 @@ export default function CreateApartmentPage() {
 
     try {
       const apartment = await createApartmentMutation.mutateAsync(input);
-      setCreatedName(apartment.name);
+      await refreshAuthSessionFromDatabase();
+      setCreatedApartment(apartment);
       toast.success("Apartment registration created.");
     } catch (error) {
       toast.error(
@@ -176,33 +217,57 @@ export default function CreateApartmentPage() {
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-white px-4 py-10 text-[var(--ink)] sm:px-6">
-      <section className="w-full max-w-[500px]">
-        <div className="mx-auto mb-7 flex w-fit items-center gap-2.5">
-          <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-[var(--brand)] text-sm font-bold text-white">
-            N
-          </span>
+      <section
+        className={`w-full ${isComplete ? "max-w-[1120px]" : "max-w-[500px]"}`}
+      >
+        {!isComplete && (
+          <div className="mx-auto mb-7 flex w-fit items-center gap-2.5">
+            <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-[var(--brand)] text-sm font-bold text-white">
+              N
+            </span>
 
-          <span className="text-[22px] font-semibold tracking-[-0.03em]">
-            Nesteeq
-          </span>
-        </div>
+            <span className="text-[22px] font-semibold tracking-[-0.03em]">
+              Nesteeq
+            </span>
+          </div>
+        )}
 
-        <div className="mb-8 flex items-center justify-center gap-2">
-          {steps.map((step, index) => (
-            <span
-              key={step.key}
-              className={`h-1 rounded-full transition-all duration-300 ${
-                index <= stepIndex
-                  ? "w-10 bg-[var(--brand)]"
-                  : "w-5 bg-[var(--green-soft)]"
-              }`}
-            />
-          ))}
-        </div>
+        {!isComplete && (
+          <div className="mb-8 flex items-center justify-center gap-2">
+            {steps.map((step, index) => (
+              <span
+                key={step.key}
+                className={`h-1 rounded-full transition-all duration-300 ${
+                  index <= stepIndex
+                    ? "w-10 bg-[var(--brand)]"
+                    : "w-5 bg-[var(--green-soft)]"
+                }`}
+              />
+            ))}
+          </div>
+        )}
 
-        <div className="min-h-[560px]">
+        <div className={isComplete ? "" : "min-h-[560px]"}>
           <AnimatePresence mode="wait" initial={false}>
-            {isComplete ? (
+            {isComplete && paymentApartment && selectedPlan ? (
+              <motion.div
+                key="payment"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <PaymentSection
+                  apartment={paymentApartment}
+                  plan={selectedPlan}
+                  user={{
+                    name: session?.user?.name,
+                    email: session?.user?.email,
+                    phone: session?.user?.phone,
+                  }}
+                />
+              </motion.div>
+            ) : isComplete ? (
               <motion.div
                 key="complete"
                 initial={{ opacity: 0, y: 12, scale: 0.98 }}
@@ -216,20 +281,19 @@ export default function CreateApartmentPage() {
                 </div>
 
                 <h1 className="mt-6 text-[30px] font-semibold leading-tight tracking-[-0.04em]">
-                  Apartment created
+                  Preparing payment
                 </h1>
 
                 <p className="mt-3 max-w-[340px] text-sm leading-6 text-[var(--text)]">
-                  {createdName || "Your apartment"} is ready for the next
-                  setup step.
+                  We are loading the selected subscription plan.
                 </p>
 
                 <button
                   type="button"
-                  onClick={() => router.push("/property-manager")}
+                  onClick={() => router.push("/pricing")}
                   className="mt-8 flex h-[50px] items-center justify-center gap-2 rounded-[13px] bg-[var(--brand)] px-6 text-sm font-semibold text-white transition hover:bg-[var(--brand-hover)]"
                 >
-                  Continue
+                  Choose plan
                   <ArrowRight className="h-4 w-4" />
                 </button>
               </motion.div>
@@ -247,6 +311,25 @@ export default function CreateApartmentPage() {
                   <h1 className="text-[30px] font-semibold leading-tight tracking-[-0.04em]">
                     {currentStep.title}
                   </h1>
+
+                  {(isPlansPending ||
+                    isPendingApartmentLoading ||
+                    isPlansError ||
+                    isPlanUnavailable) && (
+                    <p
+                      className={`mx-auto mt-3 max-w-[340px] text-sm leading-6 ${
+                        isPlansPending || isPendingApartmentLoading
+                          ? "text-[var(--text-muted)]"
+                          : "text-[var(--rose)]"
+                      }`}
+                    >
+                      {isPendingApartmentLoading
+                        ? "Checking your saved registration..."
+                        : isPlansPending
+                          ? "Loading selected plan..."
+                          : "Selected plan is unavailable. Please choose a plan again."}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-4">
@@ -437,11 +520,21 @@ export default function CreateApartmentPage() {
                   {isLastStep ? (
                     <button
                       type="submit"
-                      disabled={createApartmentMutation.isPending}
+                      disabled={
+                        createApartmentMutation.isPending ||
+                        isPlansPending ||
+                        isPendingApartmentLoading ||
+                        !isPlanReady
+                      }
                       className="flex h-[50px] flex-1 items-center justify-center gap-2 rounded-[13px] bg-[var(--brand)] text-[14px] font-semibold text-white transition hover:bg-[var(--brand-hover)] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {createApartmentMutation.isPending ? (
                         <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : isPlansPending || isPendingApartmentLoading ? (
+                        <>
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          Loading
+                        </>
                       ) : (
                         <>
                           Create apartment

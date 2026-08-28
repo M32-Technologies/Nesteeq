@@ -46,3 +46,27 @@ export const createApartment = async (input: CreateApartmentInput) => {
   }
 };
 
+export const getPendingApartment = async () => {
+  try {
+    const response = await api.get<ApiResponse<CreatedApartment | null>>(
+      "/api/v1/apartment/pending",
+    );
+
+    if (!response.data.success) {
+      throw new Error(
+        response.data.message || "Unable to load apartment registration.",
+      );
+    }
+
+    return response.data.data;
+  } catch (error) {
+    if (isAxiosError<ApiErrorResponse>(error)) {
+      throw new Error(
+        error.response?.data?.message ||
+          "Unable to load apartment registration.",
+      );
+    }
+
+    throw error;
+  }
+};
