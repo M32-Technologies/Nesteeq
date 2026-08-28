@@ -1,4 +1,4 @@
-import { Types } from "mongoose";
+import { ClientSession, Types } from "mongoose";
 
 import { Audit } from "./audit.model.js";
 import { AuditAction } from "./audit.interface.js";
@@ -31,16 +31,17 @@ const validateObjectId = (id: string) => {
 };
 
 export const createAuditLogService = async (
-  input: CreateAuditInput
+  input: CreateAuditInput,
+  session?: ClientSession
 ) => {
   validateObjectId(input.apartmentId);
   validateObjectId(input.entityId);
 
-  if (input.performedBy) {
-    validateObjectId(input.performedBy);
-  }
+  const [audit] = await Audit.create([input], {
+    session,
+  });
 
-  return Audit.create(input);
+  return audit;
 };
 
 export const getAuditLogsService = async (
@@ -54,7 +55,6 @@ export const getAuditLogsService = async (
   }
 
   if (filters.performedBy) {
-    validateObjectId(filters.performedBy);
     query.performedBy = filters.performedBy;
   }
 

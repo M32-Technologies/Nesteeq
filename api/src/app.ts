@@ -11,6 +11,7 @@ import SubscriptionsRoute from "../src/modules/subscription/subscription.routes.
 import billingRoutes from "./modules/billing/billing.routes.js";
 import auditRoutes from "./modules/audit/audit.routes.js";
 import financeRoutes from "./modules/finance/finance.routes.js";
+import paymentRoutes from "./modules/payment/payment.routes.js";
 
 const app = express()
 app.use(cors({
@@ -29,6 +30,7 @@ app.use("/api/expenses", expenseRoutes);
 app.use("/api/wallets", walletRoutes);
 app.use("/api/audit", auditRoutes);
 app.use("/api/finance", financeRoutes);
+app.use("/api/payments", paymentRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

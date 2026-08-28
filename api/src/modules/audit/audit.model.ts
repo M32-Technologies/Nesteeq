@@ -14,7 +14,8 @@ const auditSchema = new Schema<IAudit>(
     },
 
     performedBy: {
-      type: Schema.Types.ObjectId,
+      type: String,
+      trim: true,
     },
 
     action: {

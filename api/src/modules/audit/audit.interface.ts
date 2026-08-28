@@ -13,7 +13,7 @@ export enum AuditAction {
 
 export interface IAudit {
   apartmentId: Types.ObjectId;
-  performedBy?: Types.ObjectId;
+  performedBy?: string;
 
   action: AuditAction;
 

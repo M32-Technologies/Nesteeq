@@ -49,12 +49,18 @@ export async function getCurrentDashboardSession() {
     return null
   }
 
-  const response = await fetch(`${getAuthBaseUrl()}/api/auth/get-session`, {
-    headers: {
-      cookie: cookieHeader,
-    },
-    cache: "no-store",
-  })
+  let response: Response
+
+  try {
+    response = await fetch(`${getAuthBaseUrl()}/api/auth/get-session`, {
+      headers: {
+        cookie: cookieHeader,
+      },
+      cache: "no-store",
+    })
+  } catch {
+    return null
+  }
 
   if (!response.ok) {
     return null

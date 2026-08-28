@@ -14,9 +14,16 @@ import { BillStatus } from "./billing.interface.js";
 
 import { catchAsync } from "../../utils/catchAsync.js";
 
+const getAuditActor = (req: Request) => ({
+  userId: req.user!.id,
+});
+
 export const createBill = catchAsync(
   async (req: Request, res: Response) => {
-    const bill = await createBillService(req.body);
+    const bill = await createBillService(
+      req.body,
+      getAuditActor(req)
+    );
 
     res.status(201).json({
       success: true,
@@ -72,7 +79,8 @@ export const updateBill = catchAsync(
   async (req: Request, res: Response) => {
     const bill = await updateBillService(
       req.params.id as string,
-      req.body
+      req.body,
+      getAuditActor(req)
     );
 
     res.status(200).json({
@@ -87,7 +95,8 @@ export const recordBillPayment = catchAsync(
   async (req: Request, res: Response) => {
     const bill = await recordBillPaymentService(
       req.params.id as string,
-      req.body.amount
+      req.body.amount,
+      getAuditActor(req)
     );
 
     res.status(200).json({
@@ -102,7 +111,8 @@ export const waiveLateFee = catchAsync(
   async (req: Request, res: Response) => {
     const bill = await waiveLateFeeService(
       req.params.id as string,
-      req.body.amount
+      req.body.amount,
+      getAuditActor(req)
     );
 
     res.status(200).json({

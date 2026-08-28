@@ -14,9 +14,16 @@ import {
 
 import { catchAsync } from "../../utils/catchAsync.js";
 
+const getAuditActor = (req: Request) => ({
+  userId: req.user!.id,
+});
+
 export const createExpense = catchAsync(
   async (req: Request, res: Response) => {
-    const expense = await createExpenseService(req.body);
+    const expense = await createExpenseService(
+      req.body,
+      getAuditActor(req)
+    );
 
     res.status(201).json({
       success: true,
@@ -58,7 +65,8 @@ export const updateExpense = catchAsync(
   async (req: Request, res: Response) => {
     const expense = await updateExpenseService(
       req.params.id as string,
-      req.body
+      req.body,
+      getAuditActor(req)
     );
 
     res.status(200).json({

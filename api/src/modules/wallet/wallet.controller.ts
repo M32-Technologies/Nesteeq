@@ -5,9 +5,14 @@ import {
   createWalletService,
   deductWalletFundsService,
   getWalletService,
+  getWalletsService,
 } from "./wallet.service.js";
 
 import { catchAsync } from "../../utils/catchAsync.js";
+
+const getAuditActor = (req: Request) => ({
+  userId: req.user!.id,
+});
 
 export const createWallet = catchAsync(
   async (req: Request, res: Response) => {
@@ -52,7 +57,8 @@ export const addWalletFunds = catchAsync(
       apartmentId,
       residentId as string,
       amount,
-      description
+      description,
+      getAuditActor(req)
     );
 
     res.status(200).json({
@@ -79,13 +85,29 @@ export const deductWalletFunds = catchAsync(
       residentId as string,
       billId,
       amount,
-      description
+      description,
+      getAuditActor(req)
     );
 
     res.status(200).json({
       success: true,
       message: "Wallet amount deducted successfully",
       data: wallet,
+    });
+  }
+);
+
+export const getWallets = catchAsync(
+  async (req: Request, res: Response) => {
+    const { apartmentId } = req.query;
+
+    const wallets = await getWalletsService(
+      apartmentId as string
+    );
+
+    res.status(200).json({
+      success: true,
+      data: wallets,
     });
   }
 );

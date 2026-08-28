@@ -11,6 +11,12 @@ export const createWalletSchema = z.object({
   }),
 });
 
+export const getWalletsSchema = z.object({
+  query: z.object({
+    apartmentId: objectIdSchema,
+  }),
+});
+
 export const getWalletSchema = z.object({
   params: z.object({
     residentId: objectIdSchema,

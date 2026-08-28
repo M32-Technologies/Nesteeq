@@ -7,6 +7,15 @@ type ValidatedRequestData = {
   query?: unknown;
 };
 
+const setValidatedQuery = (req: Request, query: unknown) => {
+  Object.defineProperty(req, "query", {
+    value: query,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
+};
+
 export const zodValidate = (schema: ZodTypeAny): RequestHandler => {
   return (req, res, next) => {
     const result = schema.safeParse({
@@ -39,7 +48,7 @@ export const zodValidate = (schema: ZodTypeAny): RequestHandler => {
     }
 
     if (validatedData.query !== undefined) {
-      req.query = validatedData.query as Request["query"];
+      setValidatedQuery(req, validatedData.query);
     }
 
     next();
