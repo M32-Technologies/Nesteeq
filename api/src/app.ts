@@ -8,11 +8,12 @@ import { env } from "./config/env.js";
 import expenseRoutes from "./modules/expense/expense.routes.js";
 import walletRoutes from "./modules/wallet/wallet.routes.js";
 import SubscriptionsRoute from "../src/modules/subscription/subscription.routes.js"
-import billingRoutes from "./modules/billing/billing.routes.js";
-import auditRoutes from "./modules/audit/audit.routes.js";
-import financeRoutes from "./modules/finance/finance.routes.js";
-import paymentRoutes from "./modules/payment/payment.routes.js";
-
+import ResidentRoute from "../src/modules/resident/resident.routes.js"
+import InvitationRoute from "../src/modules/invitation/invitation.routes.js"
+import StaffRoute from "../src/modules/staff/staff.routes.js"
+import BlockRoute from "../src/modules/block/block.routes.js"
+import FlatRoute from "../src/modules/flat/flat.routes.js"
+import ApartmentRoute from "../src/modules/apartment/apartment.routes.js"
 const app = express()
 app.use(cors({
   origin : env.webUrl,
@@ -24,13 +25,13 @@ app.all("/api/auth/*splat", toNodeHandler(auth))
 app.use(cookieParser());
 app.use(express.json())
 
+app.use("/api/v1/apartment", ApartmentRoute )
 app.use("/api/v1" , SubscriptionsRoute)
-app.use("/api/bills", billingRoutes);
-app.use("/api/expenses", expenseRoutes);
-app.use("/api/wallets", walletRoutes);
-app.use("/api/audit", auditRoutes);
-app.use("/api/finance", financeRoutes);
-app.use("/api/payments", paymentRoutes);
+app.use("/api/v1/residents" , ResidentRoute)
+app.use("/api/v1/invitations" , InvitationRoute)
+app.use("/api/v1/staff" , StaffRoute)
+app.use("/api/v1/blocks" , BlockRoute)
+app.use("/api/v1/flats" , FlatRoute)
 
 app.use(notFoundHandler);
 app.use(errorHandler);

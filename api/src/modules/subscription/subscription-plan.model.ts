@@ -15,7 +15,7 @@ const subscriptionPlanSchema = new Schema({
 
     planType: {
         type: String,
-        enum: ["MONTHLY", "SIX_MONTHS", "YEARLY"],  
+        enum: ["MONTHLY", "SIX_MONTHS", "YEARLY"],
         required: true,
     },
 
@@ -42,6 +42,10 @@ const subscriptionPlanSchema = new Schema({
             default: 0,
             min: 0,
         },
+    },
+    razorpayPlanId: {
+        type: String,
+        required: true
     },
 
     isActive: {

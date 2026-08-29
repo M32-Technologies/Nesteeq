@@ -463,6 +463,108 @@ function buildPasswordResetHtml(otp: string): string {
   `);
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildResidentInviteHtml(input: {
+  name: string;
+  apartmentName: string;
+  inviteLink: string;
+}): string {
+  const name = escapeHtml(input.name);
+  const apartmentName = escapeHtml(input.apartmentName);
+  const inviteLink = escapeHtml(input.inviteLink);
+
+  return layout(`
+    <div style="text-align: center;">
+
+      <h1
+        style="
+          margin: 0 0 12px;
+          color: ${COLORS.ink};
+          font-size: 25px;
+          line-height: 1.3;
+          font-weight: 700;
+        "
+      >
+        You have been invited to ${apartmentName}
+      </h1>
+
+      <p
+        style="
+          max-width: 420px;
+          margin: 0 auto 28px;
+          color: ${COLORS.text};
+          font-size: 14px;
+          line-height: 1.7;
+        "
+      >
+        Hi ${name}, you have been invited to join
+        ${apartmentName} on Nesteeq. Accept the invitation
+        to open your apartment page and complete your setup.
+      </p>
+
+      <a
+        href="${inviteLink}"
+        style="
+          display: inline-block;
+          padding: 13px 22px;
+          background-color: ${COLORS.brand};
+          color: ${COLORS.white};
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 700;
+          text-decoration: none;
+        "
+      >
+        Accept invitation
+      </a>
+
+      <p
+        style="
+          margin: 26px 0 0;
+          color: ${COLORS.text};
+          font-size: 13px;
+          line-height: 1.6;
+        "
+      >
+        This invitation expires in
+        <strong style="color: ${COLORS.brand};">
+          7 days
+        </strong>.
+      </p>
+
+      <div
+        style="
+          height: 1px;
+          margin: 28px 0;
+          background-color: ${COLORS.border};
+        "
+      ></div>
+
+      <p
+        style="
+          margin: 0;
+          color: ${COLORS.muted};
+          font-size: 12px;
+          line-height: 1.6;
+        "
+      >
+        If the button does not work, copy and paste this link into your browser:
+        <br />
+        <span style="word-break: break-all;">${inviteLink}</span>
+      </p>
+
+    </div>
+  `);
+}
+
 /**
  * Public templates used by EmailService.
  */
@@ -533,6 +635,31 @@ This code expires in 5 minutes.
 Never share this code with anyone.
 
 If you did not request a password reset, you can safely ignore this email.
+    `.trim(),
+  };
+}
+
+export function residentInviteTemplate(input: {
+  name: string;
+  apartmentName: string;
+  inviteLink: string;
+}): EmailTemplate {
+  return {
+    subject: `You are invited to ${input.apartmentName} on Nesteeq`,
+
+    html: buildResidentInviteHtml(input),
+
+    text: `
+Hi ${input.name},
+
+You have been invited to join ${input.apartmentName} on Nesteeq.
+
+Accept the invitation to open your apartment page and complete your setup:
+${input.inviteLink}
+
+This invitation expires in 7 days.
+
+If you were not expecting this invitation, you can safely ignore this email.
     `.trim(),
   };
 }

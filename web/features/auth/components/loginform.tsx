@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { AnimatePresence, motion } from "framer-motion"
@@ -18,12 +18,20 @@ import {
   loginSchema,
   type LoginFormValues,
 } from "../schemas/login"
+import { useAcceptInvite } from "../hooks/useAcceptInvite"
+import { useResolveInvite } from "../hooks/useResolveInvite"
 import LoginOtpStep from "./login-otp-step"
 
 type LoginStep = "email" | "otp"
 
 function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const inviteToken =
+    searchParams.get("inviteToken") ??
+    searchParams.get("token") ??
+    searchParams.get("invite")
+  const fromPricing = searchParams.get("from") === "pricing"
 
   const [step, setStep] = useState<LoginStep>("email")
   const [email, setEmail] = useState("")
@@ -40,6 +48,16 @@ function LoginForm() {
       email: "",
     },
   })
+  const { data: inviteData, isError: isInviteError } =
+    useResolveInvite(inviteToken)
+
+  useEffect(() => {
+    if (inviteData?.email) {
+      reset({ email: inviteData.email })
+    }
+  }, [inviteData, reset])
+
+  const acceptInviteMutation = useAcceptInvite()
 
   const sendOtp = async (data: LoginFormValues) => {
     setIsSubmitting(true)
@@ -77,12 +95,33 @@ function LoginForm() {
   }
 
   const handleLoginSuccess = async () => {
-    toast.success("Welcome back to Nesteeq.")
+    let acceptedRole: string | undefined
+
+    if (inviteToken) {
+      try {
+        const acceptedInvite =
+          await acceptInviteMutation.mutateAsync(inviteToken)
+
+        acceptedRole = acceptedInvite.role
+      } catch {
+        toast.error(
+          "We couldn't apply your invite. Please contact your manager.",
+        )
+      }
+    }
 
     const { data } = await authClient.getSession()
-    const role = normalizeDashboardRole(data?.user?.role)
 
-    router.push(`/${getDashboardRoleRouteSegment(role)}`)
+    toast.success("Welcome back to Nesteeq.")
+
+    const role = normalizeDashboardRole(acceptedRole ?? data?.user?.role)
+
+    if (fromPricing) {
+      router.push("/pricing")
+    } else {
+      router.push(`/${getDashboardRoleRouteSegment(role)}`)
+    }
+
     router.refresh()
   }
 
@@ -116,7 +155,23 @@ function LoginForm() {
           </span>
         </Link>
 
-        {/* Same card for Email + OTP */}
+        {/* Invite banner */}
+        {inviteToken && inviteData?.email && (
+          <div className="mb-4 rounded-[13px] border border-[var(--border)] bg-[var(--soft-mint)] px-4 py-3 text-center text-[13px] text-[var(--ink)]">
+            You&apos;ve been invited to join Nesteeq as{" "}
+            <span className="font-semibold">{inviteData.email}</span>.
+            Verify below to activate your account.
+          </div>
+        )}
+
+        {inviteToken && isInviteError && (
+          <div className="mb-4 rounded-[13px] border border-[var(--rose)]/30 bg-[var(--rose)]/10 px-4 py-3 text-center text-[13px] text-[var(--rose)]">
+            This invite link is invalid or has expired. You can still
+            sign in normally below.
+          </div>
+        )}
+
+        {/* Auth card */}
         <div className="min-h-[450px] overflow-hidden rounded-[24px] border border-[var(--border)] bg-[var(--white)] shadow-[0_18px_50px_rgba(4,59,53,0.07)]">
           <div className="flex min-h-[450px] flex-col px-7 py-8 sm:px-9">
             <AnimatePresence mode="wait" initial={false}>
@@ -169,8 +224,9 @@ function LoginForm() {
                           type="email"
                           autoComplete="email"
                           placeholder="you@example.com"
+                          readOnly={Boolean(inviteData?.email)}
                           {...register("email")}
-                          className="h-[50px] w-full rounded-[13px] border border-[var(--border)] bg-[var(--surface)] pl-11 pr-4 text-[14px] text-[var(--ink)] outline-none transition placeholder:text-[var(--text-muted)] hover:border-[var(--green-sage)] focus:border-[var(--brand)] focus:bg-[var(--white)] focus:ring-4 focus:ring-[var(--green-soft)]"
+                          className="h-[50px] w-full rounded-[13px] border border-[var(--border)] bg-[var(--surface)] pl-11 pr-4 text-[14px] text-[var(--ink)] outline-none transition placeholder:text-[var(--text-muted)] hover:border-[var(--green-sage)] focus:border-[var(--brand)] focus:bg-[var(--white)] focus:ring-4 focus:ring-[var(--green-soft)] read-only:bg-[var(--surface)] read-only:opacity-80"
                         />
                       </div>
 
@@ -225,6 +281,7 @@ function LoginForm() {
                 >
                   <LoginOtpStep
                     email={email}
+                    name={inviteData?.fullName}
                     onChangeEmail={handleChangeEmail}
                     onSuccess={handleLoginSuccess}
                   />
