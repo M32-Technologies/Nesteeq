@@ -184,37 +184,47 @@ export const sidebarNavigation: Record<
   ],
 
   treasurer: [
-    {
-      title: "Finance",
-      items: [
-        {
-          title: "Dashboard",
-          href: "/dashboard",
-          icon: LayoutDashboard,
-        },
-        {
-          title: "Bills",
-          href: "/dashboard/bills",
-          icon: ReceiptText,
-        },
-        {
-          title: "Payments",
-          href: "/dashboard/payments",
-          icon: WalletCards,
-        },
-        {
-          title: "Outstanding Dues",
-          href: "/dashboard/dues",
-          icon: CircleDollarSign,
-        },
-        {
-          title: "Reports",
-          href: "/dashboard/reports",
-          icon: BarChart3,
-        },
-      ],
-    },
-  ],
+  {
+    title: "Finance",
+    items: [
+      {
+        title: "Dashboard",
+        href: "/dashboard",
+        icon: LayoutDashboard,
+      },
+      {
+        title: "Billing",
+        href: "/dashboard/billing",
+        icon: ReceiptText,
+      },
+      {
+        title: "Payments",
+        href: "/dashboard/payments",
+        icon: WalletCards,
+      },
+      {
+        title: "Expenses",
+        href: "/dashboard/expenses",
+        icon: CircleDollarSign,
+      },
+      {
+        title: "Wallet",
+        href: "/dashboard/wallet",
+        icon: WalletCards,
+      },
+      {
+        title: "Audit Trail",
+        href: "/dashboard/audit",
+        icon: ClipboardList,
+      },
+      {
+        title: "Reports",
+        href: "/dashboard/reports",
+        icon: BarChart3,
+      },
+    ],
+  },
+],
 
   facility_manager: [
     {
