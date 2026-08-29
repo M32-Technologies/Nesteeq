@@ -8,6 +8,7 @@ import {
 import {
   createBlockHandler,
   getBlocksHandler,
+  getSingleBlockHandler,
 } from "./block.controller.js"
 import {
   blockListQuerySchema,
@@ -20,5 +21,7 @@ const managerOnly = requireRole("property_manager")
 router.get("/",protect,managerOnly,zodValidate(blockListQuerySchema),getBlocksHandler,)
 
 router.post("/",protect,managerOnly,zodValidate(createBlockSchema),createBlockHandler,)
+
+router.get("/:id", protect, managerOnly, getSingleBlockHandler);
 
 export default router

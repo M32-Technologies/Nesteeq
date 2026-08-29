@@ -7,30 +7,6 @@ import {
   CreateBlockInput,
 } from "./block.validation.js";
 
-type BlockRecord = {
-  _id: Types.ObjectId;
-  apartmentId: Types.ObjectId;
-  blockname: string;
-  code: string;
-  totalFloors: number;
-  status: "active" | "inactive";
-  createdAt?: Date;
-  updatedAt?: Date;
-};
-
-
-const mapBlock = (block: BlockRecord) => ({
-  id: block._id.toString(),
-  apartmentId: block.apartmentId.toString(),
-  name: block.blockname,
-  blockname: block.blockname,
-  code: block.code,
-  totalFloors: block.totalFloors,
-  status: block.status,
-  createdAt: block.createdAt,
-  updatedAt: block.updatedAt,
-});
-
 export const createBlock = async (data: CreateBlockInput, apartmentId?: string,) => {
   const code = data.code.toUpperCase();
 
@@ -61,7 +37,19 @@ export const createBlock = async (data: CreateBlockInput, apartmentId?: string,)
     ...(data.status ? { status: data.status } : {}),
   });
 
-  return mapBlock(block.toObject() as BlockRecord);
+  const blockObject = block.toObject();
+
+  return {
+    id: blockObject._id.toString(),
+    apartmentId: blockObject.apartmentId.toString(),
+    name: blockObject.blockname,
+    blockname: blockObject.blockname,
+    code: blockObject.code,
+    totalFloors: blockObject.totalFloors,
+    status: blockObject.status,
+    createdAt: blockObject.createdAt,
+    updatedAt: blockObject.updatedAt,
+  };
 };
 
 export const getBlocks = async (query: BlockListQuery, apartmentId?: string) => {
@@ -80,9 +68,57 @@ export const getBlocks = async (query: BlockListQuery, apartmentId?: string) => 
   })
     .select("_id apartmentId blockname code totalFloors status createdAt updatedAt")
     .sort({ blockname: 1 })
-    .lean<BlockRecord[]>();
+    .lean();
 
   return {
-    blocks: blocks.map(mapBlock),
+    blocks: blocks.map((block) => ({
+      id: block._id.toString(),
+      apartmentId: block.apartmentId.toString(),
+      name: block.blockname,
+      blockname: block.blockname,
+      code: block.code,
+      totalFloors: block.totalFloors,
+      status: block.status,
+      createdAt: block.createdAt,
+      updatedAt: block.updatedAt,
+    })),
+  };
+};
+
+export const getSingleBlock = async (apartmentId: string, blockId: string) => {
+
+  if (!apartmentId) {
+    throw new AppError("Apartment context is required", 400);
+  }
+
+  if (!Types.ObjectId.isValid(apartmentId)) {
+    throw new AppError("Apartment id must be a valid id", 400);
+  }
+
+  if (!Types.ObjectId.isValid(blockId)) {
+    throw new AppError("Block id must be a valid id", 400);
+  }
+
+  const block = await Block.findOne({
+    _id: blockId,
+    apartmentId,
+  })
+    .select("_id apartmentId blockname code totalFloors status createdAt updatedAt")
+    .lean();
+
+  if (!block) {
+    throw new AppError("Block not found in this apartment", 404);
+  }
+
+  return {
+    id: block._id.toString(),
+    apartmentId: block.apartmentId.toString(),
+    name: block.blockname,
+    blockname: block.blockname,
+    code: block.code,
+    totalFloors: block.totalFloors,
+    status: block.status,
+    createdAt: block.createdAt,
+    updatedAt: block.updatedAt,
   };
 };

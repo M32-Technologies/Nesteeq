@@ -1,7 +1,7 @@
 import api from "@/lib/axios"
 
 import type {
-  ApiInvitation,
+  ApiInvitation,  
   ApiResident,
   ApiResidentFlat,
   BlockOption,

@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 
 import { catchAsync } from "../../utils/catchAsync.js";
-import { createBlock, getBlocks } from "./block.service.js";
+import { createBlock, getBlocks, getSingleBlock } from "./block.service.js";
 import { BlockListQuery } from "./block.validation.js";
 
 export const createBlockHandler = catchAsync(
@@ -27,6 +27,21 @@ export const getBlocksHandler = catchAsync(
     res.status(200).json({
       success: true,
       data: result,
+    });
+  },
+);
+
+export const getSingleBlockHandler = catchAsync(
+  async (req: Request, res: Response) => {
+    const apartmentId = req.user?.apartmentId!;
+    const blockId = String(req.params.id);
+    const result = await getSingleBlock(apartmentId, blockId);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        block: result,
+      },
     });
   },
 );
