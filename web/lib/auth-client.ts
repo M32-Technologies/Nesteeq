@@ -15,7 +15,7 @@ export const authClient = createAuthClient({
                 role: {
                     type: "string",
                     required: true,
-                    defaultValue: "RESIDENT",
+                    defaultValue: "resident",
                 },
                 apartmentId: {
                     type: "string",

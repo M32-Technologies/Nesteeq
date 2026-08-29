@@ -19,13 +19,12 @@ export default function Navbar() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
 
-  const [hasMounted, setHasMounted] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const user = session?.user;
   const userName = user?.name || user?.email || "Profile";
   const userInitial = userName.charAt(0).toUpperCase();
-  const isAuthLoading = !hasMounted || isPending;
+  const isAuthLoading = isPending;
 
   const handleSignOut = async () => {
     await signOut();

@@ -5,7 +5,8 @@ import { toNodeHandler } from "better-auth/node";
 import { auth } from "./lib/auth.js";
 import cors from "cors"
 import { env } from "./config/env.js";
-
+import expenseRoutes from "./modules/expense/expense.routes.js";
+import walletRoutes from "./modules/wallet/wallet.routes.js";
 import SubscriptionsRoute from "../src/modules/subscription/subscription.routes.js"
 import ResidentRoute from "../src/modules/resident/resident.routes.js"
 import InvitationRoute from "../src/modules/invitation/invitation.routes.js"
