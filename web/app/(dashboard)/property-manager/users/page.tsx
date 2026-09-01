@@ -1,5 +1,7 @@
-import UsersPage from "@/features/dashboard/manager/users/components/users-page"
+import UsersPage from "@/features/dashboard/manager/users/components/user-page"
 
 export default function Page() {
-  return <UsersPage />
+  return <UsersPage/>
 }
+
+

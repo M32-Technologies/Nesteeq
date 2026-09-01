@@ -33,7 +33,7 @@ export type DashboardRole =
 export type NavigationItem = {
   title: string
   href: string
-  icon: LucideIcon
+  icon: LucideIcon  
 }
 
 export type NavigationSection = {
@@ -179,32 +179,47 @@ export const sidebarNavigation: Record<
   ],
 
   treasurer: [
-    {
-      title: "Finance",
-      items: [
-        {
-          title: "Dashboard",
-          href: "/dashboard",
-          icon: LayoutDashboard,
-        },
-        {
-          title: "Bills",
-          href: "/dashboard/bills",
-          icon: ReceiptText,
-        },
-        {
-          title: "Payments",
-          href: "/dashboard/payments",
-          icon: WalletCards,
-        },
-        {
-          title: "Outstanding Dues",
-          href: "/dashboard/dues",
-          icon: CircleDollarSign,
-        },
-      ],
-    },
-  ],
+  {
+    title: "Finance",
+    items: [
+      {
+        title: "Dashboard",
+        href: "/dashboard",
+        icon: LayoutDashboard,
+      },
+      {
+        title: "Billing",
+        href: "/dashboard/billing",
+        icon: ReceiptText,
+      },
+      {
+        title: "Payments",
+        href: "/dashboard/payments",
+        icon: WalletCards,
+      },
+      {
+        title: "Expenses",
+        href: "/dashboard/expenses",
+        icon: CircleDollarSign,
+      },
+      {
+        title: "Wallet",
+        href: "/dashboard/wallet",
+        icon: WalletCards,
+      },
+      {
+        title: "Audit Trail",
+        href: "/dashboard/audit",
+        icon: ClipboardList,
+      },
+      {
+        title: "Reports",
+        href: "/dashboard/reports",
+        icon: BarChart3,
+      },
+    ],
+  },
+],
 
   facility_manager: [
     {
@@ -382,7 +397,7 @@ export function normalizeDashboardRole(role?: string | null): DashboardRole {
   const compactRole = normalizedRole?.replace(/_/g, "")
   const roleAliases: Record<string, DashboardRole> = {
     superadmin: "super_admin",
-    propertymanager: "property_manager",
+    propertwhymanager: "property_manager",
     treasurer: "treasurer",
     facilitymanager: "facility_manager",
     securitystaff: "security_staff",

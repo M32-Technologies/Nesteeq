@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { AnimatePresence, motion } from "framer-motion"
@@ -25,6 +25,8 @@ type Step = "register" | "otp"
 
 function RegisterForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const fromPricing = searchParams.get("from") === "pricing"
 
   const [step, setStep] = useState<Step>("register")
   const [formData, setFormData] =
@@ -88,7 +90,12 @@ function RegisterForm() {
     const { data } = await authClient.getSession()
     const role = normalizeDashboardRole(data?.user?.role)
 
-    router.push(`/${getDashboardRoleRouteSegment(role)}`)
+    if (fromPricing) {
+      router.push("/pricing")
+    } else {
+      router.push(`/${getDashboardRoleRouteSegment(role)}`)
+    }
+
     router.refresh()
   }
 
@@ -220,7 +227,7 @@ function RegisterForm() {
                     <p className="text-center text-[13px] text-[var(--text-muted)]">
                       Already have an account?{" "}
                       <Link
-                        href="/login"
+                        href={fromPricing ? "/login?from=pricing" : "/login"}
                         className="font-semibold text-[var(--brand)] hover:text-[var(--brand-hover)]"
                       >
                         Sign in

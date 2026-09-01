@@ -5,6 +5,7 @@ import {
   emailVerificationOtpTemplate,
   loginOtpTemplate,
   passwordResetTemplate,
+  residentInviteTemplate,
 } from "./emailTemplates.js";
 
 type SendEmailInput = {
@@ -93,6 +94,19 @@ export const emailService = {
     await sendEmail({
       to: email,
       ...emailVerificationOtpTemplate(otp),
+    });
+  },
+  sendResidentInvite: async (
+    email: string,
+    input: {
+      name: string;
+      apartmentName: string;
+      inviteLink: string;
+    },
+  ): Promise<void> => {
+    await sendEmail({
+      to: email,
+      ...residentInviteTemplate(input),
     });
   },
 }

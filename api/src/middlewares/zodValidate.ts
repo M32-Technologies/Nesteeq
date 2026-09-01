@@ -39,7 +39,11 @@ export const zodValidate = (schema: ZodTypeAny): RequestHandler => {
     }
 
     if (validatedData.query !== undefined) {
-      req.query = validatedData.query as Request["query"];
+      Object.defineProperty(req, "query", {
+        value: validatedData.query as Request["query"],
+        configurable: true,
+        enumerable: true,
+      });
     }
 
     next();
