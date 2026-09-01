@@ -97,11 +97,6 @@ export const sidebarNavigation: Record<
       title: "System",
       items: [
         {
-          title: "Reports",
-          href: "/dashboard/reports",
-          icon: BarChart3,
-        },
-        {
           title: "Notifications",
           href: "/dashboard/notifications",
           icon: Bell,

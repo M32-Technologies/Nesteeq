@@ -1,8 +1,32 @@
 import { Request, Response, NextFunction } from "express";
 import { auth } from "../lib/auth.js";
 import { fromNodeHeaders } from "better-auth/node";
+import { ObjectId, type Filter } from "mongodb";
+import { getAuthDB } from "../config/auth-db.js";
 import { AppError } from "../utils/AppError.js";
 import { catchAsync } from "../utils/catchAsync.js";
+import { authorize } from "./authorizeMiddleware.js";
+
+type AuthUserRecord = {
+    _id?: ObjectId;
+    id?: string;
+    name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    role?: string | null;
+    apartmentId?: string | null;
+    flatId?: string | null;
+};
+
+const buildAuthUserIdFilters = (userId: string): Filter<AuthUserRecord>[] => {
+    const filters: Filter<AuthUserRecord>[] = [{ id: userId }];
+
+    if (ObjectId.isValid(userId)) {
+        filters.push({ _id: new ObjectId(userId) });
+    }
+
+    return filters;
+};
 
 type ApartmentIdValue =
     | string

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionCookie } from "better-auth/cookies";
+<<<<<<< HEAD
+=======
 import {
   getDashboardRoleFromRouteSegment,
   normalizeDashboardRole,
@@ -45,32 +47,13 @@ async function getCurrentUserRole(request: NextRequest) {
 
   return normalizeDashboardRole(session?.user?.role);
 }
+>>>>>>> origin/dev
 
 export async function proxy(request: NextRequest) {
   const sessionCookie = getSessionCookie(request);
 
   if (!sessionCookie) {
     return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  const pathname = request.nextUrl.pathname;
-  const pathSegment = pathname.split("/")[1]; 
-
-  const requiredRole = getDashboardRoleFromRouteSegment(pathSegment);
-
-  if (!requiredRole) {
-    return NextResponse.next();
-  }
-
-  const userRole = await getCurrentUserRole(request);
-
-  if (!userRole) {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  if (userRole !== requiredRole) {
-    const homeSegment = getDashboardRoleRouteSegment(userRole);
-    return NextResponse.redirect(new URL(`/${homeSegment}`, request.url));
   }
 
   return NextResponse.next();
