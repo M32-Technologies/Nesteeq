@@ -49,7 +49,6 @@ const apartmentSchema = new Schema<IApartment>(
 
     totalFloors: {
       type: String,
-      required: true,
       trim: true,
     },
 

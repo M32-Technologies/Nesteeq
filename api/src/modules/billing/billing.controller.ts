@@ -21,7 +21,7 @@ const getAuditActor = (req: Request) => ({
 export const createBill = catchAsync(
   async (req: Request, res: Response) => {
     const bill = await createBillService(
-      req.body,
+      { ...req.body, createdBy: req.user!.id },
       getAuditActor(req)
     );
 

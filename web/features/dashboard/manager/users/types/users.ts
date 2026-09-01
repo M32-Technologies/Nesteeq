@@ -110,8 +110,34 @@ export type BlockOption = {
 export type FlatOption = {
   id: string
   blockId: string
+  block?: {
+    id: string
+    blockname: string
+    code: string
+  }
+  residentId?: string | null
+  floorNumber?: number
   flatNumber: string
   occupancyStatus: "VACANT" | "OWNER" | "TENANT"
+  status?: "active" | "inactive"
+}
+
+export type FlatListParams = {
+  search?: string
+  blockId?: string
+  floorNumber?: string | number
+  occupancyStatus?: FlatOption["occupancyStatus"]
+  status?: "active" | "inactive"
+  page?: number
+  limit?: number
+  sortBy?:
+    | "flatNumber"
+    | "floorNumber"
+    | "occupancyStatus"
+    | "status"
+    | "createdAt"
+    | "updatedAt"
+  sortOrder?: "asc" | "desc"
 }
 
 export type BulkInviteRowResult = {

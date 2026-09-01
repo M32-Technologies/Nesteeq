@@ -5,10 +5,33 @@ import { Block } from "./block.model.js";
 import {
   BlockListQuery,
   CreateBlockInput,
-} from "./block.validation.js";
+  UpdateBlockInput,
+} from "./block.schema.js";
+
+type BlockRecord = {
+  _id: Types.ObjectId;
+  apartmentId: Types.ObjectId;
+  blockname: string;
+  code: string;
+  totalFloors: number;
+  status: "active" | "inactive";
+  createdAt?: Date;
+  updatedAt?: Date;
+};
+
+const mapBlock = (block: BlockRecord) => ({
+  id: block._id.toString(),
+  apartmentId: block.apartmentId.toString(),
+  blockname: block.blockname,
+  code: block.code,
+  totalFloors: block.totalFloors,
+  status: block.status,
+  createdAt: block.createdAt,
+  updatedAt: block.updatedAt,
+});
 
 export const createBlock = async (data: CreateBlockInput, apartmentId?: string,) => {
-  const code = data.code.toUpperCase();
+  const code = data.code.trim().toUpperCase();
 
   if (!apartmentId) {
     throw new AppError("Apartment context is required", 400);
@@ -37,19 +60,7 @@ export const createBlock = async (data: CreateBlockInput, apartmentId?: string,)
     ...(data.status ? { status: data.status } : {}),
   });
 
-  const blockObject = block.toObject();
-
-  return {
-    id: blockObject._id.toString(),
-    apartmentId: blockObject.apartmentId.toString(),
-    name: blockObject.blockname,
-    blockname: blockObject.blockname,
-    code: blockObject.code,
-    totalFloors: blockObject.totalFloors,
-    status: blockObject.status,
-    createdAt: blockObject.createdAt,
-    updatedAt: blockObject.updatedAt,
-  };
+  return mapBlock(block.toObject() as BlockRecord);
 };
 
 export const getBlocks = async (query: BlockListQuery, apartmentId?: string) => {
@@ -64,24 +75,14 @@ export const getBlocks = async (query: BlockListQuery, apartmentId?: string) => 
 
   const blocks = await Block.find({
     apartmentId: apartmentId,
-    ...(query.status ? { status: query.status } : {}),
+    status: query.status ?? "active",
   })
     .select("_id apartmentId blockname code totalFloors status createdAt updatedAt")
     .sort({ blockname: 1 })
-    .lean();
+    .lean<BlockRecord[]>();
 
   return {
-    blocks: blocks.map((block) => ({
-      id: block._id.toString(),
-      apartmentId: block.apartmentId.toString(),
-      name: block.blockname,
-      blockname: block.blockname,
-      code: block.code,
-      totalFloors: block.totalFloors,
-      status: block.status,
-      createdAt: block.createdAt,
-      updatedAt: block.updatedAt,
-    })),
+    blocks: blocks.map(mapBlock),
   };
 };
 
@@ -104,21 +105,100 @@ export const getSingleBlock = async (apartmentId: string, blockId: string) => {
     apartmentId,
   })
     .select("_id apartmentId blockname code totalFloors status createdAt updatedAt")
-    .lean();
+    .lean<BlockRecord>();
 
   if (!block) {
     throw new AppError("Block not found in this apartment", 404);
   }
 
-  return {
-    id: block._id.toString(),
-    apartmentId: block.apartmentId.toString(),
-    name: block.blockname,
-    blockname: block.blockname,
-    code: block.code,
-    totalFloors: block.totalFloors,
-    status: block.status,
-    createdAt: block.createdAt,
-    updatedAt: block.updatedAt,
-  };
+  return mapBlock(block);
+};
+
+export const updateBlock = async (
+  data: UpdateBlockInput,
+  apartmentId: string,
+  blockId: string,
+) => {
+  if (!apartmentId) {
+    throw new AppError("Apartment context is required", 400);
+  }
+
+  if (!Types.ObjectId.isValid(apartmentId)) {
+    throw new AppError("Apartment id must be a valid id", 400);
+  }
+
+  if (!Types.ObjectId.isValid(blockId)) {
+    throw new AppError("Block id must be a valid id", 400);
+  }
+
+  const block = await Block.findOne({
+    _id: blockId,
+    apartmentId,
+    status: "active",
+  });
+
+  if (!block) {
+    throw new AppError("Block not found in this apartment", 404);
+  }
+
+  if (data.code !== undefined) {
+    const code = data.code.trim().toUpperCase();
+    const existingBlock = await Block.findOne({
+      _id: { $ne: block._id },
+      apartmentId,
+      code,
+    })
+      .select("_id")
+      .lean();
+
+    if (existingBlock) {
+      throw new AppError("A block with this code already exists", 409);
+    }
+
+    block.code = code;
+  }
+
+  if (data.blockname !== undefined) {
+    block.blockname = data.blockname;
+  }
+
+  if (data.totalFloors !== undefined) {
+    block.totalFloors = data.totalFloors;
+  }
+
+  if (data.status !== undefined) {
+    block.status = data.status;
+  }
+
+  await block.save();
+
+  return mapBlock(block.toObject() as BlockRecord);
+};
+
+export const deleteBlock = async (apartmentId: string, blockId: string) => {
+  if (!apartmentId) {
+    throw new AppError("Apartment context is required", 400);
+  }
+
+  if (!Types.ObjectId.isValid(apartmentId)) {
+    throw new AppError("Apartment id must be a valid id", 400);
+  }
+
+  if (!Types.ObjectId.isValid(blockId)) {
+    throw new AppError("Block id must be a valid id", 400);
+  }
+
+  const block = await Block.findOne({
+    _id: blockId,
+    apartmentId,
+  });
+
+  if (!block) {
+    throw new AppError("Block not found in this apartment", 404);
+  }
+
+  block.status = "inactive";
+  await block.save();
+
+  return mapBlock(block.toObject() as BlockRecord);
 };

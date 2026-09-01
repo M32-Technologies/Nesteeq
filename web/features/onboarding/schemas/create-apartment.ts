@@ -46,7 +46,6 @@ export const createApartmentFormSchema = z.object({
     .min(5, "Address is required"),
 
   totalUnits: positiveIntegerText("Total units"),
-  totalFloors: positiveIntegerText("Total floors"),
   totalBlocks: positiveIntegerText("Total blocks"),
 
   parkingSlots: z
@@ -81,7 +80,6 @@ export const createApartmentFields = {
   location: ["state", "city", "address"] as const,
   structure: [
     "totalUnits",
-    "totalFloors",
     "totalBlocks",
     "parkingSlots",
   ] as const,

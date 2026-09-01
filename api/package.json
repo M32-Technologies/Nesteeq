@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "migrate:flat-floor-number": "tsx src/scripts/migrate-flat-floor-number.ts",
     "test": "npm run typecheck"
   },
   "keywords": [],

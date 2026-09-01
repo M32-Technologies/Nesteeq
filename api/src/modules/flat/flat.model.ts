@@ -1,49 +1,65 @@
-import mongoose, { model, Schema } from 'mongoose';
-import { IFlat } from './flat.schema.js';
+import { Schema, model } from "mongoose";
+import { IFlat } from "./flat.schema.js";
 
 const flatSchema = new Schema<IFlat>(
   {
-    apartmentId: { 
-      type: Schema.Types.ObjectId, 
-      ref: 'apartment', 
-      required: true 
+    apartmentId: {
+      type: Schema.Types.ObjectId,
+      ref: "Apartment",
+      required: true,
+      index: true,
     },
-    blockId: { 
-      type: Schema.Types.ObjectId, 
-      ref: 'Block', 
-      required: true 
+
+    blockId: {
+      type: Schema.Types.ObjectId,
+      ref: "Block",
+      required: true,
+      index: true,
     },
-    floorId: { 
-      type: Schema.Types.ObjectId, 
-      ref: 'Floor', 
-      required: true 
+    floorNumber: {
+      type: Number,
+      required: true,
+      min: 1,
     },
-    ownerId: { 
-      type: Schema.Types.ObjectId, 
-      ref: 'Resident',
-      default: null 
+    residentId: {
+      type: Schema.Types.ObjectId,
+      ref: "Resident",
+      default: null,
+      index: true,
     },
-    tenantId: { 
-      type: Schema.Types.ObjectId, 
-      ref: 'Resident',
-      default: null 
-    },
-    flatNumber: { 
-      type: String, 
-      required: [true, 'Flat number is required'], 
-      trim: true 
+    flatNumber: {
+      type: String,
+      required: true,
+      trim: true,
+      uppercase: true,
     },
     occupancyStatus: {
       type: String,
-      enum: ['VACANT', 'OWNER', 'TENANT'],
-      default: 'VACANT'
-    }
+      enum: ["VACANT", "OWNER", "TENANT"],
+      default: "VACANT",
+      required: true,
+      index: true,
+    },
+    status: {
+      type: String,
+      enum: ["active", "inactive"],
+      default: "active",
+    },
   },
-  { 
-    timestamps: true 
+  {
+    timestamps: true,
   }
 );
 
-flatSchema.index({ blockId: 1, flatNumber: 1 }, { unique: true });
+flatSchema.index(
+  {
+    apartmentId: 1,
+    blockId: 1,
+    flatNumber: 1,
+  },
+  {
+    unique: true,
+  }
+);
 
-export const Flat = model<IFlat>('Flat', flatSchema);
+export const Flat = model<IFlat>("Flat", flatSchema);

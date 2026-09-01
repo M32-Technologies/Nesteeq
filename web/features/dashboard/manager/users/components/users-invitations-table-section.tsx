@@ -113,8 +113,8 @@ export default function UsersInvitationsTableSection() {
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-200 p-4">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-          <div className="relative flex-1">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="relative min-w-0 flex-1">
             <Search
               size={17}
               className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
@@ -139,7 +139,7 @@ export default function UsersInvitationsTableSection() {
               setPage(1)
             }}
             options={roleOptions}
-            widthClassName="xl:w-[210px]"
+            widthClassName="lg:w-[210px]"
           />
 
           <SelectFilter
@@ -149,13 +149,13 @@ export default function UsersInvitationsTableSection() {
               setPage(1)
             }}
             options={statusOptions}
-            widthClassName="xl:w-[160px]"
+            widthClassName="lg:w-[160px]"
           />
 
           <button
             type="button"
             onClick={resetFilters}
-            className="flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 hover:text-slate-950"
+            className="flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 hover:text-slate-950 lg:w-[110px]"
           >
             <RotateCcw size={15} />
             Reset
@@ -343,11 +343,11 @@ function SelectFilter({
   widthClassName: string
 }) {
   return (
-    <div className="relative">
+    <div className={`relative w-full ${widthClassName}`}>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className={`h-10 appearance-none rounded-lg border border-slate-300 bg-white pl-3 pr-9 text-sm font-medium text-slate-800 outline-none focus:border-[#0F5F45] focus:ring-2 focus:ring-[#0F5F45]/10 ${widthClassName}`}
+        className="h-10 w-full appearance-none rounded-lg border border-slate-300 bg-white pl-3 pr-9 text-sm font-medium text-slate-800 outline-none focus:border-[#0F5F45] focus:ring-2 focus:ring-[#0F5F45]/10"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>

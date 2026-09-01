@@ -67,7 +67,7 @@ export const createStaffInviteBodySchema = z.object({
 export const getInvitationsQueryObjectSchema = z.object({
   status: z.enum(INVITE_STATUSES).optional(),
   role: z.enum(INVITE_ROLES).optional(),
-  inviteType: z.enum(["residents"]).optional(),
+  inviteType: z.enum(["residents", "staff"]).optional(),
   search: z.string().trim().max(100).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),

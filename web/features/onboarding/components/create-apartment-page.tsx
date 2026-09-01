@@ -110,7 +110,6 @@ export default function CreateApartmentPage() {
       city: "",
       address: "",
       totalUnits: "",
-      totalFloors: "",
       totalBlocks: "",
       parkingSlots: "",
       contactNumber: userPhone,
@@ -194,7 +193,6 @@ export default function CreateApartmentPage() {
       city: values.city,
       address: values.address,
       totalUnits: values.totalUnits,
-      totalFloors: values.totalFloors,
       totalBlocks: values.totalBlocks,
       parkingSlots: values.parkingSlots,
       contactNumber: values.contactNumber,
@@ -423,20 +421,6 @@ export default function CreateApartmentPage() {
                           inputMode="numeric"
                           placeholder="120"
                           {...register("totalUnits")}
-                          className={`${fieldClassName} pl-11`}
-                        />
-                      </FormField>
-
-                      <FormField
-                        label="Total floors"
-                        error={getErrorMessage(errors.totalFloors)}
-                        icon={<Layers3 className="field-icon" />}
-                      >
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          placeholder="12"
-                          {...register("totalFloors")}
                           className={`${fieldClassName} pl-11`}
                         />
                       </FormField>

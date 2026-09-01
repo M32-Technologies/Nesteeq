@@ -102,6 +102,12 @@ const billingSchema = new Schema<IBilling>(
       index: true,
     },
 
+    settledAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+
     status: {
       type: String,
       enum: Object.values(BillStatus),

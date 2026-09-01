@@ -77,6 +77,7 @@ const getBillAuditValue = (bill: BillingDocument) => ({
   paidAmount: bill.paidAmount,
   balanceAmount: bill.balanceAmount,
   dueDate: bill.dueDate,
+  settledAt: bill.settledAt,
   status: bill.status,
 });
 
