@@ -13,7 +13,7 @@ const objectIdSchema = z
 const authUserIdSchema = z
   .string()
   .trim()
-  .regex(/^[a-fA-F0-9]{24}$/, "Invalid user ID");
+  .min(1, "User ID is required");
 
 const nonEmptyText = (fieldName: string, maxLength: number) =>
   z.string().trim().min(1, `${fieldName} is required`).max(maxLength, `${fieldName} is too long`);

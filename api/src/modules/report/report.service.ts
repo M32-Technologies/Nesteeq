@@ -1,7 +1,5 @@
-import { ObjectId, type Filter } from "mongodb";
 import { Types } from "mongoose";
-import { getAuthDB } from "../../config/auth-db.js";
-import { AppError } from "../../utils/AppError.js";
+import { normalizeOptionalString } from "../../utils/serviceHelpers.js";
 import {
   Complaint,
   complaintCategories,
@@ -18,6 +16,12 @@ import {
   technicianStatuses,
   type TechnicianStatus,
 } from "../technician/technician.model.js";
+import {
+  applyApartmentScope,
+  assertCanViewReports,
+  ensureCurrentUserExists,
+  type ReportFilter,
+} from "./report.policy.js";
 import type { ReportQuery } from "./report.schema.js";
 
 export type AuthenticatedReportUser = {
@@ -26,15 +30,6 @@ export type AuthenticatedReportUser = {
   apartmentId?: string | null;
   flatId?: string | null;
 };
-
-type AuthUserRecord = {
-  _id?: ObjectId;
-  id?: string;
-  role?: string | null;
-  apartmentId?: string | null;
-};
-
-type ReportFilter = Record<string, unknown>;
 
 type CountResult = {
   _id: string | null;
@@ -55,14 +50,6 @@ type TechnicianWorkloadResult = {
   inProgressTasks: number;
   pendingTasks: number;
 };
-
-const reportRoles = new Set([
-  "ADMIN",
-  "SUPER_ADMIN",
-  "PROPERTY_MANAGER",
-  "FACILITY_MANAGER",
-]);
-const globalReportRoles = new Set(["ADMIN", "SUPER_ADMIN"]);
 
 const complaintCompletedStatuses = new Set<ComplaintStatus>(["APPROVED", "CLOSED"]);
 const complaintPendingStatuses = new Set<ComplaintStatus>(["PENDING", "UNDER_REVIEW", "ASSIGNED"]);
@@ -97,42 +84,6 @@ const maintenancePendingWorkStatuses = Array.from(
   ])
 );
 
-const normalizeRole = (role: string | null | undefined): string =>
-  (role ?? "").trim().toUpperCase().replace(/[\s-]+/g, "_");
-
-const normalizeOptionalString = (value: string | null | undefined): string | null => {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
-};
-
-const isGlobalReportRole = (role: string): boolean => globalReportRoles.has(normalizeRole(role));
-
-const buildAuthUserIdFilters = (userId: string): Filter<AuthUserRecord>[] => {
-  const filters: Filter<AuthUserRecord>[] = [{ id: userId }];
-
-  if (ObjectId.isValid(userId)) {
-    filters.push({ _id: new ObjectId(userId) });
-  }
-
-  return filters;
-};
-
-const ensureCurrentUserExists = async (user: AuthenticatedReportUser): Promise<void> => {
-  const authUser = await getAuthDB()
-    .collection<AuthUserRecord>("user")
-    .findOne({ $or: buildAuthUserIdFilters(user.id) });
-
-  if (!authUser) {
-    throw new AppError("Authenticated user not found", 404);
-  }
-};
-
-const assertCanViewReports = (user: AuthenticatedReportUser): void => {
-  if (!reportRoles.has(normalizeRole(user.role))) {
-    throw new AppError("You do not have permission to view reports", 403);
-  }
-};
-
 const getDateRange = (query: ReportQuery) => {
   const range: Record<string, Date> = {};
 
@@ -156,33 +107,6 @@ const applyDateRange = (filter: ReportFilter, query: ReportQuery): void => {
 
   if (dateRange) {
     filter.createdAt = dateRange;
-  }
-};
-
-const applyApartmentScope = (
-  filter: ReportFilter,
-  field: string,
-  query: ReportQuery,
-  user: AuthenticatedReportUser
-): void => {
-  const role = normalizeRole(user.role);
-  const userApartmentId = normalizeOptionalString(user.apartmentId);
-
-  if (!isGlobalReportRole(role)) {
-    if (!userApartmentId) {
-      throw new AppError("User must be linked to an apartment to view reports", 403);
-    }
-
-    if (query.apartment && query.apartment !== userApartmentId) {
-      throw new AppError("You do not have permission to view reports for this apartment", 403);
-    }
-
-    filter[field] = userApartmentId;
-    return;
-  }
-
-  if (query.apartment) {
-    filter[field] = query.apartment;
   }
 };
 

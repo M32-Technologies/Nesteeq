@@ -1,23 +1,10 @@
 import express from "express";
+import { FACILITY_DASHBOARD_ROUTE_ROLES as facilityDashboardRoles } from "../../constants/roles.js";
 import { authorize } from "../../middlewares/authorizeMiddleware.js";
 import { protect } from "../../middlewares/authMiddleware.js";
 import { getFacilityDashboardHandler } from "./facility.controller.js";
 
 const router = express.Router();
-
-const facilityDashboardRoles = [
-  "ADMIN",
-  "admin",
-  "SUPER_ADMIN",
-  "super_admin",
-  "SUPER ADMIN",
-  "PROPERTY_MANAGER",
-  "property_manager",
-  "PROPERTY MANAGER",
-  "FACILITY_MANAGER",
-  "facility_manager",
-  "FACILITY MANAGER",
-];
 
 router.use(protect);
 

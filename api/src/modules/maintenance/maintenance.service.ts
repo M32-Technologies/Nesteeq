@@ -1,21 +1,46 @@
-import { ObjectId, type Filter } from "mongodb";
-import { Types, type UpdateQuery } from "mongoose";
-import { getAuthDB } from "../../config/auth-db.js";
 import { AppError } from "../../utils/AppError.js";
-import { createAlert } from "../alert/alert.service.js";
-import {
-  Complaint,
-  complaintStatuses,
-  type ComplaintDocument,
-  type ComplaintStatus,
-} from "../complaint/complaint.model.js";
+import { isManagementRole, isMaintenanceRole, normalizeRole } from "../../utils/role.js";
+import { getMongoId, sameId } from "../../utils/serviceHelpers.js";
+import { createNotification } from "../notification/notification.service.js";
+import { Complaint } from "../complaint/complaint.model.js";
 import {
   Maintenance,
   type MaintenanceCostStatus,
-  maintenanceStatuses,
-  type MaintenanceDocument,
-  type MaintenanceStatus,
 } from "./maintenance.model.js";
+import {
+  activeMaintenanceStatuses,
+  approvalAllowedStatuses,
+  assertNotTerminal,
+  assertValidTransition,
+  assignableMaintenanceStatuses,
+  complaintMaintenanceSourceStatuses,
+  complaintTerminalStatuses,
+  createComplaintRemark,
+  createNote,
+  createProgressUpdate,
+  getComplaintStatus,
+  getComplaintSyncForStatus,
+  getMaintenanceStatus,
+  managerStatusUpdateTargets,
+  staffStatusUpdateTargets,
+} from "./maintenance.workflow.js";
+import {
+  assertCanAccessMaintenance,
+  assertManagerCanManageApartment,
+  assertManagerCanManageMaintenance,
+  assertStaffAssignedToMaintenance,
+  buildRoleScopedFilter,
+  ensureStaffCanWorkOnApartment,
+} from "./maintenance.policy.js";
+import {
+  ensureCurrentUserExists,
+  ensureStaffUser,
+  getComplaintOrThrow,
+  getMaintenanceOrThrow,
+  syncComplaint,
+  syncComplaintFromMaintenance,
+  updateMaintenanceDocument,
+} from "./maintenance.repository.js";
 import type {
   ApproveMaintenanceInput,
   ApproveMaintenanceCostInput,
@@ -38,553 +63,6 @@ export type AuthenticatedMaintenanceUser = {
   role: string;
   apartmentId?: string | null;
   flatId?: string | null;
-};
-
-type AuthUserRecord = {
-  _id?: ObjectId;
-  id?: string;
-  role?: string | null;
-  apartmentId?: string | null;
-  flatId?: string | null;
-};
-
-type MaintenanceNote = {
-  message: string;
-  by: string;
-  role: string;
-  createdAt: Date;
-};
-
-type MaintenanceProgressUpdate = {
-  details: string;
-  status: MaintenanceStatus;
-  remarks: string | null;
-  by: string;
-  role: string;
-  createdAt: Date;
-};
-
-type MaintenancePush = {
-  progressUpdates?: MaintenanceProgressUpdate;
-  workNotes?: MaintenanceNote;
-  managerRemarks?: MaintenanceNote;
-};
-
-type ComplaintRemark = {
-  message: string;
-  by: string;
-  role: string;
-  createdAt: Date;
-};
-
-type MaintenanceFilter = Record<string, unknown>;
-
-const residentRoles = new Set(["RESIDENT", "OWNER", "TENANT"]);
-const managementRoles = new Set(["ADMIN", "SUPER_ADMIN", "PROPERTY_MANAGER", "FACILITY_MANAGER"]);
-const globalManagementRoles = new Set(["ADMIN", "SUPER_ADMIN"]);
-const maintenanceRoles = new Set(["MAINTENANCE_STAFF", "MAINTENANCE_TECHNICIAN", "TECHNICIAN"]);
-
-const terminalStatuses = new Set<MaintenanceStatus>(["CANCELLED", "CLOSED"]);
-const complaintTerminalStatuses = new Set<ComplaintStatus>(["APPROVED", "CANCELLED", "CLOSED"]);
-const complaintMaintenanceSourceStatuses = new Set<ComplaintStatus>([
-  "PENDING",
-  "UNDER_REVIEW",
-  "ASSIGNED",
-  "IN_PROGRESS",
-  "REJECTED",
-]);
-
-const allowedStatusTransitions: Record<MaintenanceStatus, readonly MaintenanceStatus[]> = {
-  PENDING: ["ASSIGNED", "CANCELLED"],
-  ASSIGNED: ["IN_PROGRESS", "CANCELLED"],
-  IN_PROGRESS: ["ON_HOLD", "AWAITING_APPROVAL", "CANCELLED"],
-  ON_HOLD: ["IN_PROGRESS", "CANCELLED"],
-  WORK_COMPLETED: ["AWAITING_APPROVAL", "APPROVED", "REJECTED", "CANCELLED"],
-  AWAITING_APPROVAL: ["APPROVED", "REJECTED", "CANCELLED"],
-  APPROVED: ["CLOSED"],
-  REJECTED: ["ASSIGNED", "IN_PROGRESS", "CANCELLED"],
-  CANCELLED: [],
-  CLOSED: [],
-};
-
-const assignableMaintenanceStatuses = new Set<MaintenanceStatus>([
-  "PENDING",
-  "ASSIGNED",
-  "ON_HOLD",
-  "REJECTED",
-]);
-
-const activeMaintenanceStatuses: MaintenanceStatus[] = [
-  "PENDING",
-  "ASSIGNED",
-  "IN_PROGRESS",
-  "ON_HOLD",
-  "WORK_COMPLETED",
-  "AWAITING_APPROVAL",
-  "REJECTED",
-];
-
-const managerStatusUpdateTargets = new Set<MaintenanceStatus>([
-  "ASSIGNED",
-  "IN_PROGRESS",
-  "ON_HOLD",
-]);
-
-const staffStatusUpdateTargets = new Set<MaintenanceStatus>(["IN_PROGRESS", "ON_HOLD"]);
-const approvalAllowedStatuses = new Set<MaintenanceStatus>(["WORK_COMPLETED", "AWAITING_APPROVAL"]);
-
-const normalizeRole = (role: string | null | undefined): string =>
-  (role ?? "").trim().toUpperCase().replace(/[\s-]+/g, "_");
-
-const normalizeOptionalString = (value: string | null | undefined): string | null => {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
-};
-
-const isResidentRole = (role: string): boolean => residentRoles.has(normalizeRole(role));
-const isManagementRole = (role: string): boolean => managementRoles.has(normalizeRole(role));
-const isGlobalManagementRole = (role: string): boolean => globalManagementRoles.has(normalizeRole(role));
-const isMaintenanceRole = (role: string): boolean => maintenanceRoles.has(normalizeRole(role));
-
-const isMaintenanceStatus = (value: string): value is MaintenanceStatus =>
-  (maintenanceStatuses as readonly string[]).includes(value);
-
-const isComplaintStatus = (value: string): value is ComplaintStatus =>
-  (complaintStatuses as readonly string[]).includes(value);
-
-const getMaintenanceStatus = (maintenance: Pick<MaintenanceDocument, "status">): MaintenanceStatus => {
-  if (!isMaintenanceStatus(maintenance.status)) {
-    throw new AppError("Maintenance has an invalid status", 500);
-  }
-
-  return maintenance.status;
-};
-
-const getComplaintStatus = (complaint: Pick<ComplaintDocument, "status">): ComplaintStatus => {
-  if (!isComplaintStatus(complaint.status)) {
-    throw new AppError("Complaint has an invalid status", 500);
-  }
-
-  return complaint.status;
-};
-
-const sameId = (left: unknown, right: unknown): boolean =>
-  String(left ?? "") === String(right ?? "");
-
-const getMongoId = (value: unknown): string => String(value ?? "");
-
-const buildAuthUserIdFilters = (userId: string): Filter<AuthUserRecord>[] => {
-  const filters: Filter<AuthUserRecord>[] = [{ id: userId }];
-
-  if (ObjectId.isValid(userId)) {
-    filters.push({ _id: new ObjectId(userId) });
-  }
-
-  return filters;
-};
-
-const findAuthUserById = async (userId: string): Promise<AuthUserRecord | null> =>
-  getAuthDB()
-    .collection<AuthUserRecord>("user")
-    .findOne({ $or: buildAuthUserIdFilters(userId) });
-
-const getAuthUserId = (user: AuthUserRecord, fallback: string): string =>
-  user.id ?? user._id?.toHexString() ?? fallback;
-
-const ensureCurrentUserExists = async (user: AuthenticatedMaintenanceUser): Promise<AuthUserRecord> => {
-  const existingUser = await findAuthUserById(user.id);
-
-  if (!existingUser) {
-    throw new AppError("Authenticated user not found", 404);
-  }
-
-  return existingUser;
-};
-
-const ensureStaffUser = async (staffId: string): Promise<AuthUserRecord> => {
-  const staff = await findAuthUserById(staffId);
-
-  if (!staff) {
-    throw new AppError("Staff not found", 404);
-  }
-
-  if (!staff.role || !isMaintenanceRole(staff.role)) {
-    throw new AppError("Assigned user must be maintenance staff", 400);
-  }
-
-  return staff;
-};
-
-const assertValidMaintenanceId = (maintenanceId: string): void => {
-  if (!Types.ObjectId.isValid(maintenanceId)) {
-    throw new AppError("Invalid maintenance ID", 400);
-  }
-};
-
-const assertValidComplaintId = (complaintId: string): void => {
-  if (!Types.ObjectId.isValid(complaintId)) {
-    throw new AppError("Invalid complaint ID", 400);
-  }
-};
-
-const assertValidTransition = (
-  currentStatus: MaintenanceStatus,
-  nextStatus: MaintenanceStatus
-): void => {
-  if (currentStatus === nextStatus) {
-    return;
-  }
-
-  if (!allowedStatusTransitions[currentStatus].includes(nextStatus)) {
-    throw new AppError(`Invalid status transition from ${currentStatus} to ${nextStatus}`, 400);
-  }
-};
-
-const assertNotTerminal = (maintenance: MaintenanceDocument): void => {
-  const status = getMaintenanceStatus(maintenance);
-
-  if (status === "CLOSED") {
-    throw new AppError("Maintenance already closed", 400);
-  }
-
-  if (status === "CANCELLED") {
-    throw new AppError("Maintenance already cancelled", 400);
-  }
-};
-
-const createNote = (
-  message: string | undefined,
-  user: AuthenticatedMaintenanceUser
-): MaintenanceNote | null => {
-  const normalizedMessage = normalizeOptionalString(message);
-
-  if (!normalizedMessage) {
-    return null;
-  }
-
-  return {
-    message: normalizedMessage,
-    by: user.id,
-    role: normalizeRole(user.role),
-    createdAt: new Date(),
-  };
-};
-
-const createComplaintRemark = (
-  message: string | undefined,
-  user: AuthenticatedMaintenanceUser
-): ComplaintRemark | null => {
-  const normalizedMessage = normalizeOptionalString(message);
-
-  if (!normalizedMessage) {
-    return null;
-  }
-
-  return {
-    message: normalizedMessage,
-    by: user.id,
-    role: normalizeRole(user.role),
-    createdAt: new Date(),
-  };
-};
-
-const createProgressUpdate = (
-  details: string,
-  status: MaintenanceStatus,
-  remarks: string | undefined,
-  user: AuthenticatedMaintenanceUser
-): MaintenanceProgressUpdate => ({
-  details,
-  status,
-  remarks: normalizeOptionalString(remarks),
-  by: user.id,
-  role: normalizeRole(user.role),
-  createdAt: new Date(),
-});
-
-const getMaintenanceOrThrow = async (maintenanceId: string) => {
-  assertValidMaintenanceId(maintenanceId);
-
-  const maintenance = await Maintenance.findById(maintenanceId);
-
-  if (!maintenance) {
-    throw new AppError("Maintenance not found", 404);
-  }
-
-  return maintenance;
-};
-
-const getComplaintOrThrow = async (complaintId: string) => {
-  assertValidComplaintId(complaintId);
-
-  const complaint = await Complaint.findById(complaintId);
-
-  if (!complaint) {
-    throw new AppError("Complaint not found", 404);
-  }
-
-  return complaint;
-};
-
-const assertManagerCanManageApartment = (
-  user: AuthenticatedMaintenanceUser,
-  apartmentId: string
-): void => {
-  const role = normalizeRole(user.role);
-
-  if (!managementRoles.has(role)) {
-    throw new AppError("You do not have permission to manage maintenance", 403);
-  }
-
-  const managerApartmentId = normalizeOptionalString(user.apartmentId);
-
-  if (!globalManagementRoles.has(role) && !managerApartmentId) {
-    throw new AppError("Management user must be linked to an apartment", 403);
-  }
-
-  if (!globalManagementRoles.has(role) && apartmentId !== managerApartmentId) {
-    throw new AppError("You do not have permission to manage maintenance for this apartment", 403);
-  }
-};
-
-const assertManagerCanManageMaintenance = (
-  user: AuthenticatedMaintenanceUser,
-  maintenance: MaintenanceDocument
-): void => {
-  assertManagerCanManageApartment(user, maintenance.apartment);
-};
-
-const assertStaffAssignedToMaintenance = (
-  user: AuthenticatedMaintenanceUser,
-  maintenance: MaintenanceDocument
-): void => {
-  if (!isMaintenanceRole(user.role)) {
-    throw new AppError("Only maintenance staff can perform this action", 403);
-  }
-
-  if (!maintenance.assignedStaff || !sameId(maintenance.assignedStaff, user.id)) {
-    throw new AppError("You can only access maintenance assigned to you", 403);
-  }
-};
-
-const assertCanAccessMaintenance = (
-  user: AuthenticatedMaintenanceUser,
-  maintenance: MaintenanceDocument
-): void => {
-  const role = normalizeRole(user.role);
-
-  if (managementRoles.has(role)) {
-    assertManagerCanManageMaintenance(user, maintenance);
-    return;
-  }
-
-  if (maintenanceRoles.has(role)) {
-    assertStaffAssignedToMaintenance(user, maintenance);
-    return;
-  }
-
-  if (residentRoles.has(role)) {
-    if (!sameId(maintenance.resident, user.id)) {
-      throw new AppError("You can only access maintenance related to your own complaints", 403);
-    }
-    return;
-  }
-
-  throw new AppError("You do not have permission to access maintenance", 403);
-};
-
-const ensureStaffCanWorkOnApartment = (
-  staff: AuthUserRecord,
-  fallbackStaffId: string,
-  apartmentId: string,
-  manager: AuthenticatedMaintenanceUser
-): string => {
-  const staffId = getAuthUserId(staff, fallbackStaffId);
-  const staffApartmentId = normalizeOptionalString(staff.apartmentId);
-  const managerApartmentId = normalizeOptionalString(manager.apartmentId);
-
-  if (
-    managerApartmentId &&
-    !isGlobalManagementRole(manager.role) &&
-    staffApartmentId &&
-    staffApartmentId !== managerApartmentId
-  ) {
-    throw new AppError("Staff member does not belong to your apartment", 403);
-  }
-
-  if (staffApartmentId && staffApartmentId !== apartmentId) {
-    throw new AppError("Staff member does not belong to this apartment", 400);
-  }
-
-  return staffId;
-};
-
-const updateMaintenanceDocument = async (
-  maintenanceId: string,
-  set: Record<string, unknown>,
-  push?: MaintenancePush
-) => {
-  const update: UpdateQuery<MaintenanceDocument> = {};
-
-  if (Object.keys(set).length > 0) {
-    update.$set = set;
-  }
-
-  if (push && Object.keys(push).length > 0) {
-    update.$push = push;
-  }
-
-  const updatedMaintenance = await Maintenance.findByIdAndUpdate(maintenanceId, update, {
-    new: true,
-    runValidators: true,
-  });
-
-  if (!updatedMaintenance) {
-    throw new AppError("Maintenance not found", 404);
-  }
-
-  return updatedMaintenance;
-};
-
-const syncComplaint = async (
-  complaintId: string,
-  set: Record<string, unknown>,
-  remark?: ComplaintRemark | null
-): Promise<void> => {
-  const update: UpdateQuery<ComplaintDocument> = {};
-
-  if (Object.keys(set).length > 0) {
-    update.$set = set;
-  }
-
-  if (remark) {
-    update.$push = { remarks: remark };
-  }
-
-  if (Object.keys(update).length === 0) {
-    return;
-  }
-
-  await Complaint.findByIdAndUpdate(complaintId, update, {
-    runValidators: true,
-  });
-};
-
-const syncComplaintFromMaintenance = async (
-  maintenance: MaintenanceDocument,
-  set: Record<string, unknown>,
-  user: AuthenticatedMaintenanceUser,
-  remark?: string
-): Promise<void> => {
-  const complaintId = getMongoId(maintenance.complaint);
-  assertValidComplaintId(complaintId);
-
-  await syncComplaint(complaintId, set, createComplaintRemark(remark, user));
-};
-
-const applySharedFilters = (
-  filter: MaintenanceFilter,
-  query: GetMaintenanceQuery
-): void => {
-  if (query.status) {
-    filter.status = query.status;
-  }
-
-  if (query.category) {
-    filter.category = query.category;
-  }
-
-  if (query.priority) {
-    filter.priority = query.priority;
-  }
-
-  if (query.complaint) {
-    filter.complaint = query.complaint;
-  }
-
-  if (query.costStatus) {
-    filter["costReview.status"] = query.costStatus;
-  }
-};
-
-const applyManagerFilters = (
-  filter: MaintenanceFilter,
-  query: GetMaintenanceQuery,
-  user: AuthenticatedMaintenanceUser
-): void => {
-  const role = normalizeRole(user.role);
-  const managerApartmentId = normalizeOptionalString(user.apartmentId);
-
-  if (!globalManagementRoles.has(role)) {
-    if (!managerApartmentId) {
-      throw new AppError("Management user must be linked to an apartment", 403);
-    }
-
-    if (query.apartment && query.apartment !== managerApartmentId) {
-      throw new AppError("You do not have permission to view maintenance for this apartment", 403);
-    }
-
-    filter.apartment = managerApartmentId;
-  } else if (query.apartment) {
-    filter.apartment = query.apartment;
-  }
-
-  if (query.flat) {
-    filter.flat = query.flat;
-  }
-
-  if (query.resident) {
-    filter.resident = query.resident;
-  }
-
-  if (query.assignedStaff) {
-    filter.assignedStaff = query.assignedStaff;
-  }
-};
-
-const buildRoleScopedFilter = (
-  query: GetMaintenanceQuery,
-  user: AuthenticatedMaintenanceUser
-): MaintenanceFilter => {
-  const role = normalizeRole(user.role);
-  const filter: MaintenanceFilter = {};
-
-  applySharedFilters(filter, query);
-
-  if (managementRoles.has(role)) {
-    applyManagerFilters(filter, query, user);
-  } else if (maintenanceRoles.has(role)) {
-    filter.assignedStaff = user.id;
-  } else if (residentRoles.has(role)) {
-    filter.resident = user.id;
-  } else {
-    throw new AppError("You do not have permission to access maintenance", 403);
-  }
-
-  return filter;
-};
-
-const getComplaintSyncForStatus = (
-  maintenance: MaintenanceDocument,
-  nextStatus: MaintenanceStatus,
-  user: AuthenticatedMaintenanceUser
-): Record<string, unknown> => {
-  if (nextStatus === "ASSIGNED") {
-    return {
-      status: "ASSIGNED",
-      assignedStaff: maintenance.assignedStaff,
-      assignedBy: user.id,
-      assignedAt: new Date(),
-    };
-  }
-
-  if (nextStatus === "IN_PROGRESS" || nextStatus === "ON_HOLD") {
-    return {
-      status: "IN_PROGRESS",
-    };
-  }
-
-  return {};
 };
 
 export const createMaintenance = async (
@@ -660,7 +138,7 @@ export const createMaintenance = async (
   );
 
   if (assignedStaff) {
-    await createAlert({
+    await createNotification({
       apartment: maintenance.apartment,
       recipientUserId: assignedStaff,
       type: "TASK_ASSIGNED",
@@ -823,7 +301,7 @@ export const assignMaintenance = async (
 
   await syncComplaintFromMaintenance(updatedMaintenance, complaintSet, user, data.remarks);
 
-  await createAlert({
+  await createNotification({
     apartment: updatedMaintenance.apartment,
     recipientUserId: staffId,
     type: "TASK_ASSIGNED",
@@ -1025,7 +503,7 @@ export const updateMaintenanceProgress = async (
     );
   }
 
-  await createAlert({
+  await createNotification({
     apartment: updatedMaintenance.apartment,
     recipientRole: "FACILITY_MANAGER",
     type: "MAINTENANCE_STATUS_UPDATED",
@@ -1114,7 +592,7 @@ export const completeMaintenance = async (
 
   await syncComplaintFromMaintenance(updatedMaintenance, complaintSet, user, data.remarks);
 
-  await createAlert({
+  await createNotification({
     apartment: updatedMaintenance.apartment,
     recipientRole: "FACILITY_MANAGER",
     type: data.finalCost !== undefined ? "COST_SUBMITTED" : "WORK_COMPLETED",
@@ -1193,7 +671,7 @@ export const approveMaintenance = async (
   );
 
   await Promise.all([
-    createAlert({
+    createNotification({
       apartment: updatedMaintenance.apartment,
       recipientUserId: updatedMaintenance.resident,
       type: "RESIDENT_CONFIRMATION_REQUESTED",
@@ -1205,7 +683,7 @@ export const approveMaintenance = async (
       createdBy: user.id,
     }),
     updatedMaintenance.assignedStaff
-      ? createAlert({
+      ? createNotification({
           apartment: updatedMaintenance.apartment,
           recipientUserId: updatedMaintenance.assignedStaff,
           type: "WORK_COMPLETED",
@@ -1276,7 +754,7 @@ export const rejectMaintenance = async (
   );
 
   if (updatedMaintenance.assignedStaff) {
-    await createAlert({
+    await createNotification({
       apartment: updatedMaintenance.apartment,
       recipientUserId: updatedMaintenance.assignedStaff,
       type: "MAINTENANCE_STATUS_UPDATED",
@@ -1437,7 +915,7 @@ export const approveMaintenanceCost = async (
   );
 
   await Promise.all([
-    createAlert({
+    createNotification({
       apartment: updatedMaintenance.apartment,
       recipientRole: "TREASURER",
       type: "COST_APPROVED",
@@ -1449,7 +927,7 @@ export const approveMaintenanceCost = async (
       createdBy: user.id,
     }),
     updatedMaintenance.assignedStaff
-      ? createAlert({
+      ? createNotification({
           apartment: updatedMaintenance.apartment,
           recipientUserId: updatedMaintenance.assignedStaff,
           type: "COST_APPROVED",
@@ -1505,7 +983,7 @@ export const rejectMaintenanceCost = async (
   );
 
   if (updatedMaintenance.assignedStaff) {
-    await createAlert({
+    await createNotification({
       apartment: updatedMaintenance.apartment,
       recipientUserId: updatedMaintenance.assignedStaff,
       type: "COST_REJECTED",

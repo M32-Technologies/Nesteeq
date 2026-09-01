@@ -1,4 +1,9 @@
 import express from "express";
+import {
+  MANAGEMENT_ROUTE_ROLES as managementRoles,
+  MAINTENANCE_ROUTE_ROLES as maintenanceRoles,
+  SCHEDULE_ACCESS_ROUTE_ROLES as scheduleAccessRoles,
+} from "../../constants/roles.js";
 import { authorize } from "../../middlewares/authorizeMiddleware.js";
 import { protect } from "../../middlewares/authMiddleware.js";
 import { zodValidate } from "../../middlewares/zodValidate.js";
@@ -29,31 +34,6 @@ import {
 } from "./schedule.schema.js";
 
 const router = express.Router();
-
-const managementRoles = [
-  "ADMIN",
-  "admin",
-  "SUPER_ADMIN",
-  "super_admin",
-  "SUPER ADMIN",
-  "PROPERTY_MANAGER",
-  "property_manager",
-  "PROPERTY MANAGER",
-  "FACILITY_MANAGER",
-  "facility_manager",
-  "FACILITY MANAGER",
-];
-const maintenanceRoles = [
-  "MAINTENANCE_STAFF",
-  "maintenance_staff",
-  "MAINTENANCE STAFF",
-  "MAINTENANCE_TECHNICIAN",
-  "maintenance_technician",
-  "MAINTENANCE TECHNICIAN",
-  "TECHNICIAN",
-  "technician",
-];
-const scheduleAccessRoles = [...managementRoles, ...maintenanceRoles];
 
 router.use(protect);
 

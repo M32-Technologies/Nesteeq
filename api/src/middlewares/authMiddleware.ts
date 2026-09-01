@@ -5,6 +5,7 @@ import { ObjectId, type Filter } from "mongodb";
 import { getAuthDB } from "../config/auth-db.js";
 import { AppError } from "../utils/AppError.js";
 import { catchAsync } from "../utils/catchAsync.js";
+import { authorize } from "./authorizeMiddleware.js";
 
 type AuthUserRecord = {
     _id?: ObjectId;
@@ -55,16 +56,4 @@ export const protect = catchAsync(async (req: Request, res: Response, next: Next
     next();
 });
 
-export const requireRole = (...allowedRoles: string[]) => {
-    return (req: Request, res: Response, next: NextFunction) => {
-        if (!req.user) {
-            return next(new AppError("You are not logged in. Please sign in to continue.", 401));
-        }
-
-        if (!allowedRoles.includes(req.user.role)) {
-            return next(new AppError("You do not have permission to perform this action.", 403));
-        }
-
-        next();
-    };
-};
+export const requireRole = authorize;

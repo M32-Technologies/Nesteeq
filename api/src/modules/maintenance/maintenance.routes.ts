@@ -1,4 +1,10 @@
 import express from "express";
+import {
+  MAINTENANCE_ACCESS_ROUTE_ROLES as maintenanceAccessRoles,
+  MANAGEMENT_AND_MAINTENANCE_ROUTE_ROLES as managementAndMaintenanceRoles,
+  MANAGEMENT_ROUTE_ROLES as managementRoles,
+  MAINTENANCE_ROUTE_ROLES as maintenanceRoles,
+} from "../../constants/roles.js";
 import { authorize } from "../../middlewares/authorizeMiddleware.js";
 import { protect } from "../../middlewares/authMiddleware.js";
 import { zodValidate } from "../../middlewares/zodValidate.js";
@@ -38,33 +44,6 @@ import {
 } from "./maintenance.schema.js";
 
 const router = express.Router();
-
-const residentRoles = ["RESIDENT", "resident", "OWNER", "owner", "TENANT", "tenant"];
-const managementRoles = [
-  "ADMIN",
-  "admin",
-  "SUPER_ADMIN",
-  "super_admin",
-  "SUPER ADMIN",
-  "PROPERTY_MANAGER",
-  "property_manager",
-  "PROPERTY MANAGER",
-  "FACILITY_MANAGER",
-  "facility_manager",
-  "FACILITY MANAGER",
-];
-const maintenanceRoles = [
-  "MAINTENANCE_STAFF",
-  "maintenance_staff",
-  "MAINTENANCE STAFF",
-  "MAINTENANCE_TECHNICIAN",
-  "maintenance_technician",
-  "MAINTENANCE TECHNICIAN",
-  "TECHNICIAN",
-  "technician",
-];
-const maintenanceAccessRoles = [...residentRoles, ...managementRoles, ...maintenanceRoles];
-const managementAndMaintenanceRoles = [...managementRoles, ...maintenanceRoles];
 
 router.use(protect);
 

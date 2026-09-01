@@ -1,4 +1,12 @@
 import express from "express";
+import {
+  COMPLAINT_ACCESS_ROUTE_ROLES as complaintAccessRoles,
+  MANAGEMENT_AND_MAINTENANCE_ROUTE_ROLES as managementAndMaintenanceRoles,
+  MANAGEMENT_ROUTE_ROLES as managementRoles,
+  RESIDENT_AND_MANAGEMENT_ROUTE_ROLES as residentAndManagementRoles,
+  RESIDENT_ROUTE_ROLES as residentRoles,
+  MAINTENANCE_ROUTE_ROLES as maintenanceRoles,
+} from "../../constants/roles.js";
 import { authorize } from "../../middlewares/authorizeMiddleware.js";
 import { protect } from "../../middlewares/authMiddleware.js";
 import { zodValidate } from "../../middlewares/zodValidate.js";
@@ -30,34 +38,6 @@ import {
 } from "./compliaint.schema.js";
 
 const router = express.Router();
-
-const residentRoles = ["RESIDENT", "resident", "OWNER", "owner", "TENANT", "tenant"];
-const managementRoles = [
-  "ADMIN",
-  "admin",
-  "SUPER_ADMIN",
-  "super_admin",
-  "SUPER ADMIN",
-  "PROPERTY_MANAGER",
-  "property_manager",
-  "PROPERTY MANAGER",
-  "FACILITY_MANAGER",
-  "facility_manager",
-  "FACILITY MANAGER",
-];
-const maintenanceRoles = [
-  "MAINTENANCE_STAFF",
-  "maintenance_staff",
-  "MAINTENANCE STAFF",
-  "MAINTENANCE_TECHNICIAN",
-  "maintenance_technician",
-  "MAINTENANCE TECHNICIAN",
-  "TECHNICIAN",
-  "technician",
-];
-const complaintAccessRoles = [...residentRoles, ...managementRoles, ...maintenanceRoles];
-const residentAndManagementRoles = [...residentRoles, ...managementRoles];
-const managementAndMaintenanceRoles = [...managementRoles, ...maintenanceRoles];
 
 router.use(protect);
 

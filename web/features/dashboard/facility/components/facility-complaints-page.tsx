@@ -2,18 +2,6 @@
 
 import { useMemo, useState, type FormEvent } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import {
-  AlertTriangle,
-  CheckCircle2,
-  ClipboardList,
-  Eye,
-  Gauge,
-  Hammer,
-  Loader2,
-  Pencil,
-  Timer,
-  UserRoundCog,
-} from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -32,9 +20,6 @@ import {
   useComplaintStats,
 } from "../facility.api"
 import {
-  complaintCategories,
-  complaintStatuses,
-  priorities,
   type AssignPayload,
   type Complaint,
   type ComplaintCategory,
@@ -43,36 +28,25 @@ import {
   type Priority,
 } from "../facility.types"
 import {
-  ActivityTimeline,
-  Drawer,
-  EmptyState,
-  ErrorState,
-  FilterSelect,
-  FormLabel,
-  FormSelect,
-  formatCurrency,
-  formatDate,
-  formatId,
-  formatLabel,
-  InfoGrid,
-  LoadingRows,
-  MetricCard,
-  PageHeader,
-  PriorityBadge,
-  priorityWeight,
-  SearchBox,
-  StatusBadge,
-  SubmitButton,
-  TextArea,
-  TextInput,
-  Toolbar,
-} from "./facility-ui"
-import {
   matchesSearch,
   readFormString,
   readOptionalNumber,
   readRequiredFormString,
 } from "../facility.utils"
+import { ComplaintDetailsDrawer } from "./complaints/complaint-details-drawer"
+import {
+  ComplaintsFilters,
+  type ComplaintSortKey,
+} from "./complaints/complaints-filters"
+import { ComplaintsStats } from "./complaints/complaints-stats"
+import { ComplaintsTable } from "./complaints/complaints-table"
+import {
+  EmptyState,
+  ErrorState,
+  LoadingRows,
+  PageHeader,
+  priorityWeight,
+} from "./facility-ui"
 
 const complaintManagerTransitions: Partial<
   Record<ComplaintStatus, ComplaintStatus[]>
@@ -109,10 +83,6 @@ const activeMaintenanceStatuses = new Set([
   "REJECTED",
 ])
 
-type SortKey = "newest" | "oldest" | "priority" | "status" | "category"
-
-const sortOptions = ["newest", "oldest", "priority", "status", "category"] as const
-
 function getComplaintStatusOptions(status: ComplaintStatus) {
   return complaintManagerTransitions[status] ?? []
 }
@@ -132,7 +102,7 @@ function getComplaintSearchValues(complaint: Complaint) {
   ]
 }
 
-function sortComplaints(complaints: Complaint[], sort: SortKey) {
+function sortComplaints(complaints: Complaint[], sort: ComplaintSortKey) {
   return [...complaints].sort((left, right) => {
     if (sort === "oldest") {
       return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
@@ -160,7 +130,7 @@ export default function FacilityComplaintsPage() {
   const [status, setStatus] = useState<"all" | ComplaintStatus>("all")
   const [priority, setPriority] = useState<"all" | Priority>("all")
   const [category, setCategory] = useState<"all" | ComplaintCategory>("all")
-  const [sort, setSort] = useState<SortKey>("newest")
+  const [sort, setSort] = useState<ComplaintSortKey>("newest")
   const [selectedComplaintId, setSelectedComplaintId] = useState<string | null>(
     null
   )
@@ -440,73 +410,21 @@ export default function FacilityComplaintsPage() {
       <div className="mx-auto w-full max-w-[1600px] min-w-0">
         <PageHeader title="Complaints" eyebrow="Facility Manager" />
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <MetricCard
-            title="Total complaints"
-            value={statsQuery.data?.total}
-            icon={ClipboardList}
-            tone="green"
-          />
-          <MetricCard
-            title="Pending"
-            value={statsQuery.data?.pending}
-            icon={Timer}
-            tone="amber"
-          />
-          <MetricCard
-            title="Assigned"
-            value={statsQuery.data?.assigned}
-            icon={UserRoundCog}
-            tone="blue"
-          />
-          <MetricCard
-            title="In progress"
-            value={statsQuery.data?.inProgress}
-            icon={Gauge}
-            tone="green"
-          />
-          <MetricCard
-            title="Resolved"
-            value={statsQuery.data?.resolved}
-            icon={CheckCircle2}
-            tone="gray"
-          />
-        </div>
+        <ComplaintsStats stats={statsQuery.data} />
 
         <div className="mt-6 overflow-hidden rounded-lg border border-[#E2E8EE] bg-white">
-          <Toolbar>
-            <SearchBox
-              value={search}
-              onChange={setSearch}
-              placeholder="Search complaints"
-            />
-            <FilterSelect
-              label="status"
-              value={status}
-              options={complaintStatuses}
-              onChange={setStatus}
-            />
-            <FilterSelect
-              label="priority"
-              value={priority}
-              options={priorities}
-              onChange={setPriority}
-            />
-            <FilterSelect
-              label="category"
-              value={category}
-              options={complaintCategories}
-              onChange={setCategory}
-            />
-            <FilterSelect
-              label="sort"
-              value={sort}
-              options={sortOptions}
-              onChange={(value) => {
-                if (value !== "all") setSort(value)
-              }}
-            />
-          </Toolbar>
+          <ComplaintsFilters
+            search={search}
+            status={status}
+            priority={priority}
+            category={category}
+            sort={sort}
+            onSearchChange={setSearch}
+            onStatusChange={setStatus}
+            onPriorityChange={setPriority}
+            onCategoryChange={setCategory}
+            onSortChange={setSort}
+          />
 
           {complaintsQuery.isPending ? (
             <LoadingRows />
@@ -526,485 +444,44 @@ export default function FacilityComplaintsPage() {
               message="There are no complaints matching the current view."
             />
           ) : (
-            <>
-              <div className="hidden overflow-x-auto lg:block">
-                <table className="w-full min-w-[1120px] text-left">
-                  <thead className="bg-[#FBFCFD] text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8793A0]">
-                    <tr>
-                      <th className="px-4 py-3">Complaint ID</th>
-                      <th className="px-4 py-3">Resident</th>
-                      <th className="px-4 py-3">Apartment/Unit</th>
-                      <th className="px-4 py-3">Category</th>
-                      <th className="px-4 py-3">Description</th>
-                      <th className="px-4 py-3">Priority</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Created</th>
-                      <th className="px-4 py-3">Technician</th>
-                      <th className="px-4 py-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#EEF2F5]">
-                    {visibleComplaints.map((complaint) => (
-                      <tr
-                        key={complaint._id}
-                        className="text-[13px] text-[#26313D] transition hover:bg-[#FBFCFD]"
-                      >
-                        <td className="px-4 py-4 font-semibold text-[#111111]">
-                          {formatId(complaint._id)}
-                        </td>
-                        <td className="px-4 py-4">{formatId(complaint.resident)}</td>
-                        <td className="px-4 py-4">
-                          <div className="font-medium">{formatId(complaint.apartment)}</div>
-                          <div className="mt-1 text-[12px] text-[#8793A0]">
-                            {formatId(complaint.flat)}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4">{formatLabel(complaint.category)}</td>
-                        <td className="max-w-[260px] px-4 py-4">
-                          <div className="truncate font-medium text-[#111111]">
-                            {complaint.title}
-                          </div>
-                          <div className="mt-1 line-clamp-2 text-[12px] leading-5 text-[#66737F]">
-                            {complaint.description}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4">
-                          <PriorityBadge priority={complaint.priority} />
-                        </td>
-                        <td className="px-4 py-4">
-                          <StatusBadge status={complaint.status} />
-                        </td>
-                        <td className="px-4 py-4 text-[12px] text-[#66737F]">
-                          {formatDate(complaint.createdAt)}
-                        </td>
-                        <td className="px-4 py-4">
-                          {formatId(complaint.assignedStaff)}
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="flex justify-end">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedComplaintId(complaint._id)}
-                              className="inline-flex size-9 items-center justify-center rounded-lg border border-[#DDE5EC] text-[#5B6875] transition hover:border-[#07584F] hover:text-[#07584F]"
-                              aria-label="View complaint"
-                            >
-                              <Eye className="size-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="divide-y divide-[#EEF2F5] lg:hidden">
-                {visibleComplaints.map((complaint) => (
-                  <article key={complaint._id} className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-[12px] font-semibold text-[#07584F]">
-                          {formatId(complaint._id)}
-                        </p>
-                        <h2 className="mt-1 line-clamp-2 text-[15px] font-semibold text-[#111111]">
-                          {complaint.title}
-                        </h2>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedComplaintId(complaint._id)}
-                        className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-[#DDE5EC] text-[#5B6875]"
-                        aria-label="View complaint"
-                      >
-                        <Eye className="size-4" />
-                      </button>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <StatusBadge status={complaint.status} />
-                      <PriorityBadge priority={complaint.priority} />
-                    </div>
-                    <div className="mt-3 grid gap-2 text-[12px] text-[#66737F]">
-                      <span>{formatLabel(complaint.category)}</span>
-                      <span>
-                        {formatId(complaint.apartment)} / {formatId(complaint.flat)}
-                      </span>
-                      <span>{formatDate(complaint.createdAt)}</span>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </>
+            <ComplaintsTable
+              complaints={visibleComplaints}
+              onSelectComplaint={setSelectedComplaintId}
+            />
           )}
         </div>
       </div>
 
-      <Drawer
+      <ComplaintDetailsDrawer
         open={Boolean(selectedComplaintId)}
-        title={selectedComplaint?.title || "Complaint"}
-        subtitle={selectedComplaint ? formatId(selectedComplaint._id) : undefined}
+        complaint={selectedComplaint}
+        isLoading={detailQuery.isPending}
+        isError={detailQuery.isError}
+        error={detailQuery.error}
+        isRetrying={detailQuery.isFetching}
+        onRetry={() => void detailQuery.refetch()}
         onClose={() => setSelectedComplaintId(null)}
-      >
-        {detailQuery.isPending ? (
-          <div className="flex min-h-[320px] items-center justify-center">
-            <Loader2 className="size-5 animate-spin text-[#07584F]" />
-          </div>
-        ) : detailQuery.isError ? (
-          <ErrorState
-            title="Unable to load details"
-            message={getApiErrorMessage(
-              detailQuery.error,
-              "The complaint details could not be loaded."
-            )}
-            isRetrying={detailQuery.isFetching}
-            onRetry={() => void detailQuery.refetch()}
-          />
-        ) : selectedComplaint ? (
-          <div>
-            <section className="border-b border-[#E8EDF2] pb-5">
-              <div className="flex flex-wrap gap-2">
-                <StatusBadge status={selectedComplaint.status} />
-                <PriorityBadge priority={selectedComplaint.priority} />
-              </div>
-              <p className="mt-4 text-[14px] leading-6 text-[#4E5B67]">
-                {selectedComplaint.description}
-              </p>
-            </section>
-
-            <section className="border-b border-[#E8EDF2] py-5">
-              <h3 className="text-[15px] font-semibold text-[#111111]">
-                Complaint Information
-              </h3>
-              <div className="mt-4">
-                <InfoGrid
-                  items={[
-                    {
-                      label: "Complaint ID",
-                      value: selectedComplaint._id,
-                    },
-                    {
-                      label: "Resident",
-                      value: formatId(selectedComplaint.resident),
-                    },
-                    {
-                      label: "Apartment",
-                      value: formatId(selectedComplaint.apartment),
-                    },
-                    {
-                      label: "Unit",
-                      value: formatId(selectedComplaint.flat),
-                    },
-                    {
-                      label: "Category",
-                      value: formatLabel(selectedComplaint.category),
-                    },
-                    {
-                      label: "Assigned technician",
-                      value: formatId(selectedComplaint.assignedStaff),
-                    },
-                    {
-                      label: "Estimated cost",
-                      value: formatCurrency(selectedComplaint.estimatedCost),
-                    },
-                    {
-                      label: "Final cost",
-                      value: formatCurrency(selectedComplaint.finalCost),
-                    },
-                    {
-                      label: "Created",
-                      value: formatDate(selectedComplaint.createdAt),
-                    },
-                    {
-                      label: "Updated",
-                      value: formatDate(selectedComplaint.updatedAt),
-                    },
-                  ]}
-                />
-              </div>
-            </section>
-
-            <section className="border-b border-[#E8EDF2] py-5">
-              <h3 className="text-[15px] font-semibold text-[#111111]">
-                Maintenance
-              </h3>
-              <div className="mt-4">
-                {relatedMaintenanceQuery.isPending ? (
-                  <div className="rounded-lg border border-[#E2E8EE] bg-[#FBFCFD] p-4 text-[13px] text-[#66737F]">
-                    Loading maintenance...
-                  </div>
-                ) : relatedMaintenance.length > 0 ? (
-                  <div className="space-y-3">
-                    {relatedMaintenance.map((item) => (
-                      <div
-                        key={item._id}
-                        className="rounded-lg border border-[#E2E8EE] bg-[#FBFCFD] p-4"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div>
-                            <p className="text-[13px] font-semibold text-[#111111]">
-                              {formatId(item._id)}
-                            </p>
-                            <p className="mt-1 text-[12px] text-[#66737F]">
-                              {formatLabel(item.category)} - {formatDate(item.createdAt)}
-                            </p>
-                          </div>
-                          <StatusBadge status={item.status} />
-                        </div>
-                        <div className="mt-3 grid gap-2 text-[12px] text-[#66737F] sm:grid-cols-3">
-                          <span>Technician: {formatId(item.assignedStaff)}</span>
-                          <span>Estimate: {formatCurrency(item.estimatedCost)}</span>
-                          <span>Actual: {formatCurrency(item.finalCost)}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="rounded-lg border border-[#E2E8EE] bg-[#FBFCFD] p-4 text-[13px] text-[#66737F]">
-                    No maintenance work is linked.
-                  </div>
-                )}
-
-                {canCreateMaintenance ? (
-                  <form
-                    onSubmit={handleCreateMaintenance}
-                    className="mt-4 grid gap-3 rounded-lg border border-[#E2E8EE] bg-white p-4"
-                  >
-                    <div className="flex items-center gap-2 text-[13px] font-semibold text-[#111111]">
-                      <Hammer className="size-4 text-[#07584F]" />
-                      Create maintenance work
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <FormLabel label="Technician user ID">
-                        <TextInput name="assignedStaff" placeholder="64f..." />
-                      </FormLabel>
-                      <FormLabel label="Estimated cost">
-                        <TextInput name="estimatedCost" type="number" placeholder="0" />
-                      </FormLabel>
-                    </div>
-                    <FormLabel label="Remarks">
-                      <TextArea name="remarks" placeholder="Remarks" />
-                    </FormLabel>
-                    <div>
-                      <SubmitButton isLoading={createMaintenanceMutation.isPending}>
-                        Create Maintenance
-                      </SubmitButton>
-                    </div>
-                  </form>
-                ) : null}
-              </div>
-            </section>
-
-            <section className="border-b border-[#E8EDF2] py-5">
-              <h3 className="text-[15px] font-semibold text-[#111111]">
-                Actions
-              </h3>
-
-              <div className="mt-4 grid gap-4">
-                <form
-                  onSubmit={handleAssign}
-                  className="grid gap-3 rounded-lg border border-[#E2E8EE] bg-[#FBFCFD] p-4"
-                >
-                  <div className="flex items-center gap-2 text-[13px] font-semibold text-[#111111]">
-                    <UserRoundCog className="size-4 text-[#2E639B]" />
-                    Assign Technician
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <FormLabel label="Technician user ID">
-                      <TextInput
-                        name="assignedStaff"
-                        required
-                        placeholder="64f..."
-                        defaultValue={selectedComplaint.assignedStaff}
-                      />
-                    </FormLabel>
-                    <FormLabel label="Estimated cost">
-                      <TextInput
-                        name="estimatedCost"
-                        type="number"
-                        placeholder="0"
-                        defaultValue={selectedComplaint.estimatedCost}
-                      />
-                    </FormLabel>
-                  </div>
-                  <FormLabel label="Remarks">
-                    <TextArea name="remarks" placeholder="Remarks" />
-                  </FormLabel>
-                  <div>
-                    <SubmitButton isLoading={assignMutation.isPending}>
-                      Assign
-                    </SubmitButton>
-                  </div>
-                </form>
-
-                {statusOptions.length > 0 ? (
-                  <form
-                    onSubmit={handleStatusUpdate}
-                    className="grid gap-3 rounded-lg border border-[#E2E8EE] bg-[#FBFCFD] p-4"
-                  >
-                    <div className="flex items-center gap-2 text-[13px] font-semibold text-[#111111]">
-                      <Gauge className="size-4 text-[#07584F]" />
-                      Update Status
-                    </div>
-                    <FormLabel label="Status">
-                      <FormSelect
-                        name="status"
-                        options={statusOptions}
-                        defaultValue={statusOptions[0]}
-                        required
-                      />
-                    </FormLabel>
-                    <FormLabel label="Remarks">
-                      <TextArea name="remarks" placeholder="Remarks" />
-                    </FormLabel>
-                    <div>
-                      <SubmitButton isLoading={statusMutation.isPending}>
-                        Update Status
-                      </SubmitButton>
-                    </div>
-                  </form>
-                ) : null}
-
-                <form
-                  onSubmit={handleEdit}
-                  className="grid gap-3 rounded-lg border border-[#E2E8EE] bg-[#FBFCFD] p-4"
-                >
-                  <div className="flex items-center gap-2 text-[13px] font-semibold text-[#111111]">
-                    <Pencil className="size-4 text-[#946415]" />
-                    Edit Complaint
-                  </div>
-                  <FormLabel label="Title">
-                    <TextInput
-                      name="title"
-                      required
-                      minLength={3}
-                      defaultValue={selectedComplaint.title}
-                    />
-                  </FormLabel>
-                  <FormLabel label="Description">
-                    <TextArea
-                      name="description"
-                      required
-                      minLength={10}
-                      defaultValue={selectedComplaint.description}
-                    />
-                  </FormLabel>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <FormLabel label="Category">
-                      <FormSelect
-                        name="category"
-                        options={complaintCategories}
-                        defaultValue={selectedComplaint.category}
-                        required
-                      />
-                    </FormLabel>
-                    <FormLabel label="Priority">
-                      <FormSelect
-                        name="priority"
-                        options={priorities}
-                        defaultValue={selectedComplaint.priority}
-                        required
-                      />
-                    </FormLabel>
-                    <FormLabel label="Estimated cost">
-                      <TextInput
-                        name="estimatedCost"
-                        type="number"
-                        defaultValue={selectedComplaint.estimatedCost}
-                      />
-                    </FormLabel>
-                  </div>
-                  <FormLabel label="Remarks">
-                    <TextArea name="remarks" placeholder="Remarks" />
-                  </FormLabel>
-                  <div>
-                    <SubmitButton isLoading={updateMutation.isPending}>
-                      Save Changes
-                    </SubmitButton>
-                  </div>
-                </form>
-
-                {canApprove ? (
-                  <div className="grid gap-4 xl:grid-cols-2">
-                    <form
-                      onSubmit={handleApprove}
-                      className="grid gap-3 rounded-lg border border-[#B6DEC5] bg-[#F8FCF9] p-4"
-                    >
-                      <div className="flex items-center gap-2 text-[13px] font-semibold text-[#111111]">
-                        <CheckCircle2 className="size-4 text-[#26733E]" />
-                        Approve Complaint
-                      </div>
-                      <FormLabel label="Remarks">
-                        <TextArea name="remarks" placeholder="Approval remarks" />
-                      </FormLabel>
-                      <div>
-                        <SubmitButton isLoading={approveMutation.isPending}>
-                          Approve
-                        </SubmitButton>
-                      </div>
-                    </form>
-
-                    <form
-                      onSubmit={handleReject}
-                      className="grid gap-3 rounded-lg border border-[#F0C0C0] bg-[#FFF8F8] p-4"
-                    >
-                      <div className="flex items-center gap-2 text-[13px] font-semibold text-[#111111]">
-                        <AlertTriangle className="size-4 text-[#A23D3D]" />
-                        Reject Complaint
-                      </div>
-                      <FormLabel label="Reason">
-                        <TextArea
-                          name="reason"
-                          required
-                          placeholder="Rejection reason"
-                        />
-                      </FormLabel>
-                      <FormLabel label="Remarks">
-                        <TextArea name="remarks" placeholder="Remarks" />
-                      </FormLabel>
-                      <div>
-                        <SubmitButton
-                          tone="danger"
-                          isLoading={rejectMutation.isPending}
-                        >
-                          Reject
-                        </SubmitButton>
-                      </div>
-                    </form>
-                  </div>
-                ) : null}
-
-                {canCancel ? (
-                  <form
-                    onSubmit={handleCancel}
-                    className="grid gap-3 rounded-lg border border-[#F0C0C0] bg-[#FFF8F8] p-4"
-                  >
-                    <div className="flex items-center gap-2 text-[13px] font-semibold text-[#111111]">
-                      <AlertTriangle className="size-4 text-[#A23D3D]" />
-                      Cancel Complaint
-                    </div>
-                    <FormLabel label="Reason">
-                      <TextArea name="reason" placeholder="Cancellation reason" />
-                    </FormLabel>
-                    <div>
-                      <SubmitButton tone="danger" isLoading={cancelMutation.isPending}>
-                        Cancel Complaint
-                      </SubmitButton>
-                    </div>
-                  </form>
-                ) : null}
-              </div>
-            </section>
-
-            <section className="py-5">
-              <h3 className="text-[15px] font-semibold text-[#111111]">
-                Activity
-              </h3>
-              <div className="mt-4">
-                <ActivityTimeline notes={selectedComplaint.remarks} />
-              </div>
-            </section>
-          </div>
-        ) : null}
-      </Drawer>
+        relatedMaintenance={relatedMaintenance}
+        isRelatedMaintenanceLoading={relatedMaintenanceQuery.isPending}
+        canCreateMaintenance={Boolean(canCreateMaintenance)}
+        statusOptions={statusOptions}
+        canApprove={canApprove}
+        canCancel={canCancel}
+        onAssign={handleAssign}
+        onStatusUpdate={handleStatusUpdate}
+        onEdit={handleEdit}
+        onApprove={handleApprove}
+        onReject={handleReject}
+        onCancel={handleCancel}
+        onCreateMaintenance={handleCreateMaintenance}
+        isAssigning={assignMutation.isPending}
+        isUpdatingStatus={statusMutation.isPending}
+        isUpdating={updateMutation.isPending}
+        isApproving={approveMutation.isPending}
+        isRejecting={rejectMutation.isPending}
+        isCancelling={cancelMutation.isPending}
+        isCreatingMaintenance={createMaintenanceMutation.isPending}
+      />
     </div>
   )
 }

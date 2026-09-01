@@ -1,26 +1,22 @@
-import { ObjectId, type Filter } from "mongodb";
-import { getAuthDB } from "../../config/auth-db.js";
-import { AppError } from "../../utils/AppError.js";
-import { Alert } from "../alert/alert.modal.js";
+import { Notification } from "../notification/notification.model.js";
 import { Complaint } from "../complaint/complaint.model.js";
 import { Maintenance } from "../maintenance/maintenance.model.js";
 import { Schedule } from "../schedule/schedule.model.js";
 import { Technician } from "../technician/technician.model.js";
+import { normalizeOptionalString } from "../../utils/serviceHelpers.js";
+import {
+  assertCanViewFacilityDashboard,
+  ensureCurrentUserExists,
+  hasDashboardApartmentScope,
+  scopedFilter,
+  type FacilityFilter,
+} from "./facility.policy.js";
 
 export type AuthenticatedFacilityUser = {
   id: string;
   role: string;
   apartmentId?: string | null;
 };
-
-type AuthUserRecord = {
-  _id?: ObjectId;
-  id?: string;
-  role?: string | null;
-  apartmentId?: string | null;
-};
-
-type FacilityFilter = Record<string, any>;
 
 type ActivityItem = {
   id: string;
@@ -39,9 +35,6 @@ type ActivityItem = {
   priority?: string | null;
 };
 
-const managementRoles = new Set(["ADMIN", "SUPER_ADMIN", "PROPERTY_MANAGER", "FACILITY_MANAGER"]);
-const globalManagementRoles = new Set(["ADMIN", "SUPER_ADMIN"]);
-
 const openComplaintStatuses = [
   "PENDING",
   "UNDER_REVIEW",
@@ -55,65 +48,6 @@ const openComplaintStatuses = [
 const workReviewStatuses = ["WORK_COMPLETED", "AWAITING_APPROVAL"];
 const completedStatuses = ["APPROVED", "CLOSED"];
 const activeScheduleStatuses = ["SCHEDULED", "IN_PROGRESS", "RESCHEDULED"];
-
-const normalizeRole = (role: string | null | undefined): string =>
-  (role ?? "").trim().toUpperCase().replace(/[\s-]+/g, "_");
-
-const normalizeOptionalString = (value: string | null | undefined): string | null => {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
-};
-
-const buildAuthUserIdFilters = (userId: string): Filter<AuthUserRecord>[] => {
-  const filters: Filter<AuthUserRecord>[] = [{ id: userId }];
-
-  if (ObjectId.isValid(userId)) {
-    filters.push({ _id: new ObjectId(userId) });
-  }
-
-  return filters;
-};
-
-const ensureCurrentUserExists = async (user: AuthenticatedFacilityUser): Promise<void> => {
-  const existingUser = await getAuthDB()
-    .collection<AuthUserRecord>("user")
-    .findOne({ $or: buildAuthUserIdFilters(user.id) });
-
-  if (!existingUser) {
-    throw new AppError("Authenticated user not found", 404);
-  }
-};
-
-const assertCanViewFacilityDashboard = (user: AuthenticatedFacilityUser): void => {
-  if (!managementRoles.has(normalizeRole(user.role))) {
-    throw new AppError("You do not have permission to view facility operations", 403);
-  }
-};
-
-const scopedFilter = (
-  user: AuthenticatedFacilityUser,
-  apartmentField: string
-): FacilityFilter => {
-  const role = normalizeRole(user.role);
-
-  if (globalManagementRoles.has(role)) {
-    return {};
-  }
-
-  const apartmentId = normalizeOptionalString(user.apartmentId);
-
-  if (!apartmentId) {
-    throw new AppError("Management user must be linked to an apartment", 403);
-  }
-
-  return { [apartmentField]: apartmentId };
-};
-
-const hasDashboardApartmentScope = (user: AuthenticatedFacilityUser): boolean => {
-  const role = normalizeRole(user.role);
-
-  return globalManagementRoles.has(role) || Boolean(normalizeOptionalString(user.apartmentId));
-};
 
 const emptyPendingActionGroup = () => ({
   count: 0,
@@ -386,7 +320,7 @@ export const getFacilityDashboard = async (user: AuthenticatedFacilityUser) => {
       .limit(5)
       .lean(),
     buildRecentActivity(complaintFilter, maintenanceFilter),
-    Alert.find({
+    Notification.find({
       $or: [
         { recipientRole: "FACILITY_MANAGER", ...complaintFilter },
         { recipientUserId: user.id },
@@ -395,7 +329,7 @@ export const getFacilityDashboard = async (user: AuthenticatedFacilityUser) => {
       .sort({ createdAt: -1 })
       .limit(8)
       .lean(),
-    Alert.countDocuments({
+    Notification.countDocuments({
       readAt: null,
       $or: [
         { recipientRole: "FACILITY_MANAGER", ...complaintFilter },
@@ -425,14 +359,14 @@ export const getFacilityDashboard = async (user: AuthenticatedFacilityUser) => {
         items: tasksWaitingAssignment.map(makeWorkItem),
       },
       workRequiringReview: {
-        count: reviewComplaints.length + reviewMaintenance.length,
+        count: complaintWorkReview + maintenanceWorkReview,
         items: [
           ...reviewComplaints.map((item) => ({ ...makeWorkItem(item), type: "complaint" })),
           ...reviewMaintenance.map((item) => ({ ...makeWorkItem(item), type: "maintenance" })),
         ],
       },
       submittedCostsRequiringApproval: {
-        count: costsRequiringApproval.length,
+        count: costReview,
         items: costsRequiringApproval.map((item) => ({
           ...makeWorkItem(item),
           type: "maintenance",
@@ -445,7 +379,7 @@ export const getFacilityDashboard = async (user: AuthenticatedFacilityUser) => {
       },
     },
     overdue: {
-      count: overdueSchedules.length,
+      count: overdueTasks,
       schedules: overdueSchedules.map((schedule) => ({
         id: String(schedule._id),
         title: schedule.title,

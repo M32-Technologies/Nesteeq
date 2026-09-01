@@ -1,18 +1,9 @@
 import mongoose, { Schema, model, type InferSchemaType } from "mongoose";
 
 export const alertTypes = [
-  "NEW_COMPLAINT",
-  "TASK_ASSIGNED",
-  "MAINTENANCE_STATUS_UPDATED",
-  "WORK_COMPLETED",
-  "COST_SUBMITTED",
-  "COST_APPROVED",
-  "COST_REJECTED",
-  "RESIDENT_CONFIRMATION_REQUESTED",
-  "RESIDENT_CONFIRMATION_RECEIVED",
-  "SCHEDULE_CREATED",
-  "SCHEDULE_UPDATED",
-  "SCHEDULE_CANCELLED",
+  "EMERGENCY_ANNOUNCEMENT",
+  "URGENT_NOTICE",
+  "CRITICAL_ALERT",
 ] as const;
 
 export const alertSeverities = ["INFO", "SUCCESS", "WARNING", "ERROR"] as const;

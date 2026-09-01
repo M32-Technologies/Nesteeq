@@ -12,7 +12,7 @@ const objectIdSchema = (entity: string) =>
     .trim()
     .regex(/^[a-fA-F0-9]{24}$/, `Invalid ${entity} ID`);
 
-const userIdSchema = objectIdSchema("user");
+const userIdSchema = z.string().trim().min(1, "User ID is required");
 const technicianIdSchema = objectIdSchema("technician");
 const workIdSchema = objectIdSchema("work");
 

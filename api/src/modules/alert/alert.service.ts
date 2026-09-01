@@ -1,7 +1,12 @@
 import { ObjectId, type Filter } from "mongodb";
 import { Types } from "mongoose";
+import {
+  APARTMENT_SCOPED_ALERT_ROLE_SET as apartmentScopedRoles,
+  GLOBAL_ROLE_SET as globalRoles,
+} from "../../constants/roles.js";
 import { getAuthDB } from "../../config/auth-db.js";
 import { AppError } from "../../utils/AppError.js";
+import { normalizeRole } from "../../utils/role.js";
 import { Alert, type AlertSeverity, type AlertType } from "./alert.modal.js";
 import type { GetAlertsQuery } from "./alert.schema.js";
 
@@ -32,17 +37,6 @@ export type CreateAlertInput = {
 };
 
 type AlertFilter = Record<string, unknown>;
-
-const globalRoles = new Set(["ADMIN", "SUPER_ADMIN"]);
-const apartmentScopedRoles = new Set([
-  "PROPERTY_MANAGER",
-  "FACILITY_MANAGER",
-  "TREASURER",
-  "SECURITY_STAFF",
-]);
-
-const normalizeRole = (role: string | null | undefined): string =>
-  (role ?? "").trim().toUpperCase().replace(/[\s-]+/g, "_");
 
 const normalizeOptionalString = (value: string | null | undefined): string | null => {
   const trimmed = value?.trim();

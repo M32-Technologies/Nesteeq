@@ -1,4 +1,5 @@
 import express from "express";
+import { REPORT_ROUTE_ROLES as reportRoles } from "../../constants/roles.js";
 import { authorize } from "../../middlewares/authorizeMiddleware.js";
 import { protect } from "../../middlewares/authMiddleware.js";
 import { zodValidate } from "../../middlewares/zodValidate.js";
@@ -13,20 +14,6 @@ import {
 import { getReportsSchema } from "./report.schema.js";
 
 const router = express.Router();
-
-const reportRoles = [
-  "ADMIN",
-  "admin",
-  "SUPER_ADMIN",
-  "super_admin",
-  "SUPER ADMIN",
-  "PROPERTY_MANAGER",
-  "property_manager",
-  "PROPERTY MANAGER",
-  "FACILITY_MANAGER",
-  "facility_manager",
-  "FACILITY MANAGER",
-];
 
 router.use(protect);
 
