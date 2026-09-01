@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "npm run typecheck"
+    "test": "tsx --test test/security-hardening.test.ts"
   },
   "keywords": [],
   "author": "",
