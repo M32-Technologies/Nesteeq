@@ -39,11 +39,6 @@ export const createApartmentBodySchema = z.object({
     .trim()
     .min(1, "Total units is required"),
 
-  totalFloors: z
-    .string()
-    .trim()
-    .min(1, "Total floors is required"),
-
   totalBlocks: z
     .string()
     .trim()

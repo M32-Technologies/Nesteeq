@@ -5,15 +5,19 @@ import { toNodeHandler } from "better-auth/node";
 import { auth } from "./lib/auth.js";
 import cors from "cors"
 import { env } from "./config/env.js";
+import auditRoutes from "./modules/audit/audit.routes.js";
+import billingRoutes from "./modules/billing/billing.routes.js";
 import expenseRoutes from "./modules/expense/expense.routes.js";
+import financeRoutes from "./modules/finance/finance.routes.js";
+import paymentRoutes from "./modules/payment/payment.routes.js";
 import walletRoutes from "./modules/wallet/wallet.routes.js";
-import SubscriptionsRoute from "../src/modules/subscription/subscription.routes.js"
-import ResidentRoute from "../src/modules/resident/resident.routes.js"
-import InvitationRoute from "../src/modules/invitation/invitation.routes.js"
-import StaffRoute from "../src/modules/staff/staff.routes.js"
-import BlockRoute from "../src/modules/block/block.routes.js"
-import FlatRoute from "../src/modules/flat/flat.routes.js"
-import ApartmentRoute from "../src/modules/apartment/apartment.routes.js"
+import SubscriptionsRoute from "./modules/subscription/subscription.routes.js"
+import ResidentRoute from "./modules/resident/resident.routes.js"
+import InvitationRoute from "./modules/invitation/invitation.routes.js"
+import StaffRoute from "./modules/staff/staff.routes.js"
+import BlockRoute from "./modules/block/block.routes.js"
+import FlatRoute from "./modules/flat/flat.routes.js"
+import ApartmentRoute from "./modules/apartment/apartment.routes.js"
 const app = express()
 app.use(cors({
   origin : env.webUrl,
@@ -32,6 +36,19 @@ app.use("/api/v1/invitations" , InvitationRoute)
 app.use("/api/v1/staff" , StaffRoute)
 app.use("/api/v1/blocks" , BlockRoute)
 app.use("/api/v1/flats" , FlatRoute)
+app.use("/api/v1/bills", billingRoutes)
+app.use("/api/v1/payments", paymentRoutes)
+app.use("/api/v1/finance", financeRoutes)
+app.use("/api/v1/expenses", expenseRoutes)
+app.use("/api/v1/wallets", walletRoutes)
+app.use("/api/v1/audit", auditRoutes)
+
+app.use("/api/bills", billingRoutes)
+app.use("/api/payments", paymentRoutes)
+app.use("/api/finance", financeRoutes)
+app.use("/api/expenses", expenseRoutes)
+app.use("/api/wallets", walletRoutes)
+app.use("/api/audit", auditRoutes)
 
 app.use(notFoundHandler);
 app.use(errorHandler);

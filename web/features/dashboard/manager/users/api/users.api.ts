@@ -1,12 +1,13 @@
 import api from "@/lib/axios"
 
 import type {
-  ApiInvitation,
+  ApiInvitation,  
   ApiResident,
   ApiResidentFlat,
   BlockOption,
   BulkInviteResult,
   CreateResidentInviteInput,
+  FlatListParams,
   FlatOption,
   InvitationListParams,
   InvitationListResult,
@@ -49,6 +50,10 @@ type BlocksApiData = {
 
 type FlatsApiData = {
   flats: FlatOption[]
+  page?: number
+  limit?: number
+  totalPages?: number
+  totalCount?: number
 }
 
 export const getResidents = async (
@@ -215,11 +220,16 @@ export const getBlocks = async (): Promise<BlockOption[]> => {
   return response.data.data.blocks
 }
 
-export const getFlats = async (blockId?: string): Promise<FlatOption[]> => {
+export const getFlats = async (
+  params: FlatListParams | string = {}
+): Promise<FlatOption[]> => {
+  const flatParams =
+    typeof params === "string"
+      ? { blockId: params, limit: 500 }
+      : cleanFlatParams(params)
+
   const response = await api.get<ApiResponse<FlatsApiData>>("/api/v1/flats", {
-    params: {
-      blockId,
-    },
+    params: flatParams,
   })
 
   if (!response.data.success) {
@@ -295,6 +305,21 @@ const cleanInvitationParams = (params: InvitationListParams) => ({
   status: params.status,
   page: params.page,
   limit: params.limit,
+})
+
+const cleanFlatParams = (params: FlatListParams) => ({
+  search: params.search?.trim() || undefined,
+  blockId: params.blockId,
+  floorNumber:
+    typeof params.floorNumber === "string"
+      ? params.floorNumber.trim() || undefined
+      : params.floorNumber,
+  occupancyStatus: params.occupancyStatus,
+  status: params.status,
+  page: params.page,
+  limit: params.limit,
+  sortBy: params.sortBy,
+  sortOrder: params.sortOrder,
 })
 
 const mapResident = (resident: ApiResident): ResidentUser => {

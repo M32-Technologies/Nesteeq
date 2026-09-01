@@ -25,7 +25,6 @@ export const protect = catchAsync(async (req: Request, res: Response, next: Next
     if (!session) {
         throw new AppError("Authentication required", 401);
     }
-    console.log(session.session)
     req.user = session.user
     req.session = session.session
 

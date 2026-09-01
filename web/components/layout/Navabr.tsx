@@ -52,7 +52,6 @@ export default function Navbar() {
     };
 
     frame = window.requestAnimationFrame(() => {
-      setHasMounted(true);
       handleScroll();
     });
     window.addEventListener("scroll", handleScroll, { passive: true });

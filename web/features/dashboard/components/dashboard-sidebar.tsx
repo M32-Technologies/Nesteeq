@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
 
 import {
@@ -8,6 +9,7 @@ import {
   ChevronRight,
   LogOut,
   Settings,
+  X,
 } from "lucide-react"
 
 import { signOut } from "@/lib/auth-client"
@@ -22,6 +24,8 @@ import {
 
 type DashboardSidebarProps = {
   role: DashboardRole
+  isMobileOpen?: boolean
+  onMobileClose?: () => void
 
   user: {
     name: string
@@ -32,6 +36,8 @@ type DashboardSidebarProps = {
 
 export default function DashboardSidebar({
   role,
+  isMobileOpen = false,
+  onMobileClose,
   user,
 }: DashboardSidebarProps) {
   const pathname = usePathname()
@@ -57,8 +63,25 @@ export default function DashboardSidebar({
   }
 
   return (
+    <>
+      {isMobileOpen && (
+        <button
+          type="button"
+          aria-label="Close navigation"
+          onClick={onMobileClose}
+          className="
+            fixed
+            inset-0
+            z-40
+            bg-[#071D35]/45
+            backdrop-blur-[2px]
+            lg:hidden
+          "
+        />
+      )}
+
     <aside
-      className="
+      className={`
         peer/sidebar
         group/sidebar
 
@@ -67,23 +90,25 @@ export default function DashboardSidebar({
         top-0
         z-50
 
-        hidden
         h-screen
-        w-[76px]
+        w-[272px]
+        flex
         flex-col
 
         overflow-hidden
 
         bg-[#071D35]
 
-        transition-[width]
+        transition-[transform,width]
         duration-300
         ease-[cubic-bezier(0.22,1,0.36,1)]
 
-        hover:w-[264px]
+        ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
 
-        lg:flex
-      "
+        lg:w-[76px]
+        lg:translate-x-0
+        lg:hover:w-[264px]
+      `}
     >
       {/* =========================
           LOGO
@@ -116,14 +141,16 @@ export default function DashboardSidebar({
             w-[172px]
             min-w-0
 
-            -translate-x-1
-            opacity-0
+            translate-x-0
+            opacity-100
 
             transition-all
             duration-200
 
-            group-hover/sidebar:translate-x-0
-            group-hover/sidebar:opacity-100
+            lg:-translate-x-1
+            lg:opacity-0
+            lg:group-hover/sidebar:translate-x-0
+            lg:group-hover/sidebar:opacity-100
           "
         >
           <p
@@ -133,7 +160,7 @@ export default function DashboardSidebar({
 
               text-[20px]
               font-semibold
-              tracking-[-0.5px]
+              tracking-normal
 
               text-white
             "
@@ -155,6 +182,29 @@ export default function DashboardSidebar({
             {roleLabel} Dashboard
           </p>
         </div>
+
+        <button
+          type="button"
+          aria-label="Close navigation"
+          onClick={onMobileClose}
+          className="
+            ml-auto
+            mr-4
+            flex
+            size-9
+            shrink-0
+            items-center
+            justify-center
+            rounded-lg
+            text-[#C3D2E3]
+            transition-colors
+            hover:bg-white/[0.07]
+            hover:text-white
+            lg:hidden
+          "
+        >
+          <X className="size-5" />
+        </button>
       </div>
       {/* =========================
           NAVIGATION
@@ -194,12 +244,12 @@ export default function DashboardSidebar({
 
                   text-[#63768D]
 
-                  opacity-0
-
                   transition-opacity
                   duration-150
 
-                  group-hover/sidebar:opacity-100
+                  opacity-100
+                  lg:opacity-0
+                  lg:group-hover/sidebar:opacity-100
                 "
               >
                 {section.title}
@@ -222,6 +272,7 @@ export default function DashboardSidebar({
                       key={href}
                       href={href}
                       title={item.title}
+                      onClick={onMobileClose}
                       className={`
                         relative
 
@@ -293,12 +344,12 @@ export default function DashboardSidebar({
                           flex-1
                           items-center
 
-                          opacity-0
-
                           transition-opacity
                           duration-200
 
-                          group-hover/sidebar:opacity-100
+                          opacity-100
+                          lg:opacity-0
+                          lg:group-hover/sidebar:opacity-100
                         "
                       >
                         <span
@@ -394,12 +445,12 @@ export default function DashboardSidebar({
                 text-[13px]
                 font-medium
 
-                opacity-0
-
                 transition-opacity
                 duration-200
 
-                group-hover/sidebar:opacity-100
+                opacity-100
+                lg:opacity-0
+                lg:group-hover/sidebar:opacity-100
               "
             >
               Notifications
@@ -448,12 +499,12 @@ export default function DashboardSidebar({
                 text-[13px]
                 font-medium
 
-                opacity-0
-
                 transition-opacity
                 duration-200
 
-                group-hover/sidebar:opacity-100
+                opacity-100
+                lg:opacity-0
+                lg:group-hover/sidebar:opacity-100
               "
             >
               Settings
@@ -497,9 +548,12 @@ export default function DashboardSidebar({
             "
           >
             {user.image ? (
-              <img
+              <Image
                 src={user.image}
                 alt={user.name}
+                width={36}
+                height={36}
+                unoptimized
                 className="
                   size-9
                   rounded-full
@@ -543,12 +597,12 @@ export default function DashboardSidebar({
               flex-1
               items-center
 
-              opacity-0
-
               transition-opacity
               duration-200
 
-              group-hover/sidebar:opacity-100
+              opacity-100
+              lg:opacity-0
+              lg:group-hover/sidebar:opacity-100
             "
           >
             <div className="min-w-0 flex-1">
@@ -610,5 +664,6 @@ export default function DashboardSidebar({
         </div>
       </div>
     </aside>
+    </>
   )
 }

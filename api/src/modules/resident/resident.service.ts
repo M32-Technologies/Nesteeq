@@ -2,8 +2,12 @@ import { AppError } from "../../utils/AppError.js";
 import { ResidentListQuery } from "./resident.validation.js";
 import { Resident } from "./resident.model.js";
 import { Flat } from "../flat/flat.model.js";
+import { syncFlatOccupancy } from "../flat/flat.service.js";
 import { getAuthDB } from "../../config/auth-db.js";
 import { Types } from "mongoose";
+
+const escapeRegex = (value: string) =>
+    value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export const getResident = async (data: ResidentListQuery, apartmentId: string) => {
     const { search, page, blockId, residentType, status, limit } = data;
@@ -22,7 +26,7 @@ export const getResident = async (data: ResidentListQuery, apartmentId: string) 
     }
 
     if (search) {
-        const regex = new RegExp(search, "i");
+        const regex = new RegExp(escapeRegex(search), "i");
         const [users, flats] = await Promise.all([
             getAuthDB()
                 .collection("user")
@@ -194,8 +198,16 @@ export const updateResidentStatus = async (
         throw new AppError("Resident not found", 404);
     }
 
+    const wasActive = resident.status === "active";
+    const flatId = new Types.ObjectId(resident.flatId.toString());
+    const apartmentObjectId = new Types.ObjectId(apartmentId);
+
     resident.status = status;
     await resident.save();
+
+    if (wasActive || status === "active") {
+        await syncFlatOccupancy(flatId, apartmentObjectId);
+    }
 
     return {
         id: resident._id.toString(),
@@ -229,6 +241,10 @@ export const updateResidentDetails = async (
     if (!resident) {
         throw new AppError("Resident not found", 404);
     }
+
+    const apartmentObjectId = new Types.ObjectId(apartmentId);
+    const previousFlatId = new Types.ObjectId(resident.flatId.toString());
+    const previousResidentType = resident.residentType;
 
     if (data.residentType !== undefined) {
         if (data.residentType !== "owner" && data.residentType !== "resident") {
@@ -279,6 +295,19 @@ export const updateResidentDetails = async (
     }
 
     await resident.save();
+
+    const currentFlatId = new Types.ObjectId(resident.flatId.toString());
+    const flatChanged = previousFlatId.toString() !== currentFlatId.toString();
+    const residentTypeChanged = previousResidentType !== resident.residentType;
+
+    if (resident.status === "active" && (flatChanged || residentTypeChanged)) {
+        await Promise.all([
+            flatChanged
+                ? syncFlatOccupancy(previousFlatId, apartmentObjectId)
+                : Promise.resolve(),
+            syncFlatOccupancy(currentFlatId, apartmentObjectId),
+        ]);
+    }
 
     return getResidentDetails(resident._id.toString(), apartmentId);
 }

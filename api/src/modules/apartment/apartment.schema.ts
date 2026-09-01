@@ -8,7 +8,7 @@ export interface IApartment {
   address: string;
   status: string;
   totalUnits: string;
-  totalFloors: string;
+  totalFloors?: string;
   totalBlocks: string;
   parkingSlots: string;
   contactNumber: string;

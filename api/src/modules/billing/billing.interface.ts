@@ -31,6 +31,7 @@ export interface IBilling {
   balanceAmount: number;
 
   dueDate: Date;
+  settledAt?: Date | null;
 
   status: BillStatus;
 

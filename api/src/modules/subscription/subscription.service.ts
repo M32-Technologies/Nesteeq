@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { razorpay } from "../../config/razorpay.js";
 import { env } from "../../config/env.js";
 import { AppError } from "../../utils/AppError.js";
+import { Apartment } from "../apartment/apartment.model.js";
 import { SubscriptionPlan } from "./subscription-plan.model.js";
 import { Subscription } from "./subscription.model.js";
 import { SubscriptionPlanInput } from "./subscription.schema.js";
@@ -224,6 +225,24 @@ export const VerifySubscriptionPayment = async (
     : undefined;
 
   await subscription.save();
+
+  if (
+    subscription.status === "active" ||
+    subscription.status === "authenticated" ||
+    Number(subscription.paidCount ?? 0) > 0
+  ) {
+    await Apartment.updateOne(
+      {
+        _id: subscription.apartment,
+        status: "pending_payment",
+      },
+      {
+        $set: {
+          status: "active",
+        },
+      },
+    );
+  }
 
   return {
     verified: true,

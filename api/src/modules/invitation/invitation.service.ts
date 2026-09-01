@@ -3,6 +3,7 @@ import { Invite } from "./invitation.model.js"
 import { Resident } from "../resident/resident.model.js"
 import { Staff } from "../staff/staff.model.js"
 import { Flat } from "../flat/flat.model.js"
+import { syncFlatOccupancy } from "../flat/flat.service.js"
 import { Block } from "../block/block.model.js"
 import {
   type BulkInviteRow,
@@ -32,6 +33,9 @@ import { getAuthDB } from "../../config/auth-db.js"
 import { parseInviteWorkbook } from "../../utils/excel/resident-parser.js"
 
 const INVITE_EXPIRY_DAYS = 7
+
+const escapeRegex = (value: string) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 
 const getMaintenanceTypeForRole = (
   role: StaffInviteRole,
@@ -277,14 +281,18 @@ export const getInvitations = async (
     filter.role = query.role
   } else if (query.inviteType === "residents") {
     filter.role = { $in: [...RESIDENT_INVITE_ROLES] }
+  } else if (query.inviteType === "staff") {
+    filter.role = { $in: [...STAFF_INVITE_ROLES] }
   }
 
   if (query.search) {
+    const escapedSearch = escapeRegex(query.search)
+
     filter.$and = [
       {
         $or: [
-          { email: { $regex: query.search, $options: "i" } },
-          { fullName: { $regex: query.search, $options: "i" } },
+          { email: { $regex: escapedSearch, $options: "i" } },
+          { fullName: { $regex: escapedSearch, $options: "i" } },
         ],
       },
     ]
@@ -489,6 +497,8 @@ export const acceptInvitation = async (
         ],
         { session },
       )
+
+      await syncFlatOccupancy(flat._id, invite.apartmentId, { session })
     } else if (STAFF_INVITE_ROLES.includes(invite.role as StaffInviteRole)) {
       const staffRole = invite.role as StaffInviteRole
 

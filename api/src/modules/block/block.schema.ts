@@ -17,7 +17,7 @@ export const createBlockBodySchema = z
       .trim()
       .min(1, "Block code is required")
       .max(20, "Block code must be 20 characters or less")
-      .transform((value) => value.toUpperCase()),
+      .transform((value) => value.trim().toUpperCase()),
     totalFloors: z.coerce
       .number()
       .int("Total floors must be a whole number")
@@ -44,6 +44,50 @@ export const createBlockSchema = z.object({
   body: createBlockBodySchema,
 });
 
+export const updateBlockBodySchema = z
+  .object({
+    blockname: blockNameField,
+    name: blockNameField,
+    code: z
+      .string()
+      .trim()
+      .min(1, "Block code is required")
+      .max(20, "Block code must be 20 characters or less")
+      .transform((value) => value.trim().toUpperCase())
+      .optional(),
+    totalFloors: z.coerce
+      .number()
+      .int("Total floors must be a whole number")
+      .min(1, "Total floors must be at least 1")
+      .optional(),
+    status: blockStatusSchema.optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (
+      data.blockname === undefined &&
+      data.name === undefined &&
+      data.code === undefined &&
+      data.totalFloors === undefined &&
+      data.status === undefined
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["body"],
+        message: "At least one field is required",
+      });
+    }
+  })
+  .transform((data) => ({
+    blockname: data.blockname ?? data.name,
+    code: data.code,
+    totalFloors: data.totalFloors,
+    status: data.status,
+  }));
+
+export const updateBlockSchema = z.object({
+  body: updateBlockBodySchema,
+});
+
 export const blockListQueryObjectSchema = z.object({
   status: blockStatusSchema.optional(),
 });
@@ -53,4 +97,5 @@ export const blockListQuerySchema = z.object({
 });
 
 export type CreateBlockInput = z.infer<typeof createBlockBodySchema>;
+export type UpdateBlockInput = z.infer<typeof updateBlockBodySchema>;
 export type BlockListQuery = z.infer<typeof blockListQueryObjectSchema>;

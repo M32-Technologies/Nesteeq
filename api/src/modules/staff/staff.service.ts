@@ -4,6 +4,9 @@ import { getAuthDB } from "../../config/auth-db.js"
 import { Staff, STAFF_ROLES } from "./staff.model.js"
 import type { StaffListQuery } from "./staff.validation.js"
 
+const escapeRegex = (value: string) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+
 export const getStaff = async (
   query: StaffListQuery,
   apartmentId: string,
@@ -44,7 +47,7 @@ export const getStaff = async (
   }
 
   if (search) {
-    const regex = new RegExp(search, "i")
+    const regex = new RegExp(escapeRegex(search), "i")
     const users = await getAuthDB()
       .collection("user")
       .find({

@@ -405,7 +405,7 @@ export default function PaymentSection({
               />
               <DetailItem
                 label="Structure"
-                value={`${apartment.totalBlocks} blocks, ${apartment.totalFloors} floors, ${apartment.totalUnits} units`}
+                value={`${apartment.totalBlocks} blocks, ${apartment.totalUnits} units`}
               />
               <DetailItem
                 label="Parking"

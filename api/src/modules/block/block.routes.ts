@@ -7,12 +7,16 @@ import {
 } from "../../middlewares/authMiddleware.js"
 import {
   createBlockHandler,
+  deleteBlockHandler,
   getBlocksHandler,
+  getSingleBlockHandler,
+  updateBlockHandler,
 } from "./block.controller.js"
 import {
   blockListQuerySchema,
   createBlockSchema,
-} from "./block.validation.js"
+  updateBlockSchema,
+} from "./block.schema.js"
 
 const router = express.Router()
 const managerOnly = requireRole("property_manager")
@@ -20,5 +24,11 @@ const managerOnly = requireRole("property_manager")
 router.get("/",protect,managerOnly,zodValidate(blockListQuerySchema),getBlocksHandler,)
 
 router.post("/",protect,managerOnly,zodValidate(createBlockSchema),createBlockHandler,)
+
+router.get("/:id", protect, managerOnly, getSingleBlockHandler);
+
+router.patch("/:id", protect, managerOnly, zodValidate(updateBlockSchema), updateBlockHandler);
+
+router.delete("/:id", protect, managerOnly, deleteBlockHandler);
 
 export default router
