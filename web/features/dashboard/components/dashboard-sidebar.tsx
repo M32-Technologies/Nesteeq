@@ -228,10 +228,11 @@ export default function DashboardSidebar({
             <div key={`${section.title}-${sectionIndex}`}>
               {/* SECTION TITLE */}
 
-              <div
-                className="
-                  mb-2
-                  ml-[15px]
+              {section.title ? (
+                <div
+                  className="
+                    mb-2
+                    ml-[15px]
 
                   whitespace-nowrap
 
@@ -240,7 +241,7 @@ export default function DashboardSidebar({
                   uppercase
                   tracking-[0.14em]
 
-                  text-[#63768D]
+                    text-[#63768D]
 
                   overflow-hidden
                   transition-all
@@ -258,6 +259,7 @@ export default function DashboardSidebar({
               >
                 {section.title}
               </div>
+              ) : null}
 
               {/* ITEMS */}
 
