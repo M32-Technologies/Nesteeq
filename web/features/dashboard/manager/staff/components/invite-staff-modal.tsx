@@ -3,7 +3,7 @@
 import { useEffect } from "react"
 import type { ReactNode } from "react"
 import { useForm, useWatch } from "react-hook-form"
-import { Mail, Phone, UserRoundCog, X } from "lucide-react"
+import { ChevronDown, Mail, Phone, UserRoundCog, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { staffRoleOptions } from "../api/staff.api"
@@ -25,7 +25,7 @@ type InviteStaffFormValues = {
 }
 
 const fieldClassName =
-  "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-[#0F5F45] focus:ring-2 focus:ring-[#0F5F45]/10"
+  "h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-700 outline-none transition focus:border-[#0F5F45] focus:ring-2 focus:ring-[#0F5F45]/10"
 
 export default function InviteStaffModal({
   open,
@@ -86,13 +86,13 @@ export default function InviteStaffModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-4 py-6">
-      <div className="w-full max-w-[520px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
-        <div className="flex h-[68px] items-center justify-between border-b border-slate-200 px-5">
+      <div className="w-full max-w-[560px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex min-h-[76px] items-center justify-between gap-4 border-b border-slate-200 px-7">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">
+            <h2 className="text-[22px] font-bold leading-7 text-slate-900">
               Invite Staff
             </h2>
-            <p className="mt-0.5 text-xs font-medium text-slate-500">
+            <p className="mt-1 text-sm font-semibold text-slate-500">
               Send access to a staff member by email.
             </p>
           </div>
@@ -100,19 +100,20 @@ export default function InviteStaffModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+            className="flex size-10 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+            aria-label="Close invite staff modal"
           >
             <X size={19} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit(submitInvite)}>
-          <div className="space-y-4 p-5">
+          <div className="space-y-5 px-7 py-6">
             <FormField label="Full name" error={errors.fullName?.message}>
               <div className="relative">
                 <UserRoundCog
-                  size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  size={18}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
                 />
                 <input
                   type="text"
@@ -123,7 +124,7 @@ export default function InviteStaffModal({
                       message: "Full name must contain at least 2 characters",
                     },
                   })}
-                  className={`${fieldClassName} pl-9`}
+                  className={`${fieldClassName} pl-11`}
                 />
               </div>
             </FormField>
@@ -131,8 +132,8 @@ export default function InviteStaffModal({
             <FormField label="Email" error={errors.email?.message}>
               <div className="relative">
                 <Mail
-                  size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  size={18}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
                 />
                 <input
                   type="email"
@@ -143,7 +144,7 @@ export default function InviteStaffModal({
                       message: "Enter a valid email",
                     },
                   })}
-                  className={`${fieldClassName} pl-9`}
+                  className={`${fieldClassName} pl-11`}
                 />
               </div>
             </FormField>
@@ -151,25 +152,34 @@ export default function InviteStaffModal({
             <FormField label="Phone">
               <div className="relative">
                 <Phone
-                  size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  size={18}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
                 />
                 <input
                   type="tel"
                   {...register("phoneNumber")}
-                  className={`${fieldClassName} pl-9`}
+                  className={`${fieldClassName} pl-11`}
                 />
               </div>
             </FormField>
 
             <FormField label="Role">
-              <select {...register("role")} className={fieldClassName}>
-                {staffRoleOptions.map((role) => (
-                  <option key={role.value} value={role.value}>
-                    {role.label}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  {...register("role")}
+                  className={`${fieldClassName} appearance-none pr-11`}
+                >
+                  {staffRoleOptions.map((role) => (
+                    <option key={role.value} value={role.value}>
+                      {role.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  size={18}
+                  className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500"
+                />
+              </div>
             </FormField>
 
             {selectedRole === "maintenance_technician" && (
@@ -184,12 +194,12 @@ export default function InviteStaffModal({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3 border-t border-slate-200 bg-white p-5">
+          <div className="grid grid-cols-1 gap-4 border-t border-slate-200 bg-white px-7 py-6 sm:grid-cols-2">
             <button
               type="button"
               onClick={onClose}
               disabled={inviteStaff.isPending}
-              className="flex h-11 items-center justify-center rounded-lg border border-slate-200 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex h-12 items-center justify-center rounded-lg border border-slate-200 text-[15px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Cancel
             </button>
@@ -197,7 +207,7 @@ export default function InviteStaffModal({
             <button
               type="submit"
               disabled={inviteStaff.isPending}
-              className="flex h-11 items-center justify-center rounded-lg bg-[#0F5F45] text-sm font-medium text-white transition hover:bg-[#0B4D38] disabled:cursor-not-allowed disabled:opacity-70"
+              className="flex h-12 items-center justify-center rounded-lg bg-[#0F5F45] text-[15px] font-semibold text-white transition hover:bg-[#0B4D38] disabled:cursor-not-allowed disabled:opacity-70"
             >
               {inviteStaff.isPending ? "Sending..." : "Send Invite"}
             </button>
@@ -219,7 +229,7 @@ function FormField({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-sm font-medium text-slate-700">
+      <span className="mb-2 block text-[15px] font-bold leading-5 text-slate-700">
         {label}
       </span>
       {children}

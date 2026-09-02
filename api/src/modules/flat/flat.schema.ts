@@ -152,8 +152,20 @@ export const deactivateFlatSchema = z.object({
   params: flatIdParamsSchema,
 });
 
+export const updateFlatStatusBodySchema = z
+  .object({
+    status: z.enum(["active", "inactive"]),
+  })
+  .strict();
+
+export const updateFlatStatusSchema = z.object({
+  params: flatIdParamsSchema,
+  body: updateFlatStatusBodySchema,
+});
+
 export type FlatListQuery = z.infer<typeof flatListQueryObjectSchema>;
 export type CreateFlatInput = z.infer<typeof createFlatBodySchema>;
 export type GenerateFlatsInput = z.infer<typeof generateFlatsBodySchema>;
 export type UpdateFlatInput = z.infer<typeof updateFlatBodySchema>;
+export type UpdateFlatStatusInput = z.infer<typeof updateFlatStatusBodySchema>;
 export type FlatIdParams = z.infer<typeof flatIdParamsSchema>;

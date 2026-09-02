@@ -77,29 +77,13 @@ export const getResidents = async (
 }
 
 export const getUserStats = async (): Promise<UserStats> => {
-  const [
-    allUsers,
-    activeUsers,
-    pendingInvitations,
-    inactiveUsers,
-  ] = await Promise.all([
-    getResidents({ page: 1, limit: 1 }),
-    getResidents({ status: "active", page: 1, limit: 1 }),
-    getInvitations({
-      inviteType: "residents",
-      status: "pending",
-      page: 1,
-      limit: 1,
-    }),
-    getResidents({ status: "inactive", page: 1, limit: 1 }),
-  ])
+  const response = await api.get<ApiResponse<UserStats>>("/api/v1/residents/stats")
 
-  return {
-    totalUsers: allUsers.totalCount,
-    activeUsers: activeUsers.totalCount,
-    pendingUsers: pendingInvitations.totalCount,
-    inactiveUsers: inactiveUsers.totalCount,
+  if (!response.data.success) {
+    throw new Error(response.data.message || "Failed to fetch user stats")
   }
+
+  return response.data.data
 }
 
 export const getInvitations = async (
