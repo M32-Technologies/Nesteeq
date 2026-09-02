@@ -43,8 +43,6 @@ export const createBillSchema = z.object({
       .optional(),
 
     dueDate: z.coerce.date(),
-
-    createdBy: objectIdSchema.optional(),
   }),
 });
 

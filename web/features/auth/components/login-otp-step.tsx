@@ -24,12 +24,14 @@ const RESEND_SECONDS = 30
 
 type LoginOtpStepProps = {
   email: string
+  name?: string
   onChangeEmail: () => void
   onSuccess: () => void
 }
 
 function LoginOtpStep({
   email,
+  name,
   onChangeEmail,
   onSuccess,
 }: LoginOtpStepProps) {
@@ -81,6 +83,11 @@ function LoginOtpStep({
         await authClient.signIn.emailOtp({
           email,
           otp: code,
+          ...(name ? { name } : {}),
+        } as {
+          email: string
+          otp: string
+          name?: string
         })
 
       if (error) {

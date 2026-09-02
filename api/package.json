@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "migrate:flat-floor-number": "tsx src/scripts/migrate-flat-floor-number.ts",
     "test": "tsx --test test/security-hardening.test.ts"
   },
   "keywords": [],
@@ -20,6 +21,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.2.0",
     "@types/node": "^26.2.0",
     "tsx": "^4.23.9",
     "typescript": "^7.0.2"
@@ -32,10 +34,12 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
+    "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "mongodb": "^7.5.0",
     "mongoose": "^9.9.1",
+    "multer": "^2.2.0",
     "razorpay": "^2.9.8",
     "redis": "^6.2.0",
     "socket.io": "^4.8.3",

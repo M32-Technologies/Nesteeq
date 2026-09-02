@@ -37,7 +37,7 @@ export default function FinalCTA() {
           className="mt-12"
         >
           <Link
-            href="/register"
+            href="/pricing"
             className="group inline-flex h-14 items-center justify-center gap-2 rounded-full bg-white px-8 text-base font-semibold text-[var(--brand-dark)] transition-all hover:scale-105 hover:bg-white/90 active:scale-100"
           >
             Get started

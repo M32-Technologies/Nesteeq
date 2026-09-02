@@ -14,6 +14,7 @@ type BillCalculationInput = Pick<
   | "lateFeeWaivedAmount"
   | "paidAmount"
   | "dueDate"
+  | "settledAt"
 >;
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -51,8 +52,10 @@ export const getDaysOverdue = (
 export const calculateBillValues = (
   bill: BillCalculationInput
 ) => {
+  const referenceDate = bill.settledAt ?? new Date();
+  const daysOverdue = getDaysOverdue(bill.dueDate, referenceDate);
   const lateFeeAmount = roundMoney(
-    getDaysOverdue(bill.dueDate) * bill.lateFeePerDay
+    daysOverdue * bill.lateFeePerDay
   );
 
   const effectiveLateFee = roundMoney(
@@ -73,7 +76,7 @@ export const calculateBillValues = (
 
   if (balanceAmount === 0) {
     status = BillStatus.PAID;
-  } else if (getDaysOverdue(bill.dueDate) > 0) {
+  } else if (daysOverdue > 0) {
     status = BillStatus.OVERDUE;
   } else if (bill.paidAmount > 0) {
     status = BillStatus.PARTIALLY_PAID;
@@ -96,6 +99,10 @@ export const applyBillValues = (
   bill.totalAmount = values.totalAmount;
   bill.balanceAmount = values.balanceAmount;
   bill.status = values.status;
+
+  if (values.balanceAmount === 0 && !bill.settledAt) {
+    bill.settledAt = new Date();
+  }
 
   return bill;
 };

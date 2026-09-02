@@ -1,6 +1,5 @@
 import "dotenv/config";
 
-import app from "./app.js";
 import { connectDB } from "./config/db.js";
 import { connectAuthDB } from "./config/auth-db.js";
 import { env } from "./config/env.js";
@@ -9,6 +8,8 @@ const startServer = async (): Promise<void> => {
     try {
         await connectDB();
         await connectAuthDB();
+
+        const { default: app } = await import("./app.js");
 
         app.listen(env.port, () => {
             console.log(`Server running on port ${env.port}`);

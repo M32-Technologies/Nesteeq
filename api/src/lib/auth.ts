@@ -1,14 +1,14 @@
 import { betterAuth } from "better-auth"
 import { APIError, createAuthMiddleware } from "better-auth/api"
 import { mongodbAdapter } from "@better-auth/mongo-adapter"
-import { getAuthDB, authMongoClient } from "../config/auth-db.js"
+import { getAuthDB, getAuthMongoClient } from "../config/auth-db.js"
 import { env } from "../config/env.js"
 import { emailOTP } from "better-auth/plugins"
 import { emailService } from "../services/EmailService.js"
 
 export const auth = betterAuth({
   database: mongodbAdapter(getAuthDB(), {
-    client: authMongoClient
+    client: getAuthMongoClient()
   }),
   baseURL: env.betterAuthUrl,
   trustedOrigins: [env.webUrl],
