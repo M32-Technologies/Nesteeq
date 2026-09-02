@@ -24,3 +24,6 @@ Thumbs.db
 
 # TypeScript
 *.tsbuildinfo
+
+# AI agent configs (local only)
+.agents/

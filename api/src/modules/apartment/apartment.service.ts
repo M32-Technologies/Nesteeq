@@ -94,3 +94,21 @@ export const getPendingApartment = async (managerId: string) => {
     });
 }
 
+export const getCurrentApartment = async (apartmentId?: string) => {
+    if (!apartmentId) {
+        throw new AppError("Apartment context is required", 400);
+    }
+
+    if (!ObjectId.isValid(apartmentId)) {
+        throw new AppError("Apartment id must be a valid id", 400);
+    }
+
+    const apartment = await Apartment.findById(apartmentId);
+
+    if (!apartment) {
+        throw new AppError("Apartment was not found", 404);
+    }
+
+    return apartment;
+}
+
