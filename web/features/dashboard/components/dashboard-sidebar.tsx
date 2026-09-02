@@ -228,32 +228,34 @@ export default function DashboardSidebar({
             <div key={`${section.title}-${sectionIndex}`}>
               {/* SECTION TITLE */}
 
-              <div
-                className="
-                  mb-2
-                  ml-[15px]
+              {section.title ? (
+                <div
+                  className="
+                    mb-2
+                    ml-[15px]
 
-                  h-[16px]
+                    h-[16px]
 
-                  whitespace-nowrap
+                    whitespace-nowrap
 
-                  text-[10px]
-                  font-medium
-                  uppercase
-                  tracking-[0.12em]
+                    text-[10px]
+                    font-medium
+                    uppercase
+                    tracking-[0.12em]
 
-                  text-[#63768D]
+                    text-[#63768D]
 
-                  transition-opacity
-                  duration-150
+                    transition-opacity
+                    duration-150
 
-                  opacity-100
-                  lg:opacity-0
-                  lg:group-hover/sidebar:opacity-100
-                "
-              >
-                {section.title}
-              </div>
+                    opacity-100
+                    lg:opacity-0
+                    lg:group-hover/sidebar:opacity-100
+                  "
+                >
+                  {section.title}
+                </div>
+              ) : null}
 
               {/* ITEMS */}
 
