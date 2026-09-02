@@ -3,7 +3,6 @@ import mongoose, {
   model,
   type InferSchemaType,
 } from "mongoose"
-import mongoose from "mongoose"
 
 const residentSchema = new Schema(
   {
@@ -87,12 +86,7 @@ residentSchema.index({
   status: 1,
 })
 
-<<<<<<< HEAD
-export const ResidentModel =
-  mongoose.models.Resident || model("Resident", residentSchema)
-=======
 export type ResidentDocument = InferSchemaType<typeof residentSchema>
 
 export const ResidentModel = mongoose.models.Resident || model("Resident", residentSchema)
 export const Resident = ResidentModel
->>>>>>> origin/dev

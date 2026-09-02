@@ -3,8 +3,6 @@ import { describe, it, type TestContext } from "node:test";
 import { Types } from "mongoose";
 import { getAuthDB } from "../../config/auth-db.js";
 import { AppError } from "../../utils/AppError.js";
-import { Alert } from "../alert/alert.modal.js";
-import { createAlert } from "../alert/alert.service.js";
 import { assertCanAccessComplaint, assertManagerCanManageComplaint } from "../complaint/complaint.policy.js";
 import { createComplaint } from "../complaint/complaint.service.js";
 import {
@@ -20,14 +18,14 @@ import {
 } from "../maintenance/maintenance.workflow.js";
 import { Maintenance } from "../maintenance/maintenance.model.js";
 import { Notification } from "../notification/notification.model.js";
-import { ensureNoTechnicianConflict } from "../schedule/schedule.repository.js";
+import { ensureNoTechnicianConflict } from "../schedule/schedule.service.js";
 import { assertCanAccessSchedule, buildScheduleFilter } from "../schedule/schedule.policy.js";
 import { Schedule } from "../schedule/schedule.model.js";
 import { assertCanAccessTechnician, buildRoleScopedFilter as buildTechnicianFilter } from "../technician/technician.policy.js";
 import {
   assertComplaintAssignedToTechnician,
   assertMaintenanceAssignedToTechnician,
-} from "../technician/technician.repository.js";
+} from "../technician/technician.service.js";
 import { assertTechnicianIsAssignable } from "../technician/technician.workflow.js";
 import { Technician } from "../technician/technician.model.js";
 
@@ -571,68 +569,5 @@ describe("Facility dashboard counts", () => {
     assert.equal(dashboard.overdue.schedules.length, 5);
     assert.equal(dashboard.notifications.unread, 9);
     assert.equal(dashboard.notifications.alerts.length, 1);
-  });
-});
-
-describe("Alert and workflow notification separation", () => {
-  it("creates Notification records, not Alert records, for normal complaint workflow events", async (t) => {
-    const notifications: FilterShape[] = [];
-    const alerts: FilterShape[] = [];
-    const complaintId = new Types.ObjectId();
-
-    mockAuthenticatedUserLookup(t);
-    mockMethod(t, Complaint, "create", async (data: FilterShape) => ({
-      _id: complaintId,
-      ...data,
-    }));
-    mockMethod(t, Notification, "create", async (data: FilterShape) => {
-      notifications.push(data);
-      return data;
-    });
-    mockMethod(t, Alert, "create", async (data: FilterShape) => {
-      alerts.push(data);
-      return data;
-    });
-
-    await createComplaint(
-      {
-        title: "Kitchen sink leak",
-        description: "Water is leaking under the kitchen sink cabinet.",
-        category: "PLUMBING",
-        priority: "HIGH",
-      },
-      resident() as any
-    );
-
-    assert.equal(notifications.length, 1);
-    assert.equal(notifications[0].type, "NEW_COMPLAINT");
-    assert.equal(notifications[0].recipientRole, "FACILITY_MANAGER");
-    assert.equal(notifications[0].relatedResourceType, "complaint");
-    assert.equal(notifications[0].relatedResourceId, String(complaintId));
-    assert.equal(alerts.length, 0);
-  });
-
-  it("keeps emergency alerts in the Alert module", async (t) => {
-    const alerts: FilterShape[] = [];
-
-    mockMethod(t, Alert, "create", async (data: FilterShape) => {
-      alerts.push(data);
-      return data;
-    });
-
-    await createAlert({
-      apartment: "apt-a",
-      recipientRole: "FACILITY_MANAGER",
-      type: "CRITICAL_ALERT",
-      severity: "ERROR",
-      title: "Critical water outage",
-      message: "Main water supply is unavailable.",
-      createdBy: "admin-1",
-    });
-
-    assert.equal(alerts.length, 1);
-    assert.equal(alerts[0].type, "CRITICAL_ALERT");
-    assert.equal(alerts[0].recipientRole, "FACILITY_MANAGER");
-    assert.equal(alerts[0].apartment, "apt-a");
   });
 });

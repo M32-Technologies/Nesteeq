@@ -1,8 +1,11 @@
 import { ObjectId, type Filter } from "mongodb";
-import { MANAGEMENT_ROLE_SET as reportRoles } from "../../constants/roles.js";
 import { getAuthDB } from "../../config/auth-db.js";
 import { AppError } from "../../utils/AppError.js";
-import { isGlobalRole as isGlobalReportRole, normalizeRole } from "../../utils/role.js";
+import {
+  isGlobalRole as isGlobalReportRole,
+  MANAGEMENT_ROLE_SET as reportRoles,
+  normalizeRole,
+} from "../../utils/role.js";
 import { normalizeOptionalString } from "../../utils/serviceHelpers.js";
 import type { ReportQuery } from "./report.schema.js";
 import type { AuthenticatedReportUser } from "./report.service.js";

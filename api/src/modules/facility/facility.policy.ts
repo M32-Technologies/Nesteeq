@@ -2,10 +2,10 @@ import { ObjectId, type Filter } from "mongodb";
 import {
   GLOBAL_ROLE_SET as globalManagementRoles,
   MANAGEMENT_ROLE_SET as managementRoles,
-} from "../../constants/roles.js";
+  normalizeRole,
+} from "../../utils/role.js";
 import { getAuthDB } from "../../config/auth-db.js";
 import { AppError } from "../../utils/AppError.js";
-import { normalizeRole } from "../../utils/role.js";
 import { normalizeOptionalString } from "../../utils/serviceHelpers.js";
 import type { AuthenticatedFacilityUser } from "./facility.service.js";
 

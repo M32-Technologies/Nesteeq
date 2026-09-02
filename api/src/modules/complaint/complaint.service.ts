@@ -1,20 +1,21 @@
-import {
-  GLOBAL_ROLE_SET as globalManagementRoles,
-  MANAGEMENT_ROLE_SET as managementRoles,
-  MAINTENANCE_ROLE_SET as maintenanceRoles,
-  RESIDENT_ROLE_SET as residentRoles,
-} from "../../constants/roles.js";
+import { ObjectId, type Filter } from "mongodb";
+import { Types, type UpdateQuery } from "mongoose";
+import { getAuthDB } from "../../config/auth-db.js";
 import { AppError } from "../../utils/AppError.js";
 import {
+  GLOBAL_ROLE_SET as globalManagementRoles,
   isGlobalRole as isGlobalManagementRole,
   isManagementRole,
   isMaintenanceRole,
   isResidentRole,
+  MANAGEMENT_ROLE_SET as managementRoles,
+  MAINTENANCE_ROLE_SET as maintenanceRoles,
   normalizeRole,
+  RESIDENT_ROLE_SET as residentRoles,
 } from "../../utils/role.js";
 import { normalizeOptionalString, sameId } from "../../utils/serviceHelpers.js";
 import { createNotification } from "../notification/notification.service.js";
-import { Complaint } from "./complaint.model.js";
+import { Complaint, type ComplaintDocument } from "./complaint.model.js";
 import {
   approvalAllowedStatuses,
   assertNotTerminal,
@@ -30,13 +31,6 @@ import {
   assertManagerCanManageComplaint,
   assertStaffAssignedToComplaint,
 } from "./complaint.policy.js";
-import {
-  ensureCurrentUserExists,
-  ensureStaffUser,
-  getAuthUserId,
-  getComplaintOrThrow,
-  updateComplaintDocument,
-} from "./complaint.repository.js";
 import type {
   ApproveComplaintInput,
   AssignComplaintInput,
@@ -65,6 +59,106 @@ type ComplaintRemark = {
 };
 
 type ComplaintFilter = Record<string, unknown>;
+
+type AuthUserRecord = {
+  _id?: ObjectId;
+  id?: string;
+  role?: string | null;
+  apartmentId?: string | null;
+  flatId?: string | null;
+};
+
+const buildAuthUserIdFilters = (userId: string): Filter<AuthUserRecord>[] => {
+  const filters: Filter<AuthUserRecord>[] = [{ id: userId }];
+
+  if (ObjectId.isValid(userId)) {
+    filters.push({ _id: new ObjectId(userId) });
+  }
+
+  return filters;
+};
+
+const findAuthUserById = async (userId: string): Promise<AuthUserRecord | null> => {
+  const filters = buildAuthUserIdFilters(userId);
+
+  return getAuthDB()
+    .collection<AuthUserRecord>("user")
+    .findOne({ $or: filters });
+};
+
+const getAuthUserId = (user: AuthUserRecord, fallback: string): string =>
+  user.id ?? user._id?.toHexString() ?? fallback;
+
+const ensureCurrentUserExists = async (
+  user: AuthenticatedComplaintUser
+): Promise<AuthUserRecord> => {
+  const existingUser = await findAuthUserById(user.id);
+
+  if (!existingUser) {
+    throw new AppError("Authenticated user not found", 404);
+  }
+
+  return existingUser;
+};
+
+const ensureStaffUser = async (staffId: string): Promise<AuthUserRecord> => {
+  const staff = await findAuthUserById(staffId);
+
+  if (!staff) {
+    throw new AppError("Staff not found", 404);
+  }
+
+  if (!staff.role || !isMaintenanceRole(staff.role)) {
+    throw new AppError("Assigned user must be maintenance staff", 400);
+  }
+
+  return staff;
+};
+
+const assertValidComplaintId = (complaintId: string): void => {
+  if (!Types.ObjectId.isValid(complaintId)) {
+    throw new AppError("Invalid complaint ID", 400);
+  }
+};
+
+const getComplaintOrThrow = async (complaintId: string) => {
+  assertValidComplaintId(complaintId);
+
+  const complaint = await Complaint.findById(complaintId);
+
+  if (!complaint) {
+    throw new AppError("Complaint not found", 404);
+  }
+
+  return complaint;
+};
+
+const updateComplaintDocument = async (
+  complaintId: string,
+  set: Record<string, unknown>,
+  remark?: ComplaintRemark | null
+) => {
+  const update: UpdateQuery<ComplaintDocument> = {};
+
+  if (Object.keys(set).length > 0) {
+    update.$set = set;
+  }
+
+  if (remark) {
+    update.$push = { remarks: remark };
+  }
+
+  const updatedComplaint = await Complaint.findByIdAndUpdate(complaintId, update, {
+    new: true,
+    runValidators: true,
+  });
+
+  if (!updatedComplaint) {
+    throw new AppError("Complaint not found", 404);
+  }
+
+  return updatedComplaint;
+};
 
 const createRemark = (message: string | undefined, user: AuthenticatedComplaintUser): ComplaintRemark | null => {
   const normalizedMessage = normalizeOptionalString(message);

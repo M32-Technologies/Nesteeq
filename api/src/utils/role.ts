@@ -1,10 +1,21 @@
-import {
-  GLOBAL_ROLE_SET,
-  MANAGEMENT_ROLE_SET,
-  MAINTENANCE_ROLE_SET,
-  RESIDENT_ROLE_SET,
-  TECHNICIAN_CREATOR_ROLE_SET,
-} from "../constants/roles.js";
+export const RESIDENT_ROLE_SET = new Set<string>(["RESIDENT", "OWNER", "TENANT"]);
+export const MANAGEMENT_ROLE_SET = new Set<string>([
+  "ADMIN",
+  "SUPER_ADMIN",
+  "PROPERTY_MANAGER",
+  "FACILITY_MANAGER",
+]);
+export const GLOBAL_ROLE_SET = new Set<string>(["ADMIN", "SUPER_ADMIN"]);
+export const MAINTENANCE_ROLE_SET = new Set<string>([
+  "MAINTENANCE_STAFF",
+  "MAINTENANCE_TECHNICIAN",
+  "TECHNICIAN",
+]);
+export const TECHNICIAN_CREATOR_ROLE_SET = new Set<string>([
+  "ADMIN",
+  "SUPER_ADMIN",
+  "PROPERTY_MANAGER",
+]);
 
 export const normalizeRole = (role: string | null | undefined): string =>
   (role ?? "").trim().toUpperCase().replace(/[\s-]+/g, "_");

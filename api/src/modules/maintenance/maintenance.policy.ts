@@ -3,20 +3,28 @@ import {
   MANAGEMENT_ROLE_SET as managementRoles,
   MAINTENANCE_ROLE_SET as maintenanceRoles,
   RESIDENT_ROLE_SET as residentRoles,
-} from "../../constants/roles.js";
-import { AppError } from "../../utils/AppError.js";
-import {
   isGlobalRole as isGlobalManagementRole,
   isMaintenanceRole,
   normalizeRole,
 } from "../../utils/role.js";
+import { AppError } from "../../utils/AppError.js";
 import { normalizeOptionalString, sameId } from "../../utils/serviceHelpers.js";
 import type { GetMaintenanceQuery } from "./maintenance.schema.js";
 import type { AuthenticatedMaintenanceUser } from "./maintenance.service.js";
 import type { MaintenanceDocument } from "./maintenance.model.js";
-import { getAuthUserId, type AuthUserRecord } from "./maintenance.repository.js";
 
 type MaintenanceFilter = Record<string, unknown>;
+
+type AuthUserRecord = {
+  _id?: { toHexString: () => string };
+  id?: string;
+  role?: string | null;
+  apartmentId?: string | null;
+  flatId?: string | null;
+};
+
+const getAuthUserId = (user: AuthUserRecord, fallback: string): string =>
+  user.id ?? user._id?.toHexString() ?? fallback;
 
 export const assertManagerCanManageApartment = (
   user: AuthenticatedMaintenanceUser,

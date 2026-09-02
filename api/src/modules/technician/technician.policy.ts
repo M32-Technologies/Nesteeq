@@ -1,9 +1,11 @@
 import {
   GLOBAL_ROLE_SET as globalManagementRoles,
+  isManagementRole,
+  isMaintenanceRole,
   MANAGEMENT_ROLE_SET as managementRoles,
-} from "../../constants/roles.js";
+  normalizeRole,
+} from "../../utils/role.js";
 import { AppError } from "../../utils/AppError.js";
-import { isManagementRole, isMaintenanceRole, normalizeRole } from "../../utils/role.js";
 import { escapeRegex, normalizeOptionalString, sameId } from "../../utils/serviceHelpers.js";
 import type { GetTechniciansQuery } from "./technician.schema.js";
 import type { AuthenticatedTechnicianUser } from "./technician.service.js";

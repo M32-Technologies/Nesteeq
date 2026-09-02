@@ -1,10 +1,14 @@
+import { ObjectId, type Filter } from "mongodb";
+import { Types, type UpdateQuery } from "mongoose";
+import { getAuthDB } from "../../config/auth-db.js";
 import { AppError } from "../../utils/AppError.js";
 import { isManagementRole, isMaintenanceRole, normalizeRole } from "../../utils/role.js";
 import { getMongoId, sameId } from "../../utils/serviceHelpers.js";
 import { createNotification } from "../notification/notification.service.js";
-import { Complaint } from "../complaint/complaint.model.js";
+import { Complaint, type ComplaintDocument } from "../complaint/complaint.model.js";
 import {
   Maintenance,
+  type MaintenanceDocument,
   type MaintenanceCostStatus,
 } from "./maintenance.model.js";
 import {
@@ -32,15 +36,6 @@ import {
   buildRoleScopedFilter,
   ensureStaffCanWorkOnApartment,
 } from "./maintenance.policy.js";
-import {
-  ensureCurrentUserExists,
-  ensureStaffUser,
-  getComplaintOrThrow,
-  getMaintenanceOrThrow,
-  syncComplaint,
-  syncComplaintFromMaintenance,
-  updateMaintenanceDocument,
-} from "./maintenance.repository.js";
 import type {
   ApproveMaintenanceInput,
   ApproveMaintenanceCostInput,
@@ -63,6 +58,167 @@ export type AuthenticatedMaintenanceUser = {
   role: string;
   apartmentId?: string | null;
   flatId?: string | null;
+};
+
+type AuthUserRecord = {
+  _id?: ObjectId;
+  id?: string;
+  role?: string | null;
+  apartmentId?: string | null;
+  flatId?: string | null;
+};
+
+type ComplaintRemark = {
+  message: string;
+  by: string;
+  role: string;
+  createdAt: Date;
+};
+
+type MaintenancePush = Partial<{
+  managerRemarks: unknown;
+  workNotes: unknown;
+  progressUpdates: unknown;
+}>;
+
+const buildAuthUserIdFilters = (userId: string): Filter<AuthUserRecord>[] => {
+  const filters: Filter<AuthUserRecord>[] = [{ id: userId }];
+
+  if (ObjectId.isValid(userId)) {
+    filters.push({ _id: new ObjectId(userId) });
+  }
+
+  return filters;
+};
+
+const findAuthUserById = async (userId: string): Promise<AuthUserRecord | null> =>
+  getAuthDB()
+    .collection<AuthUserRecord>("user")
+    .findOne({ $or: buildAuthUserIdFilters(userId) });
+
+const ensureCurrentUserExists = async (
+  user: AuthenticatedMaintenanceUser
+): Promise<AuthUserRecord> => {
+  const existingUser = await findAuthUserById(user.id);
+
+  if (!existingUser) {
+    throw new AppError("Authenticated user not found", 404);
+  }
+
+  return existingUser;
+};
+
+const ensureStaffUser = async (staffId: string): Promise<AuthUserRecord> => {
+  const staff = await findAuthUserById(staffId);
+
+  if (!staff) {
+    throw new AppError("Staff not found", 404);
+  }
+
+  if (!staff.role || !isMaintenanceRole(staff.role)) {
+    throw new AppError("Assigned user must be maintenance staff", 400);
+  }
+
+  return staff;
+};
+
+const assertValidMaintenanceId = (maintenanceId: string): void => {
+  if (!Types.ObjectId.isValid(maintenanceId)) {
+    throw new AppError("Invalid maintenance ID", 400);
+  }
+};
+
+const assertValidComplaintId = (complaintId: string): void => {
+  if (!Types.ObjectId.isValid(complaintId)) {
+    throw new AppError("Invalid complaint ID", 400);
+  }
+};
+
+const getMaintenanceOrThrow = async (maintenanceId: string) => {
+  assertValidMaintenanceId(maintenanceId);
+
+  const maintenance = await Maintenance.findById(maintenanceId);
+
+  if (!maintenance) {
+    throw new AppError("Maintenance not found", 404);
+  }
+
+  return maintenance;
+};
+
+const getComplaintOrThrow = async (complaintId: string) => {
+  assertValidComplaintId(complaintId);
+
+  const complaint = await Complaint.findById(complaintId);
+
+  if (!complaint) {
+    throw new AppError("Complaint not found", 404);
+  }
+
+  return complaint;
+};
+
+const updateMaintenanceDocument = async (
+  maintenanceId: string,
+  set: Record<string, unknown>,
+  push?: MaintenancePush
+) => {
+  const update: UpdateQuery<MaintenanceDocument> = {};
+
+  if (Object.keys(set).length > 0) {
+    update.$set = set;
+  }
+
+  if (push && Object.keys(push).length > 0) {
+    update.$push = push;
+  }
+
+  const updatedMaintenance = await Maintenance.findByIdAndUpdate(maintenanceId, update, {
+    new: true,
+    runValidators: true,
+  });
+
+  if (!updatedMaintenance) {
+    throw new AppError("Maintenance not found", 404);
+  }
+
+  return updatedMaintenance;
+};
+
+const syncComplaint = async (
+  complaintId: string,
+  set: Record<string, unknown>,
+  remark?: ComplaintRemark | null
+): Promise<void> => {
+  const update: UpdateQuery<ComplaintDocument> = {};
+
+  if (Object.keys(set).length > 0) {
+    update.$set = set;
+  }
+
+  if (remark) {
+    update.$push = { remarks: remark };
+  }
+
+  if (Object.keys(update).length === 0) {
+    return;
+  }
+
+  await Complaint.findByIdAndUpdate(complaintId, update, {
+    runValidators: true,
+  });
+};
+
+const syncComplaintFromMaintenance = async (
+  maintenance: MaintenanceDocument,
+  set: Record<string, unknown>,
+  user: AuthenticatedMaintenanceUser,
+  remark?: string
+): Promise<void> => {
+  const complaintId = getMongoId(maintenance.complaint);
+  assertValidComplaintId(complaintId);
+
+  await syncComplaint(complaintId, set, createComplaintRemark(remark, user));
 };
 
 export const createMaintenance = async (

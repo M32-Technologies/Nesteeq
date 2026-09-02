@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionCookie } from "better-auth/cookies";
-<<<<<<< HEAD
-=======
 import {
   getDashboardRoleFromRouteSegment,
   normalizeDashboardRole,
@@ -47,7 +45,6 @@ async function getCurrentUserRole(request: NextRequest) {
 
   return normalizeDashboardRole(session?.user?.role);
 }
->>>>>>> origin/dev
 
 export async function proxy(request: NextRequest) {
   const sessionCookie = getSessionCookie(request);

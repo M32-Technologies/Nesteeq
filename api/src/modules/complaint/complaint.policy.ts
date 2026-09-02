@@ -3,9 +3,9 @@ import {
   MANAGEMENT_ROLE_SET as managementRoles,
   MAINTENANCE_ROLE_SET as maintenanceRoles,
   RESIDENT_ROLE_SET as residentRoles,
-} from "../../constants/roles.js";
+  normalizeRole,
+} from "../../utils/role.js";
 import { AppError } from "../../utils/AppError.js";
-import { normalizeRole } from "../../utils/role.js";
 import { normalizeOptionalString, sameId } from "../../utils/serviceHelpers.js";
 import type { AuthenticatedComplaintUser } from "./complaint.service.js";
 import type { ComplaintDocument } from "./complaint.model.js";

@@ -1,5 +1,4 @@
 import { Request, Response } from "express";
-import { AppError } from "../../utils/AppError.js";
 import { catchAsync } from "../../utils/catchAsync.js";
 import {
   assignTechnicianWork,
@@ -25,15 +24,11 @@ import type {
 } from "./technician.schema.js";
 
 const getAuthenticatedUser = (req: Request): AuthenticatedTechnicianUser => {
-  if (!req.user?.id || !req.user.role) {
-    throw new AppError("Authentication required", 401);
-  }
-
   return {
-    id: req.user.id,
-    role: req.user.role,
-    apartmentId: req.user.apartmentId ?? null,
-    flatId: req.user.flatId ?? null,
+    id: req.user?.id!,
+    role: req.user?.role!,
+    apartmentId: req.user?.apartmentId ?? null,
+    flatId: req.user?.flatId ?? null,
   };
 };
 

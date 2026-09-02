@@ -1,11 +1,13 @@
 import { Types } from "mongoose";
 import {
   GLOBAL_ROLE_SET as globalManagementRoles,
+  isManagementRole,
+  isMaintenanceRole,
   MANAGEMENT_ROLE_SET as managementRoles,
   MAINTENANCE_ROLE_SET as maintenanceRoles,
-} from "../../constants/roles.js";
+  normalizeRole,
+} from "../../utils/role.js";
 import { AppError } from "../../utils/AppError.js";
-import { isManagementRole, isMaintenanceRole, normalizeRole } from "../../utils/role.js";
 import { escapeRegex, normalizeOptionalString, sameId } from "../../utils/serviceHelpers.js";
 import type { GetSchedulesQuery } from "./schedule.schema.js";
 import type { AuthenticatedScheduleUser } from "./schedule.service.js";
