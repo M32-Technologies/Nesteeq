@@ -22,6 +22,10 @@ import {
   VisitorParkingSlotModel,
 } from "./parking.model.js"
 import { ensureVisitorParkingSlotAvailable } from "./parking-availability.js"
+import type {
+  GenerateParkingSlotsInput,
+  UpdateParkingSlotInput,
+} from "./parking.schema.js"
 
 type ObjectIdLike = {
   toString: () => string
@@ -125,22 +129,22 @@ const enrichSlots = async (
       updatedAt: slot.updatedAt,
       currentAssignment: assignment
         ? {
-            _id: toId(assignment._id),
-            flatId: toId(assignment.flatId),
-            flatNumber:
-              flatNumberById.get(toId(assignment.flatId)) ??
-              null,
-            visitorVisitId:
-              toId(assignment.visitorVisitId) || null,
-            guestPassId:
-              toId(assignment.guestPassId) || null,
-            visitorName: assignment.visitorName,
-            vehicleNumber: assignment.vehicleNumber,
-            vehicleType: assignment.vehicleType ?? null,
-            notes: assignment.notes ?? null,
-            assignedBy: assignment.assignedBy,
-            assignedAt: assignment.assignedAt,
-          }
+          _id: toId(assignment._id),
+          flatId: toId(assignment.flatId),
+          flatNumber:
+            flatNumberById.get(toId(assignment.flatId)) ??
+            null,
+          visitorVisitId:
+            toId(assignment.visitorVisitId) || null,
+          guestPassId:
+            toId(assignment.guestPassId) || null,
+          visitorName: assignment.visitorName,
+          vehicleNumber: assignment.vehicleNumber,
+          vehicleType: assignment.vehicleType ?? null,
+          notes: assignment.notes ?? null,
+          assignedBy: assignment.assignedBy,
+          assignedAt: assignment.assignedAt,
+        }
         : null,
     }
   })
@@ -190,14 +194,19 @@ export const createParkingSlotService = async ({
   }
 }
 
+
 export const listParkingSlotsService = async ({
   apartmentId,
   status = "ALL",
   search,
+  page = 1,
+  limit = 10,
 }: {
   apartmentId: string
   status?: "ALL" | VisitorParkingSlotStatusType
   search?: string
+  page?: number
+  limit?: number
 }) => {
   const filter: Record<string, unknown> = {
     apartmentId,
@@ -216,17 +225,29 @@ export const listParkingSlotsService = async ({
     )
   }
 
-  const slots = (await VisitorParkingSlotModel.find(filter)
-    .sort({ slotNumber: 1 })
-    .lean()) as unknown as LeanParkingSlot[]
+  const skip = (page - 1) * limit
 
-  const allSlots = (await VisitorParkingSlotModel.find({
-    apartmentId,
-  }).lean()) as unknown as LeanParkingSlot[]
+  const [slots, totalCount, allSlots] = await Promise.all([
+    VisitorParkingSlotModel.find(filter)
+      .sort({ slotNumber: 1 })
+      .skip(skip)
+      .limit(limit)
+      .lean() as unknown as Promise<LeanParkingSlot[]>,
+    VisitorParkingSlotModel.countDocuments(filter),
+    VisitorParkingSlotModel.find({ apartmentId }).lean() as unknown as Promise<LeanParkingSlot[]>
+  ])
+
+  const totalPages = Math.ceil(totalCount / limit)
 
   return {
     summary: getParkingSummary(allSlots),
     slots: await enrichSlots(apartmentId, slots),
+    pagination: {
+      page,
+      limit,
+      totalCount,
+      totalPages,
+    }
   }
 }
 
@@ -480,4 +501,238 @@ export const releaseParkingSlotService = async ({
   ])
 
   return records[0]
+}
+
+export const generateParkingSlotsService = async (
+  {
+    prefix,
+    totalSlots,
+    startNumber = 1,
+  }: GenerateParkingSlotsInput,
+  apartmentId: string
+) => {
+  if (
+    !apartmentId ||
+    !Types.ObjectId.isValid(apartmentId)
+  ) {
+    throw new AppError(
+      "Apartment context is required",
+      400
+    )
+  }
+
+  const apartmentObjectId =
+    new Types.ObjectId(apartmentId)
+
+  const normalizedPrefix =
+    prefix.trim().toUpperCase()
+
+  if (!normalizedPrefix) {
+    throw new AppError(
+      "Parking slot prefix is required",
+      400
+    )
+  }
+
+  const endNumber =
+    startNumber + totalSlots - 1
+
+  const slotNumbers = Array.from(
+    { length: totalSlots },
+    (_, index) => {
+      const number = startNumber + index
+
+      return `${normalizedPrefix}-${String(
+        number
+      ).padStart(3, "0")}`
+    }
+  )
+
+  const session = await mongoose.startSession()
+
+  let result: {
+    prefix: string
+    startNumber: number
+    endNumber: number
+    totalSlotsGenerated: number
+    generatedSlots: Array<{
+      id: string
+      slotNumber: string
+      status: VisitorParkingSlotStatusType
+      notes: string | null
+    }>
+  } | null = null
+
+  try {
+    await session.withTransaction(async () => {
+      const duplicate =
+        await VisitorParkingSlotModel.findOne({
+          apartmentId: apartmentObjectId,
+          slotNumber: {
+            $in: slotNumbers,
+          },
+        })
+          .select("_id slotNumber")
+          .session(session)
+          .lean<{
+            _id: Types.ObjectId
+            slotNumber: string
+          }>()
+
+      if (duplicate) {
+        throw new AppError(
+          `Generated parking slot already exists: ${duplicate.slotNumber}`,
+          409
+        )
+      }
+
+      const inserted =
+        await VisitorParkingSlotModel.insertMany(
+          slotNumbers.map((slotNumber) => ({
+            apartmentId: apartmentObjectId,
+            slotNumber,
+            status:
+              VisitorParkingSlotStatus.AVAILABLE,
+            notes: null,
+          })),
+          {
+            ordered: true,
+            session,
+          }
+        )
+
+      const generatedSlots = inserted.map(
+        (slot) => ({
+          id: slot._id.toString(),
+          slotNumber: slot.slotNumber,
+          status: slot.status,
+          notes: slot.notes ?? null,
+        })
+      )
+
+      result = {
+        prefix: normalizedPrefix,
+        startNumber,
+        endNumber,
+        totalSlotsGenerated:
+          generatedSlots.length,
+        generatedSlots,
+      }
+    })
+  } catch (error: unknown) {
+    if (error instanceof AppError) {
+      throw error
+    }
+
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === 11000
+    ) {
+      throw new AppError(
+        "One or more generated parking slots already exist",
+        409
+      )
+    }
+
+    throw new AppError(
+      "Parking slot generation failed",
+      500
+    )
+  } finally {
+    await session.endSession()
+  }
+
+  if (!result) {
+    throw new AppError(
+      "Parking slot generation failed",
+      500
+    )
+  }
+
+  return result
+}
+
+export const updateParkingSlotService = async ({
+  apartmentId,
+  slotId,
+  slotNumber,
+  notes,
+}: {
+  apartmentId: string
+  slotId: string
+} & UpdateParkingSlotInput) => {
+  if (!Types.ObjectId.isValid(slotId)) {
+    throw new AppError("Invalid parking slot ID", 400)
+  }
+
+  const slot = await VisitorParkingSlotModel.findOne({
+    _id: slotId,
+    apartmentId,
+  })
+
+  if (!slot) {
+    throw new AppError("Parking slot not found", 404)
+  }
+
+  if (slotNumber !== undefined) {
+    const normalizedSlotNumber = slotNumber
+      .trim()
+      .toUpperCase()
+
+    if (!normalizedSlotNumber) {
+      throw new AppError(
+        "Slot number cannot be empty",
+        400
+      )
+    }
+
+    if (normalizedSlotNumber !== slot.slotNumber) {
+      const duplicate =
+        await VisitorParkingSlotModel.exists({
+          _id: { $ne: slot._id },
+          apartmentId,
+          slotNumber: normalizedSlotNumber,
+        })
+
+      if (duplicate) {
+        throw new AppError(
+          "Parking slot number already exists for this apartment",
+          409
+        )
+      }
+
+      slot.slotNumber = normalizedSlotNumber
+    }
+  }
+
+  if (notes !== undefined) {
+    slot.notes = normalizeText(
+      notes ?? undefined
+    )
+  }
+
+  try {
+    await slot.save()
+  } catch (error: unknown) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === 11000
+    ) {
+      throw new AppError("Parking slot number already exists for this apartment", 409)
+    }
+    throw error
+  }
+
+  const [updatedSlot] = await enrichSlots(
+    apartmentId,
+    [
+      slot.toObject() as LeanParkingSlot,
+    ]
+  )
+
+  return updatedSlot
 }

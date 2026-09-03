@@ -5,8 +5,10 @@ import { catchAsync } from "../../utils/catchAsync.js"
 import {
   assignParkingSlotService,
   createParkingSlotService,
+  generateParkingSlotsService,
   listParkingSlotsService,
   releaseParkingSlotService,
+  updateParkingSlotService,
   updateParkingSlotStatusService,
 } from "./parking.service.js"
 
@@ -21,6 +23,7 @@ const getSecurityContext = (req: Request) => {
 
   return { userId, apartmentId }
 }
+
 
 export const createParkingSlot = catchAsync(
   async (req: Request, res: Response) => {
@@ -49,6 +52,8 @@ export const listParkingSlots = catchAsync(
         | "ALL"
         | undefined,
       search: req.query.search as string | undefined,
+      page: req.query.page ? Number(req.query.page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
     })
 
     res.status(200).json({
@@ -129,6 +134,54 @@ export const releaseParkingSlot = catchAsync(
     res.status(200).json({
       success: true,
       message: "Parking slot released successfully",
+      data: slot,
+    })
+  }
+)
+
+
+
+
+export const generateParkingSlots = catchAsync(
+  async (req: Request, res: Response) => {
+    const { apartmentId } =
+      getSecurityContext(req)
+
+    const result =
+      await generateParkingSlotsService(
+        req.body,
+        apartmentId
+      )
+
+    res.status(201).json({
+      success: true,
+      message: `parking slots generated successfully`,
+      data: result,
+    })
+  }
+)
+
+export const updateParkingSlot = catchAsync(
+  async (req: Request, res: Response) => {
+    const { apartmentId } = getSecurityContext(req)
+    const slotId =
+      typeof req.params.slotId === "string"
+        ? req.params.slotId
+        : undefined
+
+    if (!slotId) {
+      throw new AppError("Invalid parking slot ID", 400)
+    }
+
+    const slot = await updateParkingSlotService({
+      apartmentId,
+      slotId,
+      ...req.body,
+    })
+
+    res.status(200).json({
+      success: true,
+      message: "Parking slot updated successfully",
       data: slot,
     })
   }

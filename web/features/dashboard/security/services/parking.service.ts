@@ -41,6 +41,12 @@ export interface VisitorParkingSummary {
 export interface VisitorParkingResponse {
   summary: VisitorParkingSummary
   slots: VisitorParkingSlot[]
+  pagination?: {
+    page: number
+    limit: number
+    totalCount: number
+    totalPages: number
+  }
 }
 
 export interface AssignParkingPayload {
@@ -53,9 +59,23 @@ export interface AssignParkingPayload {
   notes?: string
 }
 
+export interface GenerateParkingSlotsPayload {
+  prefix: string
+  totalSlots: number
+  startNumber: number
+}
+
+export interface UpdateParkingSlotPayload {
+  slotId: string
+  slotNumber: string
+  notes?: string
+}
+
 export const getParkingSlots = async (params: {
   status?: VisitorParkingSlotStatus
   search?: string
+  page?: number
+  limit?: number
 }) => {
   const response = await axiosInstance.get(
     "/api/security/parking",
@@ -114,6 +134,33 @@ export const updateParkingSlotStatus = async ({
 export const releaseParkingSlot = async (slotId: string) => {
   const response = await axiosInstance.patch(
     `/api/security/parking/${slotId}/release`
+  )
+
+  return response.data.data as VisitorParkingSlot
+}
+
+export const generateParkingSlots = async (
+  payload: GenerateParkingSlotsPayload
+) => {
+  const response = await axiosInstance.post(
+    "/api/security/parking/generate",
+    payload
+  )
+
+  return response.data.data as VisitorParkingResponse
+}
+
+export const updateParkingSlot = async ({
+  slotId,
+  slotNumber,
+  notes,
+}: UpdateParkingSlotPayload) => {
+  const response = await axiosInstance.patch(
+    `/api/security/parking/${slotId}`,
+    {
+      slotNumber,
+      notes,
+    }
   )
 
   return response.data.data as VisitorParkingSlot
