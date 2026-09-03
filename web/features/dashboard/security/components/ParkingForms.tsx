@@ -3,10 +3,7 @@
 import { Car, Plus } from "lucide-react"
 
 import type { SecurityFlat } from "../services/security.interface"
-import type {
-  VisitorParkingSlot,
-  VisitorParkingSlotStatus,
-} from "../services/parking.service"
+import type { VisitorParkingSlot } from "../services/parking.service"
 import type { VisitorVisit } from "../services/visitor.service"
 import {
   inputClassName,
@@ -18,10 +15,6 @@ import {
 
 export interface ParkingSlotFormState {
   slotNumber: string
-  status: Exclude<
-    VisitorParkingSlotStatus,
-    "ALL" | "OCCUPIED"
-  >
   notes: string
 }
 
@@ -99,7 +92,7 @@ export function ParkingForms({
           Add Visitor Slot
         </h2>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-3">
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
             <label className="mb-2 block text-sm font-medium text-[#111111]">
               Slot Number
@@ -115,29 +108,6 @@ export function ParkingForms({
               }
               placeholder="V-01"
             />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[#111111]">
-              Status
-            </label>
-            <select
-              className={selectClassName}
-              value={slotForm.status}
-              onChange={(event) =>
-                onSlotFormChange({
-                  ...slotForm,
-                  status: event.target.value as Exclude<
-                    VisitorParkingSlotStatus,
-                    "ALL" | "OCCUPIED"
-                  >,
-                })
-              }
-            >
-              <option value="AVAILABLE">Available</option>
-              <option value="RESERVED">Reserved</option>
-              <option value="OUT_OF_SERVICE">Out of Service</option>
-            </select>
           </div>
 
           <div>

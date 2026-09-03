@@ -24,13 +24,6 @@ export const createParkingSlotSchema = z.object({
       .trim()
       .min(1, "Slot number is required")
       .max(30),
-    status: z
-      .enum([
-        VisitorParkingSlotStatus.AVAILABLE,
-        VisitorParkingSlotStatus.RESERVED,
-        VisitorParkingSlotStatus.OUT_OF_SERVICE,
-      ])
-      .optional(),
     notes: optionalString(z.string().max(300)),
   }),
 })
@@ -59,7 +52,7 @@ export const updateParkingSlotStatusSchema =
       status: z.enum([
         VisitorParkingSlotStatus.AVAILABLE,
         VisitorParkingSlotStatus.RESERVED,
-        VisitorParkingSlotStatus.OUT_OF_SERVICE,
+        VisitorParkingSlotStatus.UNAVAILABLE,
       ]),
       notes: optionalString(z.string().max(300)),
     }),

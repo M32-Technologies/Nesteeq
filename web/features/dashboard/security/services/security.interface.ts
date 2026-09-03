@@ -8,7 +8,7 @@ export interface SecuritySummary {
   activeSosAlerts: number
   reservedVisitorParking: number
   occupiedVisitorParking: number
-  outOfServiceVisitorParking: number
+  unavailableVisitorParking: number
   upcomingVisitorsToday: number
   checkedInToday: number
   checkedOutToday: number

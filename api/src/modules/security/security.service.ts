@@ -134,7 +134,7 @@ export const getSecuritySummaryService = async (
     activeSosAlerts,
     reservedVisitorParking,
     occupiedVisitorParking,
-    outOfServiceVisitorParking,
+    unavailableVisitorParking,
     upcomingVisitorsToday,
     checkedInToday,
     checkedOutToday,
@@ -182,7 +182,7 @@ export const getSecuritySummaryService = async (
 
     VisitorParkingSlotModel.countDocuments({
       apartmentId,
-      status: VisitorParkingSlotStatus.OUT_OF_SERVICE,
+      status: VisitorParkingSlotStatus.UNAVAILABLE,
     }),
 
     GuestPassModel.countDocuments({
@@ -225,7 +225,7 @@ export const getSecuritySummaryService = async (
     activeSosAlerts,
     reservedVisitorParking,
     occupiedVisitorParking,
-    outOfServiceVisitorParking,
+    unavailableVisitorParking,
     upcomingVisitorsToday,
     checkedInToday,
     checkedOutToday,

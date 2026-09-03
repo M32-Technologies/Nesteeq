@@ -79,10 +79,10 @@ const getParkingSummary = (slots: LeanParkingSlot[]) => ({
     (slot) =>
       slot.status === VisitorParkingSlotStatus.RESERVED
   ).length,
-  outOfService: slots.filter(
+  unavailable: slots.filter(
     (slot) =>
       slot.status ===
-      VisitorParkingSlotStatus.OUT_OF_SERVICE
+      VisitorParkingSlotStatus.UNAVAILABLE
   ).length,
 })
 
@@ -149,22 +149,17 @@ const enrichSlots = async (
 export const createParkingSlotService = async ({
   apartmentId,
   slotNumber,
-  status = VisitorParkingSlotStatus.AVAILABLE,
   notes,
 }: {
   apartmentId: string
   slotNumber: string
-  status?: Exclude<
-    VisitorParkingSlotStatusType,
-    "OCCUPIED"
-  >
   notes?: string
 }) => {
   try {
     const slot = await VisitorParkingSlotModel.create({
       apartmentId,
       slotNumber: slotNumber.toUpperCase(),
-      status,
+      status: VisitorParkingSlotStatus.AVAILABLE,
       notes: normalizeText(notes),
     })
 
@@ -232,45 +227,65 @@ export const listParkingSlotsService = async ({
 
 export const updateParkingSlotStatusService = async ({
   apartmentId,
+  userId,
   slotId,
   status,
   notes,
 }: {
   apartmentId: string
+  userId: string
   slotId: string
   status: Exclude<VisitorParkingSlotStatusType, "OCCUPIED">
   notes?: string
 }) => {
+  const session = await mongoose.startSession()
+
+  try {
+    await session.withTransaction(async () => {
+      const slot = await VisitorParkingSlotModel.findOne({
+        _id: slotId,
+        apartmentId,
+      }).session(session)
+
+      if (!slot) {
+        throw new AppError("Parking slot not found", 404)
+      }
+
+      const activeAssignment =
+        await VisitorParkingAssignmentModel.findOne({
+          apartmentId,
+          slotId,
+          status: VisitorParkingAssignmentStatus.ACTIVE,
+        }).session(session)
+
+      if (activeAssignment) {
+        activeAssignment.status =
+          VisitorParkingAssignmentStatus.RELEASED
+        activeAssignment.releasedBy = userId
+        activeAssignment.releasedAt = new Date()
+        await activeAssignment.save({ session })
+      }
+
+      slot.status = status
+      slot.notes = normalizeText(notes)
+
+      await slot.save({ session })
+    })
+  } finally {
+    await session.endSession()
+  }
+
   const slot = await VisitorParkingSlotModel.findOne({
     _id: slotId,
     apartmentId,
-  })
+  }).lean()
 
   if (!slot) {
     throw new AppError("Parking slot not found", 404)
   }
 
-  const activeAssignment =
-    await VisitorParkingAssignmentModel.findOne({
-      apartmentId,
-      slotId,
-      status: VisitorParkingAssignmentStatus.ACTIVE,
-    }).lean()
-
-  if (activeAssignment) {
-    throw new AppError(
-      "Occupied parking slot cannot be manually changed",
-      400
-    )
-  }
-
-  slot.status = status
-  slot.notes = normalizeText(notes)
-
-  await slot.save()
-
   const records = await enrichSlots(apartmentId, [
-    slot.toObject() as LeanParkingSlot,
+    slot as unknown as LeanParkingSlot,
   ])
 
   return records[0]

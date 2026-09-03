@@ -5,7 +5,7 @@ export type VisitorParkingSlotStatus =
   | "AVAILABLE"
   | "OCCUPIED"
   | "RESERVED"
-  | "OUT_OF_SERVICE"
+  | "UNAVAILABLE"
 
 export interface VisitorParkingAssignment {
   _id: string
@@ -35,7 +35,7 @@ export interface VisitorParkingSummary {
   available: number
   occupied: number
   reserved: number
-  outOfService: number
+  unavailable: number
 }
 
 export interface VisitorParkingResponse {
@@ -69,7 +69,6 @@ export const getParkingSlots = async (params: {
 
 export const createParkingSlot = async (payload: {
   slotNumber: string
-  status?: Exclude<VisitorParkingSlotStatus, "ALL" | "OCCUPIED">
   notes?: string
 }) => {
   const response = await axiosInstance.post(

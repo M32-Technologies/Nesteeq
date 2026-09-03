@@ -61,7 +61,7 @@ export const listParkingSlots = catchAsync(
 
 export const updateParkingSlotStatus = catchAsync(
   async (req: Request, res: Response) => {
-    const { apartmentId } = getSecurityContext(req)
+    const { apartmentId, userId } = getSecurityContext(req)
     const slotId =
       typeof req.params.slotId === "string"
         ? req.params.slotId
@@ -73,6 +73,7 @@ export const updateParkingSlotStatus = catchAsync(
 
     const slot = await updateParkingSlotStatusService({
       apartmentId,
+      userId,
       slotId,
       status: req.body.status,
       notes: req.body.notes,

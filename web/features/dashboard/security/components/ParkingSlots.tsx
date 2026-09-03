@@ -4,8 +4,9 @@ import { useState } from "react"
 import {
   Ban,
   Car,
+  Check,
   Eye,
-  LogOut,
+  MoreVertical,
   Search,
   Wrench,
 } from "lucide-react"
@@ -41,7 +42,6 @@ import {
   tdClassName,
   thClassName,
 } from "./SecurityUi"
-import { ConfirmActionModal } from "./ConfirmActionModal"
 import { ParkingDetails } from "./ParkingDetails"
 import {
   ParkingForms,
@@ -49,6 +49,16 @@ import {
   type ParkingSlotFormState,
 } from "./ParkingForms"
 import { ParkingSummaryCards } from "./ParkingSummaryCards"
+
+type ParkingStatusAction = Exclude<
+  VisitorParkingSlotStatus,
+  "ALL" | "OCCUPIED"
+>
+
+type ParkingStatusMenuItem = Exclude<
+  VisitorParkingSlotStatus,
+  "ALL"
+>
 
 const statusFilters: Array<{
   label: string
@@ -58,8 +68,35 @@ const statusFilters: Array<{
   { label: "Available", value: "AVAILABLE" },
   { label: "Occupied", value: "OCCUPIED" },
   { label: "Reserved", value: "RESERVED" },
-  { label: "Out of Service", value: "OUT_OF_SERVICE" },
+  { label: "Unavailable", value: "UNAVAILABLE" },
 ]
+
+const parkingStatusActions = [
+  {
+    label: "Available",
+    value: "AVAILABLE",
+    icon: Car,
+  },
+  {
+    label: "Occupied",
+    value: "OCCUPIED",
+    icon: Car,
+  },
+  {
+    label: "Reserved",
+    value: "RESERVED",
+    icon: Ban,
+  },
+  {
+    label: "Unavailable",
+    value: "UNAVAILABLE",
+    icon: Wrench,
+  },
+] satisfies Array<{
+  label: string
+  value: ParkingStatusMenuItem
+  icon: typeof Car
+}>
 
 export function ParkingSlots() {
   const [status, setStatus] =
@@ -67,15 +104,11 @@ export function ParkingSlots() {
   const [search, setSearch] = useState("")
   const [selectedSlot, setSelectedSlot] =
     useState<VisitorParkingSlot | null>(null)
-  const [releaseSlot, setReleaseSlot] =
-    useState<VisitorParkingSlot | null>(null)
+  const [openActionSlotId, setOpenActionSlotId] =
+    useState<string | null>(null)
   const [slotForm, setSlotForm] =
     useState<ParkingSlotFormState>({
     slotNumber: "",
-    status: "AVAILABLE" as Exclude<
-      VisitorParkingSlotStatus,
-      "ALL" | "OCCUPIED"
-    >,
     notes: "",
   })
   const [assignForm, setAssignForm] =
@@ -119,14 +152,12 @@ export function ParkingSlots() {
     try {
       await createSlotMutation.mutateAsync({
         slotNumber: slotForm.slotNumber,
-        status: slotForm.status,
         notes: slotForm.notes || undefined,
       })
 
       toast.success("Parking slot created")
       setSlotForm({
         slotNumber: "",
-        status: "AVAILABLE",
         notes: "",
       })
     } catch (error) {
@@ -184,39 +215,28 @@ export function ParkingSlots() {
     }
   }
 
-  const handleRelease = async () => {
-    if (!releaseSlot) return
-
-    try {
-      await releaseMutation.mutateAsync(releaseSlot._id)
-      toast.success("Parking slot released")
-      setReleaseSlot(null)
-    } catch (error) {
-      toast.error(
-        getSecurityApiErrorMessage(
-          error,
-          "Unable to release parking slot"
-        )
-      )
-      throw error
-    }
-  }
-
   const handleSlotStatus = async (
     slot: VisitorParkingSlot,
-    nextStatus: Exclude<
-      VisitorParkingSlotStatus,
-      "ALL" | "OCCUPIED"
-    >
+    nextStatus: ParkingStatusAction
   ) => {
     try {
-      await updateStatusMutation.mutateAsync({
-        slotId: slot._id,
-        status: nextStatus,
-        notes: slot.notes || undefined,
-      })
+      if (
+        slot.status === "OCCUPIED" &&
+        nextStatus === "AVAILABLE"
+      ) {
+        await releaseMutation.mutateAsync(slot._id)
+        toast.success("Parking slot released")
+      } else {
+        await updateStatusMutation.mutateAsync({
+          slotId: slot._id,
+          status: nextStatus,
+          notes: slot.notes || undefined,
+        })
 
-      toast.success("Parking slot updated")
+        toast.success("Parking slot updated")
+      }
+
+      setOpenActionSlotId(null)
     } catch (error) {
       toast.error(
         getSecurityApiErrorMessage(
@@ -340,83 +360,82 @@ export function ParkingSlots() {
                     <StatusBadge status={slot.status} />
                   </td>
                   <td className={tdClassName}>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="relative flex justify-end">
                       <button
                         type="button"
-                        className={outlineButtonClassName}
-                        onClick={() => setSelectedSlot(slot)}
+                        aria-label={`Open actions for parking slot ${slot.slotNumber}`}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE3DF] bg-white text-[#111111] transition hover:bg-[#F7F8F5]"
+                        onClick={() =>
+                          setOpenActionSlotId((currentSlotId) =>
+                            currentSlotId === slot._id
+                              ? null
+                              : slot._id
+                          )
+                        }
                       >
-                        <Eye className="h-4 w-4" />
-                        View
+                        <MoreVertical className="h-4 w-4" />
                       </button>
 
-                      {slot.status === "OCCUPIED" ? (
-                        <button
-                          type="button"
-                          className={primaryButtonClassName}
-                          disabled={releaseMutation.isPending}
-                          onClick={() => setReleaseSlot(slot)}
-                        >
-                          <LogOut className="h-4 w-4" />
-                          Release
-                        </button>
-                      ) : null}
-
-                      {slot.status === "AVAILABLE" ? (
-                        <>
+                      {openActionSlotId === slot._id ? (
+                        <div className="absolute right-0 top-10 z-20 w-56 rounded-lg border border-[#DDE3DF] bg-white p-1 shadow-lg">
                           <button
                             type="button"
-                            className={outlineButtonClassName}
-                            disabled={
-                              updateStatusMutation.isPending
-                            }
-                            onClick={() =>
-                              handleSlotStatus(
-                                slot,
-                                "RESERVED"
-                              )
-                            }
+                            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-[#111111] transition hover:bg-[#F7F8F5]"
+                            onClick={() => {
+                              setSelectedSlot(slot)
+                              setOpenActionSlotId(null)
+                            }}
                           >
-                            <Ban className="h-4 w-4" />
-                            Reserve
+                            <Eye className="h-4 w-4" />
+                            View Details
                           </button>
-                          <button
-                            type="button"
-                            className={outlineButtonClassName}
-                            disabled={
-                              updateStatusMutation.isPending
-                            }
-                            onClick={() =>
-                              handleSlotStatus(
-                                slot,
-                                "OUT_OF_SERVICE"
-                              )
-                            }
-                          >
-                            <Wrench className="h-4 w-4" />
-                            Unavailable
-                          </button>
-                        </>
-                      ) : null}
 
-                      {slot.status === "RESERVED" ||
-                      slot.status === "OUT_OF_SERVICE" ? (
-                        <button
-                          type="button"
-                          className={outlineButtonClassName}
-                          disabled={
-                            updateStatusMutation.isPending
-                          }
-                          onClick={() =>
-                            handleSlotStatus(
-                              slot,
-                              "AVAILABLE"
+                          <div className="my-1 border-t border-[#EEF1F4]" />
+
+                          {parkingStatusActions.map((action) => {
+                            const StatusIcon = action.icon
+                            const isCurrentStatus =
+                              slot.status === action.value
+                            const isOccupiedAction =
+                              action.value === "OCCUPIED"
+                            const isOccupiedSlot =
+                              slot.status === "OCCUPIED"
+                            const isDisabled =
+                              isCurrentStatus ||
+                              isOccupiedAction ||
+                              (isOccupiedSlot &&
+                                action.value !==
+                                  "AVAILABLE") ||
+                              releaseMutation.isPending ||
+                              updateStatusMutation.isPending
+
+                            return (
+                              <button
+                                key={action.value}
+                                type="button"
+                                className="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm font-medium text-[#111111] transition hover:bg-[#F7F8F5] disabled:cursor-not-allowed disabled:opacity-60"
+                                disabled={isDisabled}
+                                onClick={() => {
+                                  if (isOccupiedAction) return
+
+                                  handleSlotStatus(
+                                    slot,
+                                    action.value
+                                  )
+                                }}
+                              >
+                                <span className="flex items-center gap-2">
+                                  <StatusIcon className="h-4 w-4" />
+                                  {action.label}
+                                </span>
+
+                                {isCurrentStatus ? (
+                                  <Check className="h-4 w-4 text-[#07584F]" />
+                                ) : null}
+                              </button>
                             )
-                          }
-                        >
-                          <Car className="h-4 w-4" />
-                          Available
-                        </button>
+                          })}
+                        </div>
                       ) : null}
                     </div>
                   </td>
@@ -430,21 +449,6 @@ export function ParkingSlots() {
       <ParkingDetails
         slot={selectedSlot}
         onClose={() => setSelectedSlot(null)}
-      />
-
-      <ConfirmActionModal
-        actionLabel="Release Slot"
-        isOpen={Boolean(releaseSlot)}
-        isSubmitting={releaseMutation.isPending}
-        message={
-          releaseSlot
-            ? `Release parking slot ${releaseSlot.slotNumber} for vehicle ${releaseSlot.currentAssignment?.vehicleNumber ?? "-"}?`
-            : ""
-        }
-        title="Release Parking Slot"
-        variant="danger"
-        onClose={() => setReleaseSlot(null)}
-        onConfirm={handleRelease}
       />
     </div>
   )

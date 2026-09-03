@@ -353,7 +353,7 @@ function getAttentionItems(summary: SecuritySummary) {
   const parkingIssues =
     summary.occupiedVisitorParking +
     summary.reservedVisitorParking +
-    summary.outOfServiceVisitorParking
+    summary.unavailableVisitorParking
 
   return [
     summary.activeSosAlerts > 0
@@ -389,7 +389,7 @@ function getAttentionItems(summary: SecuritySummary) {
           description: [
             `${summary.occupiedVisitorParking} occupied`,
             `${summary.reservedVisitorParking} reserved`,
-            `${summary.outOfServiceVisitorParking} unavailable`,
+            `${summary.unavailableVisitorParking} unavailable`,
           ].join(", "),
           status: "OCCUPIED",
           href: "/security/parking",

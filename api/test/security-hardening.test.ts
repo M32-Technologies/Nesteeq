@@ -114,7 +114,7 @@ test("parking assignment rejects occupied, reserved, and unavailable slots", () 
   for (const status of [
     VisitorParkingSlotStatus.OCCUPIED,
     VisitorParkingSlotStatus.RESERVED,
-    VisitorParkingSlotStatus.OUT_OF_SERVICE,
+    VisitorParkingSlotStatus.UNAVAILABLE,
   ]) {
     assert.equal(isVisitorParkingSlotAvailable(status), false)
     assert.throws(

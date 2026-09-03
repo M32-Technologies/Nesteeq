@@ -27,7 +27,7 @@ export function ParkingSummaryCards({
       />
       <SummaryCard
         label="Unavailable"
-        value={summary?.outOfService ?? 0}
+        value={summary?.unavailable ?? 0}
       />
     </div>
   )

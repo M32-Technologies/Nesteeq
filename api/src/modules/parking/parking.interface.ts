@@ -4,7 +4,7 @@ export const VisitorParkingSlotStatus = {
   AVAILABLE: "AVAILABLE",
   OCCUPIED: "OCCUPIED",
   RESERVED: "RESERVED",
-  OUT_OF_SERVICE: "OUT_OF_SERVICE",
+  UNAVAILABLE: "UNAVAILABLE",
 } as const
 
 export type VisitorParkingSlotStatus =
