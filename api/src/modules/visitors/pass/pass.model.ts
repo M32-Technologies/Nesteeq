@@ -11,8 +11,7 @@ export const GuestPassStatus = {
   USED: "USED",
 } as const
 
-export type GuestPassStatus =
-  (typeof GuestPassStatus)[keyof typeof GuestPassStatus]
+export type GuestPassStatus = (typeof GuestPassStatus)[keyof typeof GuestPassStatus]
 
 const guestPassSchema = new Schema(
   {
