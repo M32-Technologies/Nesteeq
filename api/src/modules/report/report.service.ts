@@ -1,5 +1,5 @@
 import { Types } from "mongoose";
-import { normalizeOptionalString } from "../../utils/serviceHelpers.js";
+
 import {
   Complaint,
   complaintCategories,
@@ -23,6 +23,13 @@ import {
   type ReportFilter,
 } from "./report.policy.js";
 import type { ReportQuery } from "./report.schema.js";
+
+const normalizeOptionalString = (value: string | null | undefined): string | undefined => {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+};
+
 
 export type AuthenticatedReportUser = {
   id: string;

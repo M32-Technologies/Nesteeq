@@ -1,10 +1,17 @@
 import { normalizeRole } from "../../utils/role.js";
-import { normalizeOptionalString } from "../../utils/serviceHelpers.js";
+
 import {
   Notification,
   type NotificationSeverity,
   type NotificationType,
 } from "./notification.model.js";
+
+const normalizeOptionalString = (value: string | null | undefined): string | undefined => {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+};
+
 
 export type CreateNotificationInput = {
   apartment?: string | null;

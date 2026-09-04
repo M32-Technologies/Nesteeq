@@ -6,9 +6,30 @@ import {
   normalizeRole,
 } from "../../utils/role.js";
 import { AppError } from "../../utils/AppError.js";
-import { escapeRegex, normalizeOptionalString, sameId } from "../../utils/serviceHelpers.js";
+
+
+
+
+
 import type { GetTechniciansQuery } from "./technician.schema.js";
 import type { AuthenticatedTechnicianUser } from "./technician.service.js";
+
+const normalizeOptionalString = (value: string | null | undefined): string | undefined => {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+};
+
+const sameId = (id1: any, id2: any): boolean => {
+  if (!id1 || !id2) return false;
+  return id1.toString() === id2.toString();
+};
+
+const escapeRegex = (text: string): string => {
+    return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+};
+
+
 
 type TechnicianFilter = Record<string, unknown>;
 

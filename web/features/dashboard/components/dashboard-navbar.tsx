@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { Bell, ChevronDown, Menu, UserRound } from "lucide-react"
+import { Bell, Menu, UserRound } from "lucide-react"
 
 import {
   dashboardRoleLabels,
@@ -74,18 +74,20 @@ export default function DashboardNavbar({
         top-0
         z-30
         flex
-        h-16
+        h-[60px]
         items-center
         justify-between
         gap-3
         border-b
-        border-[#E4EAF0]
-        bg-white
+        border-[#E2E8F0]
+        bg-white/95
         px-4
-        backdrop-blur
-        sm:px-5
+        backdrop-blur-md
+        sm:px-6
       "
+      style={{ boxShadow: 'var(--shadow-xs)' }}
     >
+      {/* LEFT — hamburger + breadcrumb */}
       <div className="flex min-w-0 items-center gap-3">
         <button
           type="button"
@@ -95,120 +97,135 @@ export default function DashboardNavbar({
           className="
             flex
             size-9
+            cursor-pointer
             shrink-0
             items-center
             justify-center
             rounded-lg
-            text-[#071D35]
+            text-[#475569]
             transition-colors
-            hover:bg-[#F0F5FA]
+            duration-150
+            hover:bg-[#F1F5F9]
+            hover:text-[#0F172A]
             lg:hidden
           "
         >
-          <Menu className="size-5" />
+          <Menu className="size-[18px]" />
         </button>
 
         <nav
           aria-label="Breadcrumb"
-          className="
-            flex
-            min-w-0
-            items-center
-            gap-2.5
-            text-[15px]
-            text-[#101B2A]
-          "
+          className="flex min-w-0 items-center gap-2"
         >
-          <span className="truncate font-bold">{breadcrumb.parent}</span>
-          <span className="text-[#A2ADBA]">/</span>
-          <span className="truncate font-semibold text-[#667386]">
+          <span className="truncate text-[13px] font-semibold text-[#94A3B8]">
+            {breadcrumb.parent}
+          </span>
+          <span className="text-[#CBD5E1] text-[13px]">/</span>
+          <span className="truncate text-[14px] font-semibold text-[#0F172A]">
             {breadcrumb.current}
           </span>
         </nav>
       </div>
 
-      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+      {/* RIGHT — notifications + profile */}
+      <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+
+        {/* Notification bell */}
         <button
           type="button"
           aria-label="Notifications"
           className="
             relative
             flex
-            size-10
+            size-9
+            cursor-pointer
             items-center
             justify-center
             rounded-lg
-            text-[#1E2B3C]
+            text-[#475569]
             transition-colors
-            hover:bg-[#F0F5FA]
+            duration-150
+            hover:bg-[#F1F5F9]
+            hover:text-[#0F172A]
           "
         >
           <Bell className="size-[18px]" />
-          <span className="absolute right-2 top-2 size-1.5 rounded-full bg-red-500 ring-2 ring-white" />
+          {/* notification dot */}
+          <span
+            className="absolute right-[9px] top-[9px] size-[7px] rounded-full bg-red-500 ring-[1.5px] ring-white"
+            aria-hidden="true"
+          />
         </button>
 
-        <div className="hidden h-8 w-px bg-[#E5EAF0] sm:block" />
+        {/* Divider */}
+        <div className="hidden h-7 w-px bg-[#E2E8F0] sm:block" />
 
+        {/* Profile button */}
         <button
           type="button"
-          aria-label="Profile"
+          aria-label="Profile menu"
           className="
             flex
-            h-11
-            min-w-0
+            h-10
+            cursor-pointer
             items-center
-            gap-2
+            gap-2.5
             rounded-lg
-            px-1.5
+            px-2
             text-left
             transition-colors
-            hover:bg-[#F0F5FA]
-            sm:pr-2
+            duration-150
+            hover:bg-[#F1F5F9]
           "
         >
+          {/* Avatar */}
           <span
             className="
               flex
-              size-10
+              size-8
               shrink-0
               items-center
               justify-center
               overflow-hidden
               rounded-full
-              bg-[#0D3768]
-              text-xs
-              font-semibold
+              bg-[#0F766E]
+              text-[11px]
+              font-bold
+              tracking-wide
               text-white
+              ring-2
+              ring-white
             "
+            style={{ boxShadow: '0 0 0 2px #E2E8F0' }}
           >
             {user.image ? (
               <Image
                 src={user.image}
                 alt={user.name}
-                width={40}
-                height={40}
+                width={32}
+                height={32}
                 unoptimized
                 className="size-full object-cover"
               />
             ) : initials ? (
               initials
             ) : (
-              <UserRound className="size-[18px]" />
+              <UserRound className="size-4" />
             )}
           </span>
 
+          {/* Name + role — hidden on small screens */}
           <span className="hidden min-w-0 sm:block">
-            <span className="block max-w-36 truncate text-[13px] font-bold leading-4 text-[#101B2A]">
+            <span className="block max-w-32 truncate text-[13px] font-semibold leading-[1.3] text-[#0F172A]">
               {user.name}
             </span>
-            <span className="block max-w-36 truncate text-[11px] font-semibold leading-4 text-[#667386]">
+            <span className="block max-w-32 truncate text-[11px] font-medium leading-[1.3] text-[#94A3B8]">
               {dashboardRoleLabels[role]}
             </span>
           </span>
-
-          <ChevronDown className="hidden size-4 shrink-0 text-[#667386] sm:block" />
         </button>
       </div>
     </header>
   )
 }
+

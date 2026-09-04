@@ -1,5 +1,7 @@
-import FacilityReportsPage from "@/features/dashboard/facility/components/facility-reports-page"
-
-export default function Page() {
-  return <FacilityReportsPage />
+export default function ReportsPage() {
+  return (
+    <div>
+      <h1>Analytics</h1>
+    </div>
+  )
 }

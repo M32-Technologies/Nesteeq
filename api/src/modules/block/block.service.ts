@@ -73,10 +73,18 @@ export const getBlocks = async (query: BlockListQuery, apartmentId?: string) => 
     throw new AppError("Apartment id must be a valid id", 400);
   }
 
-  const blocks = await Block.find({
+  const filter: {
+    apartmentId: string;
+    status?: "active" | "inactive";
+  } = {
     apartmentId: apartmentId,
-    status: query.status ?? "active",
-  })
+  };
+
+  if (query.status) {
+    filter.status = query.status;
+  }
+
+  const blocks = await Block.find(filter)
     .select("_id apartmentId blockname code totalFloors status createdAt updatedAt")
     .sort({ blockname: 1 })
     .lean<BlockRecord[]>();
@@ -134,7 +142,6 @@ export const updateBlock = async (
   const block = await Block.findOne({
     _id: blockId,
     apartmentId,
-    status: "active",
   });
 
   if (!block) {

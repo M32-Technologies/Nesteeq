@@ -3,7 +3,9 @@ import { Types } from "mongoose";
 import { getAuthDB } from "../../config/auth-db.js";
 import { AppError } from "../../utils/AppError.js";
 import { isMaintenanceRole } from "../../utils/role.js";
-import { getMongoId, sameId } from "../../utils/serviceHelpers.js";
+
+
+
 import { createNotification } from "../notification/notification.service.js";
 import { Complaint } from "../complaint/complaint.model.js";
 import {
@@ -47,6 +49,18 @@ import type {
   UpdateScheduleInput,
   UpdateScheduleStatusInput,
 } from "./schedule.schema.js";
+
+const sameId = (id1: any, id2: any): boolean => {
+  if (!id1 || !id2) return false;
+  return id1.toString() === id2.toString();
+};
+
+const getMongoId = (id: any): string => {
+  if (!id) return '';
+  return typeof id === 'string' ? id : (id._id ? id._id.toString() : id.toString());
+};
+
+
 
 export type AuthenticatedScheduleUser = {
   id: string;

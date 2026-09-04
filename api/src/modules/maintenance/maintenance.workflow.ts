@@ -1,6 +1,6 @@
 import { AppError } from "../../utils/AppError.js";
 import { normalizeRole } from "../../utils/role.js";
-import { normalizeOptionalString } from "../../utils/serviceHelpers.js";
+
 import {
   complaintStatuses,
   type ComplaintDocument,
@@ -12,6 +12,13 @@ import {
   type MaintenanceDocument,
   type MaintenanceStatus,
 } from "./maintenance.model.js";
+
+const normalizeOptionalString = (value: string | null | undefined): string | undefined => {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+};
+
 
 export type MaintenanceNote = {
   message: string;
@@ -182,7 +189,7 @@ export const createProgressUpdate = (
 ): MaintenanceProgressUpdate => ({
   details,
   status,
-  remarks: normalizeOptionalString(remarks),
+  remarks: normalizeOptionalString(remarks) ?? null,
   by: user.id,
   role: normalizeRole(user.role),
   createdAt: new Date(),

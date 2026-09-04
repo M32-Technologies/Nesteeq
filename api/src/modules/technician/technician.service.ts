@@ -3,7 +3,9 @@ import { Types } from "mongoose";
 import { getAuthDB } from "../../config/auth-db.js";
 import { AppError } from "../../utils/AppError.js";
 import { isMaintenanceRole, isTechnicianCreatorRole } from "../../utils/role.js";
-import { normalizeOptionalString, sameId } from "../../utils/serviceHelpers.js";
+
+
+
 import { Complaint } from "../complaint/complaint.model.js";
 import {
   assignComplaint,
@@ -40,6 +42,19 @@ import type {
   UpdateTechnicianStatusInput,
   UpdateTechnicianTaskStatusInput,
 } from "./technician.schema.js";
+
+const normalizeOptionalString = (value: string | null | undefined): string | undefined => {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+};
+
+const sameId = (id1: any, id2: any): boolean => {
+  if (!id1 || !id2) return false;
+  return id1.toString() === id2.toString();
+};
+
+
 
 export type AuthenticatedTechnicianUser = {
   id: string;

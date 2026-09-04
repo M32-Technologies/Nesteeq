@@ -1,3 +1,4 @@
+
 import { Request, Response } from "express";
 import { catchAsync } from "../../utils/catchAsync.js";
 import {
@@ -251,3 +252,4 @@ export const closeMaintenanceHandler = catchAsync(async (req: Request, res: Resp
     data: result,
   });
 });
+

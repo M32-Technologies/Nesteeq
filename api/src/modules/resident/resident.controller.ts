@@ -1,6 +1,6 @@
 import { catchAsync } from "../../utils/catchAsync.js";
 import { Request, Response } from "express";
-import { getResident, getResidentDetails, updateResidentDetails, updateResidentStatus } from "./resident.service.js";
+import { getResident, getResidentDetails, getResidentStats, updateResidentDetails, updateResidentStatus } from "./resident.service.js";
 import { ResidentListQuery } from "./resident.validation.js";
 import { AppError } from "../../utils/AppError.js";
 
@@ -13,6 +13,21 @@ export const getResidentHandler = catchAsync(async (req: Request, res: Response)
     res.status(200).json({
         success: true,
         data: result,
+    })
+})
+
+export const getResidentStatsHandler = catchAsync(async (req: Request, res: Response) => {
+    const apartmentId = req.user?.apartmentId;
+
+    if (!apartmentId) {
+        throw new AppError("Apartment context is required", 400);
+    }
+
+    const stats = await getResidentStats(apartmentId);
+
+    res.status(200).json({
+        success: true,
+        data: stats,
     })
 })
 

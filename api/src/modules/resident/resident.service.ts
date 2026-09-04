@@ -5,6 +5,7 @@ import { Flat } from "../flat/flat.model.js";
 import { syncFlatOccupancy } from "../flat/flat.service.js";
 import { getAuthDB } from "../../config/auth-db.js";
 import { Types } from "mongoose";
+import { Invite } from "../invitation/invitation.model.js";
 
 const escapeRegex = (value: string) =>
     value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -68,7 +69,7 @@ export const getResident = async (data: ResidentListQuery, apartmentId: string) 
     const users = await getAuthDB()
         .collection("user")
         .find({
-            id: { $in: residents.map((resident) => resident.userId).filter(Boolean) },
+            id: { $in: residents.map((resident: any) => resident.userId).filter(Boolean) },
         })
         .project({
             _id: 0,
@@ -85,7 +86,7 @@ export const getResident = async (data: ResidentListQuery, apartmentId: string) 
     const usersById = new Map(users.map((user) => [user.id, user]));
 
     return {
-        residents: residents.map((resident) => {
+        residents: residents.map((resident: any) => {
             const user = resident.userId ? usersById.get(resident.userId) : null;
 
             return {
@@ -112,6 +113,39 @@ export const getResident = async (data: ResidentListQuery, apartmentId: string) 
         totalCount,
     };
 }
+
+export const getResidentStats = async (apartmentId: string) => {
+    if (!apartmentId) {
+        throw new AppError("Apartment id is required", 400);
+    }
+
+    const [residentAgg, pendingInvites] = await Promise.all([
+        Resident.aggregate([
+            { $match: { apartmentId: new Types.ObjectId(apartmentId) } },
+            {
+                $facet: {
+                    total: [{ $count: "count" }],
+                    active: [{ $match: { status: "active" } }, { $count: "count" }],
+                    inactive: [{ $match: { status: "inactive" } }, { $count: "count" }],
+                },
+            },
+        ]),
+        Invite.countDocuments({
+            apartmentId: new Types.ObjectId(apartmentId),
+            role: { $in: ["owner", "resident"] },
+            status: "pending",
+        }),
+    ]);
+
+    const facet = residentAgg[0] ?? {};
+
+    return {
+        totalUsers: facet.total?.[0]?.count ?? 0,
+        activeUsers: facet.active?.[0]?.count ?? 0,
+        inactiveUsers: facet.inactive?.[0]?.count ?? 0,
+        pendingUsers: pendingInvites,
+    };
+};
 
 export const getResidentDetails = async (residentId: string, apartmentId: string) => {
     if (!apartmentId) {

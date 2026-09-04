@@ -6,8 +6,16 @@ import {
 } from "../../utils/role.js";
 import { getAuthDB } from "../../config/auth-db.js";
 import { AppError } from "../../utils/AppError.js";
-import { normalizeOptionalString } from "../../utils/serviceHelpers.js";
+
 import type { AuthenticatedFacilityUser } from "./facility.service.js";
+
+const normalizeOptionalString = (value: string | null | undefined): string | undefined => {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+};
+
+
 
 type AuthUserRecord = {
   _id?: ObjectId;

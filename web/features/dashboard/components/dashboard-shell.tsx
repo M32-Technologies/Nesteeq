@@ -25,7 +25,7 @@ export default function DashboardShell({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
   return (
-    <div className="min-h-svh bg-[#F7F9FB]">
+    <div className="min-h-svh" style={{ background: 'var(--background)' }}>
       <DashboardSidebar
         role={role}
         user={user}
@@ -36,7 +36,7 @@ export default function DashboardShell({
       <main
         className="
           min-h-svh
-          pb-5
+          pb-6
           pt-0
           transition-[padding-left]
           duration-300
@@ -52,7 +52,7 @@ export default function DashboardShell({
           onOpenSidebar={() => setIsSidebarOpen(true)}
         />
 
-        <div className="mt-5 px-4 sm:px-5">{children}</div>
+        <div className="mt-5 px-4 sm:px-6">{children}</div>
       </main>
     </div>
   )

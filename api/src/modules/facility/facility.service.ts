@@ -3,7 +3,6 @@ import { Complaint } from "../complaint/complaint.model.js";
 import { Maintenance } from "../maintenance/maintenance.model.js";
 import { Schedule } from "../schedule/schedule.model.js";
 import { Technician } from "../technician/technician.model.js";
-import { normalizeOptionalString } from "../../utils/serviceHelpers.js";
 import {
   assertCanViewFacilityDashboard,
   ensureCurrentUserExists,

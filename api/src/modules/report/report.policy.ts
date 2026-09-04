@@ -6,9 +6,17 @@ import {
   MANAGEMENT_ROLE_SET as reportRoles,
   normalizeRole,
 } from "../../utils/role.js";
-import { normalizeOptionalString } from "../../utils/serviceHelpers.js";
+
 import type { ReportQuery } from "./report.schema.js";
 import type { AuthenticatedReportUser } from "./report.service.js";
+
+const normalizeOptionalString = (value: string | null | undefined): string | undefined => {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+};
+
+
 
 type AuthUserRecord = {
   _id?: ObjectId;

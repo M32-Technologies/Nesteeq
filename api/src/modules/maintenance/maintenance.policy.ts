@@ -8,10 +8,25 @@ import {
   normalizeRole,
 } from "../../utils/role.js";
 import { AppError } from "../../utils/AppError.js";
-import { normalizeOptionalString, sameId } from "../../utils/serviceHelpers.js";
+
+
+
 import type { GetMaintenanceQuery } from "./maintenance.schema.js";
 import type { AuthenticatedMaintenanceUser } from "./maintenance.service.js";
 import type { MaintenanceDocument } from "./maintenance.model.js";
+
+const normalizeOptionalString = (value: string | null | undefined): string | undefined => {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+};
+
+const sameId = (id1: any, id2: any): boolean => {
+  if (!id1 || !id2) return false;
+  return id1.toString() === id2.toString();
+};
+
+
 
 type MaintenanceFilter = Record<string, unknown>;
 

@@ -8,10 +8,10 @@ import {
   ClipboardList,
   LayoutDashboard,
   MessageSquareWarning,
+  Package,
   QrCode,
   ReceiptText,
   Settings,
-  ShieldCheck,
   UserRound,
   UserRoundCog,
   Users,
@@ -96,6 +96,11 @@ export const sidebarNavigation: Record<
     {
       title: "System",
       items: [
+        {
+          title: "Reports",
+          href: "/dashboard/reports",
+          icon: BarChart3,
+        },
         {
           title: "Notifications",
           href: "/dashboard/notifications",
@@ -261,7 +266,7 @@ export const sidebarNavigation: Record<
 
   security_staff: [
     {
-      title: "Security",
+      title: "",
       items: [
         {
           title: "Dashboard",
@@ -274,24 +279,24 @@ export const sidebarNavigation: Record<
           icon: Users,
         },
         {
-          title: "QR Scanner",
-          href: "/dashboard/scanner",
-          icon: QrCode,
+          title: "Delivery & Parcels",
+          href: "/dashboard/deliveries",
+          icon: Package,
         },
         {
-          title: "Entry Records",
-          href: "/dashboard/entry-records",
-          icon: ClipboardList,
-        },
-        {
-          title: "Parking",
+          title: "Parking Slots",
           href: "/dashboard/parking",
           icon: Car,
         },
         {
-          title: "Security",
-          href: "/dashboard/security",
-          icon: ShieldCheck,
+          title: "Emergency / SOS Alerts",
+          href: "/dashboard/alerts",
+          icon: MessageSquareWarning,
+        },
+        {
+          title: "Residents Directory",
+          href: "/dashboard/residents",
+          icon: UserRound,
         },
       ],
     },

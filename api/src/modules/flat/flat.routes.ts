@@ -16,19 +16,14 @@ import {
   flatListQuerySchema,
   generateFlatsSchema,
   getFlatByIdSchema,
+  updateFlatStatusSchema,
   updateFlatSchema,
 } from "./flat.schema.js";
 
 const router = express.Router();
 const managerOnly = requireRole("property_manager");
 
-router.post(
-  "/",
-  protect,
-  managerOnly,
-  zodValidate(createFlatSchema),
-  createFlatHandler,
-);
+router.post("/", protect , managerOnly , zodValidate(createFlatSchema),createFlatHandler,);
 
 router.post(
   "/generate",
@@ -52,6 +47,14 @@ router.get(
   managerOnly,
   zodValidate(getFlatByIdSchema),
   getFlatByIdHandler,
+);
+
+router.patch(
+  "/:id/status",
+  protect,
+  managerOnly,
+  zodValidate(updateFlatStatusSchema),
+  deactivateFlatHandler,
 );
 
 router.patch(

@@ -12,6 +12,7 @@ import type {
   GenerateFlatsInput,
   OccupancyStatus,
   UpdateFlatInput,
+  UpdateFlatStatusInput,
 } from "./flat.schema.js";
 import type {
   ApartmentForFlatCreate,
@@ -69,7 +70,7 @@ const lockApartmentForUnitLimit = async (
       },
     },
     {
-      new: true,
+      returnDocument: 'after',
       session,
     },
   )
@@ -238,17 +239,17 @@ export const createFlat = async (
 
   try {
     await session.withTransaction(async () => {
-      const [apartment, block] = await Promise.all([
-        lockApartmentForUnitLimit(apartmentObjectId, session),
-        Block.findOne({
-          _id: blockObjectId,
-          apartmentId: apartmentObjectId,
-        })
-          .select("_id apartmentId blockname code totalFloors status")
-          .session(session)
-          .lean<BlockForFlatCreate>(),
-      ]);
-
+      const apartment = await lockApartmentForUnitLimit(
+        apartmentObjectId,
+        session,
+      );
+      const block = await Block.findOne({
+        _id: blockObjectId,
+        apartmentId: apartmentObjectId,
+      })
+        .select("_id apartmentId blockname code totalFloors status")
+        .session(session)
+        .lean<BlockForFlatCreate>();
       if (!block) {
         throw new AppError("Block not found in this apartment", 404);
       }
@@ -329,7 +330,7 @@ export const createFlat = async (
   return getFlatById(createdFlatId, apartmentId);
 };
 
-export const generateFlats = async (data: GenerateFlatsInput,apartmentId?: string,) => {
+export const generateFlats = async (data: GenerateFlatsInput, apartmentId?: string,) => {
   const apartmentObjectId = getApartmentObjectId(apartmentId);
 
   if (!Types.ObjectId.isValid(data.blockId)) {
@@ -358,16 +359,17 @@ export const generateFlats = async (data: GenerateFlatsInput,apartmentId?: strin
 
   try {
     await session.withTransaction(async () => {
-      const [apartment, block] = await Promise.all([
-        lockApartmentForUnitLimit(apartmentObjectId, session),
-        Block.findOne({
-          _id: blockObjectId,
-          apartmentId: apartmentObjectId,
-        })
-          .select("_id apartmentId blockname code totalFloors status")
-          .session(session)
-          .lean<BlockForFlatCreate>(),
-      ]);
+      const apartment = await lockApartmentForUnitLimit(
+        apartmentObjectId,
+        session,
+      );
+      const block = await Block.findOne({
+        _id: blockObjectId,
+        apartmentId: apartmentObjectId,
+      })
+        .select("_id apartmentId blockname code totalFloors status")
+        .session(session)
+        .lean<BlockForFlatCreate>();
 
       if (!block) {
         throw new AppError("Block not found in this apartment", 404);
@@ -672,7 +674,11 @@ export const updateFlat = async (
   return getFlatById(flatId, apartmentId);
 };
 
-export const deactivateFlat = async (flatId: string, apartmentId?: string) => {
+export const updateFlatStatus = async (
+  flatId: string,
+  data: UpdateFlatStatusInput,
+  apartmentId?: string,
+) => {
   const apartmentObjectId = getApartmentObjectId(apartmentId);
 
   if (!Types.ObjectId.isValid(flatId)) {
@@ -684,11 +690,30 @@ export const deactivateFlat = async (flatId: string, apartmentId?: string) => {
     _id: flatObjectId,
     apartmentId: apartmentObjectId,
   })
-    .select("_id")
-    .lean();
+    .select("_id blockId")
+    .lean<FlatRecord>();
 
   if (!flat) {
     throw new AppError("Flat not found", 404);
+  }
+
+  if (data.status === "active") {
+    const blockObjectId =
+      flat.blockId instanceof Types.ObjectId ? flat.blockId : flat.blockId._id;
+    const block = await Block.findOne({
+      _id: blockObjectId,
+      apartmentId: apartmentObjectId,
+    })
+      .select("_id status")
+      .lean<BlockForFlatCreate>();
+
+    if (!block) {
+      throw new AppError("Block does not exist", 404);
+    }
+
+    if (block.status !== "active") {
+      throw new AppError("Block is inactive", 400);
+    }
   }
 
   await Flat.updateOne(
@@ -698,10 +723,14 @@ export const deactivateFlat = async (flatId: string, apartmentId?: string) => {
     },
     {
       $set: {
-        status: "inactive",
+        status: data.status,
       },
     },
   );
+
+  if (data.status === "active") {
+    await syncFlatOccupancy(flatObjectId, apartmentObjectId);
+  }
 
   return getFlatById(flatId, apartmentId);
 };
@@ -721,12 +750,12 @@ export const syncFlatOccupancy = async (
     .lean<{ _id: Types.ObjectId; residentType: "owner" | "resident" }[]>();
 
   const primaryResident =
-    residents.find((resident) => resident.residentType === "owner") ??
+    residents.find((resident: any) => resident.residentType === "owner") ??
     residents[0] ??
     null;
 
   const occupancyStatus: OccupancyStatus = residents.some(
-    (resident) => resident.residentType === "owner",
+    (resident: any) => resident.residentType === "owner",
   )
     ? "OWNER"
     : residents.length > 0

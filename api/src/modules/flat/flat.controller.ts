@@ -3,11 +3,11 @@ import type { Request, Response } from "express";
 import type { FlatIdParams, FlatListQuery } from "./flat.schema.js";
 import {
     createFlat,
-    deactivateFlat,
     generateFlats,
     getFlat,
     getFlatById,
     updateFlat,
+    updateFlatStatus,
 } from "./flat.service.js";
 
 
@@ -86,11 +86,14 @@ export const deactivateFlatHandler = catchAsync(
     async(req : Request , res : Response) =>{
         const apartmentId = req.user?.apartmentId!
         const params = req.params as unknown as FlatIdParams;
-        const result = await deactivateFlat(params.id, apartmentId);
+        const status = req.body?.status === "active" ? "active" : "inactive";
+        const result = await updateFlatStatus(params.id, { status }, apartmentId);
+
+        const message = status === "active"? "Flat reactivated successfully" :  "Flat deactivated successfully";
 
         res.status(200).json({
             success: true,
-            message: "Flat deactivated successfully",
+            message,
             data: {
                 flat: result,
             },

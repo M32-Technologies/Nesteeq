@@ -13,8 +13,17 @@ import {
   normalizeRole,
   RESIDENT_ROLE_SET as residentRoles,
 } from "../../utils/role.js";
-import { normalizeOptionalString, sameId } from "../../utils/serviceHelpers.js";
-import { createNotification } from "../notification/notification.service.js";
+const normalizeOptionalString = (value: string | null | undefined): string | undefined => {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+};
+
+const sameId = (id1: any, id2: any): boolean => {
+  if (!id1 || !id2) return false;
+  return id1.toString() === id2.toString();
+};
+
 import { Complaint, type ComplaintDocument } from "./complaint.model.js";
 import {
   approvalAllowedStatuses,
@@ -256,17 +265,7 @@ export const createComplaint = async (
     status: "PENDING",
   });
 
-  await createNotification({
-    apartment,
-    recipientRole: "FACILITY_MANAGER",
-    type: "NEW_COMPLAINT",
-    severity: data.priority === "URGENT" || data.priority === "HIGH" ? "WARNING" : "INFO",
-    title: "New resident complaint",
-    message: `${data.title} was submitted for ${data.category.toLowerCase()} review.`,
-    relatedResourceType: "complaint",
-    relatedResourceId: String(complaint._id),
-    createdBy: user.id,
-  });
+
 
   return complaint;
 };
@@ -423,17 +422,7 @@ export const assignComplaint = async (
 
   const updatedComplaint = await updateComplaintDocument(complaintId, set, createRemark(data.remarks, user));
 
-  await createNotification({
-    apartment: updatedComplaint.apartment,
-    recipientUserId: staffId,
-    type: "TASK_ASSIGNED",
-    severity: updatedComplaint.priority === "URGENT" ? "WARNING" : "INFO",
-    title: "Complaint assigned",
-    message: `${updatedComplaint.title} has been assigned to you.`,
-    relatedResourceType: "complaint",
-    relatedResourceId: complaintId,
-    createdBy: user.id,
-  });
+
 
   return updatedComplaint;
 };
@@ -529,20 +518,7 @@ export const completeComplaintWork = async (
 
   const updatedComplaint = await updateComplaintDocument(complaintId, set, createRemark(data.remarks, user));
 
-  await createNotification({
-    apartment: updatedComplaint.apartment,
-    recipientRole: "FACILITY_MANAGER",
-    type: data.finalCost !== undefined ? "COST_SUBMITTED" : "WORK_COMPLETED",
-    severity: "INFO",
-    title: data.finalCost !== undefined ? "Complaint cost submitted" : "Complaint work completed",
-    message:
-      data.finalCost !== undefined
-        ? `${updatedComplaint.title} was completed with a submitted cost.`
-        : `${updatedComplaint.title} was submitted for review.`,
-    relatedResourceType: "complaint",
-    relatedResourceId: complaintId,
-    createdBy: user.id,
-  });
+
 
   return updatedComplaint;
 };
@@ -584,32 +560,7 @@ export const approveComplaint = async (
 
   const updatedComplaint = await updateComplaintDocument(complaintId, set, createRemark(data.remarks, user));
 
-  await Promise.all([
-    createNotification({
-      apartment: updatedComplaint.apartment,
-      recipientUserId: updatedComplaint.resident,
-      type: "RESIDENT_CONFIRMATION_REQUESTED",
-      severity: "INFO",
-      title: "Complaint ready for confirmation",
-      message: `${updatedComplaint.title} has been approved and is waiting for your confirmation.`,
-      relatedResourceType: "complaint",
-      relatedResourceId: complaintId,
-      createdBy: user.id,
-    }),
-    updatedComplaint.assignedStaff
-      ? createNotification({
-          apartment: updatedComplaint.apartment,
-          recipientUserId: updatedComplaint.assignedStaff,
-          type: "WORK_COMPLETED",
-          severity: "SUCCESS",
-          title: "Complaint work approved",
-          message: `${updatedComplaint.title} was approved by the Facility Manager.`,
-          relatedResourceType: "complaint",
-          relatedResourceId: complaintId,
-          createdBy: user.id,
-        })
-      : Promise.resolve(),
-  ]);
+
 
   return updatedComplaint;
 };
@@ -644,19 +595,7 @@ export const rejectComplaint = async (
 
   const updatedComplaint = await updateComplaintDocument(complaintId, set, createRemark(data.reason, user));
 
-  if (updatedComplaint.assignedStaff) {
-    await createNotification({
-      apartment: updatedComplaint.apartment,
-      recipientUserId: updatedComplaint.assignedStaff,
-      type: "MAINTENANCE_STATUS_UPDATED",
-      severity: "WARNING",
-      title: "Complaint work rejected",
-      message: `${updatedComplaint.title} needs more work: ${data.reason}`,
-      relatedResourceType: "complaint",
-      relatedResourceId: complaintId,
-      createdBy: user.id,
-    });
-  }
+
 
   return updatedComplaint;
 };
@@ -743,17 +682,7 @@ export const confirmComplaintResolution = async (
     createRemark(data.remarks ?? "Resident confirmed resolution", user)
   );
 
-  await createNotification({
-    apartment: updatedComplaint.apartment,
-    recipientRole: "FACILITY_MANAGER",
-    type: "RESIDENT_CONFIRMATION_RECEIVED",
-    severity: "SUCCESS",
-    title: "Resident confirmed resolution",
-    message: `${updatedComplaint.title} was confirmed and closed by the resident.`,
-    relatedResourceType: "complaint",
-    relatedResourceId: complaintId,
-    createdBy: user.id,
-  });
+
 
   return updatedComplaint;
 };

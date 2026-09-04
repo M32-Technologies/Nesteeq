@@ -1,4 +1,4 @@
-import mongoose, {
+import {
   Schema,
   model,
   type InferSchemaType,
@@ -88,5 +88,5 @@ residentSchema.index({
 
 export type ResidentDocument = InferSchemaType<typeof residentSchema>
 
-export const ResidentModel = mongoose.models.Resident || model("Resident", residentSchema)
+export const ResidentModel = model("Resident", residentSchema)
 export const Resident = ResidentModel

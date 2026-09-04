@@ -228,32 +228,38 @@ export default function DashboardSidebar({
             <div key={`${section.title}-${sectionIndex}`}>
               {/* SECTION TITLE */}
 
-              <div
-                className="
-                  mb-2
-                  ml-[15px]
-
-                  h-[16px]
+              {section.title ? (
+                <div
+                  className="
+                    mb-2
+                    ml-[15px]
 
                   whitespace-nowrap
 
                   text-[10px]
-                  font-medium
+                  font-semibold
                   uppercase
-                  tracking-[0.12em]
+                  tracking-[0.14em]
 
-                  text-[#63768D]
+                    text-[#63768D]
 
-                  transition-opacity
-                  duration-150
+                  overflow-hidden
+                  transition-all
+                  duration-200
 
+                  h-4
                   opacity-100
+                  lg:h-0
                   lg:opacity-0
+                  lg:mb-0
+                  lg:group-hover/sidebar:h-4
+                  lg:group-hover/sidebar:mb-2
                   lg:group-hover/sidebar:opacity-100
                 "
               >
                 {section.title}
               </div>
+              ) : null}
 
               {/* ITEMS */}
 
@@ -407,10 +413,12 @@ export default function DashboardSidebar({
 
           <button
             type="button"
+            aria-label="Notifications"
             className="
               flex
               h-[44px]
               w-full
+              cursor-pointer
               items-center
 
               overflow-hidden
@@ -420,7 +428,7 @@ export default function DashboardSidebar({
               text-[#C3D2E3]
 
               transition-colors
-              duration-200
+              duration-150
 
               hover:bg-white/[0.07]
               hover:text-white
@@ -428,6 +436,7 @@ export default function DashboardSidebar({
           >
             <div
               className="
+                relative
                 flex
                 w-[56px]
                 shrink-0
@@ -436,6 +445,11 @@ export default function DashboardSidebar({
               "
             >
               <Bell className="size-[18px] stroke-[1.8]" />
+              {/* notification badge — mirrors the navbar bell */}
+              <span
+                className="absolute right-3 top-[3px] size-[7px] rounded-full bg-red-400 ring-[1.5px] ring-[#071D35]"
+                aria-hidden="true"
+              />
             </div>
 
             <span
@@ -461,10 +475,12 @@ export default function DashboardSidebar({
 
           <button
             type="button"
+            aria-label="Settings"
             className="
               flex
               h-[44px]
               w-full
+              cursor-pointer
               items-center
 
               overflow-hidden
@@ -474,7 +490,7 @@ export default function DashboardSidebar({
               text-[#C3D2E3]
 
               transition-colors
-              duration-200
+              duration-150
 
               hover:bg-white/[0.07]
               hover:text-white
@@ -573,10 +589,11 @@ export default function DashboardSidebar({
 
                   rounded-full
 
-                  bg-[#16477C]
+                  bg-[#0F766E]
 
                   text-[11px]
-                  font-semibold
+                  font-bold
+                  tracking-wide
                   text-white
 
                   ring-2
@@ -644,15 +661,16 @@ export default function DashboardSidebar({
                 flex
                 size-8
                 shrink-0
+                cursor-pointer
                 items-center
                 justify-center
 
                 rounded-lg
 
-                text-[#C3D2E3]
+                text-[#8194AA]
 
                 transition-colors
-                duration-200
+                duration-150
 
                 hover:bg-red-500/10
                 hover:text-red-400

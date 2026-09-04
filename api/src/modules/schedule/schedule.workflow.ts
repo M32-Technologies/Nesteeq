@@ -1,11 +1,18 @@
 import { AppError } from "../../utils/AppError.js";
 import { normalizeRole } from "../../utils/role.js";
-import { normalizeOptionalString } from "../../utils/serviceHelpers.js";
+
 import type { ComplaintStatus } from "../complaint/complaint.model.js";
 import type { MaintenanceStatus } from "../maintenance/maintenance.model.js";
 import type { TechnicianStatus } from "../technician/technician.model.js";
 import type { AuthenticatedScheduleUser } from "./schedule.service.js";
 import type { ScheduleStatus } from "./schedule.model.js";
+
+const normalizeOptionalString = (value: string | null | undefined): string | undefined => {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+};
+
 
 export type TimeWindow = {
   scheduledDate: Date;
