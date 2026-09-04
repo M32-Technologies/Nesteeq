@@ -1,7 +1,6 @@
 import {
   Schema,
   model,
-  models,
   type InferSchemaType,
 } from "mongoose"
 

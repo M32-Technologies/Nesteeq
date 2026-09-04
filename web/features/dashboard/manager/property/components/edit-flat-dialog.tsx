@@ -77,8 +77,10 @@ export default function EditFlatDialog({
       floorNumber: String(flat.floorNumber),
       flatNumber: flat.flatNumber,
     })
-    setFormError("")
-    clearErrors()
+    queueMicrotask(() => {
+      setFormError("")
+      clearErrors()
+    })
   }, [clearErrors, flat, reset])
 
   if (!open || !flat) {

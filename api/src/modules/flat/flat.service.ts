@@ -750,12 +750,12 @@ export const syncFlatOccupancy = async (
     .lean<{ _id: Types.ObjectId; residentType: "owner" | "resident" }[]>();
 
   const primaryResident =
-    residents.find((resident) => resident.residentType === "owner") ??
+    residents.find((resident: any) => resident.residentType === "owner") ??
     residents[0] ??
     null;
 
   const occupancyStatus: OccupancyStatus = residents.some(
-    (resident) => resident.residentType === "owner",
+    (resident: any) => resident.residentType === "owner",
   )
     ? "OWNER"
     : residents.length > 0

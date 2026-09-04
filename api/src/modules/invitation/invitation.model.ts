@@ -3,7 +3,6 @@
 import {
   Schema,
   model,
-  models,
   type HydratedDocument,
   type InferSchemaType,
   type Model,

@@ -11,7 +11,7 @@ router.get("/stats", protect, requireRole("property_manager"), getResidentStatsH
 
 router.patch("/:id/status" , protect , requireRole("property_manager") , updateResidentStatusHandler)
 
-router.patch("/:id" , protect , requireRole("property_manager") , updateResidentDetailsHandler)
+router.patch("/:id" , protect , updateResidentDetailsHandler)
 
 router.get("/:id" , protect , getResidentDetailsHandler)
 

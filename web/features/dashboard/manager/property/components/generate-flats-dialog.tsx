@@ -102,11 +102,13 @@ export default function GenerateFlatsDialog({
   const removedFlatCount = totalPreviewCount - selectedFlats.length
 
   useEffect(() => {
-    setSelectedFlatNumbers(
-      flatPreview.flatMap((floor) =>
-        floor.flats.map((flat) => flat.flatNumber)
+    queueMicrotask(() => {
+      setSelectedFlatNumbers(
+        flatPreview.flatMap((floor) =>
+          floor.flats.map((flat) => flat.flatNumber)
+        )
       )
-    )
+    })
   }, [flatPreview])
 
   const blockOptions = useMemo(
