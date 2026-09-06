@@ -111,17 +111,11 @@ const requireBillApartmentAccess = catchAsync(
   }
 );
 
-router.use(protect, requireRole("treasurer"));
-
-router.post(
-  "/",
-  requireBodyApartmentAccess,
-  zodValidate(createBillSchema),
-  createBill
-);
+router.use(protect);
 
 router.get(
   "/",
+  requireRole("treasurer", "property_manager"),
   zodValidate(getBillsSchema),
   requireQueryApartmentAccess,
   getBills
@@ -129,6 +123,7 @@ router.get(
 
 router.get(
   "/summary/:apartmentId",
+  requireRole("treasurer", "property_manager"),
   zodValidate(getBillingSummarySchema),
   requireParamApartmentAccess,
   getBillingSummary
@@ -136,13 +131,23 @@ router.get(
 
 router.get(
   "/:id",
+  requireRole("treasurer", "property_manager"),
   zodValidate(getBillByIdSchema),
   requireBillApartmentAccess,
   getBillById
 );
 
+router.post(
+  "/",
+  requireRole("treasurer"),
+  requireBodyApartmentAccess,
+  zodValidate(createBillSchema),
+  createBill
+);
+
 router.patch(
   "/:id",
+  requireRole("treasurer"),
   zodValidate(updateBillSchema),
   requireBillApartmentAccess,
   updateBill
@@ -150,6 +155,7 @@ router.patch(
 
 router.patch(
   "/:id/payment",
+  requireRole("treasurer"),
   zodValidate(recordBillPaymentSchema),
   requireBillApartmentAccess,
   recordBillPayment
@@ -157,6 +163,7 @@ router.patch(
 
 router.patch(
   "/:id/waive-late-fee",
+  requireRole("treasurer"),
   zodValidate(waiveLateFeeSchema),
   requireBillApartmentAccess,
   waiveLateFee

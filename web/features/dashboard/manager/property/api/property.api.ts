@@ -15,6 +15,7 @@ import type {
   PropertyFlatListResult,
   PropertyStats,
   UpdatePropertyBlockInput,
+  UpdatePropertyBlockStatusInput,
   UpdatePropertyFlatInput,
   UpdatePropertyFlatStatusInput,
 } from "../types/property"
@@ -190,22 +191,40 @@ export const updatePropertyBlock = async ({
   }
 }
 
-export const deactivatePropertyBlock = async (
+export const updatePropertyBlockStatus = async ({
+  blockId,
+  input,
+}: {
   blockId: string
-): Promise<PropertyBlock> => {
+  input: UpdatePropertyBlockStatusInput
+}): Promise<PropertyBlock> => {
   try {
-    const response = await api.delete<ApiResponse<{ block: ApiBlock }>>(
-      `/api/v1/blocks/${blockId}`
+    const response = await api.patch<ApiResponse<{ block: ApiBlock }>>(
+      `/api/v1/blocks/${blockId}/status`,
+      input
     )
 
     if (!response.data.success) {
-      throw new Error(response.data.message || "Failed to deactivate block")
+      throw new Error(
+        response.data.message || "Failed to update block status"
+      )
     }
 
     return mapBlock(response.data.data.block)
   } catch (error) {
-    throw new Error(getApiErrorMessage(error, "Failed to deactivate block"))
+    throw new Error(
+      getApiErrorMessage(error, "Failed to update block status")
+    )
   }
+}
+
+export const deactivatePropertyBlock = async (
+  blockId: string
+): Promise<PropertyBlock> => {
+  return updatePropertyBlockStatus({
+    blockId,
+    input: { status: "inactive" },
+  })
 }
 
 export const getPropertyFlats = async (

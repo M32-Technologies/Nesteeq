@@ -1,6 +1,6 @@
 import type { ClientSession, Types } from "mongoose";
 
-import { FlatListQuery , OccupancyStatus , FlatStatus } from "./flat.schema.js";
+import { FlatListQuery , OccupancyStatus , FlatStatus } from "./flat.validation.js";
 
 export type PopulatedBlock = {
   _id: Types.ObjectId;

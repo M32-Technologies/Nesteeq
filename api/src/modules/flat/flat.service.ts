@@ -13,7 +13,7 @@ import type {
   OccupancyStatus,
   UpdateFlatInput,
   UpdateFlatStatusInput,
-} from "./flat.schema.js";
+} from "./flat.validation.js";
 import type {
   ApartmentForFlatCreate,
   BlockForFlatCreate,
@@ -53,8 +53,7 @@ const isDuplicateKeyError = (error: unknown) =>
   "code" in error &&
   error.code === 11000;
 
-const escapeRegex = (value: string) =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const lockApartmentForUnitLimit = async (
   apartmentObjectId: Types.ObjectId,
@@ -535,8 +534,7 @@ export const getFlat = async (query: FlatListQuery, apartmentId?: string) => {
       )
       .sort({ [sortField]: sortDirection, _id: 1 })
       .skip(skip)
-      .limit(limit)
-      .lean<FlatRecord[]>(),
+      .limit(limit),
     Flat.countDocuments(filter),
   ]);
 
