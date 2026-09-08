@@ -6,6 +6,7 @@ import {
     getPendingApartment,
 } from "./apartment.service.js"
 
+
 export const createApartmentHandler = catchAsync(
     async (req : Request , res : Response) =>{
         const managerId = req.user?.id!;
@@ -21,6 +22,7 @@ export const createApartmentHandler = catchAsync(
 export const getPendingApartmentHandler = catchAsync(
     async (req : Request , res : Response) =>{
         const managerId = req.user?.id!;
+        
         const result = await getPendingApartment(managerId)
 
         res.status(200).json({

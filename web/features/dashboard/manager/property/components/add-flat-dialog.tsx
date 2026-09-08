@@ -26,7 +26,13 @@ const addFlatSchema = z.object({
     })
     .int("Floor must be a whole number")
     .min(1, "Floor must be greater than 0"),
-  flatNumber: z.string().trim().min(1, "Flat number is required"),
+  flatNumber: z.coerce
+    .number({
+      message: "Unit number is required",
+    })
+    .int("Unit number must be a whole number")
+    .min(1, "Unit number must be greater than 0")
+    .max(99, "Unit number cannot exceed 99"),
 })
 
 type AddFlatFormValues = z.input<typeof addFlatSchema>
@@ -56,6 +62,9 @@ export default function AddFlatDialog({ open, onClose }: AddFlatDialogProps) {
     },
   })
   const selectedBlockId = useWatch({ control, name: "blockId" })
+  const selectedFloorNumber = useWatch({ control, name: "floorNumber" })
+  const selectedUnitNumber = useWatch({ control, name: "flatNumber" })
+
   const selectedBlock = blocks.find((block) => block.id === selectedBlockId)
   const floorOptions = selectedBlock
     ? Array.from(
@@ -63,6 +72,16 @@ export default function AddFlatDialog({ open, onClose }: AddFlatDialogProps) {
         (_, index) => index + 1
       )
     : []
+
+  const generatedPreview = useMemo(() => {
+    if (!selectedBlock?.code || !selectedFloorNumber || !selectedUnitNumber) {
+      return null
+    }
+    const unitNum = Number(selectedUnitNumber)
+    if (!Number.isInteger(unitNum) || unitNum <= 0) return null
+    const unitPad = String(unitNum).padStart(2, "0")
+    return `${selectedBlock.code}-${selectedFloorNumber}${unitPad}`
+  }, [selectedBlock, selectedFloorNumber, selectedUnitNumber])
 
   const blockOptions = useMemo(
     () =>
@@ -90,7 +109,7 @@ export default function AddFlatDialog({ open, onClose }: AddFlatDialogProps) {
     const input: CreatePropertyFlatInput = {
       blockId: values.blockId,
       floorNumber: Number(values.floorNumber),
-      flatNumber: values.flatNumber.trim().toUpperCase(),
+      flatNumber: Number(values.flatNumber),
     }
 
     try {
@@ -213,23 +232,39 @@ export default function AddFlatDialog({ open, onClose }: AddFlatDialogProps) {
 
             <label className="block">
               <span className="mb-2 block text-sm font-bold text-slate-700">
-                Flat Number *
+                Unit Number *
               </span>
               <input
-                type="text"
-                placeholder="Example: A-101"
+                type="number"
+                min="1"
+                max="99"
+                step="1"
+                inputMode="numeric"
+                placeholder="Example: 1, 2, 3"
                 disabled={createFlat.isPending}
-                {...register("flatNumber", {
-                  onChange: (event) => {
-                    event.target.value = event.target.value.toUpperCase()
-                  },
-                })}
+                onKeyDown={(event) => {
+                  if (["-", "+", ".", "e", "E"].includes(event.key)) {
+                    event.preventDefault()
+                  }
+                }}
+                {...register("flatNumber")}
                 className={fieldClassName}
               />
+              <span className="mt-1.5 block text-xs font-medium text-slate-500">
+                The door or unit number on this floor (e.g. 1, 2, 3).
+              </span>
               {errors.flatNumber?.message && (
                 <span className="mt-1 block text-xs font-medium text-red-600">
                   {errors.flatNumber.message}
                 </span>
+              )}
+              {generatedPreview && (
+                <div className="mt-2.5 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-xs font-medium text-emerald-800">
+                  <span>Will be created as:</span>
+                  <span className="rounded bg-white px-2 py-0.5 font-mono font-bold text-emerald-800 shadow-sm border border-emerald-200">
+                    {generatedPreview}
+                  </span>
+                </div>
               )}
             </label>
           </div>

@@ -5,7 +5,7 @@ import { CreateApartmentInput } from "./apartment.validation.js";
 import { ObjectId } from "mongodb";
 
 const escapeRegex = (value: string) => {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 };
 
 const getAuthUserFilter = (userId: string) => {
@@ -18,7 +18,7 @@ const getAuthUserFilter = (userId: string) => {
     return { $or: filters };
 };
 
-export const createApartment = async (data : CreateApartmentInput , managerId : string) => {
+export const createApartment = async (data: CreateApartmentInput, managerId: string) => {
     const authUser = await getAuthDB()
         .collection("user")
         .findOne(getAuthUserFilter(managerId), { projection: { _id: 1 } });
@@ -38,6 +38,7 @@ export const createApartment = async (data : CreateApartmentInput , managerId : 
             409
         );
     }
+
     const existingApartment = await Apartment.findOne({
         address: {
             $regex: `^${escapeRegex(data.address.trim())}$`,
@@ -68,24 +69,29 @@ export const createApartment = async (data : CreateApartmentInput , managerId : 
         managerId,
         status: "pending_payment",
     });
+    try {
+        const userUpdate = await getAuthDB()
+            .collection("user")
+            .updateOne(
+                getAuthUserFilter(managerId),
+                {
+                    $set: {
+                        apartmentId: apartment._id.toString(),
+                    },
+                }
+            );
 
-    const userUpdate = await getAuthDB()
-        .collection("user")
-        .updateOne(
-            getAuthUserFilter(managerId),
-            {
-                $set: {
-                    apartmentId: apartment._id.toString(),
-                },
-            }
-        );
-    
-    if (userUpdate.matchedCount === 0) {
-        throw new AppError("Unable to attach apartment to user account", 500);
+        if (userUpdate.matchedCount === 0) {
+            throw new AppError("Unable to attach apartment to user account", 500);
+        }
+    } catch (error) {
+        await Apartment.findByIdAndDelete(apartment._id)
+        throw error
     }
 
     return apartment;
 }
+
 
 export const getPendingApartment = async (managerId: string) => {
     return Apartment.findOne({
@@ -93,6 +99,7 @@ export const getPendingApartment = async (managerId: string) => {
         status: "pending_payment",
     });
 }
+
 
 export const getCurrentApartment = async (apartmentId?: string) => {
     if (!apartmentId) {

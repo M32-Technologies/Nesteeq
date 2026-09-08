@@ -1,9 +1,7 @@
 import cookieParser from "cookie-parser";
 import express from "express";
 import cors from "cors";
-
 import { toNodeHandler } from "better-auth/node";
-
 import { errorHandler, notFoundHandler } from "./middlewares/errorHandler.js";
 import { auth } from "./lib/auth.js";
 import { env } from "./config/env.js";
@@ -40,13 +38,14 @@ app.all("/api/auth/*splat", toNodeHandler(auth));
 app.use(cookieParser());
 app.use(express.json());
 
-app.use("/api/v1/apartment", ApartmentRoute);
 app.use("/api/v1", SubscriptionsRoute);
+app.use("/api/v1/apartment", ApartmentRoute);
 app.use("/api/v1/residents", ResidentRoute);
 app.use("/api/v1/invitations", InvitationRoute);
 app.use("/api/v1/staff", StaffRoute);
 app.use("/api/v1/blocks", BlockRoute);
 app.use("/api/v1/flats", FlatRoute);
+
 app.use("/api/v1/bills", billingRoutes);
 app.use("/api/v1/payments", paymentRoutes);
 app.use("/api/v1/finance", financeRoutes);

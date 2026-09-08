@@ -3,12 +3,12 @@ import { Request, Response } from "express";
 import { catchAsync } from "../../utils/catchAsync.js";
 import {
   createBlock,
-  deleteBlock,
   getBlocks,
   getSingleBlock,
   updateBlock,
+  updateBlockStatus,
 } from "./block.service.js";
-import { BlockListQuery } from "./block.schema.js";
+import { BlockListQuery } from "./block.validation.js";
 
 export const createBlockHandler = catchAsync(
   async (req: Request, res: Response) => {
@@ -28,6 +28,7 @@ export const getBlocksHandler = catchAsync(
   async (req: Request, res: Response) => {
     const apartmentId = req.user?.apartmentId!;
     const query = req.query as unknown as BlockListQuery;
+
     const result = await getBlocks(query, apartmentId);
 
     res.status(200).json({
@@ -67,15 +68,16 @@ export const updateBlockHandler = catchAsync(
   },
 );
 
-export const deleteBlockHandler = catchAsync(
+export const updateBlockStatusHandler = catchAsync(
   async (req: Request, res: Response) => {
     const apartmentId = req.user?.apartmentId!;
     const blockId = String(req.params.id);
-    const result = await deleteBlock(apartmentId, blockId);
+    const { status } = req.body;
+    const result = await updateBlockStatus({ status, apartmentId, blockId });
 
     res.status(200).json({
       success: true,
-      message: "Block deactivated successfully",
+      message: status === "active" ? "Block activated successfully" : "Block deactivated successfully",
       data: {
         block: result,
       },

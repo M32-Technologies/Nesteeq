@@ -1,12 +1,24 @@
 import type { ClientSession, Types } from "mongoose";
 
-import { FlatListQuery , OccupancyStatus , FlatStatus } from "./flat.schema.js";
+import { FlatListQuery , OccupancyStatus , FlatStatus } from "./flat.validation.js";
 
 export type PopulatedBlock = {
   _id: Types.ObjectId;
   blockname?: string;
   code?: string;
 };
+
+export interface IFlat extends Document {
+  apartmentId: Types.ObjectId;
+  blockId: Types.ObjectId;
+  floorNumber: number;
+  residentId: Types.ObjectId | null;
+  flatNumber: string;
+  occupancyStatus: OccupancyStatus;
+  status: FlatStatus;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
 
 export type FlatRecord = {
   _id: Types.ObjectId;

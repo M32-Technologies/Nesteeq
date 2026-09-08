@@ -15,6 +15,7 @@ import {
   getPropertyFlats,
   getPropertyStats,
   updatePropertyBlock,
+  updatePropertyBlockStatus,
   updatePropertyFlat,
   updatePropertyFlatStatus,
 } from "../api/property.api"
@@ -25,6 +26,7 @@ import type {
   PropertyBlockListParams,
   PropertyFlatListParams,
   UpdatePropertyBlockInput,
+  UpdatePropertyBlockStatusInput,
   UpdatePropertyFlatInput,
   UpdatePropertyFlatStatusInput,
 } from "../types/property"
@@ -121,6 +123,28 @@ export const useUpdatePropertyBlockMutation = () => {
       blockId: string
       input: UpdatePropertyBlockInput
     }) => updatePropertyBlock({ blockId, input }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: propertyQueryKeys.blocksRoot(),
+      })
+      queryClient.invalidateQueries({
+        queryKey: propertyQueryKeys.stats(),
+      })
+    },
+  })
+}
+
+export const useUpdatePropertyBlockStatusMutation = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      blockId,
+      input,
+    }: {
+      blockId: string
+      input: UpdatePropertyBlockStatusInput
+    }) => updatePropertyBlockStatus({ blockId, input }),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: propertyQueryKeys.blocksRoot(),

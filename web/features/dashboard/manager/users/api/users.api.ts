@@ -195,13 +195,16 @@ export const downloadResidentInviteTemplate = async () => {
 }
 
 export const getBlocks = async (): Promise<BlockOption[]> => {
-  const response = await api.get<ApiResponse<BlocksApiData>>("/api/v1/blocks")
+  const response = await api.get<ApiResponse<any>>("/api/v1/blocks")
 
   if (!response.data.success) {
     throw new Error(response.data.message || "Failed to fetch blocks")
   }
 
-  return response.data.data.blocks
+  return response.data.data.blocks.map((b: any) => ({
+    id: b.id,
+    name: b.blockname || b.name,
+  }))
 }
 
 export const getFlats = async (

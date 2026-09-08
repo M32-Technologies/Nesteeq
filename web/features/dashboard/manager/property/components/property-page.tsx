@@ -8,6 +8,7 @@ import {
   usePropertyFlatsQuery,
   usePropertyStatsQuery,
 } from "../hooks/use-property-query"
+import { useDebouncedValue } from "../hooks/use-debounced-value"
 import type {
   FlatAdvancedFilters,
   PropertyBlockFilterStatus,
@@ -47,11 +48,15 @@ export default function PropertyPage() {
   const [draftFilters, setDraftFilters] = useState(defaultAdvancedFilters)
   const limit = 10
 
+  const debouncedBlockSearch = useDebouncedValue(blockSearch, 300)
+  const debouncedFlatSearch = useDebouncedValue(flatSearch, 300)
+
   const { data: stats, isLoading: isStatsLoading } = usePropertyStatsQuery()
   const { data: apartment, isLoading: isApartmentLoading } =
     useCurrentPropertyApartmentQuery()
   const { data: blocks = [], isLoading: isBlocksLoading } =
     usePropertyBlocksQuery({
+      search: debouncedBlockSearch.trim() || undefined,
       status: blockStatus === "all" ? undefined : blockStatus,
     })
   const { data: activeBlocks = [], isLoading: isActiveBlocksLoading } =
@@ -61,7 +66,7 @@ export default function PropertyPage() {
 
   const flatParams = useMemo<PropertyFlatListParams>(
     () => ({
-      search: flatSearch.trim() || undefined,
+      search: debouncedFlatSearch.trim() || undefined,
       blockId: flatBlockId === "all" ? undefined : flatBlockId,
       floorNumber: advancedFilters.floorNumber.trim() || undefined,
       occupancyStatus:
@@ -75,7 +80,7 @@ export default function PropertyPage() {
       sortBy: advancedFilters.sortBy,
       sortOrder: advancedFilters.sortOrder,
     }),
-    [advancedFilters, flatBlockId, flatSearch, limit, page]
+    [advancedFilters, debouncedFlatSearch, flatBlockId, limit, page]
   )
 
   const {
@@ -93,21 +98,6 @@ export default function PropertyPage() {
   const addBlockDisabledReason = isAddBlockDisabled
     ? "All apartment blocks have already been created."
     : ""
-
-  const blocksForTable = useMemo(() => {
-    const query = blockSearch.trim().toLowerCase()
-
-    if (!query) {
-      return blocks
-    }
-
-    return blocks.filter((block) => {
-      return (
-        block.blockname.toLowerCase().includes(query) ||
-        block.code.toLowerCase().includes(query)
-      )
-    })
-  }, [blockSearch, blocks])
 
   const advancedFilterCount = [
     advancedFilters.floorNumber,
@@ -166,7 +156,7 @@ export default function PropertyPage() {
 
       {activeTab === "blocks" ? (
         <BlocksTableSection
-          blocks={blocksForTable}
+          blocks={blocks}
           blockStatus={blockStatus}
           blockSearch={blockSearch}
           isLoading={isBlocksLoading}
