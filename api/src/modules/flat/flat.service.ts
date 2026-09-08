@@ -1,8 +1,6 @@
-import mongoose, { Types, type ClientSession } from "mongoose";
-
+import { Types } from "mongoose";
 import { getAuthDB } from "../../config/auth-db.js";
 import { AppError } from "../../utils/AppError.js";
-import { Apartment } from "../apartment/apartment.model.js";
 import { Block } from "../block/block.model.js";
 import { Resident } from "../resident/resident.model.js";
 import { Flat } from "./flat.model.js";
@@ -15,7 +13,6 @@ import type {
   UpdateFlatStatusInput,
 } from "./flat.validation.js";
 import type {
-  ApartmentForFlatCreate,
   BlockForFlatCreate,
   AuthUserForFlatDetails,
   FlatQueryFilter,
@@ -35,18 +32,8 @@ const sortFields: Record<FlatSortBy, keyof FlatRecord> = {
   updatedAt: "updatedAt",
 };
 
-const getApartmentObjectId = (apartmentId?: string) => {
-  if (!apartmentId) {
-    throw new AppError("Apartment context is required", 400);
-  }
-
-  if (!Types.ObjectId.isValid(apartmentId)) {
-    throw new AppError("Apartment id must be a valid id", 400);
-  }
-
-  return new Types.ObjectId(apartmentId);
-};
-
+import mongoose from "mongoose";
+import { getSingleBlock } from "../block/block.service.js";
 const isDuplicateKeyError = (error: unknown) =>
   typeof error === "object" &&
   error !== null &&
@@ -55,70 +42,14 @@ const isDuplicateKeyError = (error: unknown) =>
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const lockApartmentForUnitLimit = async (
-  apartmentObjectId: Types.ObjectId,
-  session: ClientSession,
-) => {
-  const apartment = await Apartment.findOneAndUpdate(
-    {
-      _id: apartmentObjectId,
-    },
-    {
-      $set: {
-        updatedAt: new Date(),
-      },
-    },
-    {
-      returnDocument: 'after',
-      session,
-    },
-  )
-    .select("_id totalUnits")
-    .lean<ApartmentForFlatCreate>();
 
-  if (!apartment) {
-    throw new AppError("Apartment context is required", 400);
+
+const ValidateObjectId = (id: string, label: string) => {
+  if (!Types.ObjectId.isValid(id)) {
+    throw new AppError(`${label} must be a valid id`, 400);
   }
-
-  return apartment;
 };
 
-const getApartmentTotalUnitLimit = (totalUnits: string) => {
-  const totalUnitLimit = Number(totalUnits);
-
-  if (
-    !Number.isFinite(totalUnitLimit) ||
-    !Number.isInteger(totalUnitLimit) ||
-    totalUnitLimit <= 0
-  ) {
-    throw new AppError("Apartment total unit count is invalid", 400);
-  }
-
-  return totalUnitLimit;
-};
-
-const generateFlatNumbers = (
-  blockCode: string,
-  totalFloors: number,
-  unitsPerFloor: number,
-) => {
-  const code = blockCode.trim().toUpperCase();
-  const generatedFlats: Array<{
-    floorNumber: number;
-    flatNumber: string;
-  }> = [];
-
-  for (let floor = 1; floor <= totalFloors; floor += 1) {
-    for (let unit = 1; unit <= unitsPerFloor; unit += 1) {
-      generatedFlats.push({
-        floorNumber: floor,
-        flatNumber: `${code}-${floor}${String(unit).padStart(2, "0")}`,
-      });
-    }
-  }
-
-  return generatedFlats;
-};
 
 const getBlockDetails = (blockId: FlatRecord["blockId"]) => {
   if (blockId instanceof Types.ObjectId) {
@@ -154,18 +85,9 @@ const mapFlat = (flat: FlatRecord) => {
   };
 };
 
-const mapGeneratedFlat = (flat: FlatRecord) => ({
-  id: flat._id.toString(),
-  flatNumber: flat.flatNumber,
-  floorNumber: flat.floorNumber,
-  occupancyStatus: flat.occupancyStatus ?? "VACANT",
-  status: flat.status,
-});
 
-const getResidentDetailsForFlat = async (
-  flat: FlatRecord,
-  apartmentId: Types.ObjectId,
-) => {
+
+const getResidentDetailsForFlat = async (flat: FlatRecord, apartmentId: string,) => {
   if (!flat.residentId) {
     return null;
   }
@@ -177,8 +99,7 @@ const getResidentDetailsForFlat = async (
   })
     .select(
       "_id userId residentType phoneNumber status joinedAt createdAt updatedAt",
-    )
-    .lean<ResidentForFlatDetails>();
+    );
 
   if (!resident) {
     return null;
@@ -221,263 +142,214 @@ const getResidentDetailsForFlat = async (
   };
 };
 
-export const createFlat = async (
-  data: CreateFlatInput,
-  apartmentId?: string,
-) => {
-  const apartmentObjectId = getApartmentObjectId(apartmentId);
+export const createFlat = async (data: CreateFlatInput, apartmentId?: string) => {
+  const { blockId, flatNumber: unitNumber, floorNumber } = data;
 
-  if (!Types.ObjectId.isValid(data.blockId)) {
-    throw new AppError("Block id must be a valid id", 400);
+  if (!apartmentId) {
+    throw new AppError("Apartment context is required", 400);
   }
 
-  const blockObjectId = new Types.ObjectId(data.blockId);
-  const flatNumber = data.flatNumber.trim().toUpperCase();
-  const session = await mongoose.startSession();
-  let createdFlatId: string | null = null;
+  ValidateObjectId(apartmentId, "Apartment id");
+  ValidateObjectId(blockId, "Block id");
 
+  const block = await Block.findOne({
+    _id: blockId,
+    apartmentId,
+  }).select("_id blockname code totalFloors status");
+
+  if (!block) {
+    throw new AppError("Block not found in this apartment", 404);
+  }
+
+  if (block.status !== "active") {
+    throw new AppError("Cannot add a flat to an inactive block", 400);
+  }
+
+  if (!block.code || !block.code.trim()) {
+    throw new AppError("Block does not have a valid code assigned", 400);
+  }
+
+  if (floorNumber > block.totalFloors) {
+    throw new AppError(
+      `Floor ${floorNumber} exceeds the block's total floors (${block.totalFloors})`,
+      400
+    );
+  }
+
+  const formattedUnit = String(unitNumber).padStart(2, "0");
+  const formattedFlatNumber = `${block.code.trim().toUpperCase()}-${floorNumber}${formattedUnit}`;
+
+  const existingFlat = await Flat.findOne({
+    apartmentId,
+    blockId,
+    flatNumber: formattedFlatNumber,
+  }).select("_id status");
+
+  if (existingFlat) {
+    if (existingFlat.status === "inactive") {
+      throw new AppError(
+        `Flat ${formattedFlatNumber} already exists as an inactive flat. Please activate it from the Inactive filter.`,
+        409
+      );
+    }
+    throw new AppError(`Flat ${formattedFlatNumber} already exists in the block`, 409);
+  }
+
+  let createdFlatId: string;
   try {
-    await session.withTransaction(async () => {
-      const apartment = await lockApartmentForUnitLimit(
-        apartmentObjectId,
-        session,
-      );
-      const block = await Block.findOne({
-        _id: blockObjectId,
-        apartmentId: apartmentObjectId,
-      })
-        .select("_id apartmentId blockname code totalFloors status")
-        .session(session)
-        .lean<BlockForFlatCreate>();
-      if (!block) {
-        throw new AppError("Block not found in this apartment", 404);
-      }
-
-      if (block.status !== "active") {
-        throw new AppError("Block is inactive", 400);
-      }
-
-      if (!Number.isInteger(data.floorNumber) || data.floorNumber <= 0) {
-        throw new AppError("Invalid floor number", 400);
-      }
-
-      if (data.floorNumber > block.totalFloors) {
-        throw new AppError("Floor exceeds the block's total floors", 400);
-      }
-
-      if (!flatNumber) {
-        throw new AppError("Flat number is required", 400);
-      }
-
-      const existingFlat = await Flat.findOne({
-        apartmentId: apartmentObjectId,
-        blockId: blockObjectId,
-        flatNumber,
-      })
-        .select("_id")
-        .session(session)
-        .lean();
-
-      if (existingFlat) {
-        throw new AppError("Flat number already exists in the block", 409);
-      }
-
-      const totalUnitLimit = getApartmentTotalUnitLimit(apartment.totalUnits);
-      const existingFlatCount = await Flat.countDocuments({
-        apartmentId: apartmentObjectId,
-      }).session(session);
-
-      if (existingFlatCount >= totalUnitLimit) {
-        throw new AppError(
-          "Apartment has already reached its configured total unit limit",
-          409,
-        );
-      }
-
-      const [flat] = await Flat.create(
-        [
-          {
-            apartmentId: apartmentObjectId,
-            blockId: blockObjectId,
-            floorNumber: data.floorNumber,
-            flatNumber,
-            occupancyStatus: "VACANT",
-            status: "active",
-          },
-        ],
-        {
-          session,
-        },
-      );
-
-      createdFlatId = flat._id.toString();
+    const flat = await Flat.create({
+      apartmentId,
+      blockId,
+      floorNumber,
+      flatNumber: formattedFlatNumber,
+      occupancyStatus: "VACANT",
+      status: "active",
     });
+    createdFlatId = flat._id.toString();
   } catch (error) {
     if (isDuplicateKeyError(error)) {
-      throw new AppError("Flat number already exists in the block", 409);
+      throw new AppError(`Flat ${formattedFlatNumber} already exists in the block`, 409);
     }
-
     throw error;
-  } finally {
-    await session.endSession();
-  }
-
-  if (!createdFlatId) {
-    throw new AppError("Unable to create flat", 500);
   }
 
   return getFlatById(createdFlatId, apartmentId);
 };
 
-export const generateFlats = async (data: GenerateFlatsInput, apartmentId?: string,) => {
-  const apartmentObjectId = getApartmentObjectId(apartmentId);
-
-  if (!Types.ObjectId.isValid(data.blockId)) {
-    throw new AppError("Block id must be a valid id", 400);
+export const generateFlats = async (data: GenerateFlatsInput, apartmentId?: string) => {
+  if (!apartmentId) {
+    throw new AppError("Apartment context is required", 400);
   }
 
-  if (
-    !Number.isInteger(data.unitsPerFloor) ||
-    data.unitsPerFloor <= 0 ||
-    data.unitsPerFloor > 100
-  ) {
-    throw new AppError("Invalid units per floor", 400);
+  ValidateObjectId(apartmentId, "Apartment id");
+  ValidateObjectId(data.blockId, "Block id");
+
+  const { blockId, unitsPerFloor, excludedUnits = [] } = data;
+  const blockObjectId = new Types.ObjectId(blockId);
+  const apartmentObjectId = new Types.ObjectId(apartmentId);
+
+
+  const block = await getSingleBlock(apartmentId, blockId);
+
+  if (!block) {
+    throw new AppError("Block not found in this apartment", 404);
   }
 
-  const blockObjectId = new Types.ObjectId(data.blockId);
-  const session = await mongoose.startSession();
-  let result: {
-    blockId: string;
-    blockName: string;
-    blockCode: string;
-    totalFloors: number;
-    unitsPerFloor: number;
-    totalFlatsGenerated: number;
-    generatedFlats: ReturnType<typeof mapGeneratedFlat>[];
-  } | null = null;
+  if (block.status !== "active") {
+    throw new AppError("Cannot generate flats for an inactive block", 400);
+  }
 
-  try {
-    await session.withTransaction(async () => {
-      const apartment = await lockApartmentForUnitLimit(
-        apartmentObjectId,
-        session,
+  if (!block.code || !block.code.trim()) {
+    throw new AppError("Block code is required for flat generation", 400);
+  }
+
+  for (const item of excludedUnits) {
+    if (item.floor > block.totalFloors) {
+      throw new AppError(
+        `Excluded floor ${item.floor} exceeds the block's total floors (${block.totalFloors})`,
+        400
       );
-      const block = await Block.findOne({
-        _id: blockObjectId,
-        apartmentId: apartmentObjectId,
-      })
-        .select("_id apartmentId blockname code totalFloors status")
-        .session(session)
-        .lean<BlockForFlatCreate>();
-
-      if (!block) {
-        throw new AppError("Block not found in this apartment", 404);
-      }
-
-      if (block.status !== "active") {
-        throw new AppError("Block is inactive", 400);
-      }
-
-      if (!block.code.trim()) {
-        throw new AppError("Block code is required for flat generation", 400);
-      }
-
-      if (!Number.isInteger(block.totalFloors) || block.totalFloors <= 0) {
-        throw new AppError("Block total floors is invalid", 400);
-      }
-
-      const totalUnitLimit = getApartmentTotalUnitLimit(apartment.totalUnits);
-
-      const flatsToGenerate = generateFlatNumbers(
-        block.code,
-        block.totalFloors,
-        data.unitsPerFloor,
+    }
+    if (item.unit > unitsPerFloor) {
+      throw new AppError(
+        `Excluded unit ${item.unit} exceeds the units per floor (${unitsPerFloor})`,
+        400
       );
-      const existingFlatCount = await Flat.countDocuments({
-        apartmentId: apartmentObjectId,
-      }).session(session);
+    }
+  }
 
-      if (existingFlatCount + flatsToGenerate.length > totalUnitLimit) {
-        throw new AppError(
-          "Generating these flats would exceed the configured total unit count for this property.",
-          409,
-        );
+  const excludedSet = new Set(
+    excludedUnits.map(({ floor, unit }) => `${floor}:${unit}`)
+  );
+
+  const blockCode = block.code.trim().toUpperCase();
+  const flatsToCreate: Array<{
+    apartmentId: Types.ObjectId;
+    blockId: Types.ObjectId;
+    floorNumber: number;
+    flatNumber: string;
+    occupancyStatus: OccupancyStatus;
+    status: "active";
+  }> = [];
+
+  for (let floor = 1; floor <= block.totalFloors; floor += 1) {
+    for (let unit = 1; unit <= unitsPerFloor; unit += 1) {
+      if (excludedSet.has(`${floor}:${unit}`)) {
+        continue;
       }
 
-      const duplicateFlat = await Flat.findOne({
+      flatsToCreate.push({
         apartmentId: apartmentObjectId,
         blockId: blockObjectId,
-        flatNumber: {
-          $in: flatsToGenerate.map((flat) => flat.flatNumber),
-        },
-      })
-        .select("_id flatNumber")
-        .session(session)
-        .lean<{ _id: Types.ObjectId; flatNumber: string }>();
+        floorNumber: floor,
+        flatNumber: `${blockCode}-${floor}${String(unit).padStart(2, "0")}`,
+        occupancyStatus: "VACANT",
+        status: "active",
+      });
+    }
+  }
 
-      if (duplicateFlat) {
-        throw new AppError(
-          `Generated flat number already exists in this block: ${duplicateFlat.flatNumber}`,
-          409,
-        );
-      }
+  if (flatsToCreate.length === 0) {
+    throw new AppError(
+      "All flats have been excluded. At least one flat must be generated",
+      400
+    );
+  }
 
-      const generatedFlats = await Flat.insertMany(
-        flatsToGenerate.map((flat) => ({
-          apartmentId: apartmentObjectId,
-          blockId: blockObjectId,
-          floorNumber: flat.floorNumber,
-          flatNumber: flat.flatNumber,
-          occupancyStatus: "VACANT",
-          status: "active",
-        })),
-        {
-          ordered: true,
-          session,
-        },
-      );
+  const flatNumbers = flatsToCreate.map((flat) => flat.flatNumber);
 
-      result = {
-        blockId: block._id.toString(),
-        blockName: block.blockname,
-        blockCode: block.code,
-        totalFloors: block.totalFloors,
-        unitsPerFloor: data.unitsPerFloor,
-        totalFlatsGenerated: generatedFlats.length,
-        generatedFlats: generatedFlats.map((flat) =>
-          mapGeneratedFlat(flat.toObject() as FlatRecord),
-        ),
-      };
+  const existingFlats = await Flat.find({
+    apartmentId: apartmentObjectId,
+    blockId: blockObjectId,
+    flatNumber: {
+      $in: flatNumbers,
+    },
+  })
+    .select("flatNumber")
+    .lean<{ flatNumber: string }[]>();
+
+  if (existingFlats.length > 0) {
+    const duplicates = existingFlats.map((flat) => flat.flatNumber).join(", ");
+    throw new AppError(
+      `Flat number(s) already exist in this block: ${duplicates}`,
+      409
+    );
+  }
+  const session = await mongoose.startSession();
+
+  try {
+    session.startTransaction();
+
+    await Flat.insertMany(flatsToCreate, {
+      session,
+      ordered: true
     });
+    await session.commitTransaction();
   } catch (error) {
-    if (error instanceof AppError) {
-      throw error;
-    }
-
     if (isDuplicateKeyError(error)) {
-      throw new AppError("Generated flat numbers already exist", 409);
+      throw new AppError("One or more flats already exist in this block", 409);
     }
-
-    throw new AppError("Flat generation failed", 500);
-  } finally {
-    await session.endSession();
+    throw error;
+  }finally {
+     await session.endSession();
   }
 
-  if (!result) {
-    throw new AppError("Flat generation failed", 500);
-  }
-
-  return result;
+  return {
+    blockId: block.id.toString(),
+    generatedCount: flatsToCreate.length,
+    excludedCount: excludedSet.size,
+  };
 };
 
 export const getFlat = async (query: FlatListQuery, apartmentId?: string) => {
   if (!apartmentId || !Types.ObjectId.isValid(apartmentId)) {
     throw new AppError("Apartment context is required", 400);
-  }
-
+  } 
+  
   const apartmentObjectId = new Types.ObjectId(apartmentId);
   const filter: FlatQueryFilter = {
     apartmentId: apartmentObjectId,
+    status: "active"
   };
 
   if (query.blockId) {
@@ -548,7 +420,9 @@ export const getFlat = async (query: FlatListQuery, apartmentId?: string) => {
 };
 
 export const getFlatById = async (flatId: string, apartmentId?: string) => {
-  const apartmentObjectId = getApartmentObjectId(apartmentId);
+  if (!apartmentId || !Types.ObjectId.isValid(apartmentId)) {
+    throw new AppError("Apartment context is required", 400);
+  }
 
   if (!Types.ObjectId.isValid(flatId)) {
     throw new AppError("Flat id must be a valid id", 400);
@@ -556,7 +430,7 @@ export const getFlatById = async (flatId: string, apartmentId?: string) => {
 
   const flat = await Flat.findOne({
     _id: new Types.ObjectId(flatId),
-    apartmentId: apartmentObjectId,
+    apartmentId: apartmentId,
   })
     .populate("blockId", "_id blockname code")
     .select(
@@ -570,7 +444,7 @@ export const getFlatById = async (flatId: string, apartmentId?: string) => {
 
   return {
     ...mapFlat(flat),
-    resident: await getResidentDetailsForFlat(flat, apartmentObjectId),
+    resident: await getResidentDetailsForFlat(flat, apartmentId),
   };
 };
 
@@ -579,7 +453,10 @@ export const updateFlat = async (
   data: UpdateFlatInput,
   apartmentId?: string,
 ) => {
-  const apartmentObjectId = getApartmentObjectId(apartmentId);
+
+  if (!apartmentId || !Types.ObjectId.isValid(apartmentId)) {
+    throw new AppError("Apartment context is required", 400);
+  }
 
   if (!Types.ObjectId.isValid(flatId)) {
     throw new AppError("Flat id must be a valid id", 400);
@@ -588,7 +465,7 @@ export const updateFlat = async (
   const flatObjectId = new Types.ObjectId(flatId);
   const flat = await Flat.findOne({
     _id: flatObjectId,
-    apartmentId: apartmentObjectId,
+    apartmentId: apartmentId,
   })
     .select("_id apartmentId blockId floorNumber flatNumber")
     .lean<FlatRecord>();
@@ -608,7 +485,7 @@ export const updateFlat = async (
 
     const block = await Block.findOne({
       _id: blockObjectId,
-      apartmentId: apartmentObjectId,
+      apartmentId: apartmentId,
     })
       .select("_id apartmentId blockname code totalFloors status")
       .lean<BlockForFlatCreate>();
@@ -637,7 +514,7 @@ export const updateFlat = async (
 
     const existingFlat = await Flat.findOne({
       _id: { $ne: flatObjectId },
-      apartmentId: apartmentObjectId,
+      apartmentId: apartmentId,
       blockId: blockObjectId,
       flatNumber,
     })
@@ -655,7 +532,7 @@ export const updateFlat = async (
     await Flat.updateOne(
       {
         _id: flatObjectId,
-        apartmentId: apartmentObjectId,
+        apartmentId: apartmentId,
       },
       {
         $set: updateData,
@@ -677,7 +554,9 @@ export const updateFlatStatus = async (
   data: UpdateFlatStatusInput,
   apartmentId?: string,
 ) => {
-  const apartmentObjectId = getApartmentObjectId(apartmentId);
+  if (!apartmentId || !Types.ObjectId.isValid(apartmentId)) {
+    throw new AppError("Apartment context is required", 400);
+  }
 
   if (!Types.ObjectId.isValid(flatId)) {
     throw new AppError("Flat id must be a valid id", 400);
@@ -686,7 +565,7 @@ export const updateFlatStatus = async (
   const flatObjectId = new Types.ObjectId(flatId);
   const flat = await Flat.findOne({
     _id: flatObjectId,
-    apartmentId: apartmentObjectId,
+    apartmentId: apartmentId,
   })
     .select("_id blockId")
     .lean<FlatRecord>();
@@ -700,7 +579,7 @@ export const updateFlatStatus = async (
       flat.blockId instanceof Types.ObjectId ? flat.blockId : flat.blockId._id;
     const block = await Block.findOne({
       _id: blockObjectId,
-      apartmentId: apartmentObjectId,
+      apartmentId: apartmentId,
     })
       .select("_id status")
       .lean<BlockForFlatCreate>();
@@ -717,7 +596,7 @@ export const updateFlatStatus = async (
   await Flat.updateOne(
     {
       _id: flatObjectId,
-      apartmentId: apartmentObjectId,
+      apartmentId: apartmentId,
     },
     {
       $set: {
@@ -727,7 +606,7 @@ export const updateFlatStatus = async (
   );
 
   if (data.status === "active") {
-    await syncFlatOccupancy(flatObjectId, apartmentObjectId);
+    await syncFlatOccupancy(flatObjectId, new Types.ObjectId(apartmentId));
   }
 
   return getFlatById(flatId, apartmentId);

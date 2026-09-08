@@ -14,6 +14,8 @@ import type {
   UpdateBlockStatusInput,
 } from "./block.types.js";
 import { getCurrentApartment } from "../apartment/apartment.service.js";
+import { Flat } from "../flat/flat.model.js";
+
 const escapeRegex = (value: string) => {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 };
@@ -31,7 +33,7 @@ const mapBlock = (block: IBlock) => ({
   updatedAt: block.updatedAt,
 });
 
-export const ValidateObjectId = (id: string, label: string) => {
+const ValidateObjectId = (id: string, label: string) => {
   if (!Types.ObjectId.isValid(id)) {
     throw new AppError(`${label} must be a valid id`, 400);
   }
@@ -215,6 +217,16 @@ export const updateBlockStatus = async ({
 
   block.status = status;
   await block.save();
+
+  await Flat.updateMany(
+    {
+      apartmentId: new Types.ObjectId(apartmentId),
+      blockId: block._id,
+    },
+    {
+      $set: { status },
+    }
+  );
 
   return mapBlock(block);
 };

@@ -8,6 +8,18 @@ export type PopulatedBlock = {
   code?: string;
 };
 
+export interface IFlat extends Document {
+  apartmentId: Types.ObjectId;
+  blockId: Types.ObjectId;
+  floorNumber: number;
+  residentId: Types.ObjectId | null;
+  flatNumber: string;
+  occupancyStatus: OccupancyStatus;
+  status: FlatStatus;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 export type FlatRecord = {
   _id: Types.ObjectId;
   apartmentId: Types.ObjectId;

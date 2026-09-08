@@ -86,7 +86,7 @@ export type UpdatePropertyBlockStatusInput = {
 export type CreatePropertyFlatInput = {
   blockId: string
   floorNumber: number
-  flatNumber: string
+  flatNumber: number
 }
 
 export type UpdatePropertyFlatInput = {
@@ -101,6 +101,10 @@ export type UpdatePropertyFlatStatusInput = {
 export type GeneratePropertyFlatsInput = {
   blockId: string
   unitsPerFloor: number
+  excludedUnits?: Array<{
+    floor: number
+    unit: number
+  }>
 }
 
 export type GeneratePropertyFlatsResult = {
@@ -110,6 +114,8 @@ export type GeneratePropertyFlatsResult = {
   totalFloors: number
   unitsPerFloor: number
   totalFlatsGenerated: number
+  generatedCount: number
+  excludedCount: number
 }
 
 export type PropertyFlatListParams = {
