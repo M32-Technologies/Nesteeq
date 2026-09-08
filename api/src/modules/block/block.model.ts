@@ -1,6 +1,16 @@
-import mongoose, { model, Schema } from "mongoose"
+import { Document, model, Schema , Types } from "mongoose"
 
-const blockSchema = new Schema(
+export interface IBlock extends Document {
+    apartmentId: Types.ObjectId,
+    blockname: string
+    code: string
+    totalFloors: number
+    status: "active" | "inactive",
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+const blockSchema = new Schema<IBlock>(
     {
         apartmentId: {
             type: Schema.Types.ObjectId,

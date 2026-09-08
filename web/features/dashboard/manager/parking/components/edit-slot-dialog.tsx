@@ -65,7 +65,7 @@ export function EditSlotDialog({ slot, onClose }: EditSlotDialogProps) {
               <label className="mb-1.5 block text-sm font-medium text-slate-700">Slot Number</label>
               <input
                 {...editForm.register("slotNumber")}
-                className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-[#0F5F45] focus:ring-1 focus:ring-[#0F5F45]"
+                className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-[#0F5F45] focus:outline-none focus:ring-0"
               />
               {editForm.formState.errors.slotNumber && (
                 <p className="mt-1 text-xs text-red-600">{editForm.formState.errors.slotNumber.message}</p>
@@ -77,7 +77,7 @@ export function EditSlotDialog({ slot, onClose }: EditSlotDialogProps) {
               <textarea
                 {...editForm.register("notes")}
                 rows={3}
-                className="w-full rounded-lg border border-slate-300 p-3 text-sm outline-none transition focus:border-[#0F5F45] focus:ring-1 focus:ring-[#0F5F45]"
+                className="w-full rounded-lg border border-slate-300 p-3 text-sm outline-none transition focus:border-[#0F5F45] focus:outline-none focus:ring-0"
                 placeholder="E.g. Near Block A entrance"
               />
             </div>

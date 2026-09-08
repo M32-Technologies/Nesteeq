@@ -17,6 +17,7 @@ function getAuthBaseUrl() {
 }
 
 async function getCurrentUserRole(request: NextRequest) {
+  
   const baseUrl = getAuthBaseUrl();
   const cookieHeader = request.headers.get("cookie");
 
