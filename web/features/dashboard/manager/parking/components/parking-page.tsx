@@ -3,10 +3,8 @@
 import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
 import { Grid2X2Plus, X } from "lucide-react"
 
-import type { VisitorParkingSlotStatus } from "../../../security/services/parking.service"
 import {
   useGenerateParkingSlotsMutation,
   useParkingSlotsQuery,

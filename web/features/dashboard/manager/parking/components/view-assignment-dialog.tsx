@@ -1,5 +1,5 @@
 import { X } from "lucide-react"
-import type { VisitorParkingSlot } from "../../../security/services/parking.service"
+import type { VisitorParkingSlot } from "../../../security/schemas/parking"
 
 type ViewAssignmentDialogProps = {
   slot: VisitorParkingSlot

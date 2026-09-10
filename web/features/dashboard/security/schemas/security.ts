@@ -1,4 +1,4 @@
-import type { VisitorPagination } from "./visitor.service"
+import type { VisitorPagination } from "./visitor"
 
 export interface SecuritySummary {
   visitorsInside: number

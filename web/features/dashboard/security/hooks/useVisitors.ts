@@ -12,9 +12,12 @@ import {
   getVisitorRecords,
   registerManualVisitor,
   verifyVisitorPass,
-  type ManualVisitorInput,
-  type VisitorRecordsParams,
-} from "../services/visitor.service"
+} from "../api/visitor.api"
+import type {
+  CheckInVisitorInput,
+  ManualVisitorInput,
+  VisitorRecordsParams,
+} from "../schemas/visitor"
 import { securityDataQueryKeys } from "./useSecurityData"
 
 export const visitorQueryKeys = {
@@ -59,8 +62,8 @@ export const useCheckInVisitor = () => {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (visitorPassId: string) =>
-      checkInVisitor(visitorPassId),
+    mutationFn: (data: CheckInVisitorInput) =>
+      checkInVisitor(data),
 
     onSuccess: () => {
       invalidateVisitorQueries(queryClient)

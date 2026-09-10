@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { X } from "lucide-react"
 
-import type { VisitorParkingSlot } from "../../../security/services/parking.service"
+import type { VisitorParkingSlot } from "../../../security/schemas/parking"
 import { useUpdateParkingSlotMutation } from "../hooks/use-parking-queries"
 import { editSlotSchema } from "../schemas/parking.schema"
 import type { EditSlotFormValues } from "../types/parking.types"

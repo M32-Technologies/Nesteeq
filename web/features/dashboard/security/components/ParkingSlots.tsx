@@ -2,23 +2,18 @@
 
 import { useState } from "react"
 import {
-  Ban,
-  Car,
-  Check,
   Eye,
+  LogOut,
   MoreVertical,
   Search,
-  Wrench,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { useActiveVisitors } from "../hooks/useVisitors"
 import {
   useAssignParkingSlot,
-  useCreateParkingSlot,
   useParkingSlots,
   useReleaseParkingSlot,
-  useUpdateParkingSlotStatus,
 } from "../hooks/useParking"
 import { useDebouncedValue } from "../hooks/useDebouncedValue"
 import { useSecurityFlats } from "../hooks/useSecurityData"
@@ -26,11 +21,12 @@ import { getSecurityApiErrorMessage } from "../utils/api-error"
 import type {
   VisitorParkingSlot,
   VisitorParkingSlotStatus,
-} from "../services/parking.service"
+} from "../schemas/parking"
 import {
   EmptyState,
   ErrorState,
   LoadingState,
+  PaginationControls,
   StatusBadge,
   formatDateTime,
   inputClassName,
@@ -46,19 +42,8 @@ import { ParkingDetails } from "./ParkingDetails"
 import {
   ParkingForms,
   type ParkingAssignFormState,
-  type ParkingSlotFormState,
 } from "./ParkingForms"
 import { ParkingSummaryCards } from "./ParkingSummaryCards"
-
-type ParkingStatusAction = Exclude<
-  VisitorParkingSlotStatus,
-  "ALL" | "OCCUPIED"
->
-
-type ParkingStatusMenuItem = Exclude<
-  VisitorParkingSlotStatus,
-  "ALL"
->
 
 const statusFilters: Array<{
   label: string
@@ -71,46 +56,18 @@ const statusFilters: Array<{
   { label: "Unavailable", value: "UNAVAILABLE" },
 ]
 
-const parkingStatusActions = [
-  {
-    label: "Available",
-    value: "AVAILABLE",
-    icon: Car,
-  },
-  {
-    label: "Occupied",
-    value: "OCCUPIED",
-    icon: Car,
-  },
-  {
-    label: "Reserved",
-    value: "RESERVED",
-    icon: Ban,
-  },
-  {
-    label: "Unavailable",
-    value: "UNAVAILABLE",
-    icon: Wrench,
-  },
-] satisfies Array<{
-  label: string
-  value: ParkingStatusMenuItem
-  icon: typeof Car
-}>
+const PARKING_PAGE_SIZE = 10
+const ASSIGNMENT_SLOT_LIMIT = 100
 
 export function ParkingSlots() {
   const [status, setStatus] =
     useState<VisitorParkingSlotStatus>("ALL")
   const [search, setSearch] = useState("")
+  const [page, setPage] = useState(1)
   const [selectedSlot, setSelectedSlot] =
     useState<VisitorParkingSlot | null>(null)
   const [openActionSlotId, setOpenActionSlotId] =
     useState<string | null>(null)
-  const [slotForm, setSlotForm] =
-    useState<ParkingSlotFormState>({
-    slotNumber: "",
-    notes: "",
-  })
   const [assignForm, setAssignForm] =
     useState<ParkingAssignFormState>({
     slotId: "",
@@ -126,49 +83,24 @@ export function ParkingSlots() {
   const parkingQuery = useParkingSlots({
     status,
     search: debouncedSearch.trim() || undefined,
+    page,
+    limit: PARKING_PAGE_SIZE,
   })
   const availableSlotsQuery = useParkingSlots({
     status: "AVAILABLE",
+    limit: ASSIGNMENT_SLOT_LIMIT,
   })
   const activeVisitorsQuery = useActiveVisitors(1, 100)
   const flatsQuery = useSecurityFlats()
-  const createSlotMutation = useCreateParkingSlot()
   const assignMutation = useAssignParkingSlot()
   const releaseMutation = useReleaseParkingSlot()
-  const updateStatusMutation = useUpdateParkingSlotStatus()
 
   const slots = parkingQuery.data?.slots ?? []
   const summary = parkingQuery.data?.summary
   const flats = flatsQuery.data?.flats ?? []
+  const pagination = parkingQuery.data?.pagination
 
   const availableSlots = availableSlotsQuery.data?.slots ?? []
-
-  const handleCreateSlot = async () => {
-    if (!slotForm.slotNumber.trim()) {
-      toast.error("Slot number is required")
-      return
-    }
-
-    try {
-      await createSlotMutation.mutateAsync({
-        slotNumber: slotForm.slotNumber,
-        notes: slotForm.notes || undefined,
-      })
-
-      toast.success("Parking slot created")
-      setSlotForm({
-        slotNumber: "",
-        notes: "",
-      })
-    } catch (error) {
-      toast.error(
-        getSecurityApiErrorMessage(
-          error,
-          "Unable to create parking slot"
-        )
-      )
-    }
-  }
 
   const handleAssign = async () => {
     if (assignMutation.isPending) return
@@ -215,33 +147,26 @@ export function ParkingSlots() {
     }
   }
 
-  const handleSlotStatus = async (
-    slot: VisitorParkingSlot,
-    nextStatus: ParkingStatusAction
-  ) => {
+  const setFilterStatus = (value: VisitorParkingSlotStatus) => {
+    setStatus(value)
+    setPage(1)
+  }
+
+  const setSearchQuery = (value: string) => {
+    setSearch(value)
+    setPage(1)
+  }
+
+  const handleReleaseSlot = async (slot: VisitorParkingSlot) => {
     try {
-      if (
-        slot.status === "OCCUPIED" &&
-        nextStatus === "AVAILABLE"
-      ) {
-        await releaseMutation.mutateAsync(slot._id)
-        toast.success("Parking slot released")
-      } else {
-        await updateStatusMutation.mutateAsync({
-          slotId: slot._id,
-          status: nextStatus,
-          notes: slot.notes || undefined,
-        })
-
-        toast.success("Parking slot updated")
-      }
-
+      await releaseMutation.mutateAsync(slot._id)
+      toast.success("Parking slot released")
       setOpenActionSlotId(null)
     } catch (error) {
       toast.error(
         getSecurityApiErrorMessage(
           error,
-          "Unable to update parking slot"
+          "Unable to release parking slot"
         )
       )
     }
@@ -254,7 +179,7 @@ export function ParkingSlots() {
           Parking Slots
         </h1>
         <p className="text-sm text-[#637083]">
-          Manage visitor parking availability, assignments, and releases.
+          Assign visitors to property manager-created parking slots and release active assignments.
         </p>
       </div>
 
@@ -271,12 +196,8 @@ export function ParkingSlots() {
         flats={flats}
         flatsLoading={flatsQuery.isLoading}
         isAssigning={assignMutation.isPending}
-        isCreating={createSlotMutation.isPending}
         onAssign={handleAssign}
         onAssignFormChange={setAssignForm}
-        onCreateSlot={handleCreateSlot}
-        onSlotFormChange={setSlotForm}
-        slotForm={slotForm}
       />
 
       <div className={panelClassName}>
@@ -287,7 +208,9 @@ export function ParkingSlots() {
               type="search"
               className={`${inputClassName} pl-9`}
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) =>
+                setSearchQuery(event.target.value)
+              }
               placeholder="Search slot number"
             />
           </div>
@@ -302,7 +225,7 @@ export function ParkingSlots() {
                     ? primaryButtonClassName
                     : outlineButtonClassName
                 }
-                onClick={() => setStatus(filter.value)}
+                onClick={() => setFilterStatus(filter.value)}
               >
                 {filter.label}
               </button>
@@ -318,132 +241,113 @@ export function ParkingSlots() {
       ) : slots.length === 0 ? (
         <EmptyState
           title="No visitor parking slots found"
-          description="Add visitor parking slots to start assigning vehicles."
+          description="Property manager-created visitor parking slots will appear here."
         />
       ) : (
-        <div className={tableWrapClassName}>
-          <table className={tableClassName}>
-            <thead>
-              <tr>
-                <th className={thClassName}>Slot Number</th>
-                <th className={thClassName}>Vehicle Number</th>
-                <th className={thClassName}>Visitor</th>
-                <th className={thClassName}>Visiting Flat</th>
-                <th className={thClassName}>Assigned Time</th>
-                <th className={thClassName}>Status</th>
-                <th className={thClassName}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {slots.map((slot) => (
-                <tr key={slot._id}>
-                  <td className={tdClassName}>
-                    <p className="font-medium">{slot.slotNumber}</p>
-                  </td>
-                  <td className={tdClassName}>
-                    {slot.currentAssignment?.vehicleNumber ?? "-"}
-                  </td>
-                  <td className={tdClassName}>
-                    {slot.currentAssignment?.visitorName ?? "-"}
-                  </td>
-                  <td className={tdClassName}>
-                    {slot.currentAssignment?.flatNumber ??
-                      slot.currentAssignment?.flatId ??
-                      "-"}
-                  </td>
-                  <td className={tdClassName}>
-                    {formatDateTime(
-                      slot.currentAssignment?.assignedAt
-                    )}
-                  </td>
-                  <td className={tdClassName}>
-                    <StatusBadge status={slot.status} />
-                  </td>
-                  <td className={tdClassName}>
-                    <div className="relative flex justify-end">
-                      <button
-                        type="button"
-                        aria-label={`Open actions for parking slot ${slot.slotNumber}`}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE3DF] bg-white text-[#111111] transition hover:bg-[#F7F8F5]"
-                        onClick={() =>
-                          setOpenActionSlotId((currentSlotId) =>
-                            currentSlotId === slot._id
-                              ? null
-                              : slot._id
-                          )
-                        }
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </button>
-
-                      {openActionSlotId === slot._id ? (
-                        <div className="absolute right-0 top-10 z-20 w-56 rounded-lg border border-[#DDE3DF] bg-white p-1 shadow-lg">
-                          <button
-                            type="button"
-                            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-[#111111] transition hover:bg-[#F7F8F5]"
-                            onClick={() => {
-                              setSelectedSlot(slot)
-                              setOpenActionSlotId(null)
-                            }}
-                          >
-                            <Eye className="h-4 w-4" />
-                            View Details
-                          </button>
-
-                          <div className="my-1 border-t border-[#EEF1F4]" />
-
-                          {parkingStatusActions.map((action) => {
-                            const StatusIcon = action.icon
-                            const isCurrentStatus =
-                              slot.status === action.value
-                            const isOccupiedAction =
-                              action.value === "OCCUPIED"
-                            const isOccupiedSlot =
-                              slot.status === "OCCUPIED"
-                            const isDisabled =
-                              isCurrentStatus ||
-                              isOccupiedAction ||
-                              (isOccupiedSlot &&
-                                action.value !==
-                                  "AVAILABLE") ||
-                              releaseMutation.isPending ||
-                              updateStatusMutation.isPending
-
-                            return (
-                              <button
-                                key={action.value}
-                                type="button"
-                                className="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm font-medium text-[#111111] transition hover:bg-[#F7F8F5] disabled:cursor-not-allowed disabled:opacity-60"
-                                disabled={isDisabled}
-                                onClick={() => {
-                                  if (isOccupiedAction) return
-
-                                  handleSlotStatus(
-                                    slot,
-                                    action.value
-                                  )
-                                }}
-                              >
-                                <span className="flex items-center gap-2">
-                                  <StatusIcon className="h-4 w-4" />
-                                  {action.label}
-                                </span>
-
-                                {isCurrentStatus ? (
-                                  <Check className="h-4 w-4 text-[#07584F]" />
-                                ) : null}
-                              </button>
-                            )
-                          })}
-                        </div>
-                      ) : null}
-                    </div>
-                  </td>
+        <>
+          <div className={tableWrapClassName}>
+            <table className={tableClassName}>
+              <thead>
+                <tr>
+                  <th className={thClassName}>Slot Number</th>
+                  <th className={thClassName}>Vehicle Number</th>
+                  <th className={thClassName}>Visitor</th>
+                  <th className={thClassName}>Visiting Flat</th>
+                  <th className={thClassName}>Assigned Time</th>
+                  <th className={thClassName}>Status</th>
+                  <th className={thClassName}>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {slots.map((slot) => (
+                  <tr key={slot._id}>
+                    <td className={tdClassName}>
+                      <p className="font-medium">{slot.slotNumber}</p>
+                    </td>
+                    <td className={tdClassName}>
+                      {slot.currentAssignment?.vehicleNumber ?? "-"}
+                    </td>
+                    <td className={tdClassName}>
+                      {slot.currentAssignment?.visitorName ?? "-"}
+                    </td>
+                    <td className={tdClassName}>
+                      {slot.currentAssignment?.flatNumber ?? "-"}
+                    </td>
+                    <td className={tdClassName}>
+                      {formatDateTime(
+                        slot.currentAssignment?.assignedAt
+                      )}
+                    </td>
+                    <td className={tdClassName}>
+                      <StatusBadge status={slot.status} />
+                    </td>
+                    <td className={tdClassName}>
+                      <div className="relative flex justify-end">
+                        <button
+                          type="button"
+                          aria-label={`Open actions for parking slot ${slot.slotNumber}`}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE3DF] bg-white text-[#111111] transition hover:bg-[#F7F8F5]"
+                          onClick={() =>
+                            setOpenActionSlotId((currentSlotId) =>
+                              currentSlotId === slot._id
+                                ? null
+                                : slot._id
+                            )
+                          }
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
+
+                        {openActionSlotId === slot._id ? (
+                          <div className="absolute right-0 top-10 z-20 w-56 rounded-lg border border-[#DDE3DF] bg-white p-1 shadow-lg">
+                            <button
+                              type="button"
+                              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-[#111111] transition hover:bg-[#F7F8F5]"
+                              onClick={() => {
+                                setSelectedSlot(slot)
+                                setOpenActionSlotId(null)
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                              View Details
+                            </button>
+
+                            {slot.status === "OCCUPIED" ? (
+                              <>
+                                <div className="my-1 border-t border-[#EEF1F4]" />
+                                <button
+                                  type="button"
+                                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-[#111111] transition hover:bg-[#F7F8F5] disabled:cursor-not-allowed disabled:opacity-60"
+                                  disabled={releaseMutation.isPending}
+                                  onClick={() => handleReleaseSlot(slot)}
+                                >
+                                  <LogOut className="h-4 w-4" />
+                                  Release Slot
+                                </button>
+                              </>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {pagination ? (
+            <PaginationControls
+              page={pagination.page}
+              totalPages={pagination.totalPages}
+              hasPreviousPage={pagination.page > 1}
+              hasNextPage={
+                pagination.page < pagination.totalPages
+              }
+              onPageChange={setPage}
+            />
+          ) : null}
+        </>
       )}
 
       <ParkingDetails

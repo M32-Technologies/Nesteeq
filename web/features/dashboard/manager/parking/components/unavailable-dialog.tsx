@@ -1,18 +1,18 @@
 import { Ban } from "lucide-react"
-import type { VisitorParkingSlot } from "../../../security/services/parking.service"
+import type { VisitorParkingSlot } from "../../../security/schemas/parking"
 import { useUpdateParkingStatusMutation } from "../hooks/use-parking-queries"
 
-type OutOfServiceDialogProps = {
+type UnavailableDialogProps = {
   slot: VisitorParkingSlot
   onClose: () => void
 }
 
-export function OutOfServiceDialog({ slot, onClose }: OutOfServiceDialogProps) {
+export function UnavailableDialog({ slot, onClose }: UnavailableDialogProps) {
   const updateStatusMutation = useUpdateParkingStatusMutation()
 
   const handleConfirm = () => {
     updateStatusMutation.mutate(
-      { slotId: slot._id, status: "OUT_OF_SERVICE" },
+      { slotId: slot._id, status: "UNAVAILABLE" },
       {
         onSuccess: onClose,
       }
@@ -26,7 +26,7 @@ export function OutOfServiceDialog({ slot, onClose }: OutOfServiceDialogProps) {
           <Ban size={24} />
         </div>
         <h2 className="text-lg font-semibold text-slate-900 mb-2">
-          Mark {slot.slotNumber} out of service?
+          Mark {slot.slotNumber} unavailable?
         </h2>
         <p className="text-sm text-slate-500 mb-6">
           This slot will not be available for new parking assignments.

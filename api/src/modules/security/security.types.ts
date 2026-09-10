@@ -3,7 +3,8 @@ export type ObjectIdLike = {
 }
 
 export type BetterAuthUser = {
-  id: string
+  _id?: ObjectIdLike
+  id?: string
   name?: string | null
   email?: string | null
   phone?: string | null
@@ -21,7 +22,7 @@ export type LeanResident = {
   apartmentId: ObjectIdLike
   flatId: ObjectIdLike
   residentType: string
-  phone?: string | null
+  phoneNumber?: string | null
   status: string
   joinedAt?: Date
 }

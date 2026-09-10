@@ -15,7 +15,7 @@ import {
   listVisitorVisitsQuerySchema,
   manualVisitorEntrySchema,
   visitorVisitIdParamsSchema,
-} from "./visit.schema.js"
+} from "./visit.validation.js"
 
 import {
   protect,

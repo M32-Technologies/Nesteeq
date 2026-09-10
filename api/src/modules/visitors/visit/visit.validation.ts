@@ -22,9 +22,18 @@ const optionalString = (schema: z.ZodString) =>
   )
 
 export const checkInVisitorSchema = z.object({
-  body: z.object({
-    visitorPassId: objectIdSchema,
-  }),
+  body: z
+    .object({
+      visitorPassId: objectIdSchema.optional(),
+      token: z
+        .string()
+        .trim()
+        .min(1, "Guest pass token is required")
+        .optional(),
+    })
+    .refine((data) => Boolean(data.visitorPassId) !== Boolean(data.token), {
+      message: "Provide either guest pass token or ID",
+    }),
 })
 
 export const manualVisitorEntrySchema = z.object({
@@ -55,6 +64,12 @@ export const manualVisitorEntrySchema = z.object({
       z
         .string()
         .max(20, "Vehicle number cannot exceed 20 characters")
+    ),
+
+    vehicleType: optionalString(
+      z
+        .string()
+        .max(50, "Vehicle type cannot exceed 50 characters")
     ),
   }),
 })

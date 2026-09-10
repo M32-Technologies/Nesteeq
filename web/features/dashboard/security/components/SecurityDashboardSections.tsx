@@ -21,7 +21,7 @@ import type {
   SecurityActivity,
   SecurityActivityType,
   SecuritySummary,
-} from "../services/security.interface"
+} from "../schemas/security"
 import {
   StatusBadge,
   outlineButtonClassName,

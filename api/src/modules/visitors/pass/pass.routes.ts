@@ -11,7 +11,7 @@ import {
   createGuestPassSchema,
   guestPassIdParamsSchema,
   listGuestPassQuerySchema,
-} from "./pass.schema.js"
+} from "./pass.validation.js"
 
 import {
   protect,

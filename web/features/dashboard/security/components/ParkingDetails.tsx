@@ -1,6 +1,6 @@
 "use client"
 
-import type { VisitorParkingSlot } from "../services/parking.service"
+import type { VisitorParkingSlot } from "../schemas/parking"
 import {
   DetailGrid,
   DetailModal,
@@ -44,10 +44,7 @@ export function ParkingDetails({
           },
           {
             label: "Visiting Flat",
-            value:
-              slot.currentAssignment?.flatNumber ??
-              slot.currentAssignment?.flatId ??
-              "-",
+            value: slot.currentAssignment?.flatNumber ?? "-",
           },
           {
             label: "Assigned Time",

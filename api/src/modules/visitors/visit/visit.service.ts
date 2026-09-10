@@ -4,55 +4,50 @@ import {
   GuestPassModel,
   GuestPassStatus,
 } from "../pass/pass.model.js"
+import {
+  hashGuestPassToken,
+  parseGuestPassQrPayload,
+} from "../pass/pass-token.js"
 
 import {
   VisitorEntryType,
+  VisitorVisitModel,
   VisitorVisitStatus,
-} from "./visit.interface.js"
-
-import { VisitorVisitModel } from "./visit.model.js"
+} from "./visit.model.js"
+import type {
+  CheckInVisitorInput,
+  CheckoutVisitorInput,
+  ListVisitsInput,
+  ManualVisitorEntryInput,
+} from "./visit.types.js"
 
 import { AppError } from "../../../utils/AppError.js"
 import { buildManualVisitorDuplicateFilter } from "./manual-visitor-duplicate.js"
+import { getVisitorVisitsPage } from "./visit-list-query.js"
 
 export { getVisitorRecordsService } from "./visit-records.service.js"
-
-interface CheckInVisitorInput {
-  apartmentId: string
-  userId: string
-  visitorPassId: string
-}
-
-interface ManualVisitorEntryInput {
-  apartmentId: string
-  userId: string
-  flatId: string
-  visitorName: string
-  visitorPhone?: string
-  purpose?: string
-  vehicleNumber?: string
-}
-
-interface CheckoutVisitorInput {
-  apartmentId: string
-  userId: string
-  visitId: string
-}
-
-interface ListVisitsInput {
-  apartmentId: string
-  page?: number
-  limit?: number
-}
 
 export const checkInVisitorService = async ({
   apartmentId,
   userId,
   visitorPassId,
+  token,
 }: CheckInVisitorInput) => {
+  const tokenHash = token
+    ? hashGuestPassToken(parseGuestPassQrPayload(token))
+    : null
+  const guestPassFilter = tokenHash
+    ? {
+        tokenHash,
+        apartmentId,
+      }
+    : {
+        _id: visitorPassId,
+        apartmentId,
+      }
+
   const guestPass = await GuestPassModel.findOne({
-    _id: visitorPassId,
-    apartmentId,
+    ...guestPassFilter,
   })
 
   if (!guestPass) {
@@ -104,6 +99,7 @@ export const checkInVisitorService = async ({
     {
       _id: guestPass._id,
       apartmentId,
+      ...(tokenHash ? { tokenHash } : {}),
       status: GuestPassStatus.ACTIVE,
     },
     {
@@ -187,6 +183,7 @@ export const createManualVisitorEntryService = async ({
   visitorPhone,
   purpose,
   vehicleNumber,
+  vehicleType,
 }: ManualVisitorEntryInput) => {
   const flat = await Flat.findOne({
     _id: flatId,
@@ -231,6 +228,7 @@ export const createManualVisitorEntryService = async ({
     vehicleNumber: vehicleNumber
       ? vehicleNumber.toUpperCase()
       : null,
+    vehicleType: vehicleType || null,
 
     entryType: VisitorEntryType.MANUAL,
 
@@ -281,35 +279,17 @@ export const getActiveVisitorsService = async ({
   page = 1,
   limit = 10,
 }: ListVisitsInput) => {
-  const skip = (page - 1) * limit
-
-  const filter = {
+  const result = await getVisitorVisitsPage({
     apartmentId,
+    page,
+    limit,
     status: VisitorVisitStatus.ACTIVE,
-  }
-
-  const [visitors, total] = await Promise.all([
-    VisitorVisitModel.find(filter)
-      .sort({ checkedInAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean(),
-
-    VisitorVisitModel.countDocuments(filter),
-  ])
-
-  const totalPages = Math.ceil(total / limit)
+    includeFlatId: true,
+  })
 
   return {
-    visitors,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-      hasNextPage: page < totalPages,
-      hasPreviousPage: page > 1,
-    },
+    visitors: result.data,
+    pagination: result.pagination,
   }
 }
 
@@ -318,33 +298,14 @@ export const getVisitorHistoryService = async ({
   page = 1,
   limit = 10,
 }: ListVisitsInput) => {
-  const skip = (page - 1) * limit
-
-  const filter = {
+  const result = await getVisitorVisitsPage({
     apartmentId,
-  }
-
-  const [visits, total] = await Promise.all([
-    VisitorVisitModel.find(filter)
-      .sort({ checkedInAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean(),
-
-    VisitorVisitModel.countDocuments(filter),
-  ])
-
-  const totalPages = Math.ceil(total / limit)
+    page,
+    limit,
+  })
 
   return {
-    visits,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-      hasNextPage: page < totalPages,
-      hasPreviousPage: page > 1,
-    },
+    visits: result.data,
+    pagination: result.pagination,
   }
 }

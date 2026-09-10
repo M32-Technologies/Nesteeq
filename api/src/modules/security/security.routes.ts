@@ -11,7 +11,7 @@ import {
   listSecurityDirectorySchema,
   securityActivityQuerySchema,
   verifyGuestPassSchema,
-} from "./security.schema.js"
+} from "./security.validation.js"
 import { verifyPassRateLimit } from "./verify-pass-rate-limit.js"
 
 import {

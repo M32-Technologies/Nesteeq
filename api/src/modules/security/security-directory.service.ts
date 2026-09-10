@@ -2,6 +2,7 @@ import { Types } from "mongoose"
 
 import { getAuthDB } from "../../config/auth-db.js"
 import { AppError } from "../../utils/AppError.js"
+import { escapeRegExp } from "../../utils/regex.js"
 import { Flat } from "../flat/flat.model.js"
 import { ResidentModel } from "../resident/resident.model.js"
 import type {
@@ -11,7 +12,7 @@ import type {
   ObjectIdLike,
   ResidentDirectoryRecord,
   ResidentSummary,
-} from "./security.interface.js"
+} from "./security.types.js"
 
 const toId = (value: ObjectIdLike | string | null | undefined) =>
   value?.toString() ?? ""
@@ -20,40 +21,54 @@ export const getUserSummariesByIds = async (userIds: string[]) => {
   const uniqueUserIds = Array.from(
     new Set(userIds.filter(Boolean))
   )
+  const userObjectIds = uniqueUserIds
+    .filter((userId) => Types.ObjectId.isValid(userId))
+    .map((userId) => new Types.ObjectId(userId))
 
   if (uniqueUserIds.length === 0) {
     return new Map<string, BetterAuthUser>()
   }
 
   const users = await getAuthDB()
-    .collection<BetterAuthUser>("user")
+    .collection("user")
     .find({
-      id: {
-        $in: uniqueUserIds,
-      },
+      $or: [
+        { id: { $in: uniqueUserIds } },
+        ...(userObjectIds.length
+          ? [{ _id: { $in: userObjectIds } }]
+          : []),
+      ],
     })
-    .project<BetterAuthUser>({
+    .project({
+      _id: 1,
       id: 1,
       name: 1,
       email: 1,
       phone: 1,
     })
-    .toArray()
+    .toArray() as BetterAuthUser[]
 
-  return new Map(users.map((user) => [user.id, user]))
+  const usersById = new Map<string, BetterAuthUser>()
+
+  for (const user of users) {
+    if (user.id) usersById.set(user.id, user)
+    if (user._id) usersById.set(toId(user._id), user)
+  }
+
+  return usersById
 }
 
 export const getApartmentFlatsService = async (
   apartmentId: string
 ) => {
   const [flats, residents] = await Promise.all([
-    Flat.find({ apartmentId })
+    Flat.find({ apartmentId, status: "active" })
       .select("_id flatNumber occupancyStatus")
       .sort({ flatNumber: 1 })
       .lean(),
 
-    ResidentModel.find({ apartmentId })
-      .select("_id userId flatId residentType phone status")
+    ResidentModel.find({ apartmentId, status: "active" })
+      .select("_id userId flatId residentType phoneNumber status")
       .sort({ joinedAt: -1 })
       .lean(),
   ])
@@ -75,7 +90,7 @@ export const getApartmentFlatsService = async (
       userId: resident.userId,
       name: user?.name ?? null,
       email: user?.email ?? null,
-      phone: resident.phone ?? user?.phone ?? null,
+      phone: resident.phoneNumber ?? user?.phone ?? null,
       residentType: resident.residentType,
       status: resident.status,
     }
@@ -96,6 +111,38 @@ export const getApartmentFlatsService = async (
   }
 }
 
+export const getMatchingUserIdsForSearch = async (search: string) => {
+  const regex = new RegExp(escapeRegExp(search), "i")
+  const users = await getAuthDB()
+    .collection("user")
+    .find({
+      $or: [{ name: regex }, { email: regex }, { phone: regex }],
+    })
+    .project({
+      _id: 1,
+      id: 1,
+    })
+    .toArray() as Pick<BetterAuthUser, "_id" | "id">[]
+
+  return users
+    .flatMap((user) => [user.id, toId(user._id)])
+    .filter(Boolean)
+}
+
+export const getMatchingFlatIdsForSearch = async (
+  apartmentId: string,
+  search: string
+) => {
+  const regex = new RegExp(escapeRegExp(search), "i")
+  const flatIds = await Flat.distinct("_id", {
+    apartmentId,
+    status: "active",
+    flatNumber: regex,
+  })
+
+  return flatIds
+}
+
 export const getApartmentResidentsService = async ({
   apartmentId,
   search,
@@ -107,31 +154,67 @@ export const getApartmentResidentsService = async ({
   page?: number
   limit?: number
 }) => {
-  const [flats, residents] = await Promise.all([
-    Flat.find({ apartmentId })
-      .select("_id flatNumber occupancyStatus")
-      .sort({ flatNumber: 1 })
-      .lean(),
+  const skip = (page - 1) * limit
+  const activeFlatIds = await Flat.distinct("_id", {
+    apartmentId,
+    status: "active",
+  })
+  const filter: Record<string, unknown> = {
+    apartmentId,
+    status: "active",
+    flatId: { $in: activeFlatIds },
+  }
+  const trimmedSearch = search?.trim()
 
-    ResidentModel.find({ apartmentId })
-      .select("_id userId apartmentId flatId residentType phone status joinedAt")
+  if (trimmedSearch) {
+    const regex = new RegExp(escapeRegExp(trimmedSearch), "i")
+    const [flatIds, userIds] = await Promise.all([
+      getMatchingFlatIdsForSearch(apartmentId, trimmedSearch),
+      getMatchingUserIdsForSearch(trimmedSearch),
+    ])
+
+    filter.$or = [
+      { phoneNumber: regex },
+      { residentType: regex },
+      { status: regex },
+      ...(flatIds.length ? [{ flatId: { $in: flatIds } }] : []),
+      ...(userIds.length ? [{ userId: { $in: userIds } }] : []),
+    ]
+  }
+
+  const [residents, total] = await Promise.all([
+    ResidentModel.find(filter)
+      .select("_id userId apartmentId flatId residentType phoneNumber status joinedAt")
       .sort({ joinedAt: -1 })
+      .skip(skip)
+      .limit(limit)
       .lean(),
+    ResidentModel.countDocuments(filter),
   ])
 
-  const flatRecords = flats as unknown as LeanFlat[]
   const residentRecords = residents as unknown as LeanResident[]
-  const usersById = await getUserSummariesByIds(
-    residentRecords.map((resident) => resident.userId)
-  )
+  const [usersById, flatRecords] = await Promise.all([
+    getUserSummariesByIds(
+      residentRecords.map((resident) => resident.userId)
+    ),
+    Flat.find({
+      _id: {
+        $in: residentRecords.map((resident) => resident.flatId),
+      },
+      apartmentId,
+      status: "active",
+    })
+      .select("_id flatNumber occupancyStatus")
+      .lean(),
+  ])
   const flatsById = new Map(
-    flatRecords.map((flat) => [toId(flat._id), flat])
+    (flatRecords as unknown as LeanFlat[]).map((flat) => [
+      toId(flat._id),
+      flat,
+    ])
   )
-
-  const query = search?.trim().toLowerCase() ?? ""
-
-  const records = residentRecords
-    .map<ResidentDirectoryRecord>((resident) => {
+  const records = residentRecords.map<ResidentDirectoryRecord>(
+    (resident) => {
       const user = usersById.get(resident.userId)
       const flatId = toId(resident.flatId)
       const flat = flatsById.get(flatId)
@@ -144,35 +227,17 @@ export const getApartmentResidentsService = async ({
         flatNumber: flat?.flatNumber ?? null,
         name: user?.name ?? null,
         email: user?.email ?? null,
-        phone: resident.phone ?? user?.phone ?? null,
+        phone: resident.phoneNumber ?? user?.phone ?? null,
         residentType: resident.residentType,
         status: resident.status,
         joinedAt: resident.joinedAt ?? null,
       }
-    })
-    .filter((resident) => {
-      if (!query) return true
-
-      return [
-        resident.name,
-        resident.email,
-        resident.phone,
-        resident.flatNumber,
-        resident.residentType,
-        resident.status,
-      ]
-        .filter(Boolean)
-        .some((value) =>
-          String(value).toLowerCase().includes(query)
-        )
-    })
-
-  const total = records.length
+    }
+  )
   const totalPages = Math.ceil(total / limit)
-  const skip = (page - 1) * limit
 
   return {
-    residents: records.slice(skip, skip + limit),
+    residents: records,
     pagination: {
       page,
       limit,
@@ -198,6 +263,7 @@ export const ensureFlatInApartment = async ({
   const flat = await Flat.findOne({
     _id: flatId,
     apartmentId,
+    status: "active",
   }).lean()
 
   if (!flat) {
@@ -223,6 +289,7 @@ export const ensureResidentInApartment = async ({
   const filter: Record<string, unknown> = {
     _id: residentId,
     apartmentId,
+    status: "active",
   }
 
   if (flatId) {

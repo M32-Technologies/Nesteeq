@@ -1,6 +1,6 @@
 "use client"
 
-import type { VisitorRecord } from "../services/visitor.service"
+import type { VisitorRecord } from "../schemas/visitor"
 import {
   DetailGrid,
   DetailModal,
@@ -18,41 +18,38 @@ export function VisitorDetails({
 }) {
   if (!record) return null
 
-  return (
-    <DetailModal
-      title={record.visitorName}
-      subtitle={`Visitor ${formatLabel(record.status)}`}
-      onClose={onClose}
-    >
-      <DetailGrid
-        items={[
-          {
-            label: "Status",
-            value: <StatusBadge status={record.status} />,
-          },
-          {
-            label: "Entry Type",
-            value:
-              record.entryType === "PASS"
-                ? "Pre-Approved / Pass"
-                : "Manual",
-          },
-          {
-            label: "Flat / Unit",
-            value: record.flatNumber ?? record.flatId,
-          },
-          {
-            label: "Phone",
-            value: record.visitorPhone ?? "-",
-          },
-          {
-            label: "Purpose",
-            value: record.purpose ?? "-",
-          },
-          {
-            label: "Vehicle Number",
-            value: record.vehicleNumber ?? "-",
-          },
+  const isPassEntry = record.entryType === "PASS"
+  const detailItems = [
+    {
+      label: "Status",
+      value: <StatusBadge status={record.status} />,
+    },
+    {
+      label: "Entry Type",
+      value: isPassEntry ? "Pre-Approved / Pass" : "Manual",
+    },
+    {
+      label: "Flat / Unit",
+      value: record.flatNumber ?? "-",
+    },
+    {
+      label: "Phone",
+      value: record.visitorPhone ?? "-",
+    },
+    {
+      label: "Purpose",
+      value: record.purpose ?? "-",
+    },
+    {
+      label: "Vehicle Number",
+      value: record.vehicleNumber ?? "-",
+    },
+    {
+      label: "Vehicle Type",
+      value: record.vehicleType ?? "-",
+    },
+    ...(isPassEntry
+      ? [
           {
             label: "Expected Time",
             value: formatDateTime(record.expectedAt),
@@ -61,16 +58,28 @@ export function VisitorDetails({
             label: "Valid Until",
             value: formatDateTime(record.validUntil),
           },
-          {
-            label: "Check-In Time",
-            value: formatDateTime(record.checkedInAt),
-          },
-          {
-            label: "Check-Out Time",
-            value: formatDateTime(record.checkedOutAt),
-          },
-        ]}
-      />
+        ]
+      : []),
+    {
+      label: "Check-In Time",
+      value: formatDateTime(record.checkedInAt),
+    },
+    {
+      label: "Check-Out Time",
+      value:
+        record.status === "ACTIVE"
+          ? "Not checked out"
+          : formatDateTime(record.checkedOutAt),
+    },
+  ]
+
+  return (
+    <DetailModal
+      title={record.visitorName}
+      subtitle={`Visitor ${formatLabel(record.status)}`}
+      onClose={onClose}
+    >
+      <DetailGrid items={detailItems} />
     </DetailModal>
   )
 }

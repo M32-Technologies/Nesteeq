@@ -19,7 +19,7 @@ import { getSecurityApiErrorMessage } from "../utils/api-error"
 import type {
   EmergencyAlert,
   EmergencyAlertStatus,
-} from "../services/alert.service"
+} from "../schemas/alert"
 import {
   DetailGrid,
   DetailModal,
@@ -220,8 +220,7 @@ export function EmergencyAlerts() {
                     </td>
                     <td className={tdClassName}>
                       <p>
-                        {alert.residentName ||
-                          alert.residentId}
+                        {alert.residentName || "-"}
                       </p>
                       {alert.residentPhone ? (
                         <p className="text-xs text-[#637083]">
@@ -230,7 +229,7 @@ export function EmergencyAlerts() {
                       ) : null}
                     </td>
                     <td className={tdClassName}>
-                      {alert.flatNumber || alert.flatId}
+                      {alert.flatNumber || "-"}
                     </td>
                     <td className={tdClassName}>
                       {formatDateTime(alert.triggeredAt)}
@@ -340,9 +339,7 @@ export function EmergencyAlerts() {
               },
               {
                 label: "Resident",
-                value:
-                  selectedAlert.residentName ??
-                  selectedAlert.residentId,
+                value: selectedAlert.residentName ?? "-",
               },
               {
                 label: "Phone",
@@ -350,9 +347,7 @@ export function EmergencyAlerts() {
               },
               {
                 label: "Flat / Unit",
-                value:
-                  selectedAlert.flatNumber ??
-                  selectedAlert.flatId,
+                value: selectedAlert.flatNumber ?? "-",
               },
               {
                 label: "Triggered",

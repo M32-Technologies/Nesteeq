@@ -1,6 +1,6 @@
 "use client"
 
-import type { VisitorParkingSummary } from "../services/parking.service"
+import type { VisitorParkingSummary } from "../schemas/parking"
 
 export function ParkingSummaryCards({
   summary,

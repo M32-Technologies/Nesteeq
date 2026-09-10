@@ -1,5 +1,3 @@
-import { Types } from "mongoose"
-
 import { AppError } from "../../utils/AppError.js"
 import { escapeRegExp } from "../../utils/regex.js"
 import { ResidentModel } from "../resident/resident.model.js"
@@ -7,6 +5,8 @@ import {
   ensureFlatInApartment,
   ensureResidentInApartment,
   getApartmentFlatsService,
+  getMatchingFlatIdsForSearch,
+  getMatchingUserIdsForSearch,
   getUserSummariesByIds,
 } from "../security/security-directory.service.js"
 import { validateEmergencyAlertStatusTransition } from "../security/security-status-transitions.js"
@@ -61,13 +61,13 @@ const enrichAlerts = async (
     },
     apartmentId,
   })
-    .select("_id userId phone residentType status")
+    .select("_id userId phoneNumber residentType status")
     .lean()
 
   const residentRecords = residents as unknown as Array<{
     _id: ObjectIdLike
     userId: string
-    phone?: string | null
+    phoneNumber?: string | null
     residentType: string
     status: string
   }>
@@ -94,7 +94,7 @@ const enrichAlerts = async (
       residentId: toId(alert.residentId),
       residentName: user?.name ?? null,
       residentPhone:
-        resident?.phone ?? user?.phone ?? null,
+        resident?.phoneNumber ?? user?.phone ?? null,
       flatId: toId(alert.flatId),
       flatNumber:
         flatNumberById.get(toId(alert.flatId)) ?? null,
@@ -120,53 +120,16 @@ const getResidentIdsForSearch = async (
   apartmentId: string,
   search: string
 ) => {
-  const residents = await ResidentModel.find({
+  const regex = new RegExp(escapeRegExp(search), "i")
+  const userIds = await getMatchingUserIdsForSearch(search)
+
+  return ResidentModel.distinct("_id", {
     apartmentId,
+    $or: [
+      { phoneNumber: regex },
+      ...(userIds.length ? [{ userId: { $in: userIds } }] : []),
+    ],
   })
-    .select("_id userId phone")
-    .lean()
-
-  const residentRecords = residents as unknown as Array<{
-    _id: ObjectIdLike
-    userId: string
-    phone?: string | null
-  }>
-
-  const usersById = await getUserSummariesByIds(
-    residentRecords.map((resident) => resident.userId)
-  )
-  const query = search.toLowerCase()
-
-  return residentRecords
-    .filter((resident) => {
-      const user = usersById.get(resident.userId)
-
-      return [
-        user?.name,
-        user?.email,
-        user?.phone,
-        resident.phone,
-      ]
-        .filter(Boolean)
-        .some((value) =>
-          String(value).toLowerCase().includes(query)
-        )
-    })
-    .map((resident) => new Types.ObjectId(toId(resident._id)))
-}
-
-const getFlatIdsForSearch = async (
-  apartmentId: string,
-  search: string
-) => {
-  const { flats } = await getApartmentFlatsService(apartmentId)
-  const query = search.toLowerCase()
-
-  return flats
-    .filter((flat) =>
-      flat.flatNumber.toLowerCase().includes(query)
-    )
-    .map((flat) => new Types.ObjectId(flat._id))
 }
 
 export const createEmergencyAlertService = async ({
@@ -277,7 +240,7 @@ export const listEmergencyAlertsService = async ({
       "i"
     )
     const [flatIds, residentIds] = await Promise.all([
-      getFlatIdsForSearch(apartmentId, trimmedSearch),
+      getMatchingFlatIdsForSearch(apartmentId, trimmedSearch),
       getResidentIdsForSearch(apartmentId, trimmedSearch),
     ])
 

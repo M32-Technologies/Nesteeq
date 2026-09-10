@@ -175,6 +175,20 @@ visitorParkingAssignmentSchema.index({
 
 visitorParkingAssignmentSchema.index(
   {
+    visitorVisitId: 1,
+    status: 1,
+  },
+  {
+    unique: true,
+    partialFilterExpression: {
+      status: VisitorParkingAssignmentStatus.ACTIVE,
+      visitorVisitId: { $type: "objectId" },
+    },
+  }
+)
+
+visitorParkingAssignmentSchema.index(
+  {
     slotId: 1,
     status: 1,
   },

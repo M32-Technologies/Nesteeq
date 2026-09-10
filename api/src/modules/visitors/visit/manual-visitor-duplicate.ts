@@ -2,7 +2,7 @@ import { escapeRegExp } from "../../../utils/regex.js"
 import {
   VisitorEntryType,
   VisitorVisitStatus,
-} from "./visit.interface.js"
+} from "./visit.model.js"
 
 export const manualVisitorDuplicateWindowMs =
   5 * 60 * 1000

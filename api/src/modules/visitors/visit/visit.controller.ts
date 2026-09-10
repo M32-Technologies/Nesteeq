@@ -37,6 +37,7 @@ export const checkInVisitor = catchAsync(
       userId,
       apartmentId,
       visitorPassId: req.body.visitorPassId,
+      token: req.body.token,
     })
 
     res.status(201).json({

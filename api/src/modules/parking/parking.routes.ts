@@ -56,6 +56,17 @@ router.post(
 
 /**
  * Property Manager
+ * Create a single visitor parking slot
+ */
+router.post(
+  "/",
+  requireRole("property_manager"),
+  zodValidate(createParkingSlotSchema),
+  createParkingSlot
+)
+
+/**
+ * Property Manager
  * Edit slot number / notes
  */
 router.patch(
@@ -66,30 +77,14 @@ router.patch(
 )
 
 /**
- * Property Manager + Security Staff
- *
- * Property Manager:
- * AVAILABLE / RESERVED / OUT_OF_SERVICE
- *
- * Security can continue using the existing
- * operational status functionality if required.
+ * Property Manager
+ * AVAILABLE / RESERVED / UNAVAILABLE
  */
 router.patch(
   "/:slotId/status",
-  requireRole("property_manager", "security_staff"),
+  requireRole("property_manager"),
   zodValidate(updateParkingSlotStatusSchema),
   updateParkingSlotStatus
-)
-
-/**
- * Security Staff only
- * Create a single visitor parking slot
- */
-router.post(
-  "/",
-  requireRole("security_staff"),
-  zodValidate(createParkingSlotSchema),
-  createParkingSlot
 )
 
 /**

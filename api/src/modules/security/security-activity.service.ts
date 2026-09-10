@@ -1,3 +1,5 @@
+import { Types, type PipelineStage } from "mongoose"
+
 import { EmergencyAlertModel, EmergencyAlertStatus } from "../alert/alert.model.js"
 import { DeliveryStatus } from "../delivery/delivery.interface.js"
 import { SecurityDeliveryModel } from "../delivery/delivery.model.js"
@@ -9,298 +11,336 @@ import {
   VisitorParkingAssignmentModel,
   VisitorParkingSlotModel,
 } from "../parking/parking.model.js"
-import { VisitorEntryType, VisitorVisitStatus } from "../visitors/visit/visit.interface.js"
-import { VisitorVisitModel } from "../visitors/visit/visit.model.js"
-import { getApartmentFlatsService } from "./security-directory.service.js"
+import {
+  VisitorEntryType,
+  VisitorVisitModel,
+  VisitorVisitStatus,
+} from "../visitors/visit/visit.model.js"
+import { Flat } from "../flat/flat.model.js"
 import type {
-  ObjectIdLike,
   SecurityActivity,
   SecurityActivityQuery,
-} from "./security.interface.js"
+} from "./security.types.js"
 
-const toId = (value: ObjectIdLike | string | null | undefined) =>
-  value?.toString() ?? ""
+type ActivityValue = string | Record<string, unknown>
 
-const buildDescription = (
-  primary: string,
-  flatNumber?: string | null
-) => {
-  if (!flatNumber) return primary
+const toMongoId = (value: string) =>
+  Types.ObjectId.isValid(value) ? new Types.ObjectId(value) : value
 
-  return `${primary} - Flat ${flatNumber}`
-}
+const flatLookupStages = (): PipelineStage[] => [
+  {
+    $lookup: {
+      from: Flat.collection.name,
+      localField: "flatId",
+      foreignField: "_id",
+      as: "flat",
+    },
+  },
+  {
+    $set: {
+      flatNumber: {
+        $arrayElemAt: ["$flat.flatNumber", 0],
+      },
+      entityId: {
+        $toString: "$_id",
+      },
+    },
+  },
+]
 
-const getFlatNumberMap = async (apartmentId: string) => {
-  const { flats } = await getApartmentFlatsService(apartmentId)
+const describeWithFlat = (primary: ActivityValue) => ({
+  $cond: [
+    {
+      $and: [
+        { $ne: ["$flatNumber", null] },
+        { $ne: ["$flatNumber", ""] },
+      ],
+    },
+    { $concat: [primary, " - Flat ", "$flatNumber"] },
+    primary,
+  ],
+})
 
-  return new Map(
-    flats.map((flat) => [flat._id, flat.flatNumber])
-  )
-}
+const flattenEvents: PipelineStage[] = [
+  { $unwind: "$events" },
+  { $replaceRoot: { newRoot: "$events" } },
+  { $match: { timestamp: { $type: "date" } } },
+]
+
+const visitorActivityStages = (): PipelineStage[] => [
+  ...flatLookupStages(),
+  {
+    $project: {
+      events: [
+        {
+          id: { $concat: ["$entityId", "-checked-in"] },
+          type: {
+            $cond: [
+              { $eq: ["$entryType", VisitorEntryType.MANUAL] },
+              "VISITOR_MANUAL_REGISTERED",
+              "VISITOR_CHECKED_IN",
+            ],
+          },
+          title: {
+            $cond: [
+              { $eq: ["$entryType", VisitorEntryType.MANUAL] },
+              "Visitor Manually Registered",
+              "Visitor Checked In",
+            ],
+          },
+          description: describeWithFlat("$visitorName"),
+          timestamp: "$checkedInAt",
+          status: {
+            $cond: [
+              { $eq: ["$status", VisitorVisitStatus.ACTIVE] },
+              "ACTIVE",
+              "EXITED",
+            ],
+          },
+          relatedEntityId: "$entityId",
+          actionLabel: "View Visitors",
+          href: "/security/visitors",
+        },
+        {
+          id: { $concat: ["$entityId", "-checked-out"] },
+          type: "VISITOR_CHECKED_OUT",
+          title: "Visitor Checked Out",
+          description: describeWithFlat("$visitorName"),
+          timestamp: "$checkedOutAt",
+          status: "EXITED",
+          relatedEntityId: "$entityId",
+          actionLabel: "View Visitors",
+          href: "/security/visitors",
+        },
+      ],
+    },
+  },
+  ...flattenEvents,
+]
+
+const deliveryActivityStages = (): PipelineStage[] => [
+  ...flatLookupStages(),
+  {
+    $project: {
+      events: [
+        {
+          id: { $concat: ["$entityId", "-received"] },
+          type: "DELIVERY_RECEIVED",
+          title: "Delivery Received",
+          description: describeWithFlat("$deliveryCompany"),
+          timestamp: "$receivedAt",
+          status: "$status",
+          relatedEntityId: "$entityId",
+          actionLabel: "View Deliveries",
+          href: "/security/deliveries",
+        },
+        {
+          id: { $concat: ["$entityId", "-notified"] },
+          type: "DELIVERY_NOTIFIED",
+          title: "Resident Notified",
+          description: describeWithFlat("$deliveryCompany"),
+          timestamp: "$notifiedAt",
+          status: DeliveryStatus.NOTIFIED,
+          relatedEntityId: "$entityId",
+          actionLabel: "View Deliveries",
+          href: "/security/deliveries",
+        },
+        {
+          id: { $concat: ["$entityId", "-collected"] },
+          type: "DELIVERY_COLLECTED",
+          title: "Parcel Collected",
+          description: describeWithFlat("$deliveryCompany"),
+          timestamp: "$collectedAt",
+          status: DeliveryStatus.COLLECTED,
+          relatedEntityId: "$entityId",
+          actionLabel: "View Deliveries",
+          href: "/security/deliveries",
+        },
+        {
+          id: { $concat: ["$entityId", "-returned"] },
+          type: "DELIVERY_RETURNED",
+          title: "Parcel Returned",
+          description: describeWithFlat("$deliveryCompany"),
+          timestamp: "$returnedAt",
+          status: DeliveryStatus.RETURNED,
+          relatedEntityId: "$entityId",
+          actionLabel: "View Deliveries",
+          href: "/security/deliveries",
+        },
+      ],
+    },
+  },
+  ...flattenEvents,
+]
+
+const parkingActivityStages = (): PipelineStage[] => [
+  {
+    $lookup: {
+      from: VisitorParkingSlotModel.collection.name,
+      localField: "slotId",
+      foreignField: "_id",
+      as: "slot",
+    },
+  },
+  {
+    $set: {
+      slotNumber: {
+        $ifNull: [
+          { $arrayElemAt: ["$slot.slotNumber", 0] },
+          "Visitor Parking",
+        ],
+      },
+      entityId: {
+        $toString: "$_id",
+      },
+    },
+  },
+  {
+    $set: {
+      description: { $concat: ["$slotNumber", " - ", "$vehicleNumber"] },
+    },
+  },
+  {
+    $project: {
+      events: [
+        {
+          id: { $concat: ["$entityId", "-assigned"] },
+          type: "PARKING_ASSIGNED",
+          title: "Parking Assigned",
+          description: "$description",
+          timestamp: "$assignedAt",
+          status: VisitorParkingSlotStatus.OCCUPIED,
+          relatedEntityId: "$entityId",
+          actionLabel: "View Parking",
+          href: "/security/parking",
+        },
+        {
+          id: { $concat: ["$entityId", "-released"] },
+          type: "PARKING_RELEASED",
+          title: "Parking Released",
+          description: "$description",
+          timestamp: "$releasedAt",
+          status: {
+            $cond: [
+              { $eq: ["$status", VisitorParkingAssignmentStatus.RELEASED] },
+              VisitorParkingSlotStatus.AVAILABLE,
+              "$status",
+            ],
+          },
+          relatedEntityId: "$entityId",
+          actionLabel: "View Parking",
+          href: "/security/parking",
+        },
+      ],
+    },
+  },
+  ...flattenEvents,
+]
+
+const alertActivityStages = (): PipelineStage[] => [
+  ...flatLookupStages(),
+  {
+    $set: {
+      description: {
+        $cond: [
+          {
+            $and: [
+              { $ne: ["$flatNumber", null] },
+              { $ne: ["$flatNumber", ""] },
+            ],
+          },
+          { $concat: ["Flat ", "$flatNumber"] },
+          "Resident alert",
+        ],
+      },
+    },
+  },
+  {
+    $project: {
+      events: [
+        {
+          id: { $concat: ["$entityId", "-triggered"] },
+          type: "SOS_TRIGGERED",
+          title: "SOS Alert Triggered",
+          description: "$description",
+          timestamp: "$triggeredAt",
+          status: EmergencyAlertStatus.ACTIVE,
+          relatedEntityId: "$entityId",
+          actionLabel: "View Alerts",
+          href: "/security/alerts",
+        },
+        {
+          id: { $concat: ["$entityId", "-acknowledged"] },
+          type: "SOS_ACKNOWLEDGED",
+          title: "SOS Alert Acknowledged",
+          description: "$description",
+          timestamp: "$acknowledgedAt",
+          status: EmergencyAlertStatus.ACKNOWLEDGED,
+          relatedEntityId: "$entityId",
+          actionLabel: "View Alerts",
+          href: "/security/alerts",
+        },
+        {
+          id: { $concat: ["$entityId", "-responding"] },
+          type: "SOS_RESPONDING",
+          title: "SOS Marked Responding",
+          description: "$description",
+          timestamp: "$respondingAt",
+          status: EmergencyAlertStatus.RESPONDING,
+          relatedEntityId: "$entityId",
+          actionLabel: "View Alerts",
+          href: "/security/alerts",
+        },
+        {
+          id: { $concat: ["$entityId", "-resolved"] },
+          type: "SOS_RESOLVED",
+          title: "SOS Resolved",
+          description: "$description",
+          timestamp: "$resolvedAt",
+          status: EmergencyAlertStatus.RESOLVED,
+          relatedEntityId: "$entityId",
+          actionLabel: "View Alerts",
+          href: "/security/alerts",
+        },
+      ],
+    },
+  },
+  ...flattenEvents,
+]
 
 export const getSecurityActivityService = async ({
   apartmentId,
   limit = 8,
 }: SecurityActivityQuery) => {
-  const [visits, deliveries, assignments, alerts] =
-    await Promise.all([
-      VisitorVisitModel.find({ apartmentId })
-        .sort({ updatedAt: -1 })
-        .limit(limit * 2)
-        .lean(),
-
-      SecurityDeliveryModel.find({ apartmentId })
-        .sort({ updatedAt: -1 })
-        .limit(limit * 2)
-        .lean(),
-
-      VisitorParkingAssignmentModel.find({ apartmentId })
-        .sort({ updatedAt: -1 })
-        .limit(limit * 2)
-        .lean(),
-
-      EmergencyAlertModel.find({ apartmentId })
-        .sort({ updatedAt: -1 })
-        .limit(limit * 2)
-        .lean(),
-    ])
-
-  const flatNumberById = await getFlatNumberMap(apartmentId)
-  const slotIds = assignments
-    .map((assignment) => toId(assignment.slotId))
-    .filter(Boolean)
-
-  const slots = await VisitorParkingSlotModel.find({
-    apartmentId,
-    _id: {
-      $in: slotIds,
+  const match = { apartmentId: toMongoId(apartmentId) }
+  const pipeline = [
+    { $match: match },
+    ...visitorActivityStages(),
+    {
+      $unionWith: {
+        coll: SecurityDeliveryModel.collection.name,
+        pipeline: [{ $match: match }, ...deliveryActivityStages()],
+      },
     },
-  })
-    .select("_id slotNumber")
-    .lean()
+    {
+      $unionWith: {
+        coll: VisitorParkingAssignmentModel.collection.name,
+        pipeline: [{ $match: match }, ...parkingActivityStages()],
+      },
+    },
+    {
+      $unionWith: {
+        coll: EmergencyAlertModel.collection.name,
+        pipeline: [{ $match: match }, ...alertActivityStages()],
+      },
+    },
+    { $sort: { timestamp: -1 } },
+    { $limit: limit },
+  ] as unknown as PipelineStage[]
 
-  const slotNumberById = new Map(
-    slots.map((slot) => [toId(slot._id), slot.slotNumber])
+  const activities = await VisitorVisitModel.aggregate<SecurityActivity>(
+    pipeline
   )
 
-  const activities: SecurityActivity[] = []
-
-  for (const visit of visits) {
-    const visitId = toId(visit._id)
-    const flatNumber = flatNumberById.get(toId(visit.flatId))
-
-    activities.push({
-      id: `${visitId}-checked-in`,
-      type:
-        visit.entryType === VisitorEntryType.MANUAL
-          ? "VISITOR_MANUAL_REGISTERED"
-          : "VISITOR_CHECKED_IN",
-      title:
-        visit.entryType === VisitorEntryType.MANUAL
-          ? "Visitor Manually Registered"
-          : "Visitor Checked In",
-      description: buildDescription(
-        visit.visitorName,
-        flatNumber
-      ),
-      timestamp: visit.checkedInAt,
-      status:
-        visit.status === VisitorVisitStatus.ACTIVE
-          ? "ACTIVE"
-          : "EXITED",
-      relatedEntityId: visitId,
-      actionLabel: "View Visitors",
-      href: "/security/visitors",
-    })
-
-    if (visit.checkedOutAt) {
-      activities.push({
-        id: `${visitId}-checked-out`,
-        type: "VISITOR_CHECKED_OUT",
-        title: "Visitor Checked Out",
-        description: buildDescription(
-          visit.visitorName,
-          flatNumber
-        ),
-        timestamp: visit.checkedOutAt,
-        status: "EXITED",
-        relatedEntityId: visitId,
-        actionLabel: "View Visitors",
-        href: "/security/visitors",
-      })
-    }
-  }
-
-  for (const delivery of deliveries) {
-    const deliveryId = toId(delivery._id)
-    const flatNumber = flatNumberById.get(toId(delivery.flatId))
-    const description = buildDescription(
-      delivery.deliveryCompany,
-      flatNumber
-    )
-
-    activities.push({
-      id: `${deliveryId}-received`,
-      type: "DELIVERY_RECEIVED",
-      title: "Delivery Received",
-      description,
-      timestamp: delivery.receivedAt,
-      status: delivery.status,
-      relatedEntityId: deliveryId,
-      actionLabel: "View Deliveries",
-      href: "/security/deliveries",
-    })
-
-    if (delivery.notifiedAt) {
-      activities.push({
-        id: `${deliveryId}-notified`,
-        type: "DELIVERY_NOTIFIED",
-        title: "Resident Notified",
-        description,
-        timestamp: delivery.notifiedAt,
-        status: DeliveryStatus.NOTIFIED,
-        relatedEntityId: deliveryId,
-        actionLabel: "View Deliveries",
-        href: "/security/deliveries",
-      })
-    }
-
-    if (delivery.collectedAt) {
-      activities.push({
-        id: `${deliveryId}-collected`,
-        type: "DELIVERY_COLLECTED",
-        title: "Parcel Collected",
-        description,
-        timestamp: delivery.collectedAt,
-        status: DeliveryStatus.COLLECTED,
-        relatedEntityId: deliveryId,
-        actionLabel: "View Deliveries",
-        href: "/security/deliveries",
-      })
-    }
-
-    if (delivery.returnedAt) {
-      activities.push({
-        id: `${deliveryId}-returned`,
-        type: "DELIVERY_RETURNED",
-        title: "Parcel Returned",
-        description,
-        timestamp: delivery.returnedAt,
-        status: DeliveryStatus.RETURNED,
-        relatedEntityId: deliveryId,
-        actionLabel: "View Deliveries",
-        href: "/security/deliveries",
-      })
-    }
-  }
-
-  for (const assignment of assignments) {
-    const assignmentId = toId(assignment._id)
-    const slotNumber =
-      slotNumberById.get(toId(assignment.slotId)) ??
-      "Visitor Parking"
-
-    activities.push({
-      id: `${assignmentId}-assigned`,
-      type: "PARKING_ASSIGNED",
-      title: "Parking Assigned",
-      description: `${slotNumber} - ${assignment.vehicleNumber}`,
-      timestamp: assignment.assignedAt,
-      status: VisitorParkingSlotStatus.OCCUPIED,
-      relatedEntityId: assignmentId,
-      actionLabel: "View Parking",
-      href: "/security/parking",
-    })
-
-    if (assignment.releasedAt) {
-      activities.push({
-        id: `${assignmentId}-released`,
-        type: "PARKING_RELEASED",
-        title: "Parking Released",
-        description: `${slotNumber} - ${assignment.vehicleNumber}`,
-        timestamp: assignment.releasedAt,
-        status:
-          assignment.status ===
-          VisitorParkingAssignmentStatus.RELEASED
-            ? VisitorParkingSlotStatus.AVAILABLE
-            : assignment.status,
-        relatedEntityId: assignmentId,
-        actionLabel: "View Parking",
-        href: "/security/parking",
-      })
-    }
-  }
-
-  for (const alert of alerts) {
-    const alertId = toId(alert._id)
-    const flatNumber = flatNumberById.get(toId(alert.flatId))
-    const description = flatNumber
-      ? `Flat ${flatNumber}`
-      : "Resident alert"
-
-    activities.push({
-      id: `${alertId}-triggered`,
-      type: "SOS_TRIGGERED",
-      title: "SOS Alert Triggered",
-      description,
-      timestamp: alert.triggeredAt,
-      status: EmergencyAlertStatus.ACTIVE,
-      relatedEntityId: alertId,
-      actionLabel: "View Alerts",
-      href: "/security/alerts",
-    })
-
-    if (alert.acknowledgedAt) {
-      activities.push({
-        id: `${alertId}-acknowledged`,
-        type: "SOS_ACKNOWLEDGED",
-        title: "SOS Alert Acknowledged",
-        description,
-        timestamp: alert.acknowledgedAt,
-        status: EmergencyAlertStatus.ACKNOWLEDGED,
-        relatedEntityId: alertId,
-        actionLabel: "View Alerts",
-        href: "/security/alerts",
-      })
-    }
-
-    if (alert.respondingAt) {
-      activities.push({
-        id: `${alertId}-responding`,
-        type: "SOS_RESPONDING",
-        title: "SOS Marked Responding",
-        description,
-        timestamp: alert.respondingAt,
-        status: EmergencyAlertStatus.RESPONDING,
-        relatedEntityId: alertId,
-        actionLabel: "View Alerts",
-        href: "/security/alerts",
-      })
-    }
-
-    if (alert.resolvedAt) {
-      activities.push({
-        id: `${alertId}-resolved`,
-        type: "SOS_RESOLVED",
-        title: "SOS Resolved",
-        description,
-        timestamp: alert.resolvedAt,
-        status: EmergencyAlertStatus.RESOLVED,
-        relatedEntityId: alertId,
-        actionLabel: "View Alerts",
-        href: "/security/alerts",
-      })
-    }
-  }
-
-  return {
-    activities: activities
-      .filter((activity) => Boolean(activity.timestamp))
-      .sort(
-        (left, right) =>
-          new Date(right.timestamp).getTime() -
-          new Date(left.timestamp).getTime()
-      )
-      .slice(0, limit),
-  }
+  return { activities }
 }

@@ -1,12 +1,17 @@
-import crypto from "crypto"
-
+import { Flat } from "../flat/flat.model.js"
 import {
   GuestPassModel,
   GuestPassStatus,
 } from "../visitors/pass/pass.model.js"
+import {
+  hashGuestPassToken,
+  parseGuestPassQrPayload,
+} from "../visitors/pass/pass-token.js"
 
-import { VisitorVisitModel } from "../visitors/visit/visit.model.js"
-import { VisitorVisitStatus } from "../visitors/visit/visit.interface.js"
+import {
+  VisitorVisitModel,
+  VisitorVisitStatus,
+} from "../visitors/visit/visit.model.js"
 import { SecurityDeliveryModel } from "../delivery/delivery.model.js"
 import { DeliveryStatus } from "../delivery/delivery.interface.js"
 import { VisitorParkingSlotModel } from "../parking/parking.model.js"
@@ -25,15 +30,9 @@ import type {
   SecurityResidentsQuery,
   SecuritySummary,
   VerifyGuestPassInput,
-} from "./security.interface.js"
+} from "./security.types.js"
 
 export { getSecurityActivityService } from "./security-activity.service.js"
-
-const hashToken = (token: string) =>
-  crypto
-    .createHash("sha256")
-    .update(token)
-    .digest("hex")
 
 const getTodayRange = () => {
   const start = new Date()
@@ -49,7 +48,8 @@ export const verifyGuestPassService = async ({
   token,
   apartmentId,
 }: VerifyGuestPassInput) => {
-  const tokenHash = hashToken(token)
+  const guestPassToken = parseGuestPassQrPayload(token)
+  const tokenHash = hashGuestPassToken(guestPassToken)
 
   const guestPass = await GuestPassModel.findOne({
     tokenHash,
@@ -107,8 +107,17 @@ export const verifyGuestPassService = async ({
     tokenHash: _tokenHash,
     ...safeGuestPass
   } = guestPass
+  const flat = await Flat.findOne({
+    _id: guestPass.flatId,
+    apartmentId,
+  })
+    .select("flatNumber")
+    .lean()
 
-  return safeGuestPass
+  return {
+    ...safeGuestPass,
+    flatNumber: flat?.flatNumber ?? null,
+  }
 }
 
 export const getSecuritySummaryService = async (

@@ -5,18 +5,7 @@ import type {
   SecurityFlat,
   SecurityResidentsResponse,
   SecuritySummary,
-} from "./security.interface"
-
-export type {
-  SecurityActivity,
-  SecurityActivityResponse,
-  SecurityActivityType,
-  SecurityFlat,
-  SecurityResidentDirectoryRecord,
-  SecurityResidentSummary,
-  SecurityResidentsResponse,
-  SecuritySummary,
-} from "./security.interface"
+} from "../schemas/security"
 
 export const getSecuritySummary = async () => {
   const response = await axiosInstance.get(

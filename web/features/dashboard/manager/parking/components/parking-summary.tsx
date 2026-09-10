@@ -1,6 +1,6 @@
 import { CheckCircle2, Car, Ban, LayoutGrid } from "lucide-react"
 
-import type { VisitorParkingSummary } from "../../../security/services/parking.service"
+import type { VisitorParkingSummary } from "../../../security/schemas/parking"
 
 type ParkingSummaryProps = {
   summary?: VisitorParkingSummary
@@ -43,9 +43,9 @@ export default function ParkingSummary({
       isValueLoading: isLoading,
     },
     {
-      title: "Out of Service",
+      title: "Unavailable",
       description: "Temporarily unavailable",
-      value: summary?.outOfService ?? 0,
+      value: summary?.unavailable ?? 0,
       icon: Ban,
       accent: "bg-red-500",
       iconBg: "bg-red-50",

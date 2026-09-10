@@ -13,10 +13,10 @@ import {
   Search,
 } from "lucide-react"
 
-import type { VisitorParkingSlot, VisitorParkingSlotStatus } from "../../../security/services/parking.service"
+import type { VisitorParkingSlot, VisitorParkingSlotStatus } from "../../../security/schemas/parking"
 import { useUpdateParkingStatusMutation } from "../hooks/use-parking-queries"
 import { EditSlotDialog } from "./edit-slot-dialog"
-import { OutOfServiceDialog } from "./out-of-service-dialog"
+import { UnavailableDialog } from "./unavailable-dialog"
 import { ViewAssignmentDialog } from "./view-assignment-dialog"
 
 type ParkingTableProps = {
@@ -36,15 +36,20 @@ const statusBadgeStyles: Record<string, string> = {
   AVAILABLE: "bg-emerald-50 text-emerald-700",
   OCCUPIED: "bg-sky-50 text-sky-700",
   RESERVED: "bg-amber-50 text-amber-700",
-  OUT_OF_SERVICE: "bg-red-50 text-red-600",
+  UNAVAILABLE: "bg-red-50 text-red-600",
 }
 
 const statusDisplay: Record<string, string> = {
   AVAILABLE: "Available",
   OCCUPIED: "Occupied",
   RESERVED: "Reserved",
-  OUT_OF_SERVICE: "Out of Service",
+  UNAVAILABLE: "Unavailable",
 }
+
+const parkingDateFormatter = new Intl.DateTimeFormat("en-IN", {
+  day: "2-digit",
+  month: "short",
+})
 
 export default function ParkingTable({
   slots,
@@ -64,7 +69,7 @@ export default function ParkingTable({
   // Dialog states
   const [editSlot, setEditSlot] = useState<VisitorParkingSlot | null>(null)
   const [viewAssignmentSlot, setViewAssignmentSlot] = useState<VisitorParkingSlot | null>(null)
-  const [outOfServiceSlot, setOutOfServiceSlot] = useState<VisitorParkingSlot | null>(null)
+  const [unavailableSlot, setUnavailableSlot] = useState<VisitorParkingSlot | null>(null)
 
   const updateStatusMutation = useUpdateParkingStatusMutation()
 
@@ -73,7 +78,7 @@ export default function ParkingTable({
     setOpenActionSlotId(null)
   }
 
-  const handleStatusChange = (slotId: string, status: "AVAILABLE" | "RESERVED" | "OUT_OF_SERVICE") => {
+  const handleStatusChange = (slotId: string, status: "AVAILABLE" | "RESERVED" | "UNAVAILABLE") => {
     updateStatusMutation.mutate({ slotId, status })
     setOpenActionSlotId(null)
   }
@@ -107,7 +112,7 @@ export default function ParkingTable({
                 <option value="AVAILABLE">Available</option>
                 <option value="OCCUPIED">Occupied</option>
                 <option value="RESERVED">Reserved</option>
-                <option value="OUT_OF_SERVICE">Out of Service</option>
+                <option value="UNAVAILABLE">Unavailable</option>
               </select>
               <ChevronDown
                 size={14}
@@ -154,10 +159,9 @@ export default function ParkingTable({
             <tbody className="divide-y divide-slate-100">
               {!isLoading && slots.length > 0 && slots.map((slot) => {
                 const assignment = slot.currentAssignment
-                const updatedAt = new Intl.DateTimeFormat("en-IN", {
-                  day: "2-digit",
-                  month: "short",
-                }).format(new Date(assignment?.assignedAt || Date.now())) // Wait, we need actual updatedAt if it existed, but we fallback
+                const updatedAt = slot.updatedAt
+                  ? parkingDateFormatter.format(new Date(slot.updatedAt))
+                  : "-"
 
                 return (
                   <tr key={slot._id} className="transition hover:bg-slate-50/70">
@@ -252,19 +256,19 @@ export default function ParkingTable({
                               </button>
                             )}
 
-                            {slot.status !== "OCCUPIED" && slot.status !== "OUT_OF_SERVICE" && (
+                            {slot.status !== "OCCUPIED" && slot.status !== "UNAVAILABLE" && (
                               <>
                                 <div className="my-1 border-t border-slate-100" />
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    setOutOfServiceSlot(slot)
+                                    setUnavailableSlot(slot)
                                     setOpenActionSlotId(null)
                                   }}
                                   className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
                                 >
                                   <Ban size={15} />
-                                  Mark Out of Service
+                                  Mark Unavailable
                                 </button>
                               </>
                             )}
@@ -337,10 +341,10 @@ export default function ParkingTable({
         />
       )}
 
-      {outOfServiceSlot && (
-        <OutOfServiceDialog 
-          slot={outOfServiceSlot} 
-          onClose={() => setOutOfServiceSlot(null)} 
+      {unavailableSlot && (
+        <UnavailableDialog
+          slot={unavailableSlot}
+          onClose={() => setUnavailableSlot(null)}
         />
       )}
 

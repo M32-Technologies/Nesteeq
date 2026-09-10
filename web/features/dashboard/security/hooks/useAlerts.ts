@@ -7,8 +7,8 @@ import {
 import {
   getEmergencyAlerts,
   updateEmergencyAlertStatus,
-  type EmergencyAlertStatus,
-} from "../services/alert.service"
+} from "../api/alert.api"
+import type { EmergencyAlertStatus } from "../schemas/alert"
 import { securityDataQueryKeys } from "./useSecurityData"
 
 export const alertQueryKeys = {

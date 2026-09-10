@@ -22,7 +22,7 @@ import type {
   DeliveryStatus,
   DeliveryType,
   SecurityDelivery,
-} from "../services/delivery.service"
+} from "../schemas/delivery"
 import {
   EmptyState,
   ErrorState,
@@ -75,13 +75,10 @@ export function DeliveryParcels() {
   const [form, setForm] = useState<DeliveryFormState>({
     deliveryType: "PARCEL" as DeliveryType,
     flatId: "",
-    residentId: "",
     deliveryCompany: "",
     deliveryPersonName: "",
     deliveryPersonPhone: "",
-    trackingId: "",
     packageDescription: "",
-    notes: "",
   })
 
   const flatsQuery = useSecurityFlats()
@@ -103,13 +100,10 @@ export function DeliveryParcels() {
     setForm({
       deliveryType: "PARCEL",
       flatId: "",
-      residentId: "",
       deliveryCompany: "",
       deliveryPersonName: "",
       deliveryPersonPhone: "",
-      trackingId: "",
       packageDescription: "",
-      notes: "",
     })
   }
 
@@ -123,16 +117,13 @@ export function DeliveryParcels() {
       await createMutation.mutateAsync({
         deliveryType: form.deliveryType,
         flatId: form.flatId,
-        residentId: form.residentId || undefined,
         deliveryCompany: form.deliveryCompany,
         deliveryPersonName:
           form.deliveryPersonName || undefined,
         deliveryPersonPhone:
           form.deliveryPersonPhone || undefined,
-        trackingId: form.trackingId || undefined,
         packageDescription:
           form.packageDescription || undefined,
-        notes: form.notes || undefined,
       })
 
       toast.success("Delivery recorded")
@@ -215,7 +206,7 @@ export function DeliveryParcels() {
               onChange={(event) =>
                 setSearchQuery(event.target.value)
               }
-              placeholder="Search flat, resident, company, person, or tracking ID"
+              placeholder="Search flat, resident, company, or person"
             />
           </div>
 
@@ -269,13 +260,11 @@ export function DeliveryParcels() {
                       {formatLabel(delivery.deliveryType)}
                     </td>
                     <td className={tdClassName}>
-                      {delivery.flatNumber || delivery.flatId}
+                      {delivery.flatNumber || "-"}
                     </td>
                     <td className={tdClassName}>
                       <p>
-                        {delivery.residentName ||
-                          delivery.residentId ||
-                          "-"}
+                        {delivery.residentName || "-"}
                       </p>
                       {delivery.residentPhone ? (
                         <p className="text-xs text-[#637083]">
@@ -287,11 +276,6 @@ export function DeliveryParcels() {
                       <p className="font-medium">
                         {delivery.deliveryCompany}
                       </p>
-                      {delivery.trackingId ? (
-                        <p className="text-xs text-[#637083]">
-                          {delivery.trackingId}
-                        </p>
-                      ) : null}
                     </td>
                     <td className={tdClassName}>
                       {formatDateTime(delivery.receivedAt)}

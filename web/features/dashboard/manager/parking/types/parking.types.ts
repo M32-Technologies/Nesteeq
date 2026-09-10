@@ -1,5 +1,5 @@
 import { z } from "zod"
-import type { VisitorParkingSlotStatus } from "../../../security/services/parking.service"
+import type { VisitorParkingSlotStatus } from "../../../security/schemas/parking"
 import { editSlotSchema, generateSlotsSchema } from "../schemas/parking.schema"
 
 export type GenerateSlotsFormValues = z.infer<typeof generateSlotsSchema>

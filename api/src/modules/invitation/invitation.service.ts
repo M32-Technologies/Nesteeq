@@ -37,6 +37,16 @@ const INVITE_EXPIRY_DAYS = 7
 const escapeRegex = (value: string) =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 
+const getAuthUserFilter = (userId: string) => {
+  const filters: Record<string, unknown>[] = [{ id: userId }]
+
+  if (Types.ObjectId.isValid(userId)) {
+    filters.push({ _id: new Types.ObjectId(userId) })
+  }
+
+  return { $or: filters }
+}
+
 const getMaintenanceTypeForRole = (
   role: StaffInviteRole,
   maintenanceType?: string | null,
@@ -538,7 +548,7 @@ export const acceptInvitation = async (
     const authDb = mongoose.connection.getClient().db()
 
     await authDb.collection("user").updateOne(
-      { id: authenticatedUser.id },
+      getAuthUserFilter(authenticatedUser.id),
       invite.flatId
         ? {
           $set: {

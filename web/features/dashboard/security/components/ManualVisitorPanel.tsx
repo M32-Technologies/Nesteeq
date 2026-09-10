@@ -1,8 +1,7 @@
 "use client"
 
-import { Package } from "lucide-react"
+import { UserPlus } from "lucide-react"
 
-import type { DeliveryType } from "../schemas/delivery"
 import type { SecurityFlat } from "../schemas/security"
 import {
   inputClassName,
@@ -11,27 +10,16 @@ import {
   selectClassName,
 } from "./SecurityUi"
 
-export interface DeliveryFormState {
-  deliveryType: DeliveryType
+export interface ManualVisitorFormState {
   flatId: string
-  deliveryCompany: string
-  deliveryPersonName: string
-  deliveryPersonPhone: string
-  packageDescription: string
+  visitorName: string
+  visitorPhone: string
+  purpose: string
+  vehicleNumber: string
+  vehicleType: string
 }
 
-const deliveryTypes: Array<{
-  label: string
-  value: DeliveryType
-}> = [
-  { label: "Parcel", value: "PARCEL" },
-  { label: "Food", value: "FOOD" },
-  { label: "Grocery", value: "GROCERY" },
-  { label: "Courier", value: "COURIER" },
-  { label: "Other", value: "OTHER" },
-]
-
-export function DeliveryForm({
+export function ManualVisitorPanel({
   flats,
   flatsLoading,
   form,
@@ -41,36 +29,14 @@ export function DeliveryForm({
 }: {
   flats: SecurityFlat[]
   flatsLoading: boolean
-  form: DeliveryFormState
+  form: ManualVisitorFormState
   isSubmitting: boolean
-  onFormChange: (form: DeliveryFormState) => void
+  onFormChange: (form: ManualVisitorFormState) => void
   onSubmit: () => void
 }) {
   return (
     <div className={panelClassName}>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div>
-          <label className="mb-2 block text-sm font-medium text-[#111111]">
-            Delivery Type
-          </label>
-          <select
-            className={selectClassName}
-            value={form.deliveryType}
-            onChange={(event) =>
-              onFormChange({
-                ...form,
-                deliveryType: event.target.value as DeliveryType,
-              })
-            }
-          >
-            {deliveryTypes.map((type) => (
-              <option key={type.value} value={type.value}>
-                {type.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <div>
           <label className="mb-2 block text-sm font-medium text-[#111111]">
             Flat / Unit
@@ -96,84 +62,100 @@ export function DeliveryForm({
             ))}
           </select>
         </div>
-
         <div>
           <label className="mb-2 block text-sm font-medium text-[#111111]">
-            Delivery Company / Partner
+            Visitor Name
           </label>
           <input
+            type="text"
             className={inputClassName}
-            value={form.deliveryCompany}
+            value={form.visitorName}
             onChange={(event) =>
               onFormChange({
                 ...form,
-                deliveryCompany: event.target.value,
+                visitorName: event.target.value,
               })
             }
-            placeholder="Company or partner"
+            placeholder="Visitor name"
           />
         </div>
-
         <div>
           <label className="mb-2 block text-sm font-medium text-[#111111]">
-            Delivery Person Name
+            Visitor Phone
           </label>
           <input
+            type="tel"
             className={inputClassName}
-            value={form.deliveryPersonName}
+            value={form.visitorPhone}
             onChange={(event) =>
               onFormChange({
                 ...form,
-                deliveryPersonName: event.target.value,
+                visitorPhone: event.target.value,
               })
             }
-            placeholder="Name"
+            placeholder="Phone"
           />
         </div>
-
         <div>
           <label className="mb-2 block text-sm font-medium text-[#111111]">
-            Delivery Person Phone (Optional)
+            Purpose
           </label>
           <input
+            type="text"
             className={inputClassName}
-            value={form.deliveryPersonPhone}
+            value={form.purpose}
             onChange={(event) =>
               onFormChange({
                 ...form,
-                deliveryPersonPhone: event.target.value,
+                purpose: event.target.value,
               })
             }
-            placeholder="Optional phone"
+            placeholder="Purpose"
           />
         </div>
-
         <div>
           <label className="mb-2 block text-sm font-medium text-[#111111]">
-            Package Description
+            Vehicle Number
           </label>
           <input
+            type="text"
             className={inputClassName}
-            value={form.packageDescription}
+            value={form.vehicleNumber}
             onChange={(event) =>
               onFormChange({
                 ...form,
-                packageDescription: event.target.value,
+                vehicleNumber: event.target.value,
               })
             }
-            placeholder="Optional description"
+            placeholder="Vehicle"
+          />
+        </div>
+        <div>
+          <label className="mb-2 block text-sm font-medium text-[#111111]">
+            Vehicle Type
+          </label>
+          <input
+            type="text"
+            className={inputClassName}
+            value={form.vehicleType}
+            onChange={(event) =>
+              onFormChange({
+                ...form,
+                vehicleType: event.target.value,
+              })
+            }
+            placeholder="Car / Bike"
           />
         </div>
       </div>
-
       <button
         type="button"
         className={`${primaryButtonClassName} mt-4`}
         onClick={onSubmit}
         disabled={isSubmitting}
       >
-        <Package className="h-4 w-4" />
-        {isSubmitting ? "Recording..." : "Record Delivery"}
+        <UserPlus className="h-4 w-4" />
+        {isSubmitting ? "Registering..." : "Register & Check In"}
       </button>
     </div>
   )

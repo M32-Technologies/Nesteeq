@@ -1,4 +1,5 @@
 import crypto from "crypto"
+import QRCode from "qrcode"
 
 import { Flat } from "../../flat/flat.model.js"
 import { ResidentModel } from "../../resident/resident.model.js"
@@ -8,36 +9,14 @@ import {
   GuestPassStatus,
   type GuestPassStatus as GuestPassStatusType,
 } from "./pass.model.js"
+import type {
+  CancelGuestPassInput,
+  CreateGuestPassInput,
+  GuestPassByIdInput,
+  ListGuestPassesInput,
+} from "./pass.types.js"
 
 import { AppError } from "../../../utils/AppError.js"
-
-interface CreateGuestPassInput {
-  userId: string
-  flatId: string
-  visitorName: string
-  visitorPhone?: string
-  purpose?: string
-  vehicleNumber?: string
-  validFrom: Date
-  validUntil: Date
-}
-
-interface ListGuestPassesInput {
-  userId: string
-  page?: number
-  limit?: number
-  status?: GuestPassStatusType
-}
-
-interface GuestPassByIdInput {
-  userId: string
-  guestPassId: string
-}
-
-interface CancelGuestPassInput {
-  userId: string
-  guestPassId: string
-}
 
 /**
  * Find the active Resident record connected to
@@ -172,6 +151,11 @@ export const createGuestPassService = async ({
 
   const { rawToken, tokenHash } =
     generateGuestPassToken()
+  const qrCodeDataUrl = await QRCode.toDataURL(rawToken, {
+    width: 280,
+    margin: 2,
+    errorCorrectionLevel: "M",
+  })
 
   const guestPass = await GuestPassModel.create({
     apartmentId: resident.apartmentId,
@@ -219,6 +203,7 @@ export const createGuestPassService = async ({
      * It should not be stored client-side permanently.
      */
     token: rawToken,
+    qrCodeDataUrl,
   }
 }
 

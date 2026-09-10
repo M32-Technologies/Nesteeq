@@ -20,7 +20,7 @@ import type {
   VisitorRecord,
   VisitorRecordEntryType,
   VisitorRecordStatus,
-} from "../services/visitor.service"
+} from "../schemas/visitor"
 import {
   EmptyState,
   ErrorState,
@@ -70,6 +70,7 @@ export function SecurityVisitors() {
     visitorPhone: "",
     purpose: "",
     vehicleNumber: "",
+    vehicleType: "",
   })
 
   const initialMode =
@@ -100,18 +101,28 @@ export function SecurityVisitors() {
   const pagination = visitorRecordsQuery.data?.pagination
 
   const handleVerify = async () => {
-    if (!token.trim()) {
+    await verifyToken(token)
+  }
+
+  const verifyToken = async (tokenValue: string) => {
+    const trimmedToken = tokenValue.trim()
+
+    if (!trimmedToken) {
       toast.error("Enter or scan a visitor token")
-      return
+      return false
     }
+
+    setToken(trimmedToken)
+    setVerifiedPass(null)
 
     try {
       const result = await verifyPassMutation.mutateAsync(
-        token.trim()
+        trimmedToken
       )
 
       setVerifiedPass(result)
       toast.success("Visitor pass verified")
+      return true
     } catch (error) {
       toast.error(
         getSecurityApiErrorMessage(
@@ -119,6 +130,7 @@ export function SecurityVisitors() {
           "Unable to verify visitor pass"
         )
       )
+      return false
     }
   }
 
@@ -131,10 +143,14 @@ export function SecurityVisitors() {
   }
 
   const handleVerifiedCheckIn = async () => {
-    if (!verifiedPass?._id) return
+    const trimmedToken = token.trim()
+
+    if (!verifiedPass || !trimmedToken) return
 
     try {
-      await checkInMutation.mutateAsync(verifiedPass._id)
+      await checkInMutation.mutateAsync({
+        token: trimmedToken,
+      })
       toast.success("Visitor checked in successfully")
       setToken("")
       setVerifiedPass(null)
@@ -152,7 +168,9 @@ export function SecurityVisitors() {
     if (!record.visitorPassId) return
 
     try {
-      await checkInMutation.mutateAsync(record.visitorPassId)
+      await checkInMutation.mutateAsync({
+        visitorPassId: record.visitorPassId,
+      })
       toast.success("Visitor checked in successfully")
     } catch (error) {
       toast.error(
@@ -202,6 +220,8 @@ export function SecurityVisitors() {
         purpose: manualForm.purpose || undefined,
         vehicleNumber:
           manualForm.vehicleNumber || undefined,
+        vehicleType:
+          manualForm.vehicleType || undefined,
       })
 
       toast.success("Visitor registered and checked in")
@@ -212,6 +232,7 @@ export function SecurityVisitors() {
         visitorPhone: "",
         purpose: "",
         vehicleNumber: "",
+        vehicleType: "",
       })
     } catch (error) {
       toast.error(
@@ -264,6 +285,7 @@ export function SecurityVisitors() {
           isCheckingIn={checkInMutation.isPending}
           isVerifying={verifyPassMutation.isPending}
           onCheckIn={handleVerifiedCheckIn}
+          onScan={verifyToken}
           onTokenChange={handleTokenChange}
           onVerify={handleVerify}
         />
@@ -312,6 +334,7 @@ export function SecurityVisitors() {
                   </th>
                   <th className={thClassName}>Check-Out Time</th>
                   <th className={thClassName}>Vehicle Number</th>
+                  <th className={thClassName}>Vehicle Type</th>
                   <th className={thClassName}>Status</th>
                   <th className={thClassName}>Actions</th>
                 </tr>
@@ -329,7 +352,7 @@ export function SecurityVisitors() {
                       {record.visitorPhone || "-"}
                     </td>
                     <td className={tdClassName}>
-                      {record.flatNumber || record.flatId}
+                      {record.flatNumber || "-"}
                     </td>
                     <td className={tdClassName}>
                       {record.purpose || "-"}
@@ -351,6 +374,9 @@ export function SecurityVisitors() {
                     </td>
                     <td className={tdClassName}>
                       {record.vehicleNumber || "-"}
+                    </td>
+                    <td className={tdClassName}>
+                      {record.vehicleType || "-"}
                     </td>
                     <td className={tdClassName}>
                       <StatusBadge status={record.status} />
@@ -432,7 +458,7 @@ export function SecurityVisitors() {
         isSubmitting={checkoutMutation.isPending}
         message={
           checkoutRecord
-            ? `Are you sure you want to check out ${checkoutRecord.visitorName} from Flat ${checkoutRecord.flatNumber || checkoutRecord.flatId}?`
+            ? `Are you sure you want to check out ${checkoutRecord.visitorName} from Flat ${checkoutRecord.flatNumber || "-"}?`
             : ""
         }
         title="Check Out Visitor"
