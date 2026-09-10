@@ -1,117 +1,35 @@
-import { Router } from "express"
+import { Router } from "express";
 
 import {
-  assignParkingSlot,
-  createParkingSlot,
-  generateParkingSlots,
-  listParkingSlots,
-  releaseParkingSlot,
-  updateParkingSlot,
-  updateParkingSlotStatus,
-} from "./parking.controller.js"
-
+  generateParkingSlotsHandler,
+  getParkingSlotsHandler,
+  getParkingSlotByIdHandler,
+  updateParkingSlotHandler,
+  assignResidentParkingHandler,
+  releaseResidentParkingHandler,
+  updateParkingSlotStatusHandler,
+} from "./parking.controller.js";
 import {
-  assignParkingSlotSchema,
-  createParkingSlotSchema,
   generateParkingSlotsSchema,
-  listParkingSlotsSchema,
-  parkingSlotIdParamsSchema,
+  getParkingSlotsQuerySchema,
+  parkingIdParamsSchema,
   updateParkingSlotSchema,
+  assignResidentParkingSchema,
+  releaseParkingSchema,
   updateParkingSlotStatusSchema,
-} from "./parking.schema.js"
+} from "./parking.validation.js";
+import { protect, requireRole } from "../../middlewares/authMiddleware.js";
+import { zodValidate } from "../../middlewares/zodValidate.js";
 
-import {
-  protect,
-  requireRole,
-} from "../../middlewares/authMiddleware.js"
+const router = Router();
+router.use(protect);
 
-import { zodValidate } from "../../middlewares/zodValidate.js"
+router.get("/", requireRole("property_manager", "security_staff"), zodValidate(getParkingSlotsQuerySchema), getParkingSlotsHandler);
+router.get("/:parkingId", requireRole("property_manager"), zodValidate(parkingIdParamsSchema), getParkingSlotByIdHandler);
+router.post("/generate", requireRole("property_manager", "security_staff"), zodValidate(generateParkingSlotsSchema), generateParkingSlotsHandler);
+router.patch("/:parkingId/status", requireRole("property_manager"), zodValidate(updateParkingSlotStatusSchema), updateParkingSlotStatusHandler);
+router.patch("/:parkingId", requireRole("property_manager"), zodValidate(updateParkingSlotSchema), updateParkingSlotHandler);
+router.post("/:parkingId/assign-resident", requireRole("property_manager"), zodValidate(assignResidentParkingSchema), assignResidentParkingHandler);
+router.post("/:parkingId/release", requireRole("property_manager"), zodValidate(releaseParkingSchema), releaseResidentParkingHandler);
 
-const router = Router()
-
-// All parking routes require authentication
-router.use(protect)
-
-/**
- * Shared parking visibility
- * Property Manager + Security Staff
- */
-router.get(
-  "/",
-  requireRole("property_manager", "security_staff"),
-  zodValidate(listParkingSlotsSchema),
-  listParkingSlots
-)
-
-/**
- * Property Manager
- * Generate the apartment parking structure
- */
-router.post(
-  "/generate",
-  requireRole("property_manager"),
-  zodValidate(generateParkingSlotsSchema),
-  generateParkingSlots
-)
-
-/**
- * Property Manager
- * Edit slot number / notes
- */
-router.patch(
-  "/:slotId",
-  requireRole("property_manager"),
-  zodValidate(updateParkingSlotSchema),
-  updateParkingSlot
-)
-
-/**
- * Property Manager + Security Staff
- *
- * Property Manager:
- * AVAILABLE / RESERVED / OUT_OF_SERVICE
- *
- * Security can continue using the existing
- * operational status functionality if required.
- */
-router.patch(
-  "/:slotId/status",
-  requireRole("property_manager", "security_staff"),
-  zodValidate(updateParkingSlotStatusSchema),
-  updateParkingSlotStatus
-)
-
-/**
- * Security Staff only
- * Create a single visitor parking slot
- */
-router.post(
-  "/",
-  requireRole("security_staff"),
-  zodValidate(createParkingSlotSchema),
-  createParkingSlot
-)
-
-/**
- * Security Staff only
- * Assign a visitor to a parking slot
- */
-router.post(
-  "/assign",
-  requireRole("security_staff"),
-  zodValidate(assignParkingSlotSchema),
-  assignParkingSlot
-)
-
-/**
- * Security Staff only
- * Release an active visitor parking assignment
- */
-router.patch(
-  "/:slotId/release",
-  requireRole("security_staff"),
-  zodValidate(parkingSlotIdParamsSchema),
-  releaseParkingSlot
-)
-
-export default router
+export default router;

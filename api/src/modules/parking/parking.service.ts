@@ -1,720 +1,292 @@
-import mongoose, {
-  Types,
-} from "mongoose"
+import mongoose, {Types} from "mongoose"
 
 import { AppError } from "../../utils/AppError.js"
+import type { GenerateParkingSlotsInput, GetParkingSlotsQuery, UpdateParkingSlotInput, AssignResidentParkingInput } from "./parking.validation.js"
+import { ParkingSlotModel } from "./parking.model.js"
+import { Apartment } from "../apartment/apartment.model.js"
+import { Flat } from "../flat/flat.model.js"
+import { ResidentModel } from "../resident/resident.model.js"
 import { escapeRegExp } from "../../utils/regex.js"
-import {
-  ensureFlatInApartment,
-  getApartmentFlatsService,
-} from "../security/security-directory.service.js"
-import { VisitorVisitStatus } from "../visitors/visit/visit.interface.js"
-import { VisitorVisitModel } from "../visitors/visit/visit.model.js"
-import {
-  VisitorParkingAssignmentStatus,
-  VisitorParkingSlotStatus,
-  type IVisitorParkingAssignment,
-  type IVisitorParkingSlot,
-  type VisitorParkingSlotStatus as VisitorParkingSlotStatusType,
-} from "./parking.interface.js"
-import {
-  VisitorParkingAssignmentModel,
-  VisitorParkingSlotModel,
-} from "./parking.model.js"
-import { ensureVisitorParkingSlotAvailable } from "./parking-availability.js"
-import type {
-  GenerateParkingSlotsInput,
-  UpdateParkingSlotInput,
-} from "./parking.schema.js"
 
-type ObjectIdLike = {
-  toString: () => string
-}
 
-type LeanParkingSlot = IVisitorParkingSlot & {
-  _id: ObjectIdLike
-  apartmentId: ObjectIdLike
-}
 
-type LeanParkingAssignment = IVisitorParkingAssignment & {
-  _id: ObjectIdLike
-  apartmentId: ObjectIdLike
-  slotId: ObjectIdLike
-  flatId: ObjectIdLike
-  visitorVisitId?: ObjectIdLike | null
-  guestPassId?: ObjectIdLike | null
-}
+export const generateParkingSlots = async (apartmentId: string, data: GenerateParkingSlotsInput) => {
+  const { prefix, totalSlots, startNumber = 1, vehicleType, usageType } = data;
 
-type LinkedVisitorVisit = {
-  _id: ObjectIdLike
-  flatId: ObjectIdLike
-  visitorPassId?: ObjectIdLike | null
-  visitorName: string
-  vehicleNumber?: string | null
-}
+  if (!apartmentId || !Types.ObjectId.isValid(apartmentId)) {
+    throw new AppError("Apartment context is required", 400);
+  }
 
-const toId = (value: ObjectIdLike | string | null | undefined) =>
-  value?.toString() ?? ""
+  const apartmentObjectId = new Types.ObjectId(apartmentId);
+  const session = await mongoose.startSession();
 
-const normalizeText = (value?: string) => {
-  const trimmed = value?.trim()
-  return trimmed ? trimmed : null
-}
-
-const getFlatNumberById = async (apartmentId: string) => {
-  const { flats } = await getApartmentFlatsService(apartmentId)
-
-  return new Map(
-    flats.map((flat) => [flat._id, flat.flatNumber])
-  )
-}
-
-const getParkingSummary = (slots: LeanParkingSlot[]) => ({
-  totalVisitorSlots: slots.length,
-  available: slots.filter(
-    (slot) =>
-      slot.status === VisitorParkingSlotStatus.AVAILABLE
-  ).length,
-  occupied: slots.filter(
-    (slot) =>
-      slot.status === VisitorParkingSlotStatus.OCCUPIED
-  ).length,
-  reserved: slots.filter(
-    (slot) =>
-      slot.status === VisitorParkingSlotStatus.RESERVED
-  ).length,
-  outOfService: slots.filter(
-    (slot) =>
-      slot.status ===
-      VisitorParkingSlotStatus.OUT_OF_SERVICE
-  ).length,
-})
-
-const enrichSlots = async (
-  apartmentId: string,
-  slots: LeanParkingSlot[]
-) => {
-  const slotIds = slots.map((slot) => toId(slot._id))
-  const assignments =
-    await VisitorParkingAssignmentModel.find({
-      apartmentId,
-      slotId: {
-        $in: slotIds,
-      },
-      status: VisitorParkingAssignmentStatus.ACTIVE,
-    })
-      .sort({ assignedAt: -1 })
-      .lean()
-
-  const assignmentRecords =
-    assignments as unknown as LeanParkingAssignment[]
-  const assignmentBySlotId = new Map(
-    assignmentRecords.map((assignment) => [
-      toId(assignment.slotId),
-      assignment,
-    ])
-  )
-  const flatNumberById = await getFlatNumberById(apartmentId)
-
-  return slots.map((slot) => {
-    const assignment = assignmentBySlotId.get(toId(slot._id))
-
-    return {
-      _id: toId(slot._id),
-      apartmentId: toId(slot.apartmentId),
-      slotNumber: slot.slotNumber,
-      status: slot.status,
-      notes: slot.notes ?? null,
-      createdAt: slot.createdAt,
-      updatedAt: slot.updatedAt,
-      currentAssignment: assignment
-        ? {
-          _id: toId(assignment._id),
-          flatId: toId(assignment.flatId),
-          flatNumber:
-            flatNumberById.get(toId(assignment.flatId)) ??
-            null,
-          visitorVisitId:
-            toId(assignment.visitorVisitId) || null,
-          guestPassId:
-            toId(assignment.guestPassId) || null,
-          visitorName: assignment.visitorName,
-          vehicleNumber: assignment.vehicleNumber,
-          vehicleType: assignment.vehicleType ?? null,
-          notes: assignment.notes ?? null,
-          assignedBy: assignment.assignedBy,
-          assignedAt: assignment.assignedAt,
-        }
-        : null,
-    }
-  })
-}
-
-export const createParkingSlotService = async ({
-  apartmentId,
-  slotNumber,
-  status = VisitorParkingSlotStatus.AVAILABLE,
-  notes,
-}: {
-  apartmentId: string
-  slotNumber: string
-  status?: Exclude<
-    VisitorParkingSlotStatusType,
-    "OCCUPIED"
-  >
-  notes?: string
-}) => {
   try {
-    const slot = await VisitorParkingSlotModel.create({
-      apartmentId,
-      slotNumber: slotNumber.toUpperCase(),
-      status,
-      notes: normalizeText(notes),
-    })
+    let result;
 
-    const records = await enrichSlots(apartmentId, [
-      slot.toObject() as LeanParkingSlot,
-    ])
+    await session.withTransaction(async () => {
+      const apartment = await Apartment.findById(apartmentObjectId)
+        .select("parkingSlots")
+        .session(session)
+        .lean();
 
-    return records[0]
-  } catch (error: unknown) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === 11000
-    ) {
-      throw new AppError(
-        "Parking slot already exists for this apartment",
-        409
-      )
+      if (!apartment) {
+        throw new AppError("Apartment not found", 404);
+      }
+
+      const normalizedPrefix = prefix.trim().toUpperCase();
+
+      const currentCount = await ParkingSlotModel.countDocuments({
+        apartmentId: apartmentObjectId,
+      }).session(session);
+
+      if (apartment.parkingSlots) {
+        const maxCapacity = Number(apartment.parkingSlots);
+        const remainingSlots = maxCapacity - currentCount;
+
+        if (totalSlots > remainingSlots) {
+          throw new AppError(
+            `Only ${remainingSlots} parking slots can be generated. ${currentCount} of ${maxCapacity} parking slots already exist.`,
+            400
+          );
+        }
+      }
+
+      const slotsToGenerate = Array.from({ length: totalSlots }, (_, index) => {
+        const number = startNumber + index;
+        return {
+          apartmentId: apartmentObjectId,
+          slotNumber: `${normalizedPrefix}-${String(number).padStart(3, "0")}`,
+          vehicleType,
+          usageType,
+          status: "AVAILABLE",
+        };
+      });
+
+      const slotNumbers = slotsToGenerate.map((slot) => slot.slotNumber);
+
+      const existingSlots = await ParkingSlotModel.find({
+        apartmentId: apartmentObjectId,
+        slotNumber: { $in: slotNumbers },
+      })
+        .select("slotNumber")
+        .session(session)
+        .lean();
+
+      if (existingSlots.length > 0) {
+        const duplicates = existingSlots.map((slot) => slot.slotNumber).join(", ");
+        throw new AppError(`Parking slots already exist: ${duplicates}`, 409);
+      }
+
+      const insertedSlots = await ParkingSlotModel.insertMany(slotsToGenerate, { session });
+
+      result = {
+        totalSlotsGenerated: insertedSlots.length,
+        generatedSlots: insertedSlots.map((slot) => ({
+          id: slot._id.toString(),
+          slotNumber: slot.slotNumber,
+          vehicleType: slot.vehicleType,
+          usageType: slot.usageType,
+          status: slot.status,
+        })),
+      };
+    });
+
+    return result;
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === 11000) {
+      throw new AppError("One or more parking slots already exist. Please try again.", 409);
     }
-
-    throw error
+    throw error;
+  } finally {
+    await session.endSession();
   }
-}
+};
 
+export const getParkingSlots = async (query: GetParkingSlotsQuery, apartmentId: string) => {
+  if (!apartmentId || !Types.ObjectId.isValid(apartmentId)) {
+    throw new AppError("Apartment context is required", 400);
+  }
 
-export const listParkingSlotsService = async ({
-  apartmentId,
-  status = "ALL",
-  search,
-  page = 1,
-  limit = 10,
-}: {
-  apartmentId: string
-  status?: "ALL" | VisitorParkingSlotStatusType
-  search?: string
-  page?: number
-  limit?: number
-}) => {
+  const apartmentObjectId = new Types.ObjectId(apartmentId);
+
+  const apartment = await Apartment.findById(apartmentObjectId)
+    .select("_id")
+    .lean();
+
+  if (!apartment) {
+    throw new AppError("Apartment not found", 404);
+  }
+
   const filter: Record<string, unknown> = {
-    apartmentId,
+    apartmentId: apartmentObjectId,
+  };
+
+  if (query.vehicleType) {
+    filter.vehicleType = query.vehicleType;
   }
 
-  if (status !== "ALL") {
-    filter.status = status
+  if (query.usageType) {
+    filter.usageType = query.usageType;
   }
 
-  const trimmedSearch = search?.trim()
-
-  if (trimmedSearch) {
-    filter.slotNumber = new RegExp(
-      escapeRegExp(trimmedSearch),
-      "i"
-    )
+  if (query.status) {
+    filter.status = query.status;
   }
 
-  const skip = (page - 1) * limit
+  if (query.search) {
+    const searchTerm = query.search.trim();
+    if (searchTerm) {
+      const regex = new RegExp(escapeRegExp(searchTerm), "i");
+      filter.slotNumber = regex;
+    }
+  }
 
-  const [slots, totalCount, allSlots] = await Promise.all([
-    VisitorParkingSlotModel.find(filter)
-      .sort({ slotNumber: 1 })
+  const page = query.page;
+  const limit = query.limit;
+  const skip = (page - 1) * limit;
+
+  const [parkingSlots, total] = await Promise.all([
+    ParkingSlotModel.find(filter)
+      .populate("flatId", "_id flatNumber")
+      .populate("residentId", "_id userId phoneNumber residentType")
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .lean() as unknown as Promise<LeanParkingSlot[]>,
-    VisitorParkingSlotModel.countDocuments(filter),
-    VisitorParkingSlotModel.find({ apartmentId }).lean() as unknown as Promise<LeanParkingSlot[]>
-  ])
+      .lean(),
 
-  const totalPages = Math.ceil(totalCount / limit)
+    ParkingSlotModel.countDocuments(filter),
+  ]);
+
+  const totalPages = Math.ceil(total / limit);
 
   return {
-    summary: getParkingSummary(allSlots),
-    slots: await enrichSlots(apartmentId, slots),
+    parkingSlots,
     pagination: {
       page,
       limit,
-      totalCount,
+      total,
       totalPages,
-    }
-  }
-}
+    },
+  };
+};
 
-export const updateParkingSlotStatusService = async ({
-  apartmentId,
-  slotId,
-  status,
-  notes,
-}: {
-  apartmentId: string
-  slotId: string
-  status: Exclude<VisitorParkingSlotStatusType, "OCCUPIED">
-  notes?: string
-}) => {
-  const slot = await VisitorParkingSlotModel.findOne({
-    _id: slotId,
-    apartmentId,
+export const getParkingSlotById = async (parkingId: string, apartmentId: string) => {
+  if (!apartmentId || !Types.ObjectId.isValid(apartmentId)) {
+    throw new AppError("Apartment context is required", 400);
+  }
+
+  if (!Types.ObjectId.isValid(parkingId)) {
+    throw new AppError("Invalid parking id", 400);
+  }
+
+  const apartmentObjectId = new Types.ObjectId(apartmentId);
+  const parkingObjectId = new Types.ObjectId(parkingId);
+
+  const parkingSlot = await ParkingSlotModel.findOne({
+    _id: parkingObjectId,
+    apartmentId: apartmentObjectId,
   })
+    .populate("flatId", "_id flatNumber")
+    .populate("residentId", "_id userId phoneNumber residentType")
+    .lean();
 
-  if (!slot) {
-    throw new AppError("Parking slot not found", 404)
+  if (!parkingSlot) {
+    throw new AppError("Parking slot not found", 404);
   }
 
-  const activeAssignment =
-    await VisitorParkingAssignmentModel.findOne({
-      apartmentId,
-      slotId,
-      status: VisitorParkingAssignmentStatus.ACTIVE,
-    }).lean()
+  return parkingSlot;
+};
 
-  if (activeAssignment) {
-    throw new AppError(
-      "Occupied parking slot cannot be manually changed",
-      400
-    )
-  }
-
-  slot.status = status
-  slot.notes = normalizeText(notes)
-
-  await slot.save()
-
-  const records = await enrichSlots(apartmentId, [
-    slot.toObject() as LeanParkingSlot,
-  ])
-
-  return records[0]
-}
-
-export const assignParkingSlotService = async ({
-  apartmentId,
-  userId,
-  slotId,
-  flatId,
-  visitorVisitId,
-  visitorName,
-  vehicleNumber,
-  vehicleType,
-  notes,
-}: {
-  apartmentId: string
-  userId: string
-  slotId: string
-  flatId: string
-  visitorVisitId?: string
-  visitorName: string
-  vehicleNumber: string
-  vehicleType?: string
-  notes?: string
-}) => {
-  if (!Types.ObjectId.isValid(slotId)) {
-    throw new AppError("Invalid parking slot ID", 400)
-  }
-
-  await ensureFlatInApartment({
-    apartmentId,
-    flatId,
-  })
-
-  let linkedVisitorVisit: LinkedVisitorVisit | null = null
-
-  if (visitorVisitId) {
-    if (!Types.ObjectId.isValid(visitorVisitId)) {
-      throw new AppError("Invalid visitor visit ID", 400)
-    }
-
-    linkedVisitorVisit = (await VisitorVisitModel.findOne({
-      _id: visitorVisitId,
-      apartmentId,
-      status: VisitorVisitStatus.ACTIVE,
-    })
-      .select("_id flatId visitorPassId visitorName vehicleNumber")
-      .lean()) as LinkedVisitorVisit | null
-
-    if (!linkedVisitorVisit) {
-      throw new AppError(
-        "Selected visitor is not currently checked in",
-        400
-      )
-    }
-
-    if (toId(linkedVisitorVisit.flatId) !== flatId) {
-      throw new AppError(
-        "Selected visitor does not match the selected flat",
-        400
-      )
-    }
-  }
-
-  const visitorVisitObjectId = linkedVisitorVisit
-    ? new Types.ObjectId(toId(linkedVisitorVisit._id))
-    : null
-  const guestPassObjectId = linkedVisitorVisit?.visitorPassId
-    ? new Types.ObjectId(toId(linkedVisitorVisit.visitorPassId))
-    : null
-
-  const session = await mongoose.startSession()
-
-  try {
-    let createdAssignment:
-      | LeanParkingAssignment
-      | null = null
-
-    await session.withTransaction(async () => {
-      const slot = await VisitorParkingSlotModel.findOne({
-        _id: slotId,
-        apartmentId,
-      }).session(session)
-
-      if (!slot) {
-        throw new AppError("Parking slot not found", 404)
-      }
-
-      ensureVisitorParkingSlotAvailable(slot.status)
-
-      const assignment =
-        await VisitorParkingAssignmentModel.create(
-          [
-            {
-              apartmentId,
-              slotId,
-              flatId,
-              visitorVisitId: visitorVisitObjectId,
-              guestPassId: guestPassObjectId,
-              visitorName:
-                linkedVisitorVisit?.visitorName ?? visitorName,
-              vehicleNumber: (
-                linkedVisitorVisit?.vehicleNumber ??
-                vehicleNumber
-              ).toUpperCase(),
-              vehicleType: normalizeText(vehicleType),
-              notes: normalizeText(notes),
-              status:
-                VisitorParkingAssignmentStatus.ACTIVE,
-              assignedBy: userId,
-              assignedAt: new Date(),
-            },
-          ],
-          { session }
-        )
-
-      slot.status =
-        VisitorParkingSlotStatus.OCCUPIED
-      await slot.save({ session })
-
-      createdAssignment =
-        assignment[0].toObject() as LeanParkingAssignment
-    })
-
-    return createdAssignment
-  } catch (error: unknown) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === 11000
-    ) {
-      throw new AppError(
-        "Parking slot already has an active assignment",
-        409
-      )
-    }
-
-    throw error
-  } finally {
-    await session.endSession()
-  }
-}
-
-export const releaseParkingSlotService = async ({
-  apartmentId,
-  userId,
-  slotId,
-}: {
-  apartmentId: string
-  userId: string
-  slotId: string
-}) => {
-  const session = await mongoose.startSession()
-
-  try {
-    await session.withTransaction(async () => {
-      const slot = await VisitorParkingSlotModel.findOne({
-        _id: slotId,
-        apartmentId,
-      }).session(session)
-
-      if (!slot) {
-        throw new AppError("Parking slot not found", 404)
-      }
-
-      const assignment =
-        await VisitorParkingAssignmentModel.findOne({
-          apartmentId,
-          slotId,
-          status: VisitorParkingAssignmentStatus.ACTIVE,
-        }).session(session)
-
-      if (!assignment) {
-        throw new AppError(
-          "No active parking assignment found",
-          404
-        )
-      }
-
-      assignment.status =
-        VisitorParkingAssignmentStatus.RELEASED
-      assignment.releasedBy = userId
-      assignment.releasedAt = new Date()
-      await assignment.save({ session })
-
-      slot.status =
-        VisitorParkingSlotStatus.AVAILABLE
-      await slot.save({ session })
-    })
-  } finally {
-    await session.endSession()
-  }
-
-  const slot = await VisitorParkingSlotModel.findOne({
-    _id: slotId,
-    apartmentId,
-  }).lean()
-
-  if (!slot) {
-    throw new AppError("Parking slot not found", 404)
-  }
-
-  const records = await enrichSlots(apartmentId, [
-    slot as unknown as LeanParkingSlot,
-  ])
-
-  return records[0]
-}
-
-export const generateParkingSlotsService = async (
-  {
-    prefix,
-    totalSlots,
-    startNumber = 1,
-  }: GenerateParkingSlotsInput,
-  apartmentId: string
+export const updateParkingSlot = async (
+  parkingId: string,
+  data: UpdateParkingSlotInput,
+  apartmentId?: string
 ) => {
-  if (
-    !apartmentId ||
-    !Types.ObjectId.isValid(apartmentId)
-  ) {
-    throw new AppError(
-      "Apartment context is required",
-      400
-    )
+  if (!apartmentId) {
+    throw new AppError("Apartment context is required", 400);
   }
 
-  const apartmentObjectId =
-    new Types.ObjectId(apartmentId)
-
-  const normalizedPrefix =
-    prefix.trim().toUpperCase()
-
-  if (!normalizedPrefix) {
-    throw new AppError(
-      "Parking slot prefix is required",
-      400
-    )
+  if (!Types.ObjectId.isValid(apartmentId)) {
+    throw new AppError("Invalid apartment id", 400);
   }
 
-  const endNumber =
-    startNumber + totalSlots - 1
+  if (!parkingId || !Types.ObjectId.isValid(parkingId)) {
+    throw new AppError("Invalid parking id", 400);
+  }
 
-  const slotNumbers = Array.from(
-    { length: totalSlots },
-    (_, index) => {
-      const number = startNumber + index
+  const apartmentObjectId = new Types.ObjectId(apartmentId);
+  const parkingObjectId = new Types.ObjectId(parkingId);
 
-      return `${normalizedPrefix}-${String(
-        number
-      ).padStart(3, "0")}`
-    }
-  )
+  const parkingSlot = await ParkingSlotModel.findOne({
+    _id: parkingObjectId,
+    apartmentId: apartmentObjectId,
+  });
 
-  const session = await mongoose.startSession()
+  if (!parkingSlot) {
+    throw new AppError("Parking slot not found", 404);
+  }
 
-  let result: {
-    prefix: string
-    startNumber: number
-    endNumber: number
-    totalSlotsGenerated: number
-    generatedSlots: Array<{
-      id: string
-      slotNumber: string
-      status: VisitorParkingSlotStatusType
-      notes: string | null
-    }>
-  } | null = null
+  if (parkingSlot.status === "ASSIGNED" || parkingSlot.status === "OCCUPIED") {
+    throw new AppError(
+      "Parking slot must be released before changing usage or vehicle type",
+      400
+    );
+  }
 
-  try {
-    await session.withTransaction(async () => {
-      const duplicate =
-        await VisitorParkingSlotModel.findOne({
-          apartmentId: apartmentObjectId,
-          slotNumber: {
-            $in: slotNumbers,
-          },
-        })
-          .select("_id slotNumber")
-          .session(session)
-          .lean<{
-            _id: Types.ObjectId
-            slotNumber: string
-          }>()
+  let normalizedSlotNumber: string | undefined;
+  if (data.slotNumber !== undefined) {
+    normalizedSlotNumber = data.slotNumber.trim().toUpperCase();
+  }
 
-      if (duplicate) {
-        throw new AppError(
-          `Generated parking slot already exists: ${duplicate.slotNumber}`,
-          409
-        )
-      }
+  if (normalizedSlotNumber !== undefined) {
+    const existingSlot = await ParkingSlotModel.findOne({
+      apartmentId: apartmentObjectId,
+      slotNumber: normalizedSlotNumber,
+      _id: { $ne: parkingObjectId },
+    });
 
-      const inserted =
-        await VisitorParkingSlotModel.insertMany(
-          slotNumbers.map((slotNumber) => ({
-            apartmentId: apartmentObjectId,
-            slotNumber,
-            status:
-              VisitorParkingSlotStatus.AVAILABLE,
-            notes: null,
-          })),
-          {
-            ordered: true,
-            session,
-          }
-        )
-
-      const generatedSlots = inserted.map(
-        (slot) => ({
-          id: slot._id.toString(),
-          slotNumber: slot.slotNumber,
-          status: slot.status,
-          notes: slot.notes ?? null,
-        })
-      )
-
-      result = {
-        prefix: normalizedPrefix,
-        startNumber,
-        endNumber,
-        totalSlotsGenerated:
-          generatedSlots.length,
-        generatedSlots,
-      }
-    })
-  } catch (error: unknown) {
-    if (error instanceof AppError) {
-      throw error
-    }
-
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === 11000
-    ) {
+    if (existingSlot) {
       throw new AppError(
-        "One or more generated parking slots already exist",
+        `Parking slot ${normalizedSlotNumber} already exists`,
         409
-      )
-    }
-
-    throw new AppError(
-      "Parking slot generation failed",
-      500
-    )
-  } finally {
-    await session.endSession()
-  }
-
-  if (!result) {
-    throw new AppError(
-      "Parking slot generation failed",
-      500
-    )
-  }
-
-  return result
-}
-
-export const updateParkingSlotService = async ({
-  apartmentId,
-  slotId,
-  slotNumber,
-  notes,
-}: {
-  apartmentId: string
-  slotId: string
-} & UpdateParkingSlotInput) => {
-  if (!Types.ObjectId.isValid(slotId)) {
-    throw new AppError("Invalid parking slot ID", 400)
-  }
-
-  const slot = await VisitorParkingSlotModel.findOne({
-    _id: slotId,
-    apartmentId,
-  })
-
-  if (!slot) {
-    throw new AppError("Parking slot not found", 404)
-  }
-
-  if (slotNumber !== undefined) {
-    const normalizedSlotNumber = slotNumber
-      .trim()
-      .toUpperCase()
-
-    if (!normalizedSlotNumber) {
-      throw new AppError(
-        "Slot number cannot be empty",
-        400
-      )
-    }
-
-    if (normalizedSlotNumber !== slot.slotNumber) {
-      const duplicate =
-        await VisitorParkingSlotModel.exists({
-          _id: { $ne: slot._id },
-          apartmentId,
-          slotNumber: normalizedSlotNumber,
-        })
-
-      if (duplicate) {
-        throw new AppError(
-          "Parking slot number already exists for this apartment",
-          409
-        )
-      }
-
-      slot.slotNumber = normalizedSlotNumber
+      );
     }
   }
 
-  if (notes !== undefined) {
-    slot.notes = normalizeText(
-      notes ?? undefined
-    )
+  const updateData: Record<string, unknown> = {};
+
+  if (normalizedSlotNumber !== undefined) {
+    updateData.slotNumber = normalizedSlotNumber;
+  }
+
+  if (data.vehicleType !== undefined) {
+    updateData.vehicleType = data.vehicleType;
+  }
+
+  if (data.usageType !== undefined) {
+    updateData.usageType = data.usageType;
   }
 
   try {
-    await slot.save()
+    const updatedParkingSlot = await ParkingSlotModel.findOneAndUpdate(
+      {
+        _id: parkingObjectId,
+        apartmentId: apartmentObjectId,
+      },
+      {
+        $set: updateData,
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    ).lean();
+
+    if (!updatedParkingSlot) {
+      throw new AppError("Parking slot not found", 404);
+    }
+
+    return updatedParkingSlot;
   } catch (error: unknown) {
     if (
       typeof error === "object" &&
@@ -722,17 +294,331 @@ export const updateParkingSlotService = async ({
       "code" in error &&
       error.code === 11000
     ) {
-      throw new AppError("Parking slot number already exists for this apartment", 409)
+      throw new AppError(
+        `Parking slot ${normalizedSlotNumber || "with this number"} already exists`,
+        409
+      );
     }
-    throw error
+    throw error;
+  }
+};
+
+export const assignResidentParking = async (
+  parkingId: string,
+  data: AssignResidentParkingInput,
+  apartmentId?: string
+) => {
+  if (!apartmentId) {
+    throw new AppError("Apartment context is required", 400);
   }
 
-  const [updatedSlot] = await enrichSlots(
-    apartmentId,
-    [
-      slot.toObject() as LeanParkingSlot,
-    ]
-  )
+  if (!Types.ObjectId.isValid(apartmentId)) {
+    throw new AppError("Invalid apartment id", 400);
+  }
 
-  return updatedSlot
-}
+  if (!parkingId || !Types.ObjectId.isValid(parkingId)) {
+    throw new AppError("Invalid parking id", 400);
+  }
+
+  const apartmentObjectId = new Types.ObjectId(apartmentId);
+  const parkingObjectId = new Types.ObjectId(parkingId);
+
+  const parkingSlot = await ParkingSlotModel.findOne({
+    _id: parkingObjectId,
+    apartmentId: apartmentObjectId,
+  });
+
+  if (!parkingSlot) {
+    throw new AppError("Parking slot not found", 404);
+  }
+
+  if (parkingSlot.usageType !== "RESIDENT") {
+    throw new AppError("Visitor parking cannot be assigned as resident parking", 400);
+  }
+
+  if (parkingSlot.status !== "AVAILABLE") {
+    throw new AppError("Parking slot is not available", 409);
+  }
+
+  if (!data.flatId || !Types.ObjectId.isValid(data.flatId)) {
+    throw new AppError("Invalid flat id", 400);
+  }
+
+  const flatObjectId = new Types.ObjectId(data.flatId);
+
+  const flat = await Flat.findOne({
+    _id: flatObjectId,
+    apartmentId: apartmentObjectId,
+  });
+
+  if (!flat) {
+    throw new AppError("Flat not found", 404);
+  }
+
+  let residentObjectId: Types.ObjectId | null = null;
+
+  if (data.residentId) {
+    if (!Types.ObjectId.isValid(data.residentId)) {
+      throw new AppError("Invalid resident id", 400);
+    }
+
+    residentObjectId = new Types.ObjectId(data.residentId);
+
+    const resident = await ResidentModel.findOne({
+      _id: residentObjectId,
+      apartmentId: apartmentObjectId,
+    });
+
+    if (!resident) {
+      throw new AppError("Resident not found", 404);
+    }
+
+    if (resident.flatId.toString() !== flatObjectId.toString()) {
+      throw new AppError("Resident does not belong to the selected flat", 400);
+    }
+  }
+
+  const normalizedVehicleNumber = data.vehicleNumber.trim().toUpperCase();
+
+  const updatedParkingSlot = await ParkingSlotModel.findOneAndUpdate(
+    {
+      _id: parkingObjectId,
+      apartmentId: apartmentObjectId,
+      usageType: "RESIDENT",
+      status: "AVAILABLE",
+    },
+    {
+      $set: {
+        status: "ASSIGNED",
+        flatId: flatObjectId,
+        residentId: residentObjectId ?? null,
+        vehicleNumber: normalizedVehicleNumber,
+        assignedAt: new Date(),
+      },
+    },
+    {
+      new: true,
+      runValidators: true,
+    }
+  ).lean();
+
+  if (!updatedParkingSlot) {
+    throw new AppError("Parking slot is no longer available", 409);
+  }
+
+  return updatedParkingSlot;
+};
+
+export const releaseResidentParking = async (
+  parkingId: string,
+  apartmentId?: string
+) => {
+  if (!apartmentId) {
+    throw new AppError("Apartment context is required", 400);
+  }
+
+  if (!Types.ObjectId.isValid(apartmentId)) {
+    throw new AppError("Invalid apartment id", 400);
+  }
+
+  if (!parkingId || !Types.ObjectId.isValid(parkingId)) {
+    throw new AppError("Invalid parking id", 400);
+  }
+
+  const apartmentObjectId = new Types.ObjectId(apartmentId);
+  const parkingObjectId = new Types.ObjectId(parkingId);
+
+  const parkingSlot = await ParkingSlotModel.findOne({
+    _id: parkingObjectId,
+    apartmentId: apartmentObjectId,
+  });
+
+  if (!parkingSlot) {
+    throw new AppError("Parking slot not found", 404);
+  }
+
+  if (parkingSlot.usageType !== "RESIDENT") {
+    throw new AppError(
+      "Visitor parking cannot be released using the resident parking release API",
+      400
+    );
+  }
+
+  if (parkingSlot.status === "AVAILABLE") {
+    throw new AppError("Parking slot is already available", 409);
+  }
+
+  if (parkingSlot.status === "INACTIVE") {
+    throw new AppError("Cannot release an inactive parking slot", 400);
+  }
+
+  if (parkingSlot.status === "OCCUPIED") {
+    throw new AppError("Occupied parking slot cannot be released using this API", 400);
+  }
+
+  if (parkingSlot.status !== "ASSIGNED") {
+    throw new AppError("Only assigned parking slots can be released", 400);
+  }
+
+  if (!parkingSlot.flatId) {
+    throw new AppError(
+      "Parking slot is in an inconsistent state: missing assigned flat",
+      400
+    );
+  }
+
+  const releasedSlot = await ParkingSlotModel.findOneAndUpdate(
+    {
+      _id: parkingObjectId,
+      apartmentId: apartmentObjectId,
+      usageType: "RESIDENT",
+      status: "ASSIGNED",
+    },
+    {
+      $set: {
+        status: "AVAILABLE",
+        flatId: null,
+        residentId: null,
+        visitorId: null,
+        vehicleNumber: null,
+        assignedAt: null,
+      },
+    },
+    {
+      new: true,
+      runValidators: true,
+    }
+  ).lean();
+
+  if (!releasedSlot) {
+    throw new AppError("Parking assignment has already changed", 409);
+  }
+
+  return releasedSlot;
+};
+
+export const updateParkingSlotStatus = async (
+  parkingId: string,
+  status: "AVAILABLE" | "INACTIVE",
+  apartmentId?: string
+) => {
+  if (!apartmentId) {
+    throw new AppError("Apartment context is required", 400);
+  }
+
+  if (!Types.ObjectId.isValid(apartmentId)) {
+    throw new AppError("Invalid apartment id", 400);
+  }
+
+  if (!parkingId || !Types.ObjectId.isValid(parkingId)) {
+    throw new AppError("Invalid parking id", 400);
+  }
+
+  const apartmentObjectId = new Types.ObjectId(apartmentId);
+  const parkingObjectId = new Types.ObjectId(parkingId);
+
+  const parkingSlot = await ParkingSlotModel.findOne({
+    _id: parkingObjectId,
+    apartmentId: apartmentObjectId,
+  });
+
+  if (!parkingSlot) {
+    throw new AppError("Parking slot not found", 404);
+  }
+
+  if (status === "INACTIVE") {
+    if (parkingSlot.status === "INACTIVE") {
+      throw new AppError("Parking slot is already inactive", 409);
+    }
+
+    if (parkingSlot.status === "ASSIGNED") {
+      throw new AppError(
+        "Assigned parking must be released before it can be deactivated",
+        409
+      );
+    }
+
+    if (parkingSlot.status === "OCCUPIED") {
+      throw new AppError("Occupied parking cannot be deactivated", 409);
+    }
+
+    if (parkingSlot.status !== "AVAILABLE") {
+      throw new AppError("Only available parking slots can be deactivated", 400);
+    }
+
+    const updatedSlot = await ParkingSlotModel.findOneAndUpdate(
+      {
+        _id: parkingObjectId,
+        apartmentId: apartmentObjectId,
+        status: "AVAILABLE",
+      },
+      {
+        $set: {
+          status: "INACTIVE",
+        },
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    ).lean();
+
+    if (!updatedSlot) {
+      throw new AppError("Parking slot status has already changed", 409);
+    }
+
+    return updatedSlot;
+  }
+
+  if (status === "AVAILABLE") {
+    if (parkingSlot.status === "AVAILABLE") {
+      throw new AppError("Parking slot is already active", 409);
+    }
+
+    if (parkingSlot.status === "ASSIGNED") {
+      throw new AppError(
+        "Assigned parking cannot be activated through this endpoint",
+        409
+      );
+    }
+
+    if (parkingSlot.status === "OCCUPIED") {
+      throw new AppError(
+        "Occupied parking cannot be activated through this endpoint",
+        409
+      );
+    }
+
+    if (parkingSlot.status !== "INACTIVE") {
+      throw new AppError("Only inactive parking slots can be activated", 400);
+    }
+
+    const updatedSlot = await ParkingSlotModel.findOneAndUpdate(
+      {
+        _id: parkingObjectId,
+        apartmentId: apartmentObjectId,
+        status: "INACTIVE",
+      },
+      {
+        $set: {
+          status: "AVAILABLE",
+        },
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    ).lean();
+
+    if (!updatedSlot) {
+      throw new AppError("Parking slot status has already changed", 409);
+    }
+
+    return updatedSlot;
+  }
+
+  throw new AppError("Invalid status transition", 400);
+};
+
+
+

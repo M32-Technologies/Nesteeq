@@ -19,10 +19,10 @@ import BlockRoute from "./modules/block/block.routes.js";
 import FlatRoute from "./modules/flat/flat.routes.js";
 import ApartmentRoute from "./modules/apartment/apartment.routes.js";
 import visitorsRoutes from "./modules/visitors/routes.js";
-import securityRoutes from "./modules/security/security.routes.js";
-import deliveryRoutes from "./modules/delivery/delivery.routes.js";
+// import securityRoutes from "./modules/security/security.routes.js";
+// import deliveryRoutes from "./modules/delivery/delivery.routes.js";
 import parkingRoutes from "./modules/parking/parking.routes.js";
-import alertRoutes from "./modules/alert/alert.routes.js";
+// import alertRoutes from "./modules/alert/alert.routes.js";
 
 const app = express();
 
@@ -60,11 +60,12 @@ app.use("/api/expenses", expenseRoutes);
 app.use("/api/wallets", walletRoutes);
 app.use("/api/audit", auditRoutes);
 
+app.use("/api/v1/parking", parkingRoutes);
+
 app.use("/api/visitors", visitorsRoutes);
-app.use("/api/security/deliveries", deliveryRoutes);
-app.use("/api/security/parking", parkingRoutes);
-app.use("/api/security/alerts", alertRoutes);
-app.use("/api/security", securityRoutes);
+// app.use("/api/security/deliveries", deliveryRoutes);
+// app.use("/api/security/alerts", alertRoutes);
+// app.use("/api/security", securityRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
