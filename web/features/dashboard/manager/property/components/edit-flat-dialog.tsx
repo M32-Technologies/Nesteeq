@@ -77,7 +77,6 @@ export default function EditFlatDialog({
       floorNumber: String(flat.floorNumber),
       flatNumber: flat.flatNumber,
     })
-    setFormError("")
     clearErrors()
   }, [clearErrors, flat, reset])
 

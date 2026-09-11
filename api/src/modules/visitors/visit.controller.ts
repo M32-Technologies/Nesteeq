@@ -1,13 +1,17 @@
 import type { Request, Response } from "express"
 
-import { AppError } from "../../../utils/AppError.js"
-import { catchAsync } from "../../../utils/catchAsync.js"
+import { AppError } from "../../utils/AppError.js"
+import { catchAsync } from "../../utils/catchAsync.js"
 
 import {
+  cancelGuestPassService,
   checkInVisitorService,
   checkoutVisitorService,
+  createGuestPassService,
   createManualVisitorEntryService,
   getActiveVisitorsService,
+  getGuestPassByIdService,
+  getGuestPassesService,
   getVisitorRecordsService,
   getVisitorHistoryService,
 } from "./visit.service.js"
@@ -28,6 +32,123 @@ const getQueryNumber = (value: unknown) =>
     : typeof value === "string"
       ? Number(value)
       : undefined
+
+export const createGuestPass = catchAsync(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id
+
+    if (!userId) {
+      throw new AppError("Unauthorized", 401)
+    }
+
+    const result = await createGuestPassService({
+      userId,
+      flatId: req.body.flatId,
+      visitorName: req.body.visitorName,
+      visitorPhone: req.body.visitorPhone,
+      purpose: req.body.purpose,
+      vehicleNumber: req.body.vehicleNumber,
+      validFrom: req.body.validFrom,
+      validUntil: req.body.validUntil,
+    })
+
+    res.status(201).json({
+      success: true,
+      message: "Guest pass created successfully",
+      data: result,
+    })
+  }
+)
+
+export const getGuestPasses = catchAsync(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id
+
+    if (!userId) {
+      throw new AppError("Unauthorized", 401)
+    }
+
+    const status =
+      typeof req.query.status === "string"
+        ? req.query.status
+        : undefined
+
+    const result = await getGuestPassesService({
+      userId,
+      page: getQueryNumber(req.query.page),
+      limit: getQueryNumber(req.query.limit),
+      status: status as
+        | "ACTIVE"
+        | "CANCELLED"
+        | "EXPIRED"
+        | undefined,
+    })
+
+    res.status(200).json({
+      success: true,
+      message: "Guest passes fetched successfully",
+      data: result,
+    })
+  }
+)
+
+export const getGuestPassById = catchAsync(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id
+    const guestPassId =
+      typeof req.params.guestPassId === "string"
+        ? req.params.guestPassId
+        : undefined
+
+    if (!userId) {
+      throw new AppError("Unauthorized", 401)
+    }
+
+    if (!guestPassId) {
+      throw new AppError("Invalid guest pass ID", 400)
+    }
+
+    const guestPass = await getGuestPassByIdService({
+      userId,
+      guestPassId,
+    })
+
+    res.status(200).json({
+      success: true,
+      message: "Guest pass fetched successfully",
+      data: guestPass,
+    })
+  }
+)
+
+export const cancelGuestPass = catchAsync(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.id
+    const guestPassId =
+      typeof req.params.guestPassId === "string"
+        ? req.params.guestPassId
+        : undefined
+
+    if (!userId) {
+      throw new AppError("Unauthorized", 401)
+    }
+
+    if (!guestPassId) {
+      throw new AppError("Invalid guest pass ID", 400)
+    }
+
+    const guestPass = await cancelGuestPassService({
+      userId,
+      guestPassId,
+    })
+
+    res.status(200).json({
+      success: true,
+      message: "Guest pass cancelled successfully",
+      data: guestPass,
+    })
+  }
+)
 
 export const checkInVisitor = catchAsync(
   async (req: Request, res: Response) => {

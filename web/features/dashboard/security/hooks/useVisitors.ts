@@ -118,6 +118,9 @@ export const useCheckoutVisitor = () => {
 
     onSuccess: () => {
       invalidateVisitorQueries(queryClient)
+      queryClient.invalidateQueries({
+        queryKey: ["security-parking"],
+      })
     },
   })
 }

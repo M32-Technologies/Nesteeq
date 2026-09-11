@@ -4,7 +4,12 @@ import test from "node:test"
 import {
   hashGuestPassToken,
   parseGuestPassQrPayload,
-} from "../src/modules/visitors/pass/pass-token.js"
+} from "../src/modules/visitors/visit-token.js"
+import { EmergencyAlertStatus } from "../src/modules/alert/alert.model.js"
+import {
+  canTransitionEmergencyAlertStatus,
+  validateEmergencyAlertStatusTransition,
+} from "../src/modules/security/security-status-transitions.js"
 import {
   clearVerifyPassFailures,
   isVerifyPassRateLimited,
@@ -56,4 +61,44 @@ test("verify pass rate limit locks after failed attempts", () => {
   } finally {
     clearVerifyPassFailures(key)
   }
+})
+
+test("emergency alert status requires the security response sequence", () => {
+  assert.equal(
+    canTransitionEmergencyAlertStatus(
+      EmergencyAlertStatus.ACTIVE,
+      EmergencyAlertStatus.ACKNOWLEDGED
+    ),
+    true
+  )
+  assert.equal(
+    canTransitionEmergencyAlertStatus(
+      EmergencyAlertStatus.ACKNOWLEDGED,
+      EmergencyAlertStatus.RESPONDING
+    ),
+    true
+  )
+  assert.equal(
+    canTransitionEmergencyAlertStatus(
+      EmergencyAlertStatus.RESPONDING,
+      EmergencyAlertStatus.RESOLVED
+    ),
+    true
+  )
+  assert.throws(
+    () =>
+      validateEmergencyAlertStatusTransition(
+        EmergencyAlertStatus.ACTIVE,
+        EmergencyAlertStatus.RESOLVED
+      ),
+    /Invalid alert status transition/
+  )
+  assert.throws(
+    () =>
+      validateEmergencyAlertStatusTransition(
+        EmergencyAlertStatus.RESOLVED,
+        EmergencyAlertStatus.RESPONDING
+      ),
+    /Invalid alert status transition/
+  )
 })

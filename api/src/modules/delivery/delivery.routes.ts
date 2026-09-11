@@ -23,10 +23,6 @@ router.use(requireRole("security_staff"))
 
 router.get("/", zodValidate(listDeliveriesSchema), listDeliveries)
 router.post("/", zodValidate(createDeliverySchema), createDelivery)
-router.patch(
-  "/:deliveryId/status",
-  zodValidate(updateDeliveryStatusSchema),
-  updateDeliveryStatus
-)
+router.patch("/:deliveryId/status", zodValidate(updateDeliveryStatusSchema), updateDeliveryStatus)
 
 export default router

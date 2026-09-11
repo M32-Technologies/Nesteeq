@@ -23,54 +23,18 @@ import {
 const router = express.Router();
 const managerOnly = requireRole("property_manager");
 
-router.post("/", protect , managerOnly , zodValidate(createFlatSchema),createFlatHandler,);
+router.post("/", protect, managerOnly, zodValidate(createFlatSchema), createFlatHandler);
 
-router.post(
-  "/generate",
-  protect,
-  managerOnly,
-  zodValidate(generateFlatsSchema),
-  generateFlatsHandler,
-);
+router.post("/generate", protect, managerOnly, zodValidate(generateFlatsSchema), generateFlatsHandler);
 
-router.get(
-  "/",
-  protect,
-  managerOnly,
-  zodValidate(flatListQuerySchema),
-  getFlatHandler,
-);
+router.get("/", protect, managerOnly, zodValidate(flatListQuerySchema), getFlatHandler);
 
-router.get(
-  "/:id",
-  protect,
-  managerOnly,
-  zodValidate(getFlatByIdSchema),
-  getFlatByIdHandler,
-);
+router.get("/:id", protect, managerOnly, zodValidate(getFlatByIdSchema), getFlatByIdHandler);
 
-router.patch(
-  "/:id/status",
-  protect,
-  managerOnly,
-  zodValidate(updateFlatStatusSchema),
-  deactivateFlatHandler,
-);
+router.patch("/:id/status", protect, managerOnly, zodValidate(updateFlatStatusSchema), deactivateFlatHandler);
 
-router.patch(
-  "/:id/deactivate",
-  protect,
-  managerOnly,
-  zodValidate(deactivateFlatSchema),
-  deactivateFlatHandler,
-);
+router.patch("/:id/deactivate", protect, managerOnly, zodValidate(deactivateFlatSchema), deactivateFlatHandler);
 
-router.patch(
-  "/:id",
-  protect,
-  managerOnly,
-  zodValidate(updateFlatSchema),
-  updateFlatHandler,
-);
+router.patch("/:id", protect, managerOnly, zodValidate(updateFlatSchema), updateFlatHandler);
 
 export default router;

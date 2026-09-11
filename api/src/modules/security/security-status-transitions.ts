@@ -43,12 +43,9 @@ const alertTransitions: Record<
 > = {
   [EmergencyAlertStatus.ACTIVE]: [
     EmergencyAlertStatus.ACKNOWLEDGED,
-    EmergencyAlertStatus.RESPONDING,
-    EmergencyAlertStatus.RESOLVED,
   ],
   [EmergencyAlertStatus.ACKNOWLEDGED]: [
     EmergencyAlertStatus.RESPONDING,
-    EmergencyAlertStatus.RESOLVED,
   ],
   [EmergencyAlertStatus.RESPONDING]: [
     EmergencyAlertStatus.RESOLVED,

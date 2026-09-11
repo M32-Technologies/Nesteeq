@@ -98,32 +98,12 @@ const requireExpenseApartmentAccess = catchAsync(
 
 router.use(protect, requireRole("treasurer"));
 
-router.post(
-  "/",
-  requireBodyApartmentAccess,
-  zodValidate(createExpenseSchema),
-  createExpense
-);
+router.post("/", requireBodyApartmentAccess, zodValidate(createExpenseSchema), createExpense);
 
-router.get(
-  "/",
-  zodValidate(getExpensesSchema),
-  requireQueryApartmentAccess,
-  getExpenses
-);
+router.get("/", zodValidate(getExpensesSchema), requireQueryApartmentAccess, getExpenses);
 
-router.get(
-  "/:id",
-  zodValidate(getExpenseByIdSchema),
-  requireExpenseApartmentAccess,
-  getExpenseById
-);
+router.get("/:id", zodValidate(getExpenseByIdSchema), requireExpenseApartmentAccess, getExpenseById);
 
-router.patch(
-  "/:id",
-  zodValidate(updateExpenseSchema),
-  requireExpenseApartmentAccess,
-  updateExpense
-);
+router.patch("/:id", zodValidate(updateExpenseSchema), requireExpenseApartmentAccess, updateExpense);
 
 export default router;

@@ -2,6 +2,7 @@
 
 import { UserPlus } from "lucide-react"
 
+import type { VisitorParkingSlot } from "../schemas/parking"
 import type { SecurityFlat } from "../schemas/security"
 import {
   inputClassName,
@@ -17,12 +18,15 @@ export interface ManualVisitorFormState {
   purpose: string
   vehicleNumber: string
   vehicleType: string
+  parkingSlotId: string
 }
 
 export function ManualVisitorPanel({
   flats,
   flatsLoading,
   form,
+  availableSlots,
+  availableSlotsLoading,
   isSubmitting,
   onFormChange,
   onSubmit,
@@ -30,6 +34,8 @@ export function ManualVisitorPanel({
   flats: SecurityFlat[]
   flatsLoading: boolean
   form: ManualVisitorFormState
+  availableSlots: VisitorParkingSlot[]
+  availableSlotsLoading: boolean
   isSubmitting: boolean
   onFormChange: (form: ManualVisitorFormState) => void
   onSubmit: () => void
@@ -146,6 +152,33 @@ export function ManualVisitorPanel({
             }
             placeholder="Car / Bike"
           />
+        </div>
+        <div>
+          <label className="mb-2 block text-sm font-medium text-[#111111]">
+            Parking Slot
+          </label>
+          <select
+            className={selectClassName}
+            value={form.parkingSlotId}
+            onChange={(event) =>
+              onFormChange({
+                ...form,
+                parkingSlotId: event.target.value,
+              })
+            }
+            disabled={availableSlotsLoading}
+          >
+            <option value="">
+              {availableSlotsLoading
+                ? "Loading slots..."
+                : "No parking"}
+            </option>
+            {availableSlots.map((slot) => (
+              <option key={slot._id} value={slot._id}>
+                {slot.slotNumber}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
       <button

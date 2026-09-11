@@ -11,25 +11,9 @@ import { staffListQuerySchema } from "./staff.validation.js"
 
 const router = express.Router()
 
-router.get(
-  "/",
-  protect,
-  requireRole("property_manager"),
-  zodValidate(staffListQuerySchema),
-  getStaffHandler,
-)
-router.patch(
-  "/:id/status",
-  protect,
-  requireRole("property_manager"),
-  updateStaffStatusHandler,
-)
-router.patch(
-  "/:id",
-  protect,
-  requireRole("property_manager"),
-  updateStaffDetailsHandler,
-)
+router.get("/", protect, requireRole("property_manager"), zodValidate(staffListQuerySchema), getStaffHandler)
+router.patch("/:id/status", protect, requireRole("property_manager"), updateStaffStatusHandler)
+router.patch("/:id", protect, requireRole("property_manager"), updateStaffDetailsHandler)
 router.get("/:id", protect, requireRole("property_manager"), getStaffDetailsHandler)
 
 export default router

@@ -127,9 +127,7 @@ const visitorParkingAssignmentSchema =
 
       status: {
         type: String,
-        enum: Object.values(
-          VisitorParkingAssignmentStatus
-        ),
+        enum: Object.values(VisitorParkingAssignmentStatus),
         default: VisitorParkingAssignmentStatus.ACTIVE,
         required: true,
         index: true,

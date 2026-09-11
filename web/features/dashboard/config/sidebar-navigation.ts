@@ -289,11 +289,6 @@ export const sidebarNavigation: Record<
           icon: Package,
         },
         {
-          title: "Parking Slots",
-          href: "/dashboard/parking",
-          icon: Car,
-        },
-        {
           title: "Emergency / SOS Alerts",
           href: "/dashboard/alerts",
           icon: MessageSquareWarning,

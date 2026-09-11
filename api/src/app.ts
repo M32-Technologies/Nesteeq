@@ -18,7 +18,7 @@ import StaffRoute from "./modules/staff/staff.routes.js";
 import BlockRoute from "./modules/block/block.routes.js";
 import FlatRoute from "./modules/flat/flat.routes.js";
 import ApartmentRoute from "./modules/apartment/apartment.routes.js";
-import visitorsRoutes from "./modules/visitors/routes.js";
+import visitorsRoutes from "./modules/visitors/visit.routes.js";
 import securityRoutes from "./modules/security/security.routes.js";
 import deliveryRoutes from "./modules/delivery/delivery.routes.js";
 import parkingRoutes from "./modules/parking/parking.routes.js";
@@ -60,9 +60,11 @@ app.use("/api/expenses", expenseRoutes);
 app.use("/api/wallets", walletRoutes);
 app.use("/api/audit", auditRoutes);
 
+app.use("/api/v1/parking", parkingRoutes);
+app.use("/api/security/parking", parkingRoutes);
+
 app.use("/api/visitors", visitorsRoutes);
 app.use("/api/security/deliveries", deliveryRoutes);
-app.use("/api/security/parking", parkingRoutes);
 app.use("/api/security/alerts", alertRoutes);
 app.use("/api/security", securityRoutes);
 

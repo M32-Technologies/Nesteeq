@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Grid2X2Plus, X } from "lucide-react"
 
@@ -74,10 +74,18 @@ export default function ParkingPage() {
       defaultValues: GENERATE_FORM_DEFAULTS,
     })
 
-  const prefix = generateForm.watch("prefix")
-  const totalSlots = generateForm.watch("totalSlots")
-  const startNumber =
-    generateForm.watch("startNumber")
+  const prefix = useWatch({
+    control: generateForm.control,
+    name: "prefix",
+  })
+  const totalSlots = useWatch({
+    control: generateForm.control,
+    name: "totalSlots",
+  })
+  const startNumber = useWatch({
+    control: generateForm.control,
+    name: "startNumber",
+  })
 
   const previewPrefix =
     prefix?.trim().toUpperCase() ?? ""

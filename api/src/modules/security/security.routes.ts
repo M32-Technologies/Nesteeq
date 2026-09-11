@@ -27,22 +27,9 @@ router.use(protect)
 router.use(requireRole("security_staff"))
 
 router.get("/summary", getSecuritySummary)
-router.get(
-  "/activity",
-  zodValidate(securityActivityQuerySchema),
-  getSecurityActivity
-)
+router.get("/activity", zodValidate(securityActivityQuerySchema), getSecurityActivity)
 router.get("/flats", getSecurityFlats)
-router.get(
-  "/residents",
-  zodValidate(listSecurityDirectorySchema),
-  getSecurityResidents
-)
-router.post(
-  "/verify-pass",
-  verifyPassRateLimit,
-  zodValidate(verifyGuestPassSchema),
-  verifyGuestPass
-)
+router.get("/residents", zodValidate(listSecurityDirectorySchema), getSecurityResidents)
+router.post("/verify-pass", verifyPassRateLimit, zodValidate(verifyGuestPassSchema), verifyGuestPass)
 
 export default router

@@ -302,7 +302,7 @@ export const updateEmergencyAlertStatusService = async ({
   const alert = await EmergencyAlertModel.findOne({
     _id: alertId,
     apartmentId,
-  })
+  }).lean()
 
   if (!alert) {
     throw new AppError("Emergency alert not found", 404)
@@ -311,36 +311,74 @@ export const updateEmergencyAlertStatusService = async ({
   validateEmergencyAlertStatusTransition(alert.status, status)
 
   const now = new Date()
+  const normalizedResolutionNotes =
+    normalizeText(resolutionNotes)
+  const statusUpdate: Record<string, string | Date> = {
+    status,
+  }
 
   if (status === EmergencyAlertStatus.ACKNOWLEDGED) {
-    alert.status = EmergencyAlertStatus.ACKNOWLEDGED
-    alert.acknowledgedBy = userId
-    alert.acknowledgedAt = now
+    statusUpdate.acknowledgedBy = userId
+    statusUpdate.acknowledgedAt = now
   }
 
   if (status === EmergencyAlertStatus.RESPONDING) {
-    alert.status = EmergencyAlertStatus.RESPONDING
-    alert.respondingBy = userId
-    alert.respondingAt = now
+    statusUpdate.respondingBy = userId
+    statusUpdate.respondingAt = now
 
     if (!alert.acknowledgedAt) {
-      alert.acknowledgedBy = userId
-      alert.acknowledgedAt = now
+      statusUpdate.acknowledgedBy = userId
+      statusUpdate.acknowledgedAt = now
     }
   }
 
   if (status === EmergencyAlertStatus.RESOLVED) {
-    alert.status = EmergencyAlertStatus.RESOLVED
-    alert.resolvedBy = userId
-    alert.resolvedAt = now
-    alert.resolutionNotes =
-      normalizeText(resolutionNotes)
+    if (!normalizedResolutionNotes) {
+      throw new AppError(
+        "Resolution notes are required",
+        400
+      )
+    }
+
+    statusUpdate.resolvedBy = userId
+    statusUpdate.resolvedAt = now
+    statusUpdate.resolutionNotes = normalizedResolutionNotes
   }
 
-  await alert.save()
+  const updatedAlert =
+    await EmergencyAlertModel.findOneAndUpdate(
+      {
+        _id: alertId,
+        apartmentId,
+        status: alert.status,
+      },
+      {
+        $set: statusUpdate,
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    )
+
+  if (!updatedAlert) {
+    const latestAlert = await EmergencyAlertModel.findOne({
+      _id: alertId,
+      apartmentId,
+    }).lean()
+
+    if (!latestAlert) {
+      throw new AppError("Emergency alert not found", 404)
+    }
+
+    throw new AppError(
+      "Emergency alert status changed. Please refresh and try again.",
+      409
+    )
+  }
 
   const enriched = await enrichAlerts(apartmentId, [
-    alert.toObject() as LeanEmergencyAlert,
+    updatedAlert.toObject() as LeanEmergencyAlert,
   ])
 
   return enriched[0]

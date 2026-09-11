@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { ChevronDown, X } from "lucide-react"
 import { useForm, useWatch } from "react-hook-form"
@@ -41,7 +41,7 @@ export default function GenerateFlatsDialog({
   const { data: blocks = [], isLoading: isBlocksLoading } =
     usePropertyBlocksQuery({ status: "active" })
   const [formError, setFormError] = useState("")
-  const [selectedFlatNumbers, setSelectedFlatNumbers] = useState<string[]>([])
+  const [removedFlatNumbers, setRemovedFlatNumbers] = useState<string[]>([])
   const {
     register,
     handleSubmit,
@@ -89,26 +89,18 @@ export default function GenerateFlatsDialog({
     (total, floor) => total + floor.flats.length,
     0
   )
-  const selectedFlatNumberSet = useMemo(
-    () => new Set(selectedFlatNumbers),
-    [selectedFlatNumbers]
+  const removedFlatNumberSet = useMemo(
+    () => new Set(removedFlatNumbers),
+    [removedFlatNumbers]
   )
   const selectedFlats = useMemo(
     () =>
       flatPreview
         .flatMap((floor) => floor.flats)
-        .filter((flat) => selectedFlatNumberSet.has(flat.flatNumber)),
-    [flatPreview, selectedFlatNumberSet]
+        .filter((flat) => !removedFlatNumberSet.has(flat.flatNumber)),
+    [flatPreview, removedFlatNumberSet]
   )
   const removedFlatCount = totalPreviewCount - selectedFlats.length
-
-  useEffect(() => {
-    setSelectedFlatNumbers(
-      flatPreview.flatMap((floor) =>
-        floor.flats.map((flat) => flat.flatNumber)
-      )
-    )
-  }, [flatPreview])
 
   const blockOptions = useMemo(
     () =>
@@ -127,7 +119,7 @@ export default function GenerateFlatsDialog({
     if (generateFlats.isPending) return
 
     reset()
-    setSelectedFlatNumbers([])
+    setRemovedFlatNumbers([])
     setFormError("")
     clearErrors()
     onClose()
@@ -143,7 +135,7 @@ export default function GenerateFlatsDialog({
       setFormError("")
       const excludedUnits = flatPreview
         .flatMap((floor) => floor.flats)
-        .filter((flat) => !selectedFlatNumberSet.has(flat.flatNumber))
+        .filter((flat) => removedFlatNumberSet.has(flat.flatNumber))
         .map((flat) => ({
           floor: flat.floorNumber,
           unit: flat.unitNumber,
@@ -157,7 +149,7 @@ export default function GenerateFlatsDialog({
 
       toast.success(`${result.generatedCount} flats generated successfully`)
       reset()
-      setSelectedFlatNumbers([])
+      setRemovedFlatNumbers([])
       clearErrors()
       onClose()
     } catch (error) {
@@ -169,16 +161,14 @@ export default function GenerateFlatsDialog({
   }
 
   const resetSelectedFlats = () => {
-    setSelectedFlatNumbers(
-      flatPreview.flatMap((floor) =>
-        floor.flats.map((flat) => flat.flatNumber)
-      )
-    )
+    setRemovedFlatNumbers([])
   }
 
   const removeFlat = (flatNumber: string) => {
-    setSelectedFlatNumbers((currentFlatNumbers) =>
-      currentFlatNumbers.filter((currentFlatNumber) => currentFlatNumber !== flatNumber)
+    setRemovedFlatNumbers((currentFlatNumbers) =>
+      currentFlatNumbers.includes(flatNumber)
+        ? currentFlatNumbers
+        : [...currentFlatNumbers, flatNumber]
     )
   }
 
@@ -306,7 +296,7 @@ export default function GenerateFlatsDialog({
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {floor.flats.map((flat) => {
-                          const isSelected = selectedFlatNumberSet.has(
+                          const isSelected = !removedFlatNumberSet.has(
                             flat.flatNumber
                           )
 

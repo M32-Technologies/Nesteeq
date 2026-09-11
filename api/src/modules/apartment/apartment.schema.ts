@@ -1,7 +1,7 @@
 import { Types } from "mongoose";
 
 export interface IApartment {
-  id: string;
+
   managerId: string;
   name: string;
   state: string;

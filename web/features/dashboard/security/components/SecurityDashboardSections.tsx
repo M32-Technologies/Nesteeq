@@ -392,7 +392,7 @@ function getAttentionItems(summary: SecuritySummary) {
             `${summary.unavailableVisitorParking} unavailable`,
           ].join(", "),
           status: "OCCUPIED",
-          href: "/security/parking",
+          href: "/security/visitors",
           urgent: false,
         }
       : null,

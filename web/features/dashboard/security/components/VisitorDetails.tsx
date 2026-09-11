@@ -48,6 +48,29 @@ export function VisitorDetails({
       label: "Vehicle Type",
       value: record.vehicleType ?? "-",
     },
+    {
+      label: "Parking Slot",
+      value: record.parkingSlotNumber ?? "-",
+    },
+    {
+      label: "Parking Status",
+      value: record.parkingAssignmentStatus ? (
+        <StatusBadge status={record.parkingAssignmentStatus} />
+      ) : (
+        "-"
+      ),
+    },
+    {
+      label: "Parking Assigned",
+      value: formatDateTime(record.parkingAssignedAt),
+    },
+    {
+      label: "Parking Released",
+      value:
+        record.parkingAssignmentStatus === "ACTIVE"
+          ? "Not released"
+          : formatDateTime(record.parkingReleasedAt),
+    },
     ...(isPassEntry
       ? [
           {

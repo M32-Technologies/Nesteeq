@@ -15,7 +15,7 @@ import {
   VisitorEntryType,
   VisitorVisitModel,
   VisitorVisitStatus,
-} from "../visitors/visit/visit.model.js"
+} from "../visitors/visit.model.js"
 import { Flat } from "../flat/flat.model.js"
 import type {
   SecurityActivity,

@@ -2,16 +2,16 @@ import { Flat } from "../flat/flat.model.js"
 import {
   GuestPassModel,
   GuestPassStatus,
-} from "../visitors/pass/pass.model.js"
+} from "../visitors/visit.model.js"
 import {
   hashGuestPassToken,
   parseGuestPassQrPayload,
-} from "../visitors/pass/pass-token.js"
+} from "../visitors/visit-token.js"
 
 import {
   VisitorVisitModel,
   VisitorVisitStatus,
-} from "../visitors/visit/visit.model.js"
+} from "../visitors/visit.model.js"
 import { SecurityDeliveryModel } from "../delivery/delivery.model.js"
 import { DeliveryStatus } from "../delivery/delivery.interface.js"
 import { VisitorParkingSlotModel } from "../parking/parking.model.js"

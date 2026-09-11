@@ -46,6 +46,10 @@ import {
   DeliveryForm,
   type DeliveryFormState,
 } from "./DeliveryForm"
+import {
+  SecurityActionsMenu,
+  type SecurityMenuAction,
+} from "./SecurityActionsMenu"
 
 const PAGE_SIZE = 10
 
@@ -284,75 +288,15 @@ export function DeliveryParcels() {
                       <StatusBadge status={delivery.status} />
                     </td>
                     <td className={tdClassName}>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          className={outlineButtonClassName}
-                          onClick={() =>
-                            setSelectedDelivery(delivery)
-                          }
-                        >
-                          <Eye className="h-4 w-4" />
-                          View
-                        </button>
-
-                        {delivery.status === "WAITING" ? (
-                          <button
-                            type="button"
-                            className={outlineButtonClassName}
-                            disabled={
-                              updateStatusMutation.isPending
-                            }
-                            onClick={() =>
-                              handleStatusUpdate(
-                                  delivery,
-                                  "NOTIFIED"
-                                )
-                            }
-                          >
-                            <BellRing className="h-4 w-4" />
-                            Notify
-                          </button>
-                        ) : null}
-
-                        {delivery.status === "WAITING" ||
-                        delivery.status === "NOTIFIED" ? (
-                          <>
-                            <button
-                              type="button"
-                              className={primaryButtonClassName}
-                              disabled={
-                                updateStatusMutation.isPending
-                              }
-                              onClick={() =>
-                                setConfirmDelivery({
-                                  delivery,
-                                  status: "COLLECTED",
-                                })
-                              }
-                            >
-                              <CheckCircle2 className="h-4 w-4" />
-                              Collected
-                            </button>
-                            <button
-                              type="button"
-                              className={outlineButtonClassName}
-                              disabled={
-                                updateStatusMutation.isPending
-                              }
-                              onClick={() =>
-                                setConfirmDelivery({
-                                  delivery,
-                                  status: "RETURNED",
-                                })
-                              }
-                            >
-                              <RotateCcw className="h-4 w-4" />
-                              Returned
-                            </button>
-                          </>
-                        ) : null}
-                      </div>
+                      <DeliveryActionsMenu
+                        delivery={delivery}
+                        isUpdating={
+                          updateStatusMutation.isPending
+                        }
+                        onConfirmStatus={setConfirmDelivery}
+                        onStatusUpdate={handleStatusUpdate}
+                        onView={setSelectedDelivery}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -408,5 +352,80 @@ export function DeliveryParcels() {
         }
       />
     </div>
+  )
+}
+
+function DeliveryActionsMenu({
+  delivery,
+  isUpdating,
+  onConfirmStatus,
+  onStatusUpdate,
+  onView,
+}: {
+  delivery: SecurityDelivery
+  isUpdating: boolean
+  onConfirmStatus: (
+    value: {
+      delivery: SecurityDelivery
+      status: Exclude<DeliveryStatus, "ALL">
+    } | null
+  ) => void
+  onStatusUpdate: (
+    delivery: SecurityDelivery,
+    nextStatus: Exclude<DeliveryStatus, "ALL">
+  ) => void
+  onView: (delivery: SecurityDelivery) => void
+}) {
+  const actions: SecurityMenuAction[] = [
+    {
+      label: "View Details",
+      icon: <Eye size={15} />,
+      onClick: () => onView(delivery),
+    },
+  ]
+
+  if (delivery.status === "WAITING") {
+    actions.push({
+      label: "Notify Resident",
+      icon: <BellRing size={15} />,
+      disabled: isUpdating,
+      onClick: () => onStatusUpdate(delivery, "NOTIFIED"),
+    })
+  }
+
+  if (
+    delivery.status === "WAITING" ||
+    delivery.status === "NOTIFIED"
+  ) {
+    actions.push(
+      {
+        label: "Mark Collected",
+        icon: <CheckCircle2 size={15} />,
+        disabled: isUpdating,
+        onClick: () =>
+          onConfirmStatus({
+            delivery,
+            status: "COLLECTED",
+          }),
+      },
+      {
+        label: "Mark Returned",
+        icon: <RotateCcw size={15} />,
+        tone: "danger",
+        disabled: isUpdating,
+        onClick: () =>
+          onConfirmStatus({
+            delivery,
+            status: "RETURNED",
+          }),
+      }
+    )
+  }
+
+  return (
+    <SecurityActionsMenu
+      actions={actions}
+      label={`Open actions for ${delivery.deliveryCompany}`}
+    />
   )
 }

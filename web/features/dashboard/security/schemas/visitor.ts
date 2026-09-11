@@ -71,6 +71,7 @@ export interface VisitorRecord {
   visitId: string | null
   visitorPassId: string | null
   apartmentId: string
+  flatId?: string | null
   flatNumber?: string | null
   visitorName: string
   visitorPhone?: string | null
@@ -82,6 +83,14 @@ export interface VisitorRecord {
   validUntil?: string | null
   checkedInAt?: string | null
   checkedOutAt?: string | null
+  parkingAssignmentId?: string | null
+  parkingSlotId?: string | null
+  parkingSlotNumber?: string | null
+  parkingAssignmentStatus?: "ACTIVE" | "RELEASED" | null
+  parkingAssignedAt?: string | null
+  parkingReleasedAt?: string | null
+  parkingVehicleNumber?: string | null
+  parkingVehicleType?: string | null
 }
 
 export interface VisitorRecordsResponse {

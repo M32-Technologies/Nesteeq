@@ -44,8 +44,15 @@ type InvitationListApiData = {
   totalCount: number
 }
 
+type ApiBlock = {
+  id?: string
+  _id?: string
+  blockname?: string
+  name?: string
+}
+
 type BlocksApiData = {
-  blocks: BlockOption[]
+  blocks: ApiBlock[]
 }
 
 type FlatsApiData = {
@@ -195,15 +202,15 @@ export const downloadResidentInviteTemplate = async () => {
 }
 
 export const getBlocks = async (): Promise<BlockOption[]> => {
-  const response = await api.get<ApiResponse<any>>("/api/v1/blocks")
+  const response = await api.get<ApiResponse<BlocksApiData>>("/api/v1/blocks")
 
   if (!response.data.success) {
     throw new Error(response.data.message || "Failed to fetch blocks")
   }
 
-  return response.data.data.blocks.map((b: any) => ({
-    id: b.id,
-    name: b.blockname || b.name,
+  return response.data.data.blocks.map((block) => ({
+    id: block.id ?? block._id ?? "",
+    name: block.blockname ?? block.name ?? block.id ?? block._id ?? "-",
   }))
 }
 

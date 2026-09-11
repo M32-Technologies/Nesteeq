@@ -5,7 +5,7 @@ import { ensureFlatInApartment } from "../security/security-directory.service.js
 import {
   VisitorVisitModel,
   VisitorVisitStatus,
-} from "../visitors/visit/visit.model.js"
+} from "../visitors/visit.model.js"
 import { ensureVisitorParkingSlotAvailable } from "./parking-availability.js"
 import {
   VisitorParkingAssignmentStatus,

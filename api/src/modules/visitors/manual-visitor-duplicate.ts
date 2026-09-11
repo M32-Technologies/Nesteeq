@@ -1,4 +1,4 @@
-import { escapeRegExp } from "../../../utils/regex.js"
+import { escapeRegExp } from "../../utils/regex.js"
 import {
   VisitorEntryType,
   VisitorVisitStatus,

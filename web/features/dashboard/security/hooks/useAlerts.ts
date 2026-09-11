@@ -29,6 +29,9 @@ export const useEmergencyAlerts = (params: {
   return useQuery({
     queryKey: alertQueryKeys.list(params),
     queryFn: () => getEmergencyAlerts(params),
+    refetchInterval: 5000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
   })
 }
 

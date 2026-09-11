@@ -113,60 +113,18 @@ const requireBillApartmentAccess = catchAsync(
 
 router.use(protect);
 
-router.get(
-  "/",
-  requireRole("treasurer", "property_manager"),
-  zodValidate(getBillsSchema),
-  requireQueryApartmentAccess,
-  getBills
-);
+router.get("/", requireRole("treasurer", "property_manager"), zodValidate(getBillsSchema), requireQueryApartmentAccess, getBills);
 
-router.get(
-  "/summary/:apartmentId",
-  requireRole("treasurer", "property_manager"),
-  zodValidate(getBillingSummarySchema),
-  requireParamApartmentAccess,
-  getBillingSummary
-);
+router.get("/summary/:apartmentId", requireRole("treasurer", "property_manager"), zodValidate(getBillingSummarySchema), requireParamApartmentAccess, getBillingSummary);
 
-router.get(
-  "/:id",
-  requireRole("treasurer", "property_manager"),
-  zodValidate(getBillByIdSchema),
-  requireBillApartmentAccess,
-  getBillById
-);
+router.get("/:id", requireRole("treasurer", "property_manager"), zodValidate(getBillByIdSchema), requireBillApartmentAccess, getBillById);
 
-router.post(
-  "/",
-  requireRole("treasurer"),
-  requireBodyApartmentAccess,
-  zodValidate(createBillSchema),
-  createBill
-);
+router.post("/", requireRole("treasurer"), requireBodyApartmentAccess, zodValidate(createBillSchema), createBill);
 
-router.patch(
-  "/:id",
-  requireRole("treasurer"),
-  zodValidate(updateBillSchema),
-  requireBillApartmentAccess,
-  updateBill
-);
+router.patch("/:id", requireRole("treasurer"), zodValidate(updateBillSchema), requireBillApartmentAccess, updateBill);
 
-router.patch(
-  "/:id/payment",
-  requireRole("treasurer"),
-  zodValidate(recordBillPaymentSchema),
-  requireBillApartmentAccess,
-  recordBillPayment
-);
+router.patch("/:id/payment", requireRole("treasurer"), zodValidate(recordBillPaymentSchema), requireBillApartmentAccess, recordBillPayment);
 
-router.patch(
-  "/:id/waive-late-fee",
-  requireRole("treasurer"),
-  zodValidate(waiveLateFeeSchema),
-  requireBillApartmentAccess,
-  waiveLateFee
-);
+router.patch("/:id/waive-late-fee", requireRole("treasurer"), zodValidate(waiveLateFeeSchema), requireBillApartmentAccess, waiveLateFee);
 
 export default router;

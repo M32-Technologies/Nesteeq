@@ -1,6 +1,6 @@
 import { Types, type PipelineStage } from "mongoose"
 
-import { AppError } from "../../../utils/AppError.js"
+import { AppError } from "../../utils/AppError.js"
 import { VisitorVisitModel } from "./visit.model.js"
 import type { ListVisitsInput } from "./visit.types.js"
 

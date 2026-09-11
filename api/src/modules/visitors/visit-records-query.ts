@@ -3,15 +3,21 @@ import { Types, type PipelineStage } from "mongoose"
 import {
   GuestPassModel,
   GuestPassStatus,
-} from "../pass/pass.model.js"
+} from "./visit.model.js"
 import {
   VisitorEntryType,
   VisitorVisitModel,
   VisitorVisitStatus,
 } from "./visit.model.js"
-import { AppError } from "../../../utils/AppError.js"
-import { escapeRegExp } from "../../../utils/regex.js"
+import { AppError } from "../../utils/AppError.js"
+import { escapeRegExp } from "../../utils/regex.js"
 import type { ListVisitorRecordsInput } from "./visit.types.js"
+import {
+  emptyVisitorParkingProjectionFields,
+  visitorParkingLookupStages,
+  visitorParkingProjectionFields,
+  type VisitorRecordParkingFields,
+} from "./visit-record-parking.js"
 
 type VisitorRecordItem = {
   _id: string
@@ -20,6 +26,7 @@ type VisitorRecordItem = {
   visitId: string | null
   visitorPassId: string | null
   apartmentId: string
+  flatId: string | null
   flatNumber: string | null
   visitorName: string
   visitorPhone?: string | null
@@ -31,7 +38,15 @@ type VisitorRecordItem = {
   validUntil?: Date | null
   checkedInAt?: Date | null
   checkedOutAt?: Date | null
-}
+  parkingAssignmentId?: string | null
+  parkingSlotId?: string | null
+  parkingSlotNumber?: string | null
+  parkingAssignmentStatus?: string | null
+  parkingAssignedAt?: Date | null
+  parkingReleasedAt?: Date | null
+  parkingVehicleNumber?: string | null
+  parkingVehicleType?: string | null
+} & VisitorRecordParkingFields
 
 type VisitorRecordsFacetResult = {
   records: VisitorRecordItem[]
@@ -159,6 +174,7 @@ const getVisitStages = ({
     }),
   },
   ...flatLookupStages,
+  ...visitorParkingLookupStages,
   ...getSearchStage(searchRegex),
   {
     $project: {
@@ -194,6 +210,9 @@ const getVisitStages = ({
       apartmentId: {
         $toString: "$apartmentId",
       },
+      flatId: {
+        $toString: "$flatId",
+      },
       flatNumber: {
         $ifNull: ["$flat.flatNumber", null],
       },
@@ -215,6 +234,7 @@ const getVisitStages = ({
       checkedOutAt: {
         $ifNull: ["$checkedOutAt", null],
       },
+      ...visitorParkingProjectionFields,
       sortAt: "$checkedInAt",
     },
   },
@@ -296,6 +316,9 @@ const getPassStages = ({
       apartmentId: {
         $toString: "$apartmentId",
       },
+      flatId: {
+        $toString: "$flatId",
+      },
       flatNumber: {
         $ifNull: ["$flat.flatNumber", null],
       },
@@ -317,6 +340,7 @@ const getPassStages = ({
       checkedOutAt: {
         $literal: null,
       },
+      ...emptyVisitorParkingProjectionFields,
       sortAt: "$validFrom",
     },
   },

@@ -22,9 +22,9 @@ import {
 const router = express.Router()
 const managerOnly = requireRole("property_manager")
 
-router.get("/",protect,managerOnly,zodValidate(blockListQuerySchema),getBlocksHandler,)
+router.get("/", protect, managerOnly, zodValidate(blockListQuerySchema), getBlocksHandler)
 
-router.post("/",protect,managerOnly,zodValidate(createBlockSchema),createBlockHandler,)
+router.post("/", protect, managerOnly, zodValidate(createBlockSchema), createBlockHandler)
 
 router.get("/:id", protect, managerOnly, getSingleBlockHandler);
 

@@ -120,42 +120,14 @@ const requireBillApartmentAccess = catchAsync(
 
 router.use(protect, requireRole("treasurer"));
 
-router.post(
-  "/",
-  requireBodyApartmentAccess,
-  zodValidate(createWalletSchema),
-  createWallet
-);
+router.post("/", requireBodyApartmentAccess, zodValidate(createWalletSchema), createWallet);
 
-router.get(
-  "/",
-  requireQueryApartmentAccess,
-  zodValidate(getWalletsSchema),
-  getWallets
-);
+router.get("/", requireQueryApartmentAccess, zodValidate(getWalletsSchema), getWallets);
 
-router.get(
-  "/:residentId",
-  requireQueryApartmentAccess,
-  zodValidate(getWalletSchema),
-  requireWalletApartmentAccess,
-  getWallet
-);
+router.get("/:residentId", requireQueryApartmentAccess, zodValidate(getWalletSchema), requireWalletApartmentAccess, getWallet);
 
-router.patch(
-  "/:residentId/add-funds",
-  requireBodyApartmentAccess,
-  zodValidate(addWalletFundsSchema),
-  addWalletFunds
-);
+router.patch("/:residentId/add-funds", requireBodyApartmentAccess, zodValidate(addWalletFundsSchema), addWalletFunds);
 
-router.patch(
-  "/:residentId/deduct",
-  requireBodyApartmentAccess,
-  zodValidate(deductWalletFundsSchema),
-  requireWalletApartmentAccess,
-  requireBillApartmentAccess,
-  deductWalletFunds
-);
+router.patch("/:residentId/deduct", requireBodyApartmentAccess, zodValidate(deductWalletFundsSchema), requireWalletApartmentAccess, requireBillApartmentAccess, deductWalletFunds);
 
 export default router;

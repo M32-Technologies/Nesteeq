@@ -47,6 +47,9 @@ export const useAssignParkingSlot = () => {
         queryKey: ["security-parking"],
       })
       queryClient.invalidateQueries({
+        queryKey: ["security-visitors"],
+      })
+      queryClient.invalidateQueries({
         queryKey: securityDataQueryKeys.summary,
       })
       queryClient.invalidateQueries({
@@ -65,6 +68,9 @@ export const useReleaseParkingSlot = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["security-parking"],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ["security-visitors"],
       })
       queryClient.invalidateQueries({
         queryKey: securityDataQueryKeys.summary,

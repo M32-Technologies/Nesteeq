@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { Eye, LogIn, LogOut } from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -12,6 +11,10 @@ import {
   useVerifyVisitorPass,
   useVisitorRecords,
 } from "../hooks/useVisitors"
+import {
+  useAssignParkingSlot,
+  useParkingSlots,
+} from "../hooks/useParking"
 import { useDebouncedValue } from "../hooks/useDebouncedValue"
 import { useSecurityFlats } from "../hooks/useSecurityData"
 import { getSecurityApiErrorMessage } from "../utils/api-error"
@@ -25,19 +28,11 @@ import {
   EmptyState,
   ErrorState,
   LoadingState,
-  PaginationControls,
-  StatusBadge,
-  formatDateTime,
-  outlineButtonClassName,
-  primaryButtonClassName,
-  tableClassName,
-  tableWrapClassName,
-  tdClassName,
-  thClassName,
 } from "./SecurityUi"
 import { ConfirmActionModal } from "./ConfirmActionModal"
 import { VisitorDetails } from "./VisitorDetails"
 import { VisitorFilters } from "./VisitorFilters"
+import { VisitorRecordsTable } from "./VisitorRecordsTable"
 import {
   ManualVisitorPanel,
   VisitorEntryModeButtons,
@@ -71,6 +66,7 @@ export function SecurityVisitors() {
     purpose: "",
     vehicleNumber: "",
     vehicleType: "",
+    parkingSlotId: "",
   })
 
   const initialMode =
@@ -90,14 +86,20 @@ export function SecurityVisitors() {
     page,
     limit: PAGE_SIZE,
   })
+  const availableSlotsQuery = useParkingSlots({
+    status: "AVAILABLE",
+    limit: 100,
+  })
 
   const verifyPassMutation = useVerifyVisitorPass()
   const checkInMutation = useCheckInVisitor()
   const checkoutMutation = useCheckoutVisitor()
   const manualEntryMutation = useRegisterManualVisitor()
+  const assignParkingMutation = useAssignParkingSlot()
 
   const flats = flatsQuery.data?.flats ?? []
   const records = visitorRecordsQuery.data?.records ?? []
+  const availableSlots = availableSlotsQuery.data?.slots ?? []
   const pagination = visitorRecordsQuery.data?.pagination
 
   const handleVerify = async () => {
@@ -211,8 +213,16 @@ export function SecurityVisitors() {
       return
     }
 
+    if (
+      manualForm.parkingSlotId &&
+      !manualForm.vehicleNumber.trim()
+    ) {
+      toast.error("Vehicle number is required for parking")
+      return
+    }
+
     try {
-      await manualEntryMutation.mutateAsync({
+      const visit = await manualEntryMutation.mutateAsync({
         flatId: manualForm.flatId,
         visitorName: manualForm.visitorName,
         visitorPhone:
@@ -224,7 +234,29 @@ export function SecurityVisitors() {
           manualForm.vehicleType || undefined,
       })
 
-      toast.success("Visitor registered and checked in")
+      if (manualForm.parkingSlotId) {
+        try {
+          await assignParkingMutation.mutateAsync({
+            slotId: manualForm.parkingSlotId,
+            flatId: manualForm.flatId,
+            visitorVisitId: visit._id,
+            visitorName: manualForm.visitorName,
+            vehicleNumber: manualForm.vehicleNumber,
+            vehicleType:
+              manualForm.vehicleType || undefined,
+          })
+          toast.success("Visitor registered and parking assigned")
+        } catch (error) {
+          toast.error(
+            getSecurityApiErrorMessage(
+              error,
+              "Visitor registered, but unable to assign parking"
+            )
+          )
+        }
+      } else {
+        toast.success("Visitor registered and checked in")
+      }
 
       setManualForm({
         flatId: "",
@@ -233,6 +265,7 @@ export function SecurityVisitors() {
         purpose: "",
         vehicleNumber: "",
         vehicleType: "",
+        parkingSlotId: "",
       })
     } catch (error) {
       toast.error(
@@ -294,7 +327,12 @@ export function SecurityVisitors() {
           flats={flats}
           flatsLoading={flatsQuery.isLoading}
           form={manualForm}
-          isSubmitting={manualEntryMutation.isPending}
+          availableSlots={availableSlots}
+          availableSlotsLoading={availableSlotsQuery.isLoading}
+          isSubmitting={
+            manualEntryMutation.isPending ||
+            assignParkingMutation.isPending
+          }
           onFormChange={setManualForm}
           onSubmit={handleManualEntry}
         />
@@ -319,132 +357,18 @@ export function SecurityVisitors() {
           description="Try a different search or filter."
         />
       ) : (
-        <>
-          <div className={tableWrapClassName}>
-            <table className={tableClassName}>
-              <thead>
-                <tr>
-                  <th className={thClassName}>Visitor</th>
-                  <th className={thClassName}>Phone</th>
-                  <th className={thClassName}>Flat / Unit</th>
-                  <th className={thClassName}>Purpose</th>
-                  <th className={thClassName}>Entry Type</th>
-                  <th className={thClassName}>
-                    Expected / Check-In Time
-                  </th>
-                  <th className={thClassName}>Check-Out Time</th>
-                  <th className={thClassName}>Vehicle Number</th>
-                  <th className={thClassName}>Vehicle Type</th>
-                  <th className={thClassName}>Status</th>
-                  <th className={thClassName}>Actions</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {records.map((record) => (
-                  <tr key={record._id}>
-                    <td className={tdClassName}>
-                      <p className="font-medium">
-                        {record.visitorName}
-                      </p>
-                    </td>
-                    <td className={tdClassName}>
-                      {record.visitorPhone || "-"}
-                    </td>
-                    <td className={tdClassName}>
-                      {record.flatNumber || "-"}
-                    </td>
-                    <td className={tdClassName}>
-                      {record.purpose || "-"}
-                    </td>
-                    <td className={tdClassName}>
-                      {record.entryType === "PASS"
-                        ? "Pre-Approved / Pass"
-                        : "Manual"}
-                    </td>
-                    <td className={tdClassName}>
-                      {formatDateTime(
-                        record.status === "UPCOMING"
-                          ? record.expectedAt
-                          : record.checkedInAt
-                      )}
-                    </td>
-                    <td className={tdClassName}>
-                      {formatDateTime(record.checkedOutAt)}
-                    </td>
-                    <td className={tdClassName}>
-                      {record.vehicleNumber || "-"}
-                    </td>
-                    <td className={tdClassName}>
-                      {record.vehicleType || "-"}
-                    </td>
-                    <td className={tdClassName}>
-                      <StatusBadge status={record.status} />
-                    </td>
-                    <td className={tdClassName}>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          className={outlineButtonClassName}
-                          onClick={() =>
-                            setSelectedRecord(record)
-                          }
-                        >
-                          <Eye className="h-4 w-4" />
-                          View
-                        </button>
-
-                        {record.status === "UPCOMING" ? (
-                          <button
-                            type="button"
-                            className={primaryButtonClassName}
-                            onClick={() =>
-                              handleRecordCheckIn(record)
-                            }
-                            disabled={
-                              checkInMutation.isPending ||
-                              !record.visitorPassId
-                            }
-                          >
-                            <LogIn className="h-4 w-4" />
-                            Check In
-                          </button>
-                        ) : null}
-
-                        {record.status === "ACTIVE" ? (
-                          <button
-                            type="button"
-                            className={primaryButtonClassName}
-                            onClick={() =>
-                              setCheckoutRecord(record)
-                            }
-                            disabled={
-                              checkoutMutation.isPending ||
-                              !record.visitId
-                            }
-                          >
-                            <LogOut className="h-4 w-4" />
-                            Check Out
-                          </button>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {pagination ? (
-            <PaginationControls
-              page={pagination.page}
-              totalPages={pagination.totalPages}
-              hasPreviousPage={pagination.hasPreviousPage}
-              hasNextPage={pagination.hasNextPage}
-              onPageChange={setPage}
-            />
-          ) : null}
-        </>
+        <VisitorRecordsTable
+          records={records}
+          pagination={pagination}
+          availableSlots={availableSlots}
+          availableSlotsLoading={availableSlotsQuery.isLoading}
+          isCheckingIn={checkInMutation.isPending}
+          isCheckingOut={checkoutMutation.isPending}
+          onCheckIn={handleRecordCheckIn}
+          onCheckout={setCheckoutRecord}
+          onPageChange={setPage}
+          onView={setSelectedRecord}
+        />
       )}
 
       <VisitorDetails
