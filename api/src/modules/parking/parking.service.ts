@@ -1,4 +1,4 @@
-import mongoose, {Types} from "mongoose"
+import mongoose, { Types } from "mongoose"
 
 import { AppError } from "../../utils/AppError.js"
 import type { GenerateParkingSlotsInput, GetParkingSlotsQuery, UpdateParkingSlotInput, AssignResidentParkingInput } from "./parking.validation.js"
@@ -7,11 +7,46 @@ import { Apartment } from "../apartment/apartment.model.js"
 import { Flat } from "../flat/flat.model.js"
 import { ResidentModel } from "../resident/resident.model.js"
 import { escapeRegExp } from "../../utils/regex.js"
+import type { GeneratedParkingSlotResponse } from "./parking.type.js"
 
+export type { GeneratedParkingSlotResponse }
 
+export const generateLevelCode = (level: string): string => {
+  return level
+    .trim()
+    .toUpperCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word[0])
+    .join("");
+};
 
-export const generateParkingSlots = async (apartmentId: string, data: GenerateParkingSlotsInput) => {
-  const { prefix, totalSlots, startNumber = 1, vehicleType, usageType } = data;
+const VEHICLE_CODE_MAP: Record<GenerateParkingSlotsInput["vehicleType"], string> = {
+  CAR: "C",
+  BIKE: "B",
+  EV: "E",
+  OTHER: "O",
+};
+
+export const getVehicleCode = (vehicleType: GenerateParkingSlotsInput["vehicleType"]): string => {
+  return VEHICLE_CODE_MAP[vehicleType] ?? "O";
+};
+
+export const generateZoneCode = (zoneName?: string | null): string | null => {
+  if (!zoneName || !zoneName.trim()) {
+    return null;
+  }
+  return zoneName
+    .trim()
+    .toUpperCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word[0])
+    .join("");
+};
+
+export const generateParkingSlots = async (apartmentId: string,data: GenerateParkingSlotsInput): Promise<GeneratedParkingSlotResponse> => {
+  const { level, zoneName, numberOfSlots, vehicleType, usageType } = data;
 
   if (!apartmentId || !Types.ObjectId.isValid(apartmentId)) {
     throw new AppError("Apartment context is required", 400);
@@ -21,7 +56,7 @@ export const generateParkingSlots = async (apartmentId: string, data: GeneratePa
   const session = await mongoose.startSession();
 
   try {
-    let result;
+    let result: GeneratedParkingSlotResponse | undefined;
 
     await session.withTransaction(async () => {
       const apartment = await Apartment.findById(apartmentObjectId)
@@ -33,7 +68,8 @@ export const generateParkingSlots = async (apartmentId: string, data: GeneratePa
         throw new AppError("Apartment not found", 404);
       }
 
-      const normalizedPrefix = prefix.trim().toUpperCase();
+      const normalizedLevel = level.trim();
+      const normalizedZoneName = zoneName?.trim() || null;
 
       const currentCount = await ParkingSlotModel.countDocuments({
         apartmentId: apartmentObjectId,
@@ -43,47 +79,88 @@ export const generateParkingSlots = async (apartmentId: string, data: GeneratePa
         const maxCapacity = Number(apartment.parkingSlots);
         const remainingSlots = maxCapacity - currentCount;
 
-        if (totalSlots > remainingSlots) {
+        if (numberOfSlots > remainingSlots) {
           throw new AppError(
-            `Only ${remainingSlots} parking slots can be generated. ${currentCount} of ${maxCapacity} parking slots already exist.`,
+            `Only ${remainingSlots} parking slots can be generated. ` +
+              `${currentCount} of ${maxCapacity} parking slots already exist.`,
             400
           );
         }
       }
 
-      const slotsToGenerate = Array.from({ length: totalSlots }, (_, index) => {
-        const number = startNumber + index;
-        return {
-          apartmentId: apartmentObjectId,
-          slotNumber: `${normalizedPrefix}-${String(number).padStart(3, "0")}`,
-          vehicleType,
-          usageType,
-          status: "AVAILABLE",
-        };
-      });
+      const levelCode = generateLevelCode(normalizedLevel);
+      const zoneCode = generateZoneCode(normalizedZoneName);
+      const vehicleCode = getVehicleCode(vehicleType);
 
-      const slotNumbers = slotsToGenerate.map((slot) => slot.slotNumber);
+      const prefix = [levelCode, zoneCode, vehicleCode]
+        .filter(Boolean)
+        .join("-");
 
+      // 5. Find existing slots with this prefix to determine next sequential number
       const existingSlots = await ParkingSlotModel.find({
         apartmentId: apartmentObjectId,
-        slotNumber: { $in: slotNumbers },
+        prefix,
       })
         .select("slotNumber")
         .session(session)
         .lean();
 
+      let nextNumber = 1;
+
       if (existingSlots.length > 0) {
-        const duplicates = existingSlots.map((slot) => slot.slotNumber).join(", ");
-        throw new AppError(`Parking slots already exist: ${duplicates}`, 409);
+        const highestNumber = existingSlots.reduce((max, slot) => {
+          const match = slot.slotNumber.match(/(\d+)$/);
+          const num = match ? Number(match[1]) : 0;
+          return num > max ? num : max;
+        }, 0);
+
+        nextNumber = highestNumber + 1;
       }
 
-      const insertedSlots = await ParkingSlotModel.insertMany(slotsToGenerate, { session });
+      const slotsToGenerate = Array.from(
+        { length: numberOfSlots },
+        (_, index) => {
+          const number = nextNumber + index;
+          const slotNumber = `${prefix}-${String(number).padStart(3, "0")}`;
+
+          return {
+            apartmentId: apartmentObjectId,
+            setupType: "ADVANCED" as const,
+            level: normalizedLevel,
+            zoneName: normalizedZoneName,
+            zoneCode,
+            prefix,
+            slotNumber,
+            vehicleType,
+            usageType,
+            status: "AVAILABLE" as const,
+            flatId: null,
+            residentId: null,
+            visitorId: null,
+            vehicleNumber: null,
+            assignedAt: null,
+          };
+        }
+      );
+
+      const insertedSlots = await ParkingSlotModel.insertMany(slotsToGenerate, {
+        session,
+        ordered: true,
+      });
 
       result = {
         totalSlotsGenerated: insertedSlots.length,
+        level: normalizedLevel,
+        zoneName: normalizedZoneName,
+        zoneCode,
+        prefix,
         generatedSlots: insertedSlots.map((slot) => ({
           id: slot._id.toString(),
           slotNumber: slot.slotNumber,
+          level: slot.level,
+          zoneName: slot.zoneName ?? null,
+          zoneCode: slot.zoneCode ?? null,
+          prefix: slot.prefix,
           vehicleType: slot.vehicleType,
           usageType: slot.usageType,
           status: slot.status,
@@ -91,18 +168,34 @@ export const generateParkingSlots = async (apartmentId: string, data: GeneratePa
       };
     });
 
+    if (!result) {
+      throw new AppError("Failed to generate parking slots", 500);
+    }
+
     return result;
   } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === 11000) {
-      throw new AppError("One or more parking slots already exist. Please try again.", 409);
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { code: number }).code === 11000
+    ) {
+      throw new AppError(
+        "One or more parking slots already exist. Please try again.",
+        409
+      );
     }
+
     throw error;
   } finally {
     await session.endSession();
   }
 };
 
-export const getParkingSlots = async (query: GetParkingSlotsQuery, apartmentId: string) => {
+export const getParkingSlots = async (
+  query: GetParkingSlotsQuery,
+  apartmentId: string
+) => {
   if (!apartmentId || !Types.ObjectId.isValid(apartmentId)) {
     throw new AppError("Apartment context is required", 400);
   }
@@ -128,16 +221,35 @@ export const getParkingSlots = async (query: GetParkingSlotsQuery, apartmentId: 
   if (query.usageType) {
     filter.usageType = query.usageType;
   }
-
+  
   if (query.status) {
     filter.status = query.status;
   }
 
+  if (query.level) {
+    filter.level = query.level;
+  }
+
+  if (query.zoneCode) {
+    filter.zoneCode = query.zoneCode;
+  }
   if (query.search) {
     const searchTerm = query.search.trim();
+
     if (searchTerm) {
-      const regex = new RegExp(escapeRegExp(searchTerm), "i");
-      filter.slotNumber = regex;
+      const regex = new RegExp(
+        escapeRegExp(searchTerm),
+        "i"
+      );
+
+      filter.$or = [
+        {
+          slotNumber: regex,
+        },
+        {
+          vehicleNumber: regex,
+        },
+      ];
     }
   }
 
@@ -145,11 +257,23 @@ export const getParkingSlots = async (query: GetParkingSlotsQuery, apartmentId: 
   const limit = query.limit;
   const skip = (page - 1) * limit;
 
+  const sortDirection = query.sortOrder === "asc" ? 1 : -1;
+  const sortField = query.sortBy === "slotNumber" ? "slotNumber" : "createdAt";
+
+  const sortOptions: Record<string, 1 | -1> =
+    sortField === "slotNumber"
+      ? { slotNumber: sortDirection, createdAt: -1 }
+      : { [sortField]: sortDirection, slotNumber: 1 };
+
   const [parkingSlots, total] = await Promise.all([
     ParkingSlotModel.find(filter)
       .populate("flatId", "_id flatNumber")
-      .populate("residentId", "_id userId phoneNumber residentType")
-      .sort({ createdAt: -1 })
+      .populate(
+        "residentId",
+        "_id userId phoneNumber residentType"
+      )
+      .collation({ locale: "en", numericOrdering: true })
+      .sort(sortOptions)
       .skip(skip)
       .limit(limit)
       .lean(),
@@ -169,8 +293,8 @@ export const getParkingSlots = async (query: GetParkingSlotsQuery, apartmentId: 
     },
   };
 };
-
 export const getParkingSlotById = async (parkingId: string, apartmentId: string) => {
+  
   if (!apartmentId || !Types.ObjectId.isValid(apartmentId)) {
     throw new AppError("Apartment context is required", 400);
   }
@@ -226,61 +350,72 @@ export const updateParkingSlot = async (
     throw new AppError("Parking slot not found", 404);
   }
 
-  if (parkingSlot.status === "ASSIGNED" || parkingSlot.status === "OCCUPIED") {
+  // Assigned / occupied slots must be released
+  // before changing their parking configuration.
+  if (
+    parkingSlot.status === "ASSIGNED" ||
+    parkingSlot.status === "OCCUPIED"
+  ) {
     throw new AppError(
-      "Parking slot must be released before changing usage or vehicle type",
+      "Parking slot must be released before changing parking configuration",
       400
     );
   }
 
-  let normalizedSlotNumber: string | undefined;
-  if (data.slotNumber !== undefined) {
-    normalizedSlotNumber = data.slotNumber.trim().toUpperCase();
+  const updateData: Record<string, unknown> = {};
+
+  // Level
+  if (data.level !== undefined) {
+    const level = data.level.trim();
+
+    if (!level) {
+      throw new AppError("Level cannot be empty", 400);
+    }
+
+    updateData.level = level;
   }
 
-  if (normalizedSlotNumber !== undefined) {
-    const existingSlot = await ParkingSlotModel.findOne({
-      apartmentId: apartmentObjectId,
-      slotNumber: normalizedSlotNumber,
-      _id: { $ne: parkingObjectId },
-    });
+ 
+  if (data.zoneName !== undefined) {
+    if (data.zoneName === null) {
+      updateData.zoneName = null;
+    } else {
+      const zoneName = data.zoneName.trim();
 
-    if (existingSlot) {
-      throw new AppError(
-        `Parking slot ${normalizedSlotNumber} already exists`,
-        409
-      );
+      updateData.zoneName = zoneName || null;
     }
   }
 
-  const updateData: Record<string, unknown> = {};
-
-  if (normalizedSlotNumber !== undefined) {
-    updateData.slotNumber = normalizedSlotNumber;
-  }
-
+  // Vehicle type
   if (data.vehicleType !== undefined) {
     updateData.vehicleType = data.vehicleType;
   }
 
+  // Usage type
   if (data.usageType !== undefined) {
     updateData.usageType = data.usageType;
   }
 
+  // Prevent an empty update
+  if (Object.keys(updateData).length === 0) {
+    throw new AppError("No parking slot fields provided for update", 400);
+  }
+
   try {
-    const updatedParkingSlot = await ParkingSlotModel.findOneAndUpdate(
-      {
-        _id: parkingObjectId,
-        apartmentId: apartmentObjectId,
-      },
-      {
-        $set: updateData,
-      },
-      {
-        new: true,
-        runValidators: true,
-      }
-    ).lean();
+    const updatedParkingSlot =
+      await ParkingSlotModel.findOneAndUpdate(
+        {
+          _id: parkingObjectId,
+          apartmentId: apartmentObjectId,
+        },
+        {
+          $set: updateData,
+        },
+        {
+          returnDocument: "after",
+          runValidators: true,
+        }
+      ).lean();
 
     if (!updatedParkingSlot) {
       throw new AppError("Parking slot not found", 404);
@@ -288,17 +423,6 @@ export const updateParkingSlot = async (
 
     return updatedParkingSlot;
   } catch (error: unknown) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === 11000
-    ) {
-      throw new AppError(
-        `Parking slot ${normalizedSlotNumber || "with this number"} already exists`,
-        409
-      );
-    }
     throw error;
   }
 };
@@ -397,7 +521,7 @@ export const assignResidentParking = async (
       },
     },
     {
-      new: true,
+      returnDocument: "after",
       runValidators: true,
     }
   ).lean();
@@ -485,7 +609,7 @@ export const releaseResidentParking = async (
       },
     },
     {
-      new: true,
+      returnDocument: "after",
       runValidators: true,
     }
   ).lean();
@@ -558,7 +682,7 @@ export const updateParkingSlotStatus = async (
         },
       },
       {
-        new: true,
+        returnDocument: "after",
         runValidators: true,
       }
     ).lean();
@@ -605,7 +729,7 @@ export const updateParkingSlotStatus = async (
         },
       },
       {
-        new: true,
+        returnDocument: "after",
         runValidators: true,
       }
     ).lean();
@@ -620,5 +744,49 @@ export const updateParkingSlotStatus = async (
   throw new AppError("Invalid status transition", 400);
 };
 
+export const getParkingStats = async (apartmentId: string) => {
+  if (!apartmentId || !Types.ObjectId.isValid(apartmentId)) {
+    throw new AppError("Apartment context is required", 400);
+  }
 
-
+  const apartmentObjectId = new Types.ObjectId(apartmentId);
+
+  const [total, available, assigned, occupied, inactive, residentSlots, visitorSlots] =
+    await Promise.all([
+      ParkingSlotModel.countDocuments({ apartmentId: apartmentObjectId }),
+      ParkingSlotModel.countDocuments({
+        apartmentId: apartmentObjectId,
+        status: "AVAILABLE",
+      }),
+      ParkingSlotModel.countDocuments({
+        apartmentId: apartmentObjectId,
+        status: "ASSIGNED",
+      }),
+      ParkingSlotModel.countDocuments({
+        apartmentId: apartmentObjectId,
+        status: "OCCUPIED",
+      }),
+      ParkingSlotModel.countDocuments({
+        apartmentId: apartmentObjectId,
+        status: "INACTIVE",
+      }),
+      ParkingSlotModel.countDocuments({
+        apartmentId: apartmentObjectId,
+        usageType: "RESIDENT",
+      }),
+      ParkingSlotModel.countDocuments({
+        apartmentId: apartmentObjectId,
+        usageType: "VISITOR",
+      }),
+    ]);
+
+  return {
+    total,
+    available,
+    assigned,
+    occupied,
+    inactive,
+    residentSlots,
+    visitorSlots,
+  };
+};

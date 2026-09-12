@@ -1,156 +1,5 @@
 import { Types } from "mongoose"
 import { z } from "zod"
-// import { VisitorParkingSlotStatus } from "./parking.interface.js"
-
-// const objectIdSchema = z
-//   .string()
-//   .trim()
-//   .regex(/^[0-9a-fA-F]{24}$/, "Invalid ObjectId")
-
-// const optionalString = (
-//   schema: z.ZodString
-// ) =>
-//   z.preprocess((value) => {
-//     if (typeof value !== "string") return value
-
-//     const trimmedValue = value.trim()
-//     return trimmedValue === "" ? undefined : trimmedValue
-//   }, schema.optional())
-
-// export const createParkingSlotSchema = z.object({
-//   body: z.object({
-//     slotNumber: z
-//       .string()
-//       .trim()
-//       .min(1, "Slot number is required")
-//       .max(30),
-//     status: z
-//       .enum([])
-//       .optional(),
-//     vehicleType: z.enum(["CAR", "BIKE", "EV", "OTHER"], {
-//       message: "Invalid vehicle type",
-//     }).optional(),
-//     usageType: z.enum(["RESIDENT", "VISITOR"] , {
-//       message: "Invalid usage type",
-//     }).optional(),
-//   }),
-// })
-
-// export const listParkingSlotsSchema = z.object({
-//   query: z.object({
-//     status: z
-//       .enum([
-//         "ALL",
-//         ...Object.values(VisitorParkingSlotStatus),
-//       ])
-//       .optional(),
-//     search: z.string().trim().max(100).optional(),
-//     page: z.coerce.number().int().min(1).optional().default(1),
-//     limit: z.coerce.number().int().min(1).max(100).optional().default(10),
-//   }),
-// })
-
-// export const parkingSlotIdParamsSchema = z.object({
-//   params: z.object({
-//     slotId: objectIdSchema,
-//   }),
-// })
-
-// export const updateParkingSlotStatusSchema =
-//   parkingSlotIdParamsSchema.extend({
-//     body: z.object({
-//       status: z.enum([
-//         VisitorParkingSlotStatus.AVAILABLE,
-//         VisitorParkingSlotStatus.RESERVED,
-//         VisitorParkingSlotStatus.OUT_OF_SERVICE,
-//       ]),
-//       notes: optionalString(z.string().max(300)),
-//     }),
-//   })
-
-// export const assignParkingSlotSchema = z.object({
-//   body: z.object({
-//     slotId: objectIdSchema,
-//     flatId: objectIdSchema,
-//     visitorVisitId: objectIdSchema.optional(),
-//     visitorName: z
-//       .string()
-//       .trim()
-//       .min(1, "Visitor name is required")
-//       .max(100),
-//     vehicleNumber: z
-//       .string()
-//       .trim()
-//       .min(1, "Vehicle number is required")
-//       .max(20),
-//     vehicleType: optionalString(z.string().max(50)),
-//     notes: optionalString(z.string().max(300)),
-//   }),
-// })
-
-// export const generateParkingSlotsBodySchema = z
-//   .object({
-//     prefix: z
-//       .string()
-//       .trim()
-//       .min(1, "Prefix is required")
-//       .max(10, "Prefix must be 10 characters or less"),
-//     totalSlots: z
-//       .number()
-//       .int("totalSlots must be a whole number")
-//       .min(1, "totalSlots must be greater than 0")
-//       .max(500, "totalSlots cannot exceed 500"),
-//     startNumber: z
-//       .number()
-//       .int("startNumber must be a whole number")
-//       .min(1, "startNumber must be greater than 0")
-//       .optional()
-//       .default(1),
-//   })
-//   .strict()
-
-
-// export const generateParkingSlotsSchema = z.object({
-//   body: generateParkingSlotsBodySchema,
-// })
-
-// export type GenerateParkingSlotsInput = z.infer<
-//   typeof generateParkingSlotsBodySchema
-// >
-
-// export const updateParkingSlotBodySchema = z
-//   .object({
-//     slotNumber: optionalString(
-//       z
-//         .string()
-//         .min(1, "Slot number cannot be empty")
-//         .max(30)
-//     ),
-//     notes: z
-//       .string()
-//       .trim()
-//       .max(300)
-//       .nullable()
-//       .optional(),
-//   })
-//   .refine(
-//     (data) =>
-//       data.slotNumber !== undefined ||
-//       data.notes !== undefined,
-//     {
-//       message:
-//         "At least one field (slotNumber or notes) must be provided",
-//     }
-//   )
-
-// export const updateParkingSlotSchema =
-//   parkingSlotIdParamsSchema.extend({
-//     body: updateParkingSlotBodySchema,
-//   })
-
-// export type UpdateParkingSlotInput = z.infer<
-//   typeof updateParkingSlotBodySchema
-// >
 
 const objectIdSchema = (fieldName: string) =>
   z.string()
@@ -161,32 +10,44 @@ const objectIdSchema = (fieldName: string) =>
 
 export const generateParkingSlotsSchema = z.object({
   body: z.object({
-    prefix: z
+    level: z
       .string()
       .trim()
-      .min(1, "Prefix is required")
-      .max(10, "Prefix must be 10 characters or less"),
+      .min(1, "Level is required")
+      .max(100, "Level is too long"),
 
-    totalSlots: z
+    zoneName: z.preprocess(
+      (value) => {
+        if (typeof value !== "string") return value;
+
+        const trimmed = value.trim();
+
+        return trimmed === "" ? null : trimmed;
+      },
+      z
+        .string()
+        .max(100, "Zone name is too long")
+        .nullable()
+        .optional()
+    ),
+
+    usageType: z.preprocess(
+      (value) =>
+        typeof value === "string" ? value.trim().toUpperCase() : value,
+      z.enum(["RESIDENT", "VISITOR"])
+    ),
+
+    vehicleType: z.preprocess(
+      (value) =>
+        typeof value === "string" ? value.trim().toUpperCase() : value,
+      z.enum(["CAR", "BIKE", "EV", "OTHER"])
+    ),
+
+    numberOfSlots: z.coerce
       .number()
-      .int("totalSlots must be a whole number")
-      .min(1, "totalSlots must be greater than 0")
-      .max(500, "totalSlots cannot exceed 500"),
-
-    startNumber: z
-      .number()
-      .int("startNumber must be a whole number")
-      .min(1, "startNumber must be greater than 0")
-      .optional()
-      .default(1),
-
-    vehicleType: z.enum(["CAR", "BIKE", "EV", "OTHER"], {
-      message: "Invalid vehicle type",
-    }),
-
-    usageType: z.enum(["RESIDENT", "VISITOR"], {
-      message: "Invalid usage type",
-    }),
+      .int("Number of slots must be a whole number")
+      .positive("Number of slots must be greater than 0")
+      .max(1000, "You can generate a maximum of 1000 slots at once"),
   }).strict(),
 });
 
@@ -197,28 +58,68 @@ const emptyToUndefined = (value: unknown) =>
 
 export const getParkingSlotsQuerySchema = z.object({
   query: z.object({
-    search: z.preprocess(emptyToUndefined, z.string().trim().optional()),
+    search: z.preprocess(
+      emptyToUndefined,
+      z.string().trim().optional()
+    ),
+
     vehicleType: z.preprocess(
       emptyToUndefined,
       z.enum(["CAR", "BIKE", "EV", "OTHER"]).optional()
     ),
+
     usageType: z.preprocess(
       emptyToUndefined,
       z.enum(["RESIDENT", "VISITOR"]).optional()
     ),
+
     status: z.preprocess(
       emptyToUndefined,
-      z.enum(["AVAILABLE", "ASSIGNED", "OCCUPIED", "INACTIVE"]).optional()
+      z.enum([
+        "AVAILABLE",
+        "ASSIGNED",
+        "OCCUPIED",
+        "INACTIVE",
+      ]).optional()
     ),
+
+    level: z.preprocess(
+      emptyToUndefined,
+      z.string().trim().optional()
+    ),
+
+    zoneCode: z.preprocess(
+      emptyToUndefined,
+      z.string().trim().toUpperCase().optional()
+    ),
+
     page: z
-      .preprocess(emptyToUndefined, z.coerce.number().int().min(1).optional())
+      .preprocess(
+        emptyToUndefined,
+        z.coerce.number().int().min(1).optional()
+      )
       .default(1),
+
     limit: z
       .preprocess(
         emptyToUndefined,
         z.coerce.number().int().min(1).max(100).optional()
       )
       .default(10),
+
+    sortBy: z
+      .preprocess(
+        emptyToUndefined,
+        z.enum(["createdAt", "slotNumber"]).optional()
+      )
+      .default("slotNumber"),
+
+    sortOrder: z
+      .preprocess(
+        emptyToUndefined,
+        z.enum(["asc", "desc"]).optional()
+      )
+      .default("asc"),
   }),
 });
 
@@ -234,11 +135,18 @@ export type ParkingIdParams = z.infer<typeof parkingIdParamsSchema>["params"];
 
 export const updateParkingSlotBodySchema = z
   .object({
-    slotNumber: z
+    level: z
       .string()
       .trim()
-      .min(1, "Slot number is required")
-      .max(30, "Slot number cannot exceed 30 characters")
+      .min(1, "Level is required")
+      .max(100, "Level cannot exceed 100 characters")
+      .optional(),
+
+    zoneName: z
+      .string()
+      .trim()
+      .max(100, "Zone name cannot exceed 100 characters")
+      .nullable()
       .optional(),
 
     vehicleType: z
@@ -252,7 +160,8 @@ export const updateParkingSlotBodySchema = z
   .strict()
   .refine(
     (data) =>
-      data.slotNumber !== undefined ||
+      data.level !== undefined ||
+      data.zoneName !== undefined ||
       data.vehicleType !== undefined ||
       data.usageType !== undefined,
     {
@@ -315,5 +224,3 @@ export type UpdateParkingSlotStatusInput = z.infer<
   typeof updateParkingSlotStatusSchema
 >["body"];
 
-
-

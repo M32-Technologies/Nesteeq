@@ -1,10 +1,7 @@
 import { Router } from "express";
 
 import {
-  generateParkingSlotsHandler,
-  getParkingSlotsHandler,
-  getParkingSlotByIdHandler,
-  updateParkingSlotHandler,
+  generateParkingSlotsHandler, getParkingStatsHandler, getParkingSlotsHandler, getParkingSlotByIdHandler, updateParkingSlotHandler,
   assignResidentParkingHandler,
   releaseResidentParkingHandler,
   updateParkingSlotStatusHandler,
@@ -24,6 +21,7 @@ import { zodValidate } from "../../middlewares/zodValidate.js";
 const router = Router();
 router.use(protect);
 
+router.get("/stats", requireRole("property_manager", "security_staff"), getParkingStatsHandler);
 router.get("/", requireRole("property_manager", "security_staff"), zodValidate(getParkingSlotsQuerySchema), getParkingSlotsHandler);
 router.get("/:parkingId", requireRole("property_manager"), zodValidate(parkingIdParamsSchema), getParkingSlotByIdHandler);
 router.post("/generate", requireRole("property_manager", "security_staff"), zodValidate(generateParkingSlotsSchema), generateParkingSlotsHandler);

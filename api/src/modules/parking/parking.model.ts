@@ -12,34 +12,37 @@ const parkingSlotSchema = new Schema(
       required: true,
       index: true,
     },
-
-    setupType: {
-      type: String,
-      enum: ["SIMPLE", "ADVANCED"],
-      required: true,
-      default: "SIMPLE",
-    },
-
     level: {
       type: String,
+      required: true,
       trim: true,
-      default: null,
-      maxlength: 100,
     },
 
-    zone: {
+    zoneName: {
       type: String,
       trim: true,
       default: null,
-      maxlength: 100,
+    },
+
+    zoneCode: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: null,
+    },
+
+
+    prefix: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      required: true,
     },
 
     slotNumber: {
       type: String,
       required: true,
       trim: true,
-      uppercase: true,
-      maxlength: 50,
     },
 
     vehicleType: {
@@ -56,14 +59,9 @@ const parkingSlotSchema = new Schema(
 
     status: {
       type: String,
-      enum: [
-        "AVAILABLE",
-        "ASSIGNED",
-        "OCCUPIED",
-        "INACTIVE",
-      ],
-      required: true,
+      enum: ["AVAILABLE", "ASSIGNED", "OCCUPIED", "INACTIVE"],
       default: "AVAILABLE",
+      required: true,
     },
 
     flatId: {
@@ -86,10 +84,8 @@ const parkingSlotSchema = new Schema(
 
     vehicleNumber: {
       type: String,
-      trim: true,
-      uppercase: true,
       default: null,
-      maxlength: 20,
+      trim: true,
     },
 
     assignedAt: {
@@ -127,7 +123,12 @@ parkingSlotSchema.index({
 parkingSlotSchema.index({
   apartmentId: 1,
   level: 1,
-  zone: 1,
+  zoneCode: 1,
+});
+
+parkingSlotSchema.index({
+  apartmentId: 1,
+  prefix: 1,
 });
 
 export type ParkingSlot = InferSchemaType<typeof parkingSlotSchema>;

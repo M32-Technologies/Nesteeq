@@ -114,7 +114,7 @@ export const checkInVisitorService = async ({
       },
     },
     {
-      new: true,
+      returnDocument: "after",
     }
   )
 

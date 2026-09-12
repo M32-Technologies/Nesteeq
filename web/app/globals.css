@@ -74,3 +74,14 @@ body {
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
+
+input:focus,
+input:focus-visible,
+select:focus,
+select:focus-visible,
+textarea:focus,
+textarea:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
+}
+

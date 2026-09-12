@@ -1,46 +1,74 @@
 import type { Request, Response } from "express"
 import { catchAsync } from "../../utils/catchAsync.js"
-import { generateParkingSlots, getParkingSlots, getParkingSlotById, updateParkingSlot, assignResidentParking, releaseResidentParking, updateParkingSlotStatus } from "./parking.service.js"
-import type { GetParkingSlotsQuery, ParkingIdParams, UpdateParkingSlotInput, AssignResidentParkingInput, UpdateParkingSlotStatusInput } from "./parking.validation.js"
+import {
+  generateParkingSlots,
+  getParkingSlots,
+  getParkingSlotById,
+  updateParkingSlot,
+  assignResidentParking,
+  releaseResidentParking,
+  updateParkingSlotStatus,
+  getParkingStats,  
+} from "./parking.service.js"
+import type {
+  GetParkingSlotsQuery,
+  ParkingIdParams,
+  UpdateParkingSlotInput,
+  AssignResidentParkingInput,
+  UpdateParkingSlotStatusInput,
+} from "./parking.validation.js"
 
 
 export const generateParkingSlotsHandler = catchAsync(
-    async (req: Request, res: Response) => {
-        const apartmentId = req.user?.apartmentId!;
-        const result = await generateParkingSlots(apartmentId, req.body);
+  async (req: Request, res: Response) => {
+    const apartmentId = req.user?.apartmentId!;
+    const result = await generateParkingSlots(apartmentId, req.body);
 
-        res.status(201).json({
-            success: true,
-            message: "Parking slots generated successfully",
-            data: result,
-        });
-    }
+    res.status(201).json({
+      success: true,
+      message: "Parking slots generated successfully",
+      data: result,
+    });
+  }
 )
 
-export const getParkingSlotsHandler = catchAsync(
-    async (req: Request, res: Response) => {
-        const apartmentId = req.user?.apartmentId!;
-        const query = req.query as unknown as GetParkingSlotsQuery;
-        const result = await getParkingSlots(query, apartmentId);
+export const getParkingStatsHandler = catchAsync(
+  async (req: Request, res: Response) => {
+    const apartmentId = req.user?.apartmentId!;
+    const result = await getParkingStats(apartmentId);
 
-        res.status(200).json({
-            success: true,
-            data: result,
-        });
-    }
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  }
+);
+
+
+export const getParkingSlotsHandler = catchAsync(
+  async (req: Request, res: Response) => {
+    const apartmentId = req.user?.apartmentId!;
+    const query = req.query as unknown as GetParkingSlotsQuery;
+    const result = await getParkingSlots(query, apartmentId);
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  }
 )
 
 export const getParkingSlotByIdHandler = catchAsync(
-    async (req: Request, res: Response) => {
-        const apartmentId = req.user?.apartmentId!;
-        const { parkingId } = req.params as unknown as ParkingIdParams;
-        const parkingSlot = await getParkingSlotById(parkingId, apartmentId);
+  async (req: Request, res: Response) => {
+    const apartmentId = req.user?.apartmentId!;
+    const { parkingId } = req.params as unknown as ParkingIdParams;
+    const parkingSlot = await getParkingSlotById(parkingId, apartmentId);
 
-        res.status(200).json({
-            success: true,
-            data: parkingSlot,
-        });
-    }
+    res.status(200).json({
+      success: true,
+      data: parkingSlot,
+    });
+  }
 )
 
 export const updateParkingSlotHandler = catchAsync(
@@ -106,6 +134,7 @@ export const updateParkingSlotStatusHandler = catchAsync(
     });
   }
 );
+
 
 
 

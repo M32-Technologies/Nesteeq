@@ -1,58 +1,68 @@
-import { CheckCircle2, Car, Ban, LayoutGrid } from "lucide-react"
+"use client"
 
-import type { VisitorParkingSummary } from "../../../security/services/parking.service"
+import { CheckCircle2, Car, Ban, LayoutGrid, Users, type LucideIcon } from "lucide-react"
+import type { ParkingStats } from "../types/parking.types"
 
 type ParkingSummaryProps = {
-  summary?: VisitorParkingSummary
+  stats?: ParkingStats
   isLoading: boolean
 }
 
-export default function ParkingSummary({
-  summary,
-  isLoading,
-}: ParkingSummaryProps) {
-  const cards = [
-    {
-      title: "Total Parking",
-      description: "Configured parking slots",
-      value: summary?.totalVisitorSlots ?? 0,
-      icon: LayoutGrid,
-      accent: "bg-slate-900",
-      iconBg: "bg-slate-100",
-      iconColor: "text-slate-700",
-      isValueLoading: isLoading,
-    },
-    {
-      title: "Available",
-      description: "Ready to use",
-      value: summary?.available ?? 0,
-      icon: CheckCircle2,
-      accent: "bg-[#0F5F45]",
-      iconBg: "bg-[#E7F4EE]",
-      iconColor: "text-[#0F5F45]",
-      isValueLoading: isLoading,
-    },
-    {
-      title: "Occupied",
-      description: "Currently in use",
-      value: summary?.occupied ?? 0,
-      icon: Car,
-      accent: "bg-sky-500",
-      iconBg: "bg-sky-50",
-      iconColor: "text-sky-700",
-      isValueLoading: isLoading,
-    },
-    {
-      title: "Out of Service",
-      description: "Temporarily unavailable",
-      value: summary?.outOfService ?? 0,
-      icon: Ban,
-      accent: "bg-red-500",
-      iconBg: "bg-red-50",
-      iconColor: "text-red-700",
-      isValueLoading: isLoading,
-    },
-  ]
+export default function ParkingSummary({ stats, isLoading }: ParkingSummaryProps) {
+  const total = stats?.total ?? 0
+  const available = stats?.available ?? 0
+  const assigned = stats?.assigned ?? 0
+  const occupied = stats?.occupied ?? 0
+  const inactive = stats?.inactive ?? 0
+  const residentSlots = stats?.residentSlots ?? 0
+  const visitorSlots = stats?.visitorSlots ?? 0
+
+  const cards: {
+    title: string
+    description: string
+    value: number | string
+    icon: LucideIcon
+    accent: string
+    iconBg: string
+    iconColor: string
+  }[] = [
+      {
+        title: "Total Slots",
+        description: `${residentSlots} resident • ${visitorSlots} visitor`,
+        value: total,
+        icon: LayoutGrid,
+        accent: "bg-slate-900",
+        iconBg: "bg-slate-100",
+        iconColor: "text-slate-700",
+      },
+      {
+        title: "Available",
+        description: "Ready for vehicle parking",
+        value: available,
+        icon: CheckCircle2,
+        accent: "bg-[#0F5F45]",
+        iconBg: "bg-[#E7F4EE]",
+        iconColor: "text-[#0F5F45]",
+      },
+      {
+        title: "Assigned",
+        description: "Assigned to resident flats",
+        value: assigned,
+        icon: Users,
+        accent: "bg-sky-500",
+        iconBg: "bg-sky-50",
+        iconColor: "text-sky-700",
+      },
+      {
+        title: "Occupied / Inactive",
+        description: `${occupied} occupied • ${inactive} inactive`,
+        value: occupied + inactive,
+        icon: inactive > 0 ? Ban : Car,
+        accent: inactive > 0 ? "bg-amber-500" : "bg-sky-500",
+        iconBg: inactive > 0 ? "bg-amber-50" : "bg-sky-50",
+        iconColor: inactive > 0 ? "text-amber-700" : "text-sky-700",
+      },
+    ]
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -74,7 +84,7 @@ export default function ParkingSummary({
                   {card.title}
                 </p>
                 <p className="mt-1.5 text-[22px] font-semibold tabular-nums leading-none tracking-tight text-slate-900">
-                  {card.isValueLoading ? (
+                  {isLoading ? (
                     <span className="inline-block h-6 w-8 animate-pulse rounded bg-slate-100 align-middle" />
                   ) : (
                     card.value

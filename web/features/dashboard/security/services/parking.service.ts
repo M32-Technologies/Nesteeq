@@ -52,8 +52,9 @@ export interface VisitorParkingResponse {
 export interface AssignParkingPayload {
   slotId: string
   flatId: string
+  residentId?: string
   visitorVisitId?: string
-  visitorName: string
+  visitorName?: string
   vehicleNumber: string
   vehicleType?: string
   notes?: string
@@ -68,6 +69,8 @@ export interface GenerateParkingSlotsPayload {
 export interface UpdateParkingSlotPayload {
   slotId: string
   slotNumber: string
+  vehicleType?: string
+  usageType?: string
   notes?: string
 }
 
@@ -103,9 +106,10 @@ export const createParkingSlot = async (payload: {
 export const assignParkingSlot = async (
   payload: AssignParkingPayload
 ) => {
+  const { slotId, ...rest } = payload
   const response = await axiosInstance.post(
-    "/api/security/parking/assign",
-    payload
+    `/api/security/parking/${slotId}/assign-resident`,
+    rest
   )
 
   return response.data.data as VisitorParkingResponse
@@ -114,7 +118,6 @@ export const assignParkingSlot = async (
 export const updateParkingSlotStatus = async ({
   slotId,
   status,
-  notes,
 }: {
   slotId: string
   status: Exclude<VisitorParkingSlotStatus, "ALL" | "OCCUPIED">
@@ -124,7 +127,6 @@ export const updateParkingSlotStatus = async ({
     `/api/security/parking/${slotId}/status`,
     {
       status,
-      notes,
     }
   )
 
@@ -132,7 +134,7 @@ export const updateParkingSlotStatus = async ({
 }
 
 export const releaseParkingSlot = async (slotId: string) => {
-  const response = await axiosInstance.patch(
+  const response = await axiosInstance.post(
     `/api/security/parking/${slotId}/release`
   )
 
@@ -153,13 +155,15 @@ export const generateParkingSlots = async (
 export const updateParkingSlot = async ({
   slotId,
   slotNumber,
-  notes,
+  vehicleType,
+  usageType,
 }: UpdateParkingSlotPayload) => {
   const response = await axiosInstance.patch(
     `/api/security/parking/${slotId}`,
     {
       slotNumber,
-      notes,
+      vehicleType,
+      usageType,
     }
   )
 

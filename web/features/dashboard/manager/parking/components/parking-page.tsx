@@ -1,423 +1,256 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
-import { Grid2X2Plus, X } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { Car, Plus, Sparkles } from "lucide-react"
 
-import type { VisitorParkingSlotStatus } from "../../../security/services/parking.service"
 import {
-  useGenerateParkingSlotsMutation,
   useParkingSlotsQuery,
+  useParkingStatsQuery,
 } from "../hooks/use-parking-queries"
+import type {
+  ParkingSortBy,
+  ParkingSortOption,
+  ParkingSortOrder,
+  ParkingStatusFilter,
+  ParkingUsageFilter,
+  ParkingVehicleFilter,
+} from "../types/parking.types"
 
 import ParkingSummary from "./parking-summary"
 import ParkingTable from "./parking-table"
-import { generateSlotsSchema } from "../schemas/parking.schema"
-import type { GenerateSlotsFormValues, ParkingStatusFilter } from "../types/parking.types"
-
-
-const GENERATE_FORM_DEFAULTS: GenerateSlotsFormValues = {
-  prefix: "P",
-  totalSlots: 80,
-  startNumber: 1,
-}
+import { GenerateSlotsDialog } from "./generate-slots-dialog"
 
 export default function ParkingPage() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [debouncedSearchQuery, setDebouncedSearchQuery] =
-    useState("")
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("")
 
-  const [statusFilter, setStatusFilter] =
-    useState<ParkingStatusFilter>("ALL")
+  const [statusFilter, setStatusFilter] = useState<ParkingStatusFilter>("ALL")
+  const [usageFilter, setUsageFilter] = useState<ParkingUsageFilter>("ALL")
+  const [vehicleFilter, setVehicleFilter] = useState<ParkingVehicleFilter>("ALL")
 
+  const [levelFilter, setLevelFilter] = useState("")
+  const [debouncedLevelFilter, setDebouncedLevelFilter] = useState("")
+  const [zoneFilter, setZoneFilter] = useState("")
+  const [debouncedZoneFilter, setDebouncedZoneFilter] = useState("")
+
+  const [sortOption, setSortOption] = useState<ParkingSortOption>("slot_asc")
+  const [viewMode, setViewMode] = useState<"table" | "grid">("table")
+  const [isGenerateOpen, setIsGenerateOpen] = useState(false)
   const [page, setPage] = useState(1)
 
-  const [isGenerateOpen, setIsGenerateOpen] =
-    useState(false)
-
+  // Debounce search and text filters
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setDebouncedSearchQuery(searchQuery.trim())
-      setPage(1) // Reset page on search change
+      setDebouncedLevelFilter(levelFilter.trim())
+      setDebouncedZoneFilter(zoneFilter.trim())
+      setPage(1)
     }, 300)
 
     return () => {
       window.clearTimeout(timeoutId)
     }
-  }, [searchQuery])
+  }, [searchQuery, levelFilter, zoneFilter])
 
-  // Reset page when status filter changes
-  const handleStatusChange = (status: ParkingStatusFilter) => {
-    setStatusFilter(status)
+  // Map sortOption to API query params
+  const { sortBy, sortOrder } = useMemo<{
+    sortBy: ParkingSortBy
+    sortOrder: ParkingSortOrder
+  }>(() => {
+    switch (sortOption) {
+      case "newest":
+        return { sortBy: "createdAt", sortOrder: "desc" }
+      case "oldest":
+        return { sortBy: "createdAt", sortOrder: "asc" }
+      case "slot_desc":
+        return { sortBy: "slotNumber", sortOrder: "desc" }
+      case "slot_asc":
+      default:
+        return { sortBy: "slotNumber", sortOrder: "asc" }
+    }
+  }, [sortOption])
+
+  const handleClearFilters = () => {
+    setSearchQuery("")
+    setDebouncedSearchQuery("")
+    setStatusFilter("ALL")
+    setUsageFilter("ALL")
+    setVehicleFilter("ALL")
+    setLevelFilter("")
+    setDebouncedLevelFilter("")
+    setZoneFilter("")
+    setDebouncedZoneFilter("")
+    setSortOption("slot_asc")
     setPage(1)
   }
 
-  const {
-    data,
-    isLoading,
-  } = useParkingSlotsQuery({
+  // Fetch slots list with comprehensive query filters and sorting
+  const { data, isLoading } = useParkingSlotsQuery({
     search: debouncedSearchQuery || undefined,
-    status:
-      statusFilter === "ALL"
-        ? undefined
-        : statusFilter,
+    status: statusFilter === "ALL" ? undefined : statusFilter,
+    usageType: usageFilter === "ALL" ? undefined : usageFilter,
+    vehicleType: vehicleFilter === "ALL" ? undefined : vehicleFilter,
+    level: debouncedLevelFilter || undefined,
+    zoneCode: debouncedZoneFilter || undefined,
+    sortBy,
+    sortOrder,
     page,
     limit: 10,
   })
 
-  const generateMutation =
-    useGenerateParkingSlotsMutation()
+  // Fetch stats summary
+  const { data: stats, isLoading: isStatsLoading } = useParkingStatsQuery()
 
-  const generateForm =
-    useForm<GenerateSlotsFormValues>({
-      resolver: zodResolver(generateSlotsSchema),
-      defaultValues: GENERATE_FORM_DEFAULTS,
-    })
-
-  const prefix = generateForm.watch("prefix")
-  const totalSlots = generateForm.watch("totalSlots")
-  const startNumber =
-    generateForm.watch("startNumber")
-
-  const previewPrefix =
-    prefix?.trim().toUpperCase() ?? ""
-
-  const previewEndNumber =
-    Number.isInteger(totalSlots) &&
-    Number.isInteger(startNumber)
-      ? startNumber + totalSlots - 1
-      : 0
-
-  const handleGenerateSubmit = (
-    formData: GenerateSlotsFormValues
-  ) => {
-    generateMutation.mutate(
-      {
-        ...formData,
-        prefix: formData.prefix
-          .trim()
-          .toUpperCase(),
-      },
-      {
-        onSuccess: () => {
-          setIsGenerateOpen(false)
-          generateForm.reset(
-            GENERATE_FORM_DEFAULTS
-          )
-        },
-      }
-    )
-  }
-
-  const handleGenerateDialogClose = () => {
-    if (generateMutation.isPending) return
-
-    setIsGenerateOpen(false)
-    generateForm.reset(GENERATE_FORM_DEFAULTS)
-  }
-
-  const hasConfiguredSlots =
-    (data?.summary?.totalVisitorSlots ?? 0) > 0
-
+  const totalSlotsCount = stats?.total ?? data?.pagination?.total ?? 0
   const hasActiveFilters =
     searchQuery.trim().length > 0 ||
-    statusFilter !== "ALL"
+    statusFilter !== "ALL" ||
+    usageFilter !== "ALL" ||
+    vehicleFilter !== "ALL" ||
+    levelFilter.trim().length > 0 ||
+    zoneFilter.trim().length > 0 ||
+    sortOption !== "slot_asc"
+
+  // 100% dynamic from backend data: NO hardcoded dummy levels or zones
+  const availableLevels = useMemo(() => {
+    const set = new Set<string>()
+    data?.parkingSlots?.forEach((s) => {
+      if (s.level && s.level.trim()) {
+        set.add(s.level.trim())
+      }
+    })
+    return Array.from(set).sort()
+  }, [data?.parkingSlots])
+
+  const availableZones = useMemo(() => {
+    const set = new Set<string>()
+    data?.parkingSlots?.forEach((s) => {
+      const zone = s.zoneName?.trim() || s.zoneCode?.trim()
+      if (zone) {
+        set.add(zone)
+      }
+    })
+    return Array.from(set).sort()
+  }, [data?.parkingSlots])
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-7 p-6">
       {/* Header */}
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-slate-900">
             Parking
           </h1>
-
           <p className="mt-1 text-sm text-slate-500">
-            Manage parking slots, availability,
-            and current assignments.
+            Manage parking slots, resident vehicle assignments, and availability.
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsGenerateOpen(true)}
-          className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-lg bg-[#0F5F45] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#0B4D38] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F5F45] focus-visible:ring-offset-2 xl:self-auto"
-        >
-          <Grid2X2Plus
-            size={16}
-            strokeWidth={2.25}
-          />
-          Generate Parking Slots
-        </button>
+        {/* Action Buttons */}
+        <div className="flex items-center gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsGenerateOpen(true)}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50"
+          >
+            <Sparkles size={16} strokeWidth={2.25} />
+            Generate Slots
+          </button>
+
+          {/* "+ Add Slot" (rendered for UI, action unconnected per instruction) */}
+          <button
+            type="button"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0F5F45] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0B4D38]"
+          >
+            <Plus size={16} strokeWidth={2.25} />
+            Add Slot
+          </button>
+        </div>
       </div>
 
-      {/* Summary */}
-      <ParkingSummary
-        summary={data?.summary}
-        isLoading={isLoading}
-      />
+      {/* Summary Cards */}
+      <ParkingSummary stats={stats} isLoading={isStatsLoading} />
 
-      {/* First-time empty state */}
-      {!isLoading &&
-        !hasConfiguredSlots &&
-        !hasActiveFilters && (
-          <div className="mt-8 rounded-xl border border-slate-200 bg-white p-12 text-center shadow-sm">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-50 text-slate-400">
-              <Grid2X2Plus size={32} />
-            </div>
-
-            <h2 className="mb-2 text-xl font-semibold text-slate-900">
-              No parking slots configured
-            </h2>
-
-            <p className="mx-auto mb-8 max-w-sm text-sm text-slate-500">
-              Generate parking slots to start
-              managing parking for this property.
-            </p>
-
-            <button
-              type="button"
-              onClick={() =>
-                setIsGenerateOpen(true)
-              }
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0F5F45] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#0B4D38] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F5F45] focus-visible:ring-offset-2"
-            >
-              <Grid2X2Plus
-                size={16}
-                strokeWidth={2.25}
-              />
-              Generate Parking Slots
-            </button>
+      {/* First-Time Empty State (when completely 0 slots) */}
+      {!isLoading && !isStatsLoading && totalSlotsCount === 0 && !hasActiveFilters && (
+        <div className="mt-8 rounded-xl border border-slate-200 bg-white p-12 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-50 text-slate-400">
+            <Car size={32} />
           </div>
-        )}
 
-      {/* Parking table */}
-      {(isLoading ||
-        hasConfiguredSlots ||
-        hasActiveFilters) && (
+          <h2 className="mb-2 text-xl font-semibold text-slate-900">
+            No parking slots configured
+          </h2>
+
+          <p className="mx-auto max-w-sm text-sm text-slate-500 mb-6">
+            No parking slots have been generated for this property yet. Generate your first batch of slots now.
+          </p>
+
+          <button
+            type="button"
+            onClick={() => setIsGenerateOpen(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F5F45] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0B4D38]"
+          >
+            <Sparkles size={16} />
+            Generate Slots Now
+          </button>
+        </div>
+      )}
+
+      {/* Main Table / Grid View Container */}
+      {(isLoading || totalSlotsCount > 0 || hasActiveFilters) && (
         <ParkingTable
-          slots={data?.slots ?? []}
+          slots={data?.parkingSlots ?? []}
           statusFilter={statusFilter}
+          usageFilter={usageFilter}
+          vehicleFilter={vehicleFilter}
           searchQuery={searchQuery}
+          levelFilter={levelFilter}
+          zoneFilter={zoneFilter}
+          sortOption={sortOption}
+          viewMode={viewMode}
+          availableLevels={availableLevels}
+          availableZones={availableZones}
           isLoading={isLoading}
           page={data?.pagination?.page ?? page}
           totalPages={data?.pagination?.totalPages ?? 1}
-          totalCount={data?.pagination?.totalCount ?? 0}
+          totalCount={data?.pagination?.total ?? 0}
           onSearchChange={setSearchQuery}
-          onStatusChange={handleStatusChange}
+          onStatusChange={(val) => {
+            setStatusFilter(val)
+            setPage(1)
+          }}
+          onUsageChange={(val) => {
+            setUsageFilter(val)
+            setPage(1)
+          }}
+          onVehicleChange={(val) => {
+            setVehicleFilter(val)
+            setPage(1)
+          }}
+          onLevelChange={(val) => {
+            setLevelFilter(val)
+            setPage(1)
+          }}
+          onZoneChange={(val) => {
+            setZoneFilter(val)
+            setPage(1)
+          }}
+          onSortChange={(val) => {
+            setSortOption(val)
+            setPage(1)
+          }}
+          onViewModeChange={setViewMode}
+          onClearFilters={handleClearFilters}
           onPageChange={setPage}
         />
       )}
 
-      {/* Generate Parking Slots Dialog */}
-      {isGenerateOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="generate-parking-title"
-        >
-          <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-              <h2
-                id="generate-parking-title"
-                className="text-lg font-semibold text-slate-900"
-              >
-                Generate Parking Slots
-              </h2>
-
-              <button
-                type="button"
-                onClick={
-                  handleGenerateDialogClose
-                }
-                disabled={
-                  generateMutation.isPending
-                }
-                aria-label="Close generate parking slots dialog"
-                className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <form
-              onSubmit={generateForm.handleSubmit(
-                handleGenerateSubmit
-              )}
-              className="p-6"
-            >
-              <div className="space-y-4">
-                {/* Prefix */}
-                <div>
-                  <label
-                    htmlFor="parking-prefix"
-                    className="mb-1.5 block text-sm font-medium text-slate-700"
-                  >
-                    Slot Prefix
-                  </label>
-
-                  <input
-                    id="parking-prefix"
-                    {...generateForm.register(
-                      "prefix"
-                    )}
-                    autoComplete="off"
-                    className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-[#0F5F45] focus:ring-1 focus:ring-[#0F5F45]"
-                  />
-
-                  <p className="mt-1.5 text-[13px] text-slate-500">
-                    Used to generate slot numbers
-                    such as P-001.
-                  </p>
-
-                  {generateForm.formState.errors
-                    .prefix && (
-                    <p className="mt-1 text-xs text-red-600">
-                      {
-                        generateForm.formState
-                          .errors.prefix.message
-                      }
-                    </p>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  {/* Total Slots */}
-                  <div>
-                    <label
-                      htmlFor="parking-total-slots"
-                      className="mb-1.5 block text-sm font-medium text-slate-700"
-                    >
-                      Number of Slots
-                    </label>
-
-                    <input
-                      id="parking-total-slots"
-                      type="number"
-                      min={1}
-                      max={500}
-                      {...generateForm.register(
-                        "totalSlots",
-                        {
-                          valueAsNumber: true,
-                        }
-                      )}
-                      className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-[#0F5F45] focus:ring-1 focus:ring-[#0F5F45]"
-                    />
-
-                    {generateForm.formState.errors
-                      .totalSlots && (
-                      <p className="mt-1 text-xs text-red-600">
-                        {
-                          generateForm
-                            .formState.errors
-                            .totalSlots.message
-                        }
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Starting Number */}
-                  <div>
-                    <label
-                      htmlFor="parking-start-number"
-                      className="mb-1.5 block text-sm font-medium text-slate-700"
-                    >
-                      Starting Number
-                    </label>
-
-                    <input
-                      id="parking-start-number"
-                      type="number"
-                      min={1}
-                      {...generateForm.register(
-                        "startNumber",
-                        {
-                          valueAsNumber: true,
-                        }
-                      )}
-                      className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-[#0F5F45] focus:ring-1 focus:ring-[#0F5F45]"
-                    />
-
-                    {generateForm.formState.errors
-                      .startNumber && (
-                      <p className="mt-1 text-xs text-red-600">
-                        {
-                          generateForm
-                            .formState.errors
-                            .startNumber.message
-                        }
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Preview */}
-                {previewPrefix &&
-                  Number.isInteger(totalSlots) &&
-                  totalSlots > 0 &&
-                  Number.isInteger(
-                    startNumber
-                  ) &&
-                  startNumber > 0 && (
-                    <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
-                      <p className="mb-1 text-xs font-medium text-slate-500">
-                        Preview
-                      </p>
-
-                      <p className="text-sm text-slate-700">
-                        Slots will be generated
-                        from
-                      </p>
-
-                      <p className="mt-1 font-semibold text-slate-900">
-                        {previewPrefix}-
-                        {String(
-                          startNumber
-                        ).padStart(3, "0")}
-                        {" → "}
-                        {previewPrefix}-
-                        {String(
-                          previewEndNumber
-                        ).padStart(3, "0")}
-                      </p>
-                    </div>
-                  )}
-              </div>
-
-              <div className="mt-8 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={
-                    handleGenerateDialogClose
-                  }
-                  disabled={
-                    generateMutation.isPending
-                  }
-                  className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={
-                    generateMutation.isPending
-                  }
-                  className="h-10 rounded-lg bg-[#0F5F45] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0B4D38] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {generateMutation.isPending
-                    ? "Generating..."
-                    : "Generate Slots"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Generate Slots Modal Dialog */}
+      <GenerateSlotsDialog
+        open={isGenerateOpen}
+        onClose={() => setIsGenerateOpen(false)}
+      />
     </div>
   )
 }
