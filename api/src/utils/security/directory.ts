@@ -1,10 +1,8 @@
 import { Types } from "mongoose"
 
 import { getAuthDB } from "../../config/auth-db.js"
-import { AppError } from "../../utils/AppError.js"
-import { escapeRegExp } from "../../utils/regex.js"
-import { Flat } from "../flat/flat.model.js"
-import { ResidentModel } from "../resident/resident.model.js"
+import { Flat } from "../../modules/flat/flat.model.js"
+import { ResidentModel } from "../../modules/resident/resident.model.js"
 import type {
   BetterAuthUser,
   LeanFlat,
@@ -12,7 +10,9 @@ import type {
   ObjectIdLike,
   ResidentDirectoryRecord,
   ResidentSummary,
-} from "./security.types.js"
+} from "../../modules/security/security.types.js"
+import { AppError } from "../AppError.js"
+import { escapeRegExp } from "../regex.js"
 
 const toId = (value: ObjectIdLike | string | null | undefined) =>
   value?.toString() ?? ""

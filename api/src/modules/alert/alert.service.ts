@@ -8,8 +8,8 @@ import {
   getMatchingFlatIdsForSearch,
   getMatchingUserIdsForSearch,
   getUserSummariesByIds,
-} from "../security/security-directory.service.js"
-import { validateEmergencyAlertStatusTransition } from "../security/security-status-transitions.js"
+} from "../../utils/security/directory.js"
+import { validateEmergencyAlertStatusTransition } from "../../utils/security/status-transitions.js"
 import {
   EmergencyAlertModel,
   EmergencyAlertStatus,

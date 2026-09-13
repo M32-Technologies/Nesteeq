@@ -12,7 +12,7 @@ import {
   securityActivityQuerySchema,
   verifyGuestPassSchema,
 } from "./security.validation.js"
-import { verifyPassRateLimit } from "./verify-pass-rate-limit.js"
+import { verifyPassRateLimit } from "../../utils/security/verify-pass-rate-limit.js"
 
 import {
   protect,

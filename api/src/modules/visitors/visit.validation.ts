@@ -13,6 +13,17 @@ const indianPhoneNumberRegex =
 const indianVehicleNumberRegex =
   /^(?:[A-Z]{2}[\s-]?\d{1,2}[\s-]?[A-Z]{1,3}[\s-]?\d{1,4}|\d{2}[\s-]?BH[\s-]?\d{4}[\s-]?[A-Z]{1,2})$/i
 
+const vehicleTypes = ["CAR", "BIKE", "EV", "OTHER"] as const
+
+const optionalVehicleType = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") return value
+    const trimmedValue = value.trim()
+    return trimmedValue ? trimmedValue.toUpperCase() : undefined
+  },
+  z.enum(vehicleTypes).optional()
+)
+
 const optionalString = (schema: z.ZodString) =>
   z.preprocess(
     (value) => {
@@ -94,47 +105,52 @@ export const checkInVisitorSchema = z.object({
 })
 
 export const manualVisitorEntrySchema = z.object({
-  body: z.object({
-    flatId: objectIdSchema,
+  body: z
+    .object({
+      flatId: objectIdSchema,
 
-    visitorName: z
-      .string()
-      .trim()
-      .min(1, "Visitor name is required")
-      .max(100, "Visitor name cannot exceed 100 characters"),
-
-    visitorPhone: optionalString(
-      z
+      visitorName: z
         .string()
-        .max(20, "Visitor phone cannot exceed 20 characters")
-        .regex(
-          indianPhoneNumberRegex,
-          "Enter a valid mobile number"
-        )
-    ),
+        .trim()
+        .min(1, "Visitor name is required")
+        .max(100, "Visitor name cannot exceed 100 characters"),
 
-    purpose: optionalString(
-      z
-        .string()
-        .max(200, "Purpose cannot exceed 200 characters")
-    ),
+      visitorPhone: optionalString(
+        z
+          .string()
+          .max(20, "Visitor phone cannot exceed 20 characters")
+          .regex(
+            indianPhoneNumberRegex,
+            "Enter a valid mobile number"
+          )
+      ),
 
-    vehicleNumber: optionalString(
-      z
-        .string()
-        .max(20, "Vehicle number cannot exceed 20 characters")
-        .regex(
-          indianVehicleNumberRegex,
-          "Enter a valid vehicle number"
-        )
-    ),
+      purpose: optionalString(
+        z
+          .string()
+          .max(200, "Purpose cannot exceed 200 characters")
+      ),
 
-    vehicleType: optionalString(
-      z
-        .string()
-        .max(50, "Vehicle type cannot exceed 50 characters")
-    ),
-  }),
+      vehicleNumber: optionalString(
+        z
+          .string()
+          .max(20, "Vehicle number cannot exceed 20 characters")
+          .regex(
+            indianVehicleNumberRegex,
+            "Enter a valid vehicle number"
+          )
+      ),
+
+      vehicleType: optionalVehicleType,
+    })
+    .refine((data) => !data.vehicleNumber || data.vehicleType, {
+      path: ["vehicleType"],
+      message: "Vehicle type is required when vehicle number is provided",
+    })
+    .refine((data) => !data.vehicleType || data.vehicleNumber, {
+      path: ["vehicleNumber"],
+      message: "Vehicle number is required when vehicle type is provided",
+    }),
 })
 
 export const visitorVisitIdParamsSchema = z.object({

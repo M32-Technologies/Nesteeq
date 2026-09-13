@@ -5,8 +5,8 @@ import {
   getMatchingFlatIdsForSearch,
   getMatchingUserIdsForSearch,
   getUserSummariesByIds,
-} from "../security/security-directory.service.js"
-import { validateDeliveryStatusTransition } from "../security/security-status-transitions.js"
+} from "../../utils/security/directory.js"
+import { validateDeliveryStatusTransition } from "../../utils/security/status-transitions.js"
 import { AppError } from "../../utils/AppError.js"
 import { escapeRegExp } from "../../utils/regex.js"
 import {

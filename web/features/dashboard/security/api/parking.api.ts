@@ -1,5 +1,6 @@
 import axiosInstance from "@/lib/axios"
 
+import type { ParkingVehicleType } from "../constants/parking-vehicle-types"
 import type {
   AssignParkingPayload,
   GenerateParkingSlotsPayload,
@@ -11,6 +12,7 @@ import type {
 
 export const getParkingSlots = async (params: {
   status?: VisitorParkingSlotStatus
+  vehicleType?: ParkingVehicleType
   search?: string
   page?: number
   limit?: number

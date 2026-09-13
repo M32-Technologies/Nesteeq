@@ -1,6 +1,7 @@
 "use client"
 
 import type { VisitorParkingSlot } from "../schemas/parking"
+import { getParkingVehicleTypeLabel } from "../constants/parking-vehicle-types"
 import {
   DetailGrid,
   DetailModal,
@@ -36,7 +37,9 @@ export function ParkingDetails({
           },
           {
             label: "Vehicle Type",
-            value: slot.currentAssignment?.vehicleType ?? "-",
+            value: getParkingVehicleTypeLabel(
+              slot.vehicleType ?? slot.currentAssignment?.vehicleType
+            ),
           },
           {
             label: "Visitor",

@@ -4,7 +4,7 @@ import {
   DeliveryStatus,
   DeliveryType,
 } from "./delivery.interface.js"
-import { deliveryUpdateStatuses } from "../security/security-status-transitions.js"
+import { deliveryUpdateStatuses } from "../../utils/security/status-transitions.js"
 
 const objectIdSchema = z
   .string()

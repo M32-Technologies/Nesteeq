@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { Fragment, useState } from "react"
 import {
   Eye,
   LogOut,
@@ -22,6 +22,10 @@ import {
   isValidVehicleNumber,
   normalizeVehicleNumber,
 } from "../utils/vehicle-validation"
+import {
+  parkingVehicleTypeOptions,
+  toParkingVehicleType,
+} from "../constants/parking-vehicle-types"
 import type {
   VisitorParkingSlot,
   VisitorParkingSlotStatus,
@@ -62,6 +66,7 @@ const statusFilters: Array<{
 
 const PARKING_PAGE_SIZE = 10
 const ASSIGNMENT_SLOT_LIMIT = 100
+const PARKING_TABLE_COLUMN_COUNT = 7
 
 export function ParkingSlots() {
   const [status, setStatus] =
@@ -84,6 +89,7 @@ export function ParkingSlots() {
   })
 
   const debouncedSearch = useDebouncedValue(search, 350)
+  const assignVehicleType = toParkingVehicleType(assignForm.vehicleType)
   const parkingQuery = useParkingSlots({
     status,
     search: debouncedSearch.trim() || undefined,
@@ -92,7 +98,10 @@ export function ParkingSlots() {
   })
   const availableSlotsQuery = useParkingSlots({
     status: "AVAILABLE",
+    vehicleType: assignVehicleType,
     limit: ASSIGNMENT_SLOT_LIMIT,
+  }, {
+    enabled: Boolean(assignVehicleType),
   })
   const activeVisitorsQuery = useActiveVisitors(1, 100)
   const flatsQuery = useSecurityFlats()
@@ -110,6 +119,14 @@ export function ParkingSlots() {
     (slot) =>
       slot.status === "AVAILABLE" && !slot.currentAssignment
   )
+  const parkingSections = parkingVehicleTypeOptions.map((vehicleType) => ({
+    ...vehicleType,
+    slots: slots.filter((slot) =>
+      vehicleType.value === "OTHER"
+        ? !slot.vehicleType || slot.vehicleType === vehicleType.value
+        : slot.vehicleType === vehicleType.value
+    ),
+  }))
 
   const handleAssign = async () => {
     if (assignMutation.isPending) return
@@ -117,14 +134,16 @@ export function ParkingSlots() {
     const normalizedVehicleNumber = normalizeVehicleNumber(
       assignForm.vehicleNumber
     )
+    const vehicleType = toParkingVehicleType(assignForm.vehicleType)
 
     if (
       !assignForm.slotId ||
       !assignForm.flatId ||
       !assignForm.visitorName.trim() ||
-      !normalizedVehicleNumber
+      !normalizedVehicleNumber ||
+      !vehicleType
     ) {
-      toast.error("Slot, flat, visitor, and vehicle are required")
+      toast.error("Slot, flat, visitor, vehicle number, and vehicle type are required")
       return
     }
 
@@ -141,7 +160,7 @@ export function ParkingSlots() {
           assignForm.visitorVisitId || undefined,
         visitorName: assignForm.visitorName,
         vehicleNumber: normalizedVehicleNumber,
-        vehicleType: assignForm.vehicleType || undefined,
+        vehicleType,
         notes: assignForm.notes || undefined,
       })
 
@@ -277,78 +296,107 @@ export function ParkingSlots() {
                 </tr>
               </thead>
               <tbody>
-                {slots.map((slot) => (
-                  <tr key={slot._id}>
-                    <td className={tdClassName}>
-                      <p className="font-medium">{slot.slotNumber}</p>
-                    </td>
-                    <td className={tdClassName}>
-                      {slot.currentAssignment?.vehicleNumber ?? "-"}
-                    </td>
-                    <td className={tdClassName}>
-                      {slot.currentAssignment?.visitorName ?? "-"}
-                    </td>
-                    <td className={tdClassName}>
-                      {slot.currentAssignment?.flatNumber ?? "-"}
-                    </td>
-                    <td className={tdClassName}>
-                      {formatDateTime(
-                        slot.currentAssignment?.assignedAt
-                      )}
-                    </td>
-                    <td className={tdClassName}>
-                      <StatusBadge status={slot.status} />
-                    </td>
-                    <td className={tdClassName}>
-                      <div className="relative flex justify-end">
-                        <button
-                          type="button"
-                          aria-label={`Open actions for parking slot ${slot.slotNumber}`}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE3DF] bg-white text-[#111111] transition hover:bg-[#F7F8F5]"
-                          onClick={() =>
-                            setOpenActionSlotId((currentSlotId) =>
-                              currentSlotId === slot._id
-                                ? null
-                                : slot._id
-                            )
-                          }
+                {parkingSections.map((section) => (
+                  <Fragment key={section.value}>
+                    <tr>
+                      <td
+                        className="bg-[#F7F8F5] px-4 py-3 text-sm font-semibold text-[#111111]"
+                        colSpan={PARKING_TABLE_COLUMN_COUNT}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span>{section.label} Parking</span>
+                          <span className="text-xs font-medium text-[#637083]">
+                            {section.slots.length} slots
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+
+                    {section.slots.length === 0 ? (
+                      <tr>
+                        <td
+                          className="px-4 py-5 text-sm text-[#637083]"
+                          colSpan={PARKING_TABLE_COLUMN_COUNT}
                         >
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
+                          No {section.label.toLowerCase()} parking slots
+                        </td>
+                      </tr>
+                    ) : (
+                      section.slots.map((slot) => (
+                        <tr key={slot._id}>
+                          <td className={tdClassName}>
+                            <p className="font-medium">{slot.slotNumber}</p>
+                          </td>
+                          <td className={tdClassName}>
+                            {slot.currentAssignment?.vehicleNumber ?? "-"}
+                          </td>
+                          <td className={tdClassName}>
+                            {slot.currentAssignment?.visitorName ?? "-"}
+                          </td>
+                          <td className={tdClassName}>
+                            {slot.currentAssignment?.flatNumber ?? "-"}
+                          </td>
+                          <td className={tdClassName}>
+                            {formatDateTime(
+                              slot.currentAssignment?.assignedAt
+                            )}
+                          </td>
+                          <td className={tdClassName}>
+                            <StatusBadge status={slot.status} />
+                          </td>
+                          <td className={tdClassName}>
+                            <div className="relative flex justify-end">
+                              <button
+                                type="button"
+                                aria-label={`Open actions for parking slot ${slot.slotNumber}`}
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE3DF] bg-white text-[#111111] transition hover:bg-[#F7F8F5]"
+                                onClick={() =>
+                                  setOpenActionSlotId((currentSlotId) =>
+                                    currentSlotId === slot._id
+                                      ? null
+                                      : slot._id
+                                  )
+                                }
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </button>
 
-                        {openActionSlotId === slot._id ? (
-                          <div className="absolute right-0 top-10 z-20 w-56 rounded-lg border border-[#DDE3DF] bg-white p-1 shadow-lg">
-                            <button
-                              type="button"
-                              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-[#111111] transition hover:bg-[#F7F8F5]"
-                              onClick={() => {
-                                setSelectedSlot(slot)
-                                setOpenActionSlotId(null)
-                              }}
-                            >
-                              <Eye className="h-4 w-4" />
-                              View Details
-                            </button>
+                              {openActionSlotId === slot._id ? (
+                                <div className="absolute right-0 top-10 z-20 w-56 rounded-lg border border-[#DDE3DF] bg-white p-1 shadow-lg">
+                                  <button
+                                    type="button"
+                                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-[#111111] transition hover:bg-[#F7F8F5]"
+                                    onClick={() => {
+                                      setSelectedSlot(slot)
+                                      setOpenActionSlotId(null)
+                                    }}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                    View Details
+                                  </button>
 
-                            {slot.status === "OCCUPIED" ? (
-                              <>
-                                <div className="my-1 border-t border-[#EEF1F4]" />
-                                <button
-                                  type="button"
-                                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-[#111111] transition hover:bg-[#F7F8F5] disabled:cursor-not-allowed disabled:opacity-60"
-                                  disabled={releaseMutation.isPending}
-                                  onClick={() => handleReleaseSlot(slot)}
-                                >
-                                  <LogOut className="h-4 w-4" />
-                                  Release Slot
-                                </button>
-                              </>
-                            ) : null}
-                          </div>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
+                                  {slot.status === "OCCUPIED" ? (
+                                    <>
+                                      <div className="my-1 border-t border-[#EEF1F4]" />
+                                      <button
+                                        type="button"
+                                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-[#111111] transition hover:bg-[#F7F8F5] disabled:cursor-not-allowed disabled:opacity-60"
+                                        disabled={releaseMutation.isPending}
+                                        onClick={() => handleReleaseSlot(slot)}
+                                      >
+                                        <LogOut className="h-4 w-4" />
+                                        Release Slot
+                                      </button>
+                                    </>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

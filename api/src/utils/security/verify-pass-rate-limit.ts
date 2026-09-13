@@ -4,7 +4,7 @@ import type {
   Response,
 } from "express"
 
-import { AppError } from "../../utils/AppError.js"
+import { AppError } from "../AppError.js"
 
 type VerifyPassAttempt = {
   count: number

@@ -1,12 +1,12 @@
 import {
   EmergencyAlertStatus,
   type EmergencyAlertStatus as EmergencyAlertStatusType,
-} from "../alert/alert.model.js"
+} from "../../modules/alert/alert.model.js"
 import {
   DeliveryStatus,
   type DeliveryStatus as DeliveryStatusType,
-} from "../delivery/delivery.interface.js"
-import { AppError } from "../../utils/AppError.js"
+} from "../../modules/delivery/delivery.interface.js"
+import { AppError } from "../AppError.js"
 
 export const deliveryUpdateStatuses = [
   DeliveryStatus.NOTIFIED,

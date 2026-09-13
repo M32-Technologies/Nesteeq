@@ -1,3 +1,5 @@
+import type { ParkingVehicleType } from "../constants/parking-vehicle-types"
+
 export type VisitorParkingSlotStatus =
   | "ALL"
   | "AVAILABLE"
@@ -23,6 +25,7 @@ export interface VisitorParkingSlot {
   _id: string
   apartmentId: string
   slotNumber: string
+  vehicleType?: ParkingVehicleType | null
   status: Exclude<VisitorParkingSlotStatus, "ALL">
   notes?: string | null
   createdAt?: string
@@ -55,7 +58,7 @@ export interface AssignParkingPayload {
   visitorVisitId?: string
   visitorName: string
   vehicleNumber: string
-  vehicleType?: string
+  vehicleType: ParkingVehicleType
   notes?: string
 }
 

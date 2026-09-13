@@ -1,11 +1,12 @@
 import { Types } from "mongoose"
 
-import { getApartmentFlatsService } from "../modules/security/security-directory.service.js"
+import { getApartmentFlatsService } from "./security/directory.js"
 import {
   VisitorVisitModel,
   VisitorVisitStatus,
 } from "../modules/visitors/visit.model.js"
 import {
+  ParkingVehicleType,
   VisitorParkingAssignmentStatus,
   VisitorParkingSlotStatus,
   type LeanParkingAssignment,
@@ -39,6 +40,9 @@ export const normalizeText = (value?: string | null) => {
   return trimmed ? trimmed : null
 }
 
+export const normalizeVehicleNumber = (value: string) =>
+  value.replace(/[\s-]/g, "").toUpperCase()
+
 export const isDuplicateKeyError = (
   error: unknown
 ): error is DuplicateKeyError =>
@@ -61,6 +65,53 @@ export const assertParkingSlotId = (slotId: string) => {
     throw new AppError("Invalid parking slot ID", 400)
   }
 }
+
+export const parkingObjectId = (
+  value: string | undefined,
+  label: string
+) => {
+  if (!value || !Types.ObjectId.isValid(value)) {
+    throw new AppError(`Invalid ${label}`, 400)
+  }
+
+  return new Types.ObjectId(value)
+}
+
+const parkingVehicleCodeMap: Record<ParkingVehicleType, string> = {
+  CAR: "C",
+  BIKE: "B",
+  EV: "E",
+  OTHER: "O",
+}
+
+export const generateParkingCode = (value: string) =>
+  value
+    .trim()
+    .toUpperCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word[0])
+    .join("")
+
+export const generateParkingZoneCode = (zoneName?: string | null) =>
+  zoneName?.trim() ? generateParkingCode(zoneName) : null
+
+export const buildParkingPrefix = ({
+  level,
+  zoneName,
+  vehicleType,
+}: {
+  level: string
+  zoneName?: string | null
+  vehicleType: ParkingVehicleType
+}) =>
+  [
+    generateParkingCode(level),
+    generateParkingZoneCode(zoneName),
+    parkingVehicleCodeMap[vehicleType] ?? "O",
+  ]
+    .filter(Boolean)
+    .join("-")
 
 const ensureVisitorParkingSlotAvailable = (
   status: VisitorParkingSlotStatusType
@@ -128,6 +179,7 @@ export const enrichSlots = async (
       _id: toId(slot._id),
       apartmentId: toId(slot.apartmentId),
       slotNumber: slot.slotNumber,
+      vehicleType: slot.vehicleType ?? null,
       status: slot.status,
       notes: slot.notes ?? null,
       createdAt: slot.createdAt,

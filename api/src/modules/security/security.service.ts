@@ -6,7 +6,7 @@ import {
 import {
   hashGuestPassToken,
   parseGuestPassQrPayload,
-} from "../visitors/visit-token.js"
+} from "../../utils/visitors/token.js"
 
 import {
   VisitorVisitModel,
@@ -14,8 +14,6 @@ import {
 } from "../visitors/visit.model.js"
 import { SecurityDeliveryModel } from "../delivery/delivery.model.js"
 import { DeliveryStatus } from "../delivery/delivery.interface.js"
-import { VisitorParkingSlotModel } from "../parking/parking.model.js"
-import { VisitorParkingSlotStatus } from "../parking/parking.interface.js"
 import {
   EmergencyAlertModel,
   EmergencyAlertStatus,
@@ -23,16 +21,17 @@ import {
 import {
   getApartmentFlatsService,
   getApartmentResidentsService,
-} from "./security-directory.service.js"
+} from "../../utils/security/directory.js"
 
 import { AppError } from "../../utils/AppError.js"
+import { getSecurityVisitorParkingSummary } from "../../utils/security-visitor-parking.js"
 import type {
   SecurityResidentsQuery,
   SecuritySummary,
   VerifyGuestPassInput,
 } from "./security.types.js"
 
-export { getSecurityActivityService } from "./security-activity.service.js"
+export { getSecurityActivityService } from "../../utils/security/activity.js"
 
 const getTodayRange = () => {
   const start = new Date()
@@ -139,11 +138,8 @@ export const getSecuritySummaryService = async (
     visitorsInside,
     upcomingVisitors,
     deliveriesWaiting,
-    availableVisitorParking,
+    visitorParkingSummary,
     activeSosAlerts,
-    reservedVisitorParking,
-    occupiedVisitorParking,
-    unavailableVisitorParking,
     upcomingVisitorsToday,
     checkedInToday,
     checkedOutToday,
@@ -169,29 +165,11 @@ export const getSecuritySummaryService = async (
       status: DeliveryStatus.WAITING,
     }),
 
-    VisitorParkingSlotModel.countDocuments({
-      apartmentId,
-      status: VisitorParkingSlotStatus.AVAILABLE,
-    }),
+    getSecurityVisitorParkingSummary(apartmentId),
 
     EmergencyAlertModel.countDocuments({
       apartmentId,
       status: EmergencyAlertStatus.ACTIVE,
-    }),
-
-    VisitorParkingSlotModel.countDocuments({
-      apartmentId,
-      status: VisitorParkingSlotStatus.RESERVED,
-    }),
-
-    VisitorParkingSlotModel.countDocuments({
-      apartmentId,
-      status: VisitorParkingSlotStatus.OCCUPIED,
-    }),
-
-    VisitorParkingSlotModel.countDocuments({
-      apartmentId,
-      status: VisitorParkingSlotStatus.UNAVAILABLE,
     }),
 
     GuestPassModel.countDocuments({
@@ -230,11 +208,11 @@ export const getSecuritySummaryService = async (
     visitorsInside,
     upcomingVisitors,
     deliveriesWaiting,
-    availableVisitorParking,
+    availableVisitorParking: visitorParkingSummary.available,
     activeSosAlerts,
-    reservedVisitorParking,
-    occupiedVisitorParking,
-    unavailableVisitorParking,
+    reservedVisitorParking: visitorParkingSummary.reserved,
+    occupiedVisitorParking: visitorParkingSummary.occupied,
+    unavailableVisitorParking: visitorParkingSummary.unavailable,
     upcomingVisitorsToday,
     checkedInToday,
     checkedOutToday,

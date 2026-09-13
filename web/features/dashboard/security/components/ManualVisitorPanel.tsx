@@ -2,6 +2,11 @@
 
 import { UserPlus } from "lucide-react"
 
+import {
+  getParkingVehicleTypeLabel,
+  matchesParkingVehicleType,
+  parkingVehicleTypeOptions,
+} from "../constants/parking-vehicle-types"
 import type { VisitorParkingSlot } from "../schemas/parking"
 import type { SecurityFlat } from "../schemas/security"
 import {
@@ -20,15 +25,6 @@ export interface ManualVisitorFormState {
   vehicleType: string
   parkingSlotId: string
 }
-
-const vehicleTypeOptions = [
-  "Bike",
-  "Car",
-  "Van",
-  "Auto Rickshaw",
-  "Truck",
-  "Other",
-]
 
 export function ManualVisitorPanel({
   flats,
@@ -49,6 +45,18 @@ export function ManualVisitorPanel({
   onFormChange: (form: ManualVisitorFormState) => void
   onSubmit: () => void
 }) {
+  const filteredAvailableSlots = availableSlots.filter((slot) =>
+    matchesParkingVehicleType(slot.vehicleType, form.vehicleType)
+  )
+  const parkingSlotPlaceholder = (() => {
+    if (availableSlotsLoading) return "Loading slots..."
+    if (form.vehicleType) {
+      return `Select ${getParkingVehicleTypeLabel(form.vehicleType)} slot`
+    }
+
+    return "Select vehicle type first"
+  })()
+
   return (
     <div className={panelClassName}>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -156,13 +164,14 @@ export function ManualVisitorPanel({
               onFormChange({
                 ...form,
                 vehicleType: event.target.value,
+                parkingSlotId: "",
               })
             }
           >
             <option value="">Select vehicle type</option>
-            {vehicleTypeOptions.map((vehicleType) => (
-              <option key={vehicleType} value={vehicleType}>
-                {vehicleType}
+            {parkingVehicleTypeOptions.map((vehicleType) => (
+              <option key={vehicleType.value} value={vehicleType.value}>
+                {vehicleType.label}
               </option>
             ))}
           </select>
@@ -180,14 +189,10 @@ export function ManualVisitorPanel({
                 parkingSlotId: event.target.value,
               })
             }
-            disabled={availableSlotsLoading}
+            disabled={availableSlotsLoading || !form.vehicleType}
           >
-            <option value="">
-              {availableSlotsLoading
-                ? "Loading slots..."
-                : "No parking"}
-            </option>
-            {availableSlots.map((slot) => (
+            <option value="">{parkingSlotPlaceholder}</option>
+            {filteredAvailableSlots.map((slot) => (
               <option key={slot._id} value={slot._id}>
                 {slot.slotNumber}
               </option>

@@ -15,6 +15,7 @@ import {
   useAssignParkingSlot,
   useParkingSlots,
 } from "../hooks/useParking"
+import { toParkingVehicleType } from "../constants/parking-vehicle-types"
 import { useDebouncedValue } from "../hooks/useDebouncedValue"
 import { useSecurityFlats } from "../hooks/useSecurityData"
 import { getSecurityApiErrorMessage } from "../utils/api-error"
@@ -98,11 +99,14 @@ export function SecurityVisitors() {
     page,
     limit: PAGE_SIZE,
   })
-  const availableSlotsQuery = useParkingSlots({
+  const manualVehicleType = toParkingVehicleType(manualForm.vehicleType)
+  const manualAvailableSlotsQuery = useParkingSlots({
     status: "AVAILABLE",
+    vehicleType: manualVehicleType,
     limit: 100,
+  }, {
+    enabled: Boolean(manualVehicleType),
   })
-
   const verifyPassMutation = useVerifyVisitorPass()
   const checkInMutation = useCheckInVisitor()
   const checkoutMutation = useCheckoutVisitor()
@@ -111,8 +115,8 @@ export function SecurityVisitors() {
 
   const flats = flatsQuery.data?.flats ?? []
   const records = visitorRecordsQuery.data?.records ?? []
-  const availableSlots = (
-    availableSlotsQuery.data?.slots ?? []
+  const manualAvailableSlots = (
+    manualAvailableSlotsQuery.data?.slots ?? []
   ).filter(
     (slot) =>
       slot.status === "AVAILABLE" && !slot.currentAssignment
@@ -227,6 +231,7 @@ export function SecurityVisitors() {
     const normalizedVehicleNumber = normalizeVehicleNumber(
       manualForm.vehicleNumber
     )
+    const vehicleType = toParkingVehicleType(manualForm.vehicleType)
 
     if (
       !manualForm.flatId ||
@@ -252,11 +257,26 @@ export function SecurityVisitors() {
       return
     }
 
+    if (normalizedVehicleNumber && !vehicleType) {
+      toast.error("Vehicle type is required when vehicle number is added")
+      return
+    }
+
+    if (manualForm.vehicleType && !normalizedVehicleNumber) {
+      toast.error("Vehicle number is required when vehicle type is added")
+      return
+    }
+
     if (
       manualForm.parkingSlotId &&
       !normalizedVehicleNumber
     ) {
       toast.error("Vehicle number is required for parking")
+      return
+    }
+
+    if (manualForm.parkingSlotId && !vehicleType) {
+      toast.error("Vehicle type is required for parking")
       return
     }
 
@@ -269,11 +289,15 @@ export function SecurityVisitors() {
         purpose: manualForm.purpose || undefined,
         vehicleNumber:
           normalizedVehicleNumber || undefined,
-        vehicleType:
-          manualForm.vehicleType || undefined,
+        vehicleType: vehicleType || undefined,
       })
 
       if (manualForm.parkingSlotId) {
+        if (!vehicleType) {
+          toast.error("Vehicle type is required for parking")
+          return
+        }
+
         try {
           await assignParkingMutation.mutateAsync({
             slotId: manualForm.parkingSlotId,
@@ -281,8 +305,7 @@ export function SecurityVisitors() {
             visitorVisitId: visit._id,
             visitorName: manualForm.visitorName,
             vehicleNumber: normalizedVehicleNumber,
-            vehicleType:
-              manualForm.vehicleType || undefined,
+            vehicleType,
           })
           toast.success("Visitor registered and parking assigned")
         } catch (error) {
@@ -366,8 +389,8 @@ export function SecurityVisitors() {
           flats={flats}
           flatsLoading={flatsQuery.isLoading}
           form={manualForm}
-          availableSlots={availableSlots}
-          availableSlotsLoading={availableSlotsQuery.isLoading}
+          availableSlots={manualAvailableSlots}
+          availableSlotsLoading={manualAvailableSlotsQuery.isLoading}
           isSubmitting={
             manualEntryMutation.isPending ||
             assignParkingMutation.isPending
@@ -399,8 +422,8 @@ export function SecurityVisitors() {
         <VisitorRecordsTable
           records={records}
           pagination={pagination}
-          availableSlots={availableSlots}
-          availableSlotsLoading={availableSlotsQuery.isLoading}
+          availableSlots={[]}
+          availableSlotsLoading={false}
           isCheckingIn={checkInMutation.isPending}
           isCheckingOut={checkoutMutation.isPending}
           onCheckIn={handleRecordCheckIn}

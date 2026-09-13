@@ -1,26 +1,27 @@
 import { Types, type PipelineStage } from "mongoose"
 
-import { EmergencyAlertModel, EmergencyAlertStatus } from "../alert/alert.model.js"
-import { DeliveryStatus } from "../delivery/delivery.interface.js"
-import { SecurityDeliveryModel } from "../delivery/delivery.model.js"
+import { EmergencyAlertModel, EmergencyAlertStatus } from "../../modules/alert/alert.model.js"
+import { DeliveryStatus } from "../../modules/delivery/delivery.interface.js"
+import { SecurityDeliveryModel } from "../../modules/delivery/delivery.model.js"
 import {
   VisitorParkingAssignmentStatus,
   VisitorParkingSlotStatus,
-} from "../parking/parking.interface.js"
+} from "../../modules/parking/parking.interface.js"
 import {
+  ParkingSlotModel,
   VisitorParkingAssignmentModel,
   VisitorParkingSlotModel,
-} from "../parking/parking.model.js"
+} from "../../modules/parking/parking.model.js"
 import {
   VisitorEntryType,
   VisitorVisitModel,
   VisitorVisitStatus,
-} from "../visitors/visit.model.js"
-import { Flat } from "../flat/flat.model.js"
+} from "../../modules/visitors/visit.model.js"
+import { Flat } from "../../modules/flat/flat.model.js"
 import type {
   SecurityActivity,
   SecurityActivityQuery,
-} from "./security.types.js"
+} from "../../modules/security/security.types.js"
 
 type ActivityValue = string | Record<string, unknown>
 
@@ -183,11 +184,24 @@ const parkingActivityStages = (): PipelineStage[] => [
     },
   },
   {
+    $lookup: {
+      from: ParkingSlotModel.collection.name,
+      localField: "slotId",
+      foreignField: "_id",
+      as: "managerSlot",
+    },
+  },
+  {
     $set: {
       slotNumber: {
         $ifNull: [
           { $arrayElemAt: ["$slot.slotNumber", 0] },
-          "Visitor Parking",
+          {
+            $ifNull: [
+              { $arrayElemAt: ["$managerSlot.slotNumber", 0] },
+              "Visitor Parking",
+            ],
+          },
         ],
       },
       entityId: {

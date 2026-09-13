@@ -11,8 +11,15 @@ import { toast } from "sonner"
 
 import {
   useAssignParkingSlot,
+  useParkingSlots,
   useReleaseParkingSlot,
 } from "../hooks/useParking"
+import {
+  getParkingVehicleTypeLabel,
+  matchesParkingVehicleType,
+  parkingVehicleTypeOptions,
+  toParkingVehicleType,
+} from "../constants/parking-vehicle-types"
 import type { VisitorParkingSlot } from "../schemas/parking"
 import type { VisitorRecord } from "../schemas/visitor"
 import { getSecurityApiErrorMessage } from "../utils/api-error"
@@ -61,10 +68,41 @@ export function VisitorParkingActions({
   const [form, setForm] = useState<ParkingForm>({
     slotId: "",
     vehicleNumber: record.vehicleNumber ?? "",
-    vehicleType: record.vehicleType ?? "",
+    vehicleType: toParkingVehicleType(record.vehicleType) ?? "",
   })
   const assignMutation = useAssignParkingSlot()
   const releaseMutation = useReleaseParkingSlot()
+  const selectedVehicleType = toParkingVehicleType(form.vehicleType)
+  const typedSlotsQuery = useParkingSlots(
+    {
+      status: "AVAILABLE",
+      vehicleType: selectedVehicleType,
+      limit: 100,
+    },
+    {
+      enabled: assignOpen && Boolean(selectedVehicleType),
+    }
+  )
+  const slotSource = selectedVehicleType
+    ? typedSlotsQuery.data?.slots ?? []
+    : availableSlots
+  const filteredAvailableSlots = slotSource.filter(
+    (slot) =>
+      slot.status === "AVAILABLE" &&
+      !slot.currentAssignment &&
+      matchesParkingVehicleType(slot.vehicleType, form.vehicleType)
+  )
+  const isLoadingSlots = selectedVehicleType
+    ? typedSlotsQuery.isLoading
+    : availableSlotsLoading
+  const parkingSlotPlaceholder = (() => {
+    if (isLoadingSlots) return "Loading slots..."
+    if (form.vehicleType) {
+      return `Select ${getParkingVehicleTypeLabel(form.vehicleType)} slot`
+    }
+
+    return "Select vehicle type first"
+  })()
 
   const hasParking = Boolean(record.parkingSlotId)
   const hasActiveParking =
@@ -85,7 +123,7 @@ export function VisitorParkingActions({
     setForm({
       slotId: "",
       vehicleNumber: record.vehicleNumber ?? "",
-      vehicleType: record.vehicleType ?? "",
+      vehicleType: toParkingVehicleType(record.vehicleType) ?? "",
     })
     setAssignOpen(true)
   }
@@ -99,9 +137,10 @@ export function VisitorParkingActions({
     const normalizedVehicleNumber = normalizeVehicleNumber(
       form.vehicleNumber
     )
+    const vehicleType = toParkingVehicleType(form.vehicleType)
 
-    if (!form.slotId || !normalizedVehicleNumber) {
-      toast.error("Parking slot and vehicle number are required")
+    if (!form.slotId || !normalizedVehicleNumber || !vehicleType) {
+      toast.error("Parking slot, vehicle number, and vehicle type are required")
       return
     }
 
@@ -117,7 +156,7 @@ export function VisitorParkingActions({
         visitorVisitId: record.visitId,
         visitorName: record.visitorName,
         vehicleNumber: normalizedVehicleNumber,
-        vehicleType: form.vehicleType || undefined,
+        vehicleType,
       })
       toast.success("Parking slot assigned")
       setAssignOpen(false)
@@ -212,7 +251,7 @@ export function VisitorParkingActions({
               <select
                 className={selectClassName}
                 value={form.slotId}
-                disabled={availableSlotsLoading}
+                disabled={isLoadingSlots || !form.vehicleType}
                 onChange={(event) =>
                   setForm({
                     ...form,
@@ -220,12 +259,8 @@ export function VisitorParkingActions({
                   })
                 }
               >
-                <option value="">
-                  {availableSlotsLoading
-                    ? "Loading slots..."
-                    : "Select slot"}
-                </option>
-                {availableSlots.map((slot) => (
+                <option value="">{parkingSlotPlaceholder}</option>
+                {filteredAvailableSlots.map((slot) => (
                   <option key={slot._id} value={slot._id}>
                     {slot.slotNumber}
                   </option>
@@ -254,17 +289,24 @@ export function VisitorParkingActions({
               <label className="mb-2 block text-sm font-medium text-[#111111]">
                 Vehicle Type
               </label>
-              <input
-                className={inputClassName}
+              <select
+                className={selectClassName}
                 value={form.vehicleType}
                 onChange={(event) =>
                   setForm({
                     ...form,
                     vehicleType: event.target.value,
+                    slotId: "",
                   })
                 }
-                placeholder="Optional"
-              />
+              >
+                <option value="">Select vehicle type</option>
+                {parkingVehicleTypeOptions.map((vehicleType) => (
+                  <option key={vehicleType.value} value={vehicleType.value}>
+                    {vehicleType.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

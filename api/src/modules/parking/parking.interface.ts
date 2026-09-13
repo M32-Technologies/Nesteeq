@@ -1,5 +1,33 @@
 import type { Types } from "mongoose"
 
+export const ParkingVehicleType = {
+  CAR: "CAR",
+  BIKE: "BIKE",
+  EV: "EV",
+  OTHER: "OTHER",
+} as const
+
+export type ParkingVehicleType =
+  (typeof ParkingVehicleType)[keyof typeof ParkingVehicleType]
+
+export const ParkingUsageType = {
+  RESIDENT: "RESIDENT",
+  VISITOR: "VISITOR",
+} as const
+
+export type ParkingUsageType =
+  (typeof ParkingUsageType)[keyof typeof ParkingUsageType]
+
+export const ParkingSlotStatus = {
+  AVAILABLE: "AVAILABLE",
+  ASSIGNED: "ASSIGNED",
+  OCCUPIED: "OCCUPIED",
+  INACTIVE: "INACTIVE",
+} as const
+
+export type ParkingSlotStatus =
+  (typeof ParkingSlotStatus)[keyof typeof ParkingSlotStatus]
+
 export const VisitorParkingSlotStatus = {
   AVAILABLE: "AVAILABLE",
   OCCUPIED: "OCCUPIED",
@@ -18,9 +46,29 @@ export const VisitorParkingAssignmentStatus = {
 export type VisitorParkingAssignmentStatus =
   (typeof VisitorParkingAssignmentStatus)[keyof typeof VisitorParkingAssignmentStatus]
 
+export interface IParkingSlot {
+  apartmentId: Types.ObjectId
+  level: string
+  zoneName?: string | null
+  zoneCode?: string | null
+  prefix: string
+  slotNumber: string
+  vehicleType: ParkingVehicleType
+  usageType: ParkingUsageType
+  status: ParkingSlotStatus
+  flatId?: Types.ObjectId | null
+  residentId?: Types.ObjectId | null
+  visitorId?: Types.ObjectId | null
+  vehicleNumber?: string | null
+  assignedAt?: Date | null
+  createdAt?: Date
+  updatedAt?: Date
+}
+
 export interface IVisitorParkingSlot {
   apartmentId: Types.ObjectId
   slotNumber: string
+  vehicleType?: ParkingVehicleType | null
   status: VisitorParkingSlotStatus
   notes?: string | null
   createdAt?: Date
@@ -35,7 +83,7 @@ export interface IVisitorParkingAssignment {
   guestPassId?: Types.ObjectId | null
   visitorName: string
   vehicleNumber: string
-  vehicleType?: string | null
+  vehicleType?: ParkingVehicleType | null
   notes?: string | null
   status: VisitorParkingAssignmentStatus
   assignedBy: string
@@ -78,4 +126,35 @@ export type ParkingSummary = {
   occupied: number
   reserved: number
   unavailable: number
+}
+
+export interface GeneratedParkingSlotItem {
+  id: string
+  slotNumber: string
+  level: string
+  zoneName: string | null
+  zoneCode: string | null
+  prefix: string
+  vehicleType: ParkingVehicleType
+  usageType: ParkingUsageType
+  status: string
+}
+
+export interface GeneratedParkingSlotResponse {
+  totalSlotsGenerated: number
+  level: string
+  zoneName: string | null
+  zoneCode: string | null
+  prefix: string
+  generatedSlots: GeneratedParkingSlotItem[]
+}
+
+export interface ParkingStatsResponse {
+  total: number
+  available: number
+  assigned: number
+  occupied: number
+  inactive: number
+  residentSlots: number
+  visitorSlots: number
 }

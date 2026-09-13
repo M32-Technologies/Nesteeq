@@ -1,6 +1,7 @@
 "use client"
 
 import type { VisitorRecord } from "../schemas/visitor"
+import { getParkingVehicleTypeLabel } from "../constants/parking-vehicle-types"
 import {
   DetailGrid,
   DetailModal,
@@ -46,7 +47,7 @@ export function VisitorDetails({
     },
     {
       label: "Vehicle Type",
-      value: record.vehicleType ?? "-",
+      value: getParkingVehicleTypeLabel(record.vehicleType),
     },
     {
       label: "Parking Slot",

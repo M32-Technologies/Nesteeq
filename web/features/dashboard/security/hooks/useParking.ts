@@ -13,26 +13,35 @@ import type {
   AssignParkingPayload,
   VisitorParkingSlotStatus,
 } from "../schemas/parking"
+import type { ParkingVehicleType } from "../constants/parking-vehicle-types"
 import { securityDataQueryKeys } from "./useSecurityData"
 
 export const parkingQueryKeys = {
   slots: (params: {
     status?: VisitorParkingSlotStatus
+    vehicleType?: ParkingVehicleType
     search?: string
     page?: number
     limit?: number
   }) => ["security-parking", "slots", params] as const,
 }
 
-export const useParkingSlots = (params: {
-  status?: VisitorParkingSlotStatus
-  search?: string
-  page?: number
-  limit?: number
-}) => {
+export const useParkingSlots = (
+  params: {
+    status?: VisitorParkingSlotStatus
+    vehicleType?: ParkingVehicleType
+    search?: string
+    page?: number
+    limit?: number
+  },
+  options?: {
+    enabled?: boolean
+  }
+) => {
   return useQuery({
     queryKey: parkingQueryKeys.slots(params),
     queryFn: () => getParkingSlots(params),
+    enabled: options?.enabled ?? true,
   })
 }
 

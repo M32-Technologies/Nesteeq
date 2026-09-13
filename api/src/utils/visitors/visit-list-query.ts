@@ -1,8 +1,8 @@
 import { Types, type PipelineStage } from "mongoose"
 
-import { AppError } from "../../utils/AppError.js"
-import { VisitorVisitModel } from "./visit.model.js"
-import type { ListVisitsInput } from "./visit.types.js"
+import { VisitorVisitModel } from "../../modules/visitors/visit.model.js"
+import type { ListVisitsInput } from "../../modules/visitors/visit.types.js"
+import { AppError } from "../AppError.js"
 
 type VisitorVisitListItem = {
   _id: string

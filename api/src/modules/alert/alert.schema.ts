@@ -4,7 +4,7 @@ import {
   EmergencyAlertStatus,
   EmergencyAlertType,
 } from "./alert.model.js"
-import { emergencyAlertUpdateStatuses } from "../security/security-status-transitions.js"
+import { emergencyAlertUpdateStatuses } from "../../utils/security/status-transitions.js"
 
 const objectIdSchema = z
   .string()

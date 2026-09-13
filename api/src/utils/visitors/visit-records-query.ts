@@ -3,15 +3,15 @@ import { Types, type PipelineStage } from "mongoose"
 import {
   GuestPassModel,
   GuestPassStatus,
-} from "./visit.model.js"
+} from "../../modules/visitors/visit.model.js"
 import {
   VisitorEntryType,
   VisitorVisitModel,
   VisitorVisitStatus,
-} from "./visit.model.js"
-import { AppError } from "../../utils/AppError.js"
-import { escapeRegExp } from "../../utils/regex.js"
-import type { ListVisitorRecordsInput } from "./visit.types.js"
+} from "../../modules/visitors/visit.model.js"
+import type { ListVisitorRecordsInput } from "../../modules/visitors/visit.types.js"
+import { AppError } from "../AppError.js"
+import { escapeRegExp } from "../regex.js"
 import {
   emptyVisitorParkingProjectionFields,
   visitorParkingLookupStages,

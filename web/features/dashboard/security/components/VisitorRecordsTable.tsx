@@ -5,6 +5,7 @@ import type {
   VisitorPagination,
   VisitorRecord,
 } from "../schemas/visitor"
+import { getParkingVehicleTypeLabel } from "../constants/parking-vehicle-types"
 import {
   PaginationControls,
   StatusBadge,
@@ -94,7 +95,7 @@ export function VisitorRecordsTable({
                   {record.vehicleNumber || "-"}
                 </td>
                 <td className={tdClassName}>
-                  {record.vehicleType || "-"}
+                  {getParkingVehicleTypeLabel(record.vehicleType)}
                 </td>
                 <td className={tdClassName}>
                   {record.parkingSlotNumber ? (

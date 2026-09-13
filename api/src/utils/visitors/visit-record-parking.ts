@@ -1,9 +1,10 @@
 import type { PipelineStage } from "mongoose"
 
 import {
+  ParkingSlotModel,
   VisitorParkingAssignmentModel,
   VisitorParkingSlotModel,
-} from "../parking/parking.model.js"
+} from "../../modules/parking/parking.model.js"
 
 export type VisitorRecordParkingFields = {
   parkingAssignmentId?: string | null
@@ -43,9 +44,21 @@ export const visitorParkingLookupStages: PipelineStage[] = [
           },
         },
         {
-          $unwind: {
-            path: "$slot",
-            preserveNullAndEmptyArrays: true,
+          $lookup: {
+            from: ParkingSlotModel.collection.name,
+            localField: "slotId",
+            foreignField: "_id",
+            as: "managerSlot",
+          },
+        },
+        {
+          $set: {
+            slot: {
+              $ifNull: [
+                { $arrayElemAt: ["$slot", 0] },
+                { $arrayElemAt: ["$managerSlot", 0] },
+              ],
+            },
           },
         },
       ],

@@ -2,6 +2,12 @@
 
 import { Car } from "lucide-react"
 
+import {
+  getParkingVehicleTypeLabel,
+  matchesParkingVehicleType,
+  parkingVehicleTypeOptions,
+  toParkingVehicleType,
+} from "../constants/parking-vehicle-types"
 import type { VisitorParkingSlot } from "../schemas/parking"
 import type { SecurityFlat } from "../schemas/security"
 import type { VisitorVisit } from "../schemas/visitor"
@@ -46,6 +52,18 @@ export function ParkingForms({
   onAssign: () => void
   onAssignFormChange: (form: ParkingAssignFormState) => void
 }) {
+  const filteredAvailableSlots = availableSlots.filter((slot) =>
+    matchesParkingVehicleType(slot.vehicleType, assignForm.vehicleType)
+  )
+  const parkingSlotPlaceholder = (() => {
+    if (availableSlotsLoading) return "Loading available slots..."
+    if (assignForm.vehicleType) {
+      return `Select ${getParkingVehicleTypeLabel(assignForm.vehicleType)} slot`
+    }
+
+    return "Select vehicle type first"
+  })()
+
   const handleVisitorVisitChange = (visitId: string) => {
     const visitor = activeVisitors.find(
       (visit) => visit._id === visitId
@@ -65,7 +83,8 @@ export function ParkingForms({
       flatId: visitor.flatId ?? assignForm.flatId,
       visitorName: visitor.visitorName,
       vehicleNumber: visitor.vehicleNumber ?? "",
-      vehicleType: visitor.vehicleType ?? "",
+      vehicleType: toParkingVehicleType(visitor.vehicleType) ?? "",
+      slotId: "",
     })
   }
 
@@ -115,14 +134,10 @@ export function ParkingForms({
                 slotId: event.target.value,
               })
             }
-            disabled={availableSlotsLoading}
+            disabled={availableSlotsLoading || !assignForm.vehicleType}
           >
-            <option value="">
-              {availableSlotsLoading
-                ? "Loading available slots..."
-                : "Select available slot"}
-            </option>
-            {availableSlots.map((slot) => (
+            <option value="">{parkingSlotPlaceholder}</option>
+            {filteredAvailableSlots.map((slot) => (
               <option key={slot._id} value={slot._id}>
                 {slot.slotNumber}
               </option>
@@ -194,17 +209,24 @@ export function ParkingForms({
           <label className="mb-2 block text-sm font-medium text-[#111111]">
             Vehicle Type
           </label>
-          <input
-            className={inputClassName}
+          <select
+            className={selectClassName}
             value={assignForm.vehicleType}
             onChange={(event) =>
               onAssignFormChange({
                 ...assignForm,
                 vehicleType: event.target.value,
+                slotId: "",
               })
             }
-            placeholder="Optional"
-          />
+          >
+            <option value="">Select vehicle type</option>
+            {parkingVehicleTypeOptions.map((vehicleType) => (
+              <option key={vehicleType.value} value={vehicleType.value}>
+                {vehicleType.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

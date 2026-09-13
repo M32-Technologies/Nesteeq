@@ -1,25 +1,33 @@
 import { Types } from "mongoose"
 
 import { AppError } from "../../utils/AppError.js"
-import { escapeRegExp } from "../../utils/regex.js"
 import {
   assertParkingSlotId,
   duplicateKeyPatternIncludes,
   enrichSlots,
   ensureParkingSlotCanBeAssigned,
   getLinkedVisitorVisit,
-  getParkingSummary,
   isDuplicateKeyError,
   normalizeText,
-  rollbackClaimedSlot,
+  normalizeVehicleNumber,
+  parkingObjectId,
   toId,
 } from "../../utils/parking.js"
-import { ensureFlatInApartment } from "../security/security-directory.service.js"
+import {
+  claimSecurityVisitorParkingSlot,
+  findSecurityVisitorParkingSlot,
+  listSecurityVisitorParkingSlots,
+  releaseSecurityVisitorParkingSlot,
+  rollbackSecurityVisitorParkingSlot,
+  setSecurityVisitorParkingSlotStatus,
+} from "../../utils/security-visitor-parking.js"
+import { ensureFlatInApartment } from "../../utils/security/directory.js"
 import {
   VisitorParkingAssignmentStatus,
   VisitorParkingSlotStatus,
   type LeanParkingAssignment,
   type LeanParkingSlot,
+  type ParkingVehicleType,
   type VisitorParkingSlotStatus as VisitorParkingSlotStatusType,
 } from "./parking.interface.js"
 import {
@@ -31,8 +39,17 @@ import type {
   UpdateParkingSlotInput,
 } from "./parking.schema.js"
 
-export const normalizeVehicleNumber = (value: string) =>
-  value.replace(/[\s-]/g, "").toUpperCase()
+export { normalizeVehicleNumber }
+export {
+  assignResidentParking,
+  generateParkingSlots,
+  getParkingSlotById,
+  getParkingSlots,
+  getParkingStats,
+  releaseResidentParking,
+  updateParkingSlot,
+  updateParkingSlotStatus,
+} from "../../utils/parking-manager.js"
 
 export const createParkingSlotService = async ({
   apartmentId,
@@ -51,11 +68,9 @@ export const createParkingSlotService = async ({
       notes: normalizeText(notes),
     })
 
-    const records = await enrichSlots(apartmentId, [
+    return (await enrichSlots(apartmentId, [
       slot.toObject() as LeanParkingSlot,
-    ])
-
-    return records[0]
+    ]))[0]
   } catch (error: unknown) {
     if (isDuplicateKeyError(error)) {
       throw new AppError(
@@ -70,46 +85,27 @@ export const createParkingSlotService = async ({
 export const listParkingSlotsService = async ({
   apartmentId,
   status = "ALL",
+  vehicleType,
   search,
   page = 1,
   limit = 10,
 }: {
   apartmentId: string
   status?: "ALL" | VisitorParkingSlotStatusType
+  vehicleType?: ParkingVehicleType
   search?: string
   page?: number
   limit?: number
 }) => {
-  const filter: Record<string, unknown> = { apartmentId }
-  if (status !== "ALL") filter.status = status
-
-  const trimmedSearch = search?.trim()
-  if (trimmedSearch) {
-    filter.slotNumber = new RegExp(escapeRegExp(trimmedSearch), "i")
-  }
-
-  if (status === VisitorParkingSlotStatus.AVAILABLE) {
-    const activeAssignedSlotIds =
-      await VisitorParkingAssignmentModel.distinct("slotId", {
-        apartmentId,
-        status: VisitorParkingAssignmentStatus.ACTIVE,
-      })
-
-    if (activeAssignedSlotIds.length > 0) {
-      filter._id = { $nin: activeAssignedSlotIds }
-    }
-  }
-
-  const skip = (page - 1) * limit
-  const [slots, totalCount, summary] = await Promise.all([
-    VisitorParkingSlotModel.find(filter)
-      .sort({ slotNumber: 1 })
-      .skip(skip)
-      .limit(limit)
-      .lean() as unknown as Promise<LeanParkingSlot[]>,
-    VisitorParkingSlotModel.countDocuments(filter),
-    getParkingSummary(apartmentId),
-  ])
+  const { slots, totalCount, summary } =
+    await listSecurityVisitorParkingSlots({
+      apartmentId,
+      status,
+      vehicleType,
+      search,
+      page,
+      limit,
+    })
 
   return {
     summary,
@@ -137,10 +133,11 @@ export const updateParkingSlotStatusService = async ({
   notes?: string
 }) => {
   assertParkingSlotId(slotId)
-
-  const slot = await VisitorParkingSlotModel.findOne({
-    _id: slotId,
+  const slot = await setSecurityVisitorParkingSlotStatus({
     apartmentId,
+    slotId,
+    status,
+    notes,
   })
   if (!slot) throw new AppError("Parking slot not found", 404)
 
@@ -159,31 +156,15 @@ export const updateParkingSlotStatusService = async ({
     }
   )
 
-  slot.status = status
-  slot.notes = normalizeText(notes)
-  await slot.save()
-
-  const records = await enrichSlots(apartmentId, [
-    slot.toObject() as LeanParkingSlot,
-  ])
-
-  return records[0]
+  return (await enrichSlots(apartmentId, [slot]))[0]
 }
 
 export const generateParkingSlotsService = async (
   { prefix, totalSlots, startNumber = 1 }: GenerateParkingSlotsInput,
   apartmentId: string
 ) => {
-  if (!apartmentId || !Types.ObjectId.isValid(apartmentId)) {
-    throw new AppError("Apartment context is required", 400)
-  }
-
-  const apartmentObjectId = new Types.ObjectId(apartmentId)
+  const apartmentObjectId = parkingObjectId(apartmentId, "apartment id")
   const normalizedPrefix = prefix.trim().toUpperCase()
-  if (!normalizedPrefix) {
-    throw new AppError("Parking slot prefix is required", 400)
-  }
-
   const endNumber = startNumber + totalSlots - 1
   const slotNumbers = Array.from(
     { length: totalSlots },
@@ -250,7 +231,6 @@ export const updateParkingSlotService = async ({
   slotId: string
 } & UpdateParkingSlotInput) => {
   assertParkingSlotId(slotId)
-
   const slot = await VisitorParkingSlotModel.findOne({
     _id: slotId,
     apartmentId,
@@ -259,46 +239,28 @@ export const updateParkingSlotService = async ({
 
   if (slotNumber !== undefined) {
     const normalizedSlotNumber = slotNumber.trim().toUpperCase()
-    if (!normalizedSlotNumber) {
-      throw new AppError("Slot number cannot be empty", 400)
-    }
+    const duplicate = await VisitorParkingSlotModel.exists({
+      _id: { $ne: slot._id },
+      apartmentId,
+      slotNumber: normalizedSlotNumber,
+    })
 
-    if (normalizedSlotNumber !== slot.slotNumber) {
-      const duplicate = await VisitorParkingSlotModel.exists({
-        _id: { $ne: slot._id },
-        apartmentId,
-        slotNumber: normalizedSlotNumber,
-      })
-
-      if (duplicate) {
-        throw new AppError(
-          "Parking slot number already exists for this apartment",
-          409
-        )
-      }
-      slot.slotNumber = normalizedSlotNumber
-    }
-  }
-
-  if (notes !== undefined) slot.notes = normalizeText(notes)
-
-  try {
-    await slot.save()
-  } catch (error: unknown) {
-    if (isDuplicateKeyError(error)) {
+    if (duplicate) {
       throw new AppError(
         "Parking slot number already exists for this apartment",
         409
       )
     }
-    throw error
+
+    slot.slotNumber = normalizedSlotNumber
   }
 
-  const [updatedSlot] = await enrichSlots(apartmentId, [
-    slot.toObject() as LeanParkingSlot,
-  ])
+  if (notes !== undefined) slot.notes = normalizeText(notes)
+  await slot.save()
 
-  return updatedSlot
+  return (await enrichSlots(apartmentId, [
+    slot.toObject() as LeanParkingSlot,
+  ]))[0]
 }
 
 export const assignParkingSlotService = async ({
@@ -319,7 +281,7 @@ export const assignParkingSlotService = async ({
   visitorVisitId?: string
   visitorName: string
   vehicleNumber: string
-  vehicleType?: string
+  vehicleType: ParkingVehicleType
   notes?: string
 }) => {
   assertParkingSlotId(slotId)
@@ -337,12 +299,19 @@ export const assignParkingSlotService = async ({
     ? new Types.ObjectId(toId(linkedVisitorVisit.visitorPassId))
     : null
   const assignmentVehicleNumber = normalizeVehicleNumber(vehicleNumber)
-  const slot = await VisitorParkingSlotModel.findOne({
-    _id: slotId,
+  const slot = await findSecurityVisitorParkingSlot({
     apartmentId,
-  }).lean<LeanParkingSlot | null>()
+    slotId,
+  })
 
   if (!slot) throw new AppError("Parking slot not found", 404)
+  const slotVehicleType = slot.vehicleType ?? "OTHER"
+  if (slotVehicleType !== vehicleType) {
+    throw new AppError(
+      "Selected parking slot does not match vehicle type",
+      400
+    )
+  }
 
   await ensureParkingSlotCanBeAssigned({
     apartmentId,
@@ -352,15 +321,11 @@ export const assignParkingSlotService = async ({
     vehicleNumber: assignmentVehicleNumber,
   })
 
-  const claimedSlot = await VisitorParkingSlotModel.findOneAndUpdate(
-    {
-      _id: slotId,
-      apartmentId,
-      status: VisitorParkingSlotStatus.AVAILABLE,
-    },
-    { $set: { status: VisitorParkingSlotStatus.OCCUPIED } },
-    { new: true }
-  ).lean<LeanParkingSlot | null>()
+  const claimedSlot = await claimSecurityVisitorParkingSlot({
+    apartmentId,
+    slotId,
+    vehicleNumber: assignmentVehicleNumber,
+  })
 
   if (!claimedSlot) {
     throw new AppError("Parking slot is no longer available", 409)
@@ -375,7 +340,7 @@ export const assignParkingSlotService = async ({
       guestPassId: guestPassObjectId,
       visitorName: linkedVisitorVisit?.visitorName ?? visitorName,
       vehicleNumber: assignmentVehicleNumber,
-      vehicleType: normalizeText(vehicleType),
+      vehicleType,
       notes: normalizeText(notes),
       status: VisitorParkingAssignmentStatus.ACTIVE,
       assignedBy: userId,
@@ -384,19 +349,12 @@ export const assignParkingSlotService = async ({
 
     return assignment.toObject() as LeanParkingAssignment
   } catch (error: unknown) {
-    await rollbackClaimedSlot(apartmentId, slotId)
+    await rollbackSecurityVisitorParkingSlot(apartmentId, slotId)
 
     if (isDuplicateKeyError(error)) {
       if (duplicateKeyPatternIncludes(error, "visitorVisitId")) {
         throw new AppError(
           "Selected visitor already has an active parking assignment",
-          409
-        )
-      }
-
-      if (duplicateKeyPatternIncludes(error, "vehicleNumber")) {
-        throw new AppError(
-          "This vehicle already has an active parking assignment",
           409
         )
       }
@@ -421,9 +379,9 @@ export const releaseParkingSlotService = async ({
 }) => {
   assertParkingSlotId(slotId)
 
-  const slotExists = await VisitorParkingSlotModel.exists({
-    _id: slotId,
+  const slotExists = await findSecurityVisitorParkingSlot({
     apartmentId,
+    slotId,
   })
   if (!slotExists) throw new AppError("Parking slot not found", 404)
 
@@ -447,13 +405,17 @@ export const releaseParkingSlotService = async ({
     throw new AppError("No active parking assignment found", 404)
   }
 
-  const slot = await VisitorParkingSlotModel.findOneAndUpdate(
-    { _id: slotId, apartmentId },
-    { $set: { status: VisitorParkingSlotStatus.AVAILABLE } },
-    { new: true }
-  ).lean<LeanParkingSlot | null>()
+  const released = await releaseSecurityVisitorParkingSlot(
+    apartmentId,
+    slotId
+  )
+  if (!released) throw new AppError("Parking slot not found", 404)
+
+  const slot = await findSecurityVisitorParkingSlot({
+    apartmentId,
+    slotId,
+  })
 
   if (!slot) throw new AppError("Parking slot not found", 404)
-  const records = await enrichSlots(apartmentId, [slot])
-  return records[0]
+  return (await enrichSlots(apartmentId, [slot]))[0]
 }
