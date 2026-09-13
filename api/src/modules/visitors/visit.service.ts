@@ -10,6 +10,7 @@ import {
   VisitorParkingAssignmentModel,
   VisitorParkingSlotModel,
 } from "../parking/parking.model.js"
+import { normalizeVehicleNumber } from "../parking/parking.service.js"
 import { ResidentModel } from "../resident/resident.model.js"
 import {
   hashGuestPassToken,
@@ -162,6 +163,9 @@ export const createGuestPassService = async ({
   validUntil,
 }: CreateGuestPassInput) => {
   const resident = await getActiveResidentByUserId(userId)
+  const normalizedVehicleNumber = vehicleNumber
+    ? normalizeVehicleNumber(vehicleNumber)
+    : null
 
   if (resident.flatId.toString() !== flatId) {
     throw new AppError(
@@ -209,9 +213,7 @@ export const createGuestPassService = async ({
     visitorName,
     visitorPhone: visitorPhone || null,
     purpose: purpose || null,
-    vehicleNumber: vehicleNumber
-      ? vehicleNumber.toUpperCase()
-      : null,
+    vehicleNumber: normalizedVehicleNumber,
     tokenHash,
     validFrom,
     validUntil,
@@ -492,6 +494,9 @@ export const createManualVisitorEntryService = async ({
   vehicleNumber,
   vehicleType,
 }: ManualVisitorEntryInput) => {
+  const normalizedVehicleNumber = vehicleNumber
+    ? normalizeVehicleNumber(vehicleNumber)
+    : null
   const flat = await Flat.findOne({
     _id: flatId,
     apartmentId,
@@ -510,7 +515,7 @@ export const createManualVisitorEntryService = async ({
       flatId,
       visitorName,
       visitorPhone,
-      vehicleNumber,
+      vehicleNumber: normalizedVehicleNumber,
     })
   )
     .select("_id")
@@ -532,9 +537,7 @@ export const createManualVisitorEntryService = async ({
     visitorName,
     visitorPhone: visitorPhone || null,
     purpose: purpose || null,
-    vehicleNumber: vehicleNumber
-      ? vehicleNumber.toUpperCase()
-      : null,
+    vehicleNumber: normalizedVehicleNumber,
     vehicleType: vehicleType || null,
 
     entryType: VisitorEntryType.MANUAL,

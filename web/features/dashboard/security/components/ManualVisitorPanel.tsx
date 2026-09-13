@@ -21,6 +21,15 @@ export interface ManualVisitorFormState {
   parkingSlotId: string
 }
 
+const vehicleTypeOptions = [
+  "Bike",
+  "Car",
+  "Van",
+  "Auto Rickshaw",
+  "Truck",
+  "Other",
+]
+
 export function ManualVisitorPanel({
   flats,
   flatsLoading,
@@ -140,9 +149,8 @@ export function ManualVisitorPanel({
           <label className="mb-2 block text-sm font-medium text-[#111111]">
             Vehicle Type
           </label>
-          <input
-            type="text"
-            className={inputClassName}
+          <select
+            className={selectClassName}
             value={form.vehicleType}
             onChange={(event) =>
               onFormChange({
@@ -150,8 +158,14 @@ export function ManualVisitorPanel({
                 vehicleType: event.target.value,
               })
             }
-            placeholder="Car / Bike"
-          />
+          >
+            <option value="">Select vehicle type</option>
+            {vehicleTypeOptions.map((vehicleType) => (
+              <option key={vehicleType} value={vehicleType}>
+                {vehicleType}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="mb-2 block text-sm font-medium text-[#111111]">

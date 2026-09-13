@@ -17,6 +17,10 @@ import type { VisitorParkingSlot } from "../schemas/parking"
 import type { VisitorRecord } from "../schemas/visitor"
 import { getSecurityApiErrorMessage } from "../utils/api-error"
 import {
+  isValidVehicleNumber,
+  normalizeVehicleNumber,
+} from "../utils/vehicle-validation"
+import {
   DetailModal,
   inputClassName,
   outlineButtonClassName,
@@ -92,8 +96,17 @@ export function VisitorParkingActions({
       return
     }
 
-    if (!form.slotId || !form.vehicleNumber.trim()) {
+    const normalizedVehicleNumber = normalizeVehicleNumber(
+      form.vehicleNumber
+    )
+
+    if (!form.slotId || !normalizedVehicleNumber) {
       toast.error("Parking slot and vehicle number are required")
+      return
+    }
+
+    if (!isValidVehicleNumber(normalizedVehicleNumber)) {
+      toast.error("Enter a valid vehicle number")
       return
     }
 
@@ -103,7 +116,7 @@ export function VisitorParkingActions({
         flatId: record.flatId,
         visitorVisitId: record.visitId,
         visitorName: record.visitorName,
-        vehicleNumber: form.vehicleNumber,
+        vehicleNumber: normalizedVehicleNumber,
         vehicleType: form.vehicleType || undefined,
       })
       toast.success("Parking slot assigned")

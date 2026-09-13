@@ -45,3 +45,37 @@ export interface IVisitorParkingAssignment {
   createdAt?: Date
   updatedAt?: Date
 }
+
+export type ObjectIdLike = {
+  toString: () => string
+}
+
+export type LeanParkingSlot = IVisitorParkingSlot & {
+  _id: ObjectIdLike
+  apartmentId: ObjectIdLike
+}
+
+export type LeanParkingAssignment = IVisitorParkingAssignment & {
+  _id: ObjectIdLike
+  apartmentId: ObjectIdLike
+  slotId: ObjectIdLike
+  flatId: ObjectIdLike
+  visitorVisitId?: ObjectIdLike | null
+  guestPassId?: ObjectIdLike | null
+}
+
+export type LinkedVisitorVisit = {
+  _id: ObjectIdLike
+  flatId: ObjectIdLike
+  visitorPassId?: ObjectIdLike | null
+  visitorName: string
+  vehicleNumber?: string | null
+}
+
+export type ParkingSummary = {
+  totalVisitorSlots: number
+  available: number
+  occupied: number
+  reserved: number
+  unavailable: number
+}

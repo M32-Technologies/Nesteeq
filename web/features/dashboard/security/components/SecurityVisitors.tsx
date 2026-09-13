@@ -18,6 +18,10 @@ import {
 import { useDebouncedValue } from "../hooks/useDebouncedValue"
 import { useSecurityFlats } from "../hooks/useSecurityData"
 import { getSecurityApiErrorMessage } from "../utils/api-error"
+import {
+  isValidVehicleNumber,
+  normalizeVehicleNumber,
+} from "../utils/vehicle-validation"
 import type {
   VisitorPass,
   VisitorRecord,
@@ -41,6 +45,14 @@ import {
 } from "./VisitorEntryPanels"
 
 const PAGE_SIZE = 10
+const indianMobileNumberRegex =
+  /^(?:\+91|91|0)?[6-9]\d{9}$/
+
+const normalizePhoneNumber = (value: string) =>
+  value.replace(/[\s-]/g, "")
+
+const isValidIndianPhoneNumber = (value: string) =>
+  indianMobileNumberRegex.test(normalizePhoneNumber(value))
 
 export function SecurityVisitors() {
   const searchParams = useSearchParams()
@@ -99,7 +111,12 @@ export function SecurityVisitors() {
 
   const flats = flatsQuery.data?.flats ?? []
   const records = visitorRecordsQuery.data?.records ?? []
-  const availableSlots = availableSlotsQuery.data?.slots ?? []
+  const availableSlots = (
+    availableSlotsQuery.data?.slots ?? []
+  ).filter(
+    (slot) =>
+      slot.status === "AVAILABLE" && !slot.currentAssignment
+  )
   const pagination = visitorRecordsQuery.data?.pagination
 
   const handleVerify = async () => {
@@ -205,6 +222,12 @@ export function SecurityVisitors() {
   const handleManualEntry = async () => {
     if (manualEntryMutation.isPending) return
 
+    const trimmedVisitorPhone =
+      manualForm.visitorPhone.trim()
+    const normalizedVehicleNumber = normalizeVehicleNumber(
+      manualForm.vehicleNumber
+    )
+
     if (
       !manualForm.flatId ||
       !manualForm.visitorName.trim()
@@ -214,8 +237,24 @@ export function SecurityVisitors() {
     }
 
     if (
+      trimmedVisitorPhone &&
+      !isValidIndianPhoneNumber(trimmedVisitorPhone)
+    ) {
+      toast.error("Enter a valid mobile number")
+      return
+    }
+
+    if (
+      normalizedVehicleNumber &&
+      !isValidVehicleNumber(normalizedVehicleNumber)
+    ) {
+      toast.error("Enter a valid vehicle number")
+      return
+    }
+
+    if (
       manualForm.parkingSlotId &&
-      !manualForm.vehicleNumber.trim()
+      !normalizedVehicleNumber
     ) {
       toast.error("Vehicle number is required for parking")
       return
@@ -226,10 +265,10 @@ export function SecurityVisitors() {
         flatId: manualForm.flatId,
         visitorName: manualForm.visitorName,
         visitorPhone:
-          manualForm.visitorPhone || undefined,
+          trimmedVisitorPhone || undefined,
         purpose: manualForm.purpose || undefined,
         vehicleNumber:
-          manualForm.vehicleNumber || undefined,
+          normalizedVehicleNumber || undefined,
         vehicleType:
           manualForm.vehicleType || undefined,
       })
@@ -241,7 +280,7 @@ export function SecurityVisitors() {
             flatId: manualForm.flatId,
             visitorVisitId: visit._id,
             visitorName: manualForm.visitorName,
-            vehicleNumber: manualForm.vehicleNumber,
+            vehicleNumber: normalizedVehicleNumber,
             vehicleType:
               manualForm.vehicleType || undefined,
           })

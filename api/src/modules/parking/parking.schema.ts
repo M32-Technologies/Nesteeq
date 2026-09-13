@@ -7,6 +7,9 @@ const objectIdSchema = z
   .trim()
   .regex(/^[0-9a-fA-F]{24}$/, "Invalid ObjectId")
 
+const indianVehicleNumberRegex =
+  /^(?:[A-Z]{2}[\s-]?\d{1,2}[\s-]?[A-Z]{1,3}[\s-]?\d{1,4}|\d{2}[\s-]?BH[\s-]?\d{4}[\s-]?[A-Z]{1,2})$/i
+
 const optionalString = (
   schema: z.ZodString
 ) =>
@@ -74,7 +77,11 @@ export const assignParkingSlotSchema = z.object({
       .string()
       .trim()
       .min(1, "Vehicle number is required")
-      .max(20),
+      .max(20)
+      .regex(
+        indianVehicleNumberRegex,
+        "Enter a valid vehicle number"
+      ),
     vehicleType: optionalString(z.string().max(50)),
     notes: optionalString(z.string().max(300)),
   }),

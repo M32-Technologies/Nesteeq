@@ -7,6 +7,12 @@ const objectIdSchema = z
   .trim()
   .regex(/^[0-9a-fA-F]{24}$/, "Invalid ObjectId")
 
+const indianPhoneNumberRegex =
+  /^(?:(?:\+91|91|0)[-\s]?)?[6-9](?:[\s-]?\d){9}$/
+
+const indianVehicleNumberRegex =
+  /^(?:[A-Z]{2}[\s-]?\d{1,2}[\s-]?[A-Z]{1,3}[\s-]?\d{1,4}|\d{2}[\s-]?BH[\s-]?\d{4}[\s-]?[A-Z]{1,2})$/i
+
 const optionalString = (schema: z.ZodString) =>
   z.preprocess(
     (value) => {
@@ -100,9 +106,11 @@ export const manualVisitorEntrySchema = z.object({
     visitorPhone: optionalString(
       z
         .string()
-        .min(5, "Visitor phone must contain at least 5 characters")
         .max(20, "Visitor phone cannot exceed 20 characters")
-        .regex(/^[0-9+\-\s()]+$/, "Invalid visitor phone")
+        .regex(
+          indianPhoneNumberRegex,
+          "Enter a valid mobile number"
+        )
     ),
 
     purpose: optionalString(
@@ -115,6 +123,10 @@ export const manualVisitorEntrySchema = z.object({
       z
         .string()
         .max(20, "Vehicle number cannot exceed 20 characters")
+        .regex(
+          indianVehicleNumberRegex,
+          "Enter a valid vehicle number"
+        )
     ),
 
     vehicleType: optionalString(

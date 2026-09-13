@@ -19,7 +19,6 @@ const visitorParkingSlotSchema =
         required: true,
         index: true,
       },
-
       slotNumber: {
         type: String,
         required: true,
@@ -27,7 +26,6 @@ const visitorParkingSlotSchema =
         uppercase: true,
         maxlength: 30,
       },
-
       status: {
         type: String,
         enum: Object.values(VisitorParkingSlotStatus),
@@ -35,7 +33,6 @@ const visitorParkingSlotSchema =
         required: true,
         index: true,
       },
-
       notes: {
         type: String,
         trim: true,
@@ -67,42 +64,36 @@ const visitorParkingAssignmentSchema =
         required: true,
         index: true,
       },
-
       slotId: {
         type: Schema.Types.ObjectId,
         ref: "VisitorParkingSlot",
         required: true,
         index: true,
       },
-
       flatId: {
         type: Schema.Types.ObjectId,
         ref: "Flat",
         required: true,
         index: true,
       },
-
       visitorVisitId: {
         type: Schema.Types.ObjectId,
         ref: "VisitorVisit",
         default: null,
         index: true,
       },
-
       guestPassId: {
         type: Schema.Types.ObjectId,
         ref: "GuestPass",
         default: null,
         index: true,
       },
-
       visitorName: {
         type: String,
         required: true,
         trim: true,
         maxlength: 100,
       },
-
       vehicleNumber: {
         type: String,
         required: true,
@@ -110,21 +101,18 @@ const visitorParkingAssignmentSchema =
         uppercase: true,
         maxlength: 20,
       },
-
       vehicleType: {
         type: String,
         trim: true,
         maxlength: 50,
         default: null,
       },
-
       notes: {
         type: String,
         trim: true,
         maxlength: 300,
         default: null,
       },
-
       status: {
         type: String,
         enum: Object.values(VisitorParkingAssignmentStatus),
@@ -132,23 +120,19 @@ const visitorParkingAssignmentSchema =
         required: true,
         index: true,
       },
-
       assignedBy: {
         type: String,
         required: true,
       },
-
       assignedAt: {
         type: Date,
         default: Date.now,
         required: true,
       },
-
       releasedBy: {
         type: String,
         default: null,
       },
-
       releasedAt: {
         type: Date,
         default: null,

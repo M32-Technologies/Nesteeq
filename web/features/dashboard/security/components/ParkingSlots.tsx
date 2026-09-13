@@ -18,6 +18,10 @@ import {
 import { useDebouncedValue } from "../hooks/useDebouncedValue"
 import { useSecurityFlats } from "../hooks/useSecurityData"
 import { getSecurityApiErrorMessage } from "../utils/api-error"
+import {
+  isValidVehicleNumber,
+  normalizeVehicleNumber,
+} from "../utils/vehicle-validation"
 import type {
   VisitorParkingSlot,
   VisitorParkingSlotStatus,
@@ -100,18 +104,32 @@ export function ParkingSlots() {
   const flats = flatsQuery.data?.flats ?? []
   const pagination = parkingQuery.data?.pagination
 
-  const availableSlots = availableSlotsQuery.data?.slots ?? []
+  const availableSlots = (
+    availableSlotsQuery.data?.slots ?? []
+  ).filter(
+    (slot) =>
+      slot.status === "AVAILABLE" && !slot.currentAssignment
+  )
 
   const handleAssign = async () => {
     if (assignMutation.isPending) return
+
+    const normalizedVehicleNumber = normalizeVehicleNumber(
+      assignForm.vehicleNumber
+    )
 
     if (
       !assignForm.slotId ||
       !assignForm.flatId ||
       !assignForm.visitorName.trim() ||
-      !assignForm.vehicleNumber.trim()
+      !normalizedVehicleNumber
     ) {
       toast.error("Slot, flat, visitor, and vehicle are required")
+      return
+    }
+
+    if (!isValidVehicleNumber(normalizedVehicleNumber)) {
+      toast.error("Enter a valid vehicle number")
       return
     }
 
@@ -122,7 +140,7 @@ export function ParkingSlots() {
         visitorVisitId:
           assignForm.visitorVisitId || undefined,
         visitorName: assignForm.visitorName,
-        vehicleNumber: assignForm.vehicleNumber,
+        vehicleNumber: normalizedVehicleNumber,
         vehicleType: assignForm.vehicleType || undefined,
         notes: assignForm.notes || undefined,
       })
