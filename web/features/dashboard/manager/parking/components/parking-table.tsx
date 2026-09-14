@@ -154,10 +154,12 @@ export default function ParkingTable({
             <tbody className="divide-y divide-slate-100">
               {!isLoading && slots.length > 0 && slots.map((slot) => {
                 const assignment = slot.currentAssignment
-                const updatedAt = new Intl.DateTimeFormat("en-IN", {
-                  day: "2-digit",
-                  month: "short",
-                }).format(new Date(assignment?.assignedAt || Date.now())) // Wait, we need actual updatedAt if it existed, but we fallback
+                const updatedAt = assignment?.assignedAt
+                  ? new Intl.DateTimeFormat("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                    }).format(new Date(assignment.assignedAt))
+                  : "N/A"
 
                 return (
                   <tr key={slot._id} className="transition hover:bg-slate-50/70">

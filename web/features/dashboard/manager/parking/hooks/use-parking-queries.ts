@@ -35,13 +35,13 @@ export function useGenerateParkingSlotsMutation() {
   return useMutation({
     mutationFn: (payload: GenerateParkingSlotsPayload) =>
       generateParkingSlots(payload),
-    onSuccess: (data: any) => {
-      toast.success(data?.message || "Parking slots generated successfully")
+    onSuccess: (data) => {
+      toast.success((data as { message?: string })?.message || "Parking slots generated successfully")
       queryClient.invalidateQueries({ queryKey: PARKING_QUERY_KEYS.all })
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast.error(
-        error?.response?.data?.message || "Failed to generate parking slots"
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to generate parking slots"
       )
     },
   })
@@ -57,9 +57,9 @@ export function useUpdateParkingSlotMutation() {
       toast.success("Parking slot updated successfully")
       queryClient.invalidateQueries({ queryKey: PARKING_QUERY_KEYS.all })
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast.error(
-        error?.response?.data?.message || "Failed to update parking slot"
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to update parking slot"
       )
     },
   })
@@ -78,9 +78,9 @@ export function useUpdateParkingStatusMutation() {
       toast.success("Parking slot status updated successfully")
       queryClient.invalidateQueries({ queryKey: PARKING_QUERY_KEYS.all })
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast.error(
-        error?.response?.data?.message || "Failed to update parking status"
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to update parking status"
       )
     },
   })
