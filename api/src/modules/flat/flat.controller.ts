@@ -1,6 +1,6 @@
 import { catchAsync } from "../../utils/catchAsync.js";
 import type { Request, Response } from "express";
-import type { FlatIdParams, FlatListQuery } from "./flat.schema.js";
+import type { FlatIdParams, FlatListQuery } from "./flat.validation.js";
 import {
     createFlat,
     generateFlats,

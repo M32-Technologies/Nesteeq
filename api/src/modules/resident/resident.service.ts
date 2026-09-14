@@ -4,7 +4,7 @@ import { Resident } from "./resident.model.js";
 import { Flat } from "../flat/flat.model.js";
 import { syncFlatOccupancy } from "../flat/flat.service.js";
 import { getAuthDB } from "../../config/auth-db.js";
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import { Invite } from "../invitation/invitation.model.js";
 
 const escapeRegex = (value: string) =>
@@ -196,7 +196,7 @@ export const getResidentDetails = async (residentId: string, apartmentId: string
         emailVerified: user?.emailVerified ?? false,
         image: user?.image ?? null,
         role: user?.role ?? resident.residentType,
-        residentType: resident.residentType,
+        residentType: resident.residentType, 
         phone: resident.phoneNumber ?? user?.phone ?? null,
         status: resident.status,
         flat: resident.flatId,
@@ -236,12 +236,14 @@ export const updateResidentStatus = async (
     const flatId = new Types.ObjectId(resident.flatId.toString());
     const apartmentObjectId = new Types.ObjectId(apartmentId);
 
-    resident.status = status;
-    await resident.save();
+    await mongoose.connection.transaction(async (session) => {
+        resident.status = status;
+        await resident.save({ session });
 
-    if (wasActive || status === "active") {
-        await syncFlatOccupancy(flatId, apartmentObjectId);
-    }
+        if (wasActive || status === "active") {
+            await syncFlatOccupancy(flatId, apartmentObjectId, { session });
+        }
+    });
 
     return {
         id: resident._id.toString(),
@@ -328,20 +330,22 @@ export const updateResidentDetails = async (
         }
     }
 
-    await resident.save();
-
     const currentFlatId = new Types.ObjectId(resident.flatId.toString());
     const flatChanged = previousFlatId.toString() !== currentFlatId.toString();
     const residentTypeChanged = previousResidentType !== resident.residentType;
 
-    if (resident.status === "active" && (flatChanged || residentTypeChanged)) {
-        await Promise.all([
-            flatChanged
-                ? syncFlatOccupancy(previousFlatId, apartmentObjectId)
-                : Promise.resolve(),
-            syncFlatOccupancy(currentFlatId, apartmentObjectId),
-        ]);
-    }
+    await mongoose.connection.transaction(async (session) => {
+        await resident.save({ session });
+
+        if (resident.status === "active" && (flatChanged || residentTypeChanged)) {
+            await Promise.all([
+                flatChanged
+                    ? syncFlatOccupancy(previousFlatId, apartmentObjectId, { session })
+                    : Promise.resolve(),
+                syncFlatOccupancy(currentFlatId, apartmentObjectId, { session }),
+            ]);
+        }
+    });
 
     return getResidentDetails(resident._id.toString(), apartmentId);
 }

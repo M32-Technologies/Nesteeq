@@ -46,7 +46,7 @@ const requireQueryApartmentAccess: RequestHandler = (
   next();
 };
 
-router.use(protect, requireRole("treasurer"));
+router.use(protect, requireRole("treasurer" , "property_manager"));
 
 router.get(
   "/",

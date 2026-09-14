@@ -18,7 +18,7 @@ import {
   getFlatByIdSchema,
   updateFlatStatusSchema,
   updateFlatSchema,
-} from "./flat.schema.js";
+} from "./flat.validation.js";
 
 const router = express.Router();
 const managerOnly = requireRole("property_manager");

@@ -8,8 +8,8 @@ import { toast } from "sonner"
 import { z } from "zod"
 
 import {
-  useDeactivatePropertyBlockMutation,
   useUpdatePropertyBlockMutation,
+  useUpdatePropertyBlockStatusMutation,
 } from "../hooks/use-property-query"
 import type {
   PropertyBlock,
@@ -48,9 +48,9 @@ export default function BlockActionDialog({
   onClose,
 }: BlockActionDialogProps) {
   const updateBlock = useUpdatePropertyBlockMutation()
-  const deactivateBlock = useDeactivatePropertyBlockMutation()
+  const updateBlockStatus = useUpdatePropertyBlockStatusMutation()
   const [formError, setFormError] = useState("")
-  const isSubmitting = updateBlock.isPending || deactivateBlock.isPending
+  const isSubmitting = updateBlock.isPending || updateBlockStatus.isPending
   const open = Boolean(block && mode)
   const {
     register,
@@ -124,7 +124,12 @@ export default function BlockActionDialog({
   const submitDeactivate = async () => {
     try {
       setFormError("")
-      await deactivateBlock.mutateAsync(block.id)
+      await updateBlockStatus.mutateAsync({
+        blockId: block.id,
+        input: {
+          status: "inactive",
+        },
+      })
       toast.success("Block deactivated successfully")
       onClose()
     } catch (error) {
@@ -137,7 +142,7 @@ export default function BlockActionDialog({
   const submitActivate = async () => {
     try {
       setFormError("")
-      await updateBlock.mutateAsync({
+      await updateBlockStatus.mutateAsync({
         blockId: block.id,
         input: {
           status: "active",
@@ -285,7 +290,7 @@ export default function BlockActionDialog({
             <DialogFooter
               cancelLabel="Cancel"
               submitLabel={
-                deactivateBlock.isPending ? "Deactivating..." : "Deactivate"
+                updateBlockStatus.isPending ? "Deactivating..." : "Deactivate"
               }
               submitDisabled={isSubmitting}
               submitTone="danger"
@@ -317,7 +322,9 @@ export default function BlockActionDialog({
 
             <DialogFooter
               cancelLabel="Cancel"
-              submitLabel={updateBlock.isPending ? "Activating..." : "Activate"}
+              submitLabel={
+                updateBlockStatus.isPending ? "Activating..." : "Activate"
+              }
               submitDisabled={isSubmitting}
               onCancel={closeDialog}
               onSubmit={submitActivate}
