@@ -109,13 +109,6 @@ export const updateParkingSlot = async (
 ): Promise<ParkingSlot> => {
   try {
     const payload: Record<string, unknown> = {}
-    if (input.level !== undefined && input.level.trim()) {
-      payload.level = input.level.trim()
-    }
-    if (input.zoneName !== undefined) {
-      payload.zoneName = input.zoneName ? input.zoneName.trim() : null
-    }
-    if (input.vehicleType) payload.vehicleType = input.vehicleType
     if (input.usageType) payload.usageType = input.usageType
 
     const response = await api.patch<ApiResponse<ParkingSlot>>(

@@ -2,20 +2,6 @@ import { z } from "zod"
 
 
 export const editSlotSchema = z.object({
-  level: z
-    .string()
-    .trim()
-    .min(1, "Level is required (e.g., Basement 1, Ground Floor)")
-    .max(100, "Level cannot exceed 100 characters"),
-  zoneName: z
-    .string()
-    .trim()
-    .max(100, "Zone name cannot exceed 100 characters")
-    .optional()
-    .nullable(),
-  vehicleType: z.enum(["CAR", "BIKE", "EV", "OTHER"], {
-    message: "Please select a vehicle type",
-  }),
   usageType: z.enum(["RESIDENT", "VISITOR"], {
     message: "Please select a usage type",
   }),

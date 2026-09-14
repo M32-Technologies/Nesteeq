@@ -35,6 +35,7 @@ import {
   useSubscriptionPlans,
 } from "@/features/subscription/subscription.query";
 import PaymentSection from "@/features/subscription/components/payment-section";
+import { normalizeDashboardRole } from "@/features/dashboard/config/sidebar-navigation";
 
 const steps = [
   {
@@ -151,6 +152,16 @@ export default function CreateApartmentPage() {
     if (!isSessionPending && !session?.user) {
       toast.error("Please sign in to create your apartment.");
       router.push("/login?from=pricing");
+      return;
+    }
+
+    if (!isSessionPending && session?.user) {
+      const role = normalizeDashboardRole(session.user.role);
+      if (role === "property_manager") {
+        toast.info("Your apartment registration is already complete.");
+        router.replace("/property-manager");
+        return;
+      }
     }
   }, [isSessionPending, router, session?.user]);
 

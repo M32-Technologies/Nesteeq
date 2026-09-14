@@ -48,13 +48,42 @@ async function getCurrentUserRole(request: NextRequest) {
 }
 
 export async function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
   const sessionCookie = getSessionCookie(request);
 
+  // 1. Auth routes (/login, /register): Redirect authenticated users to their dashboard
+  const isAuthRoute = pathname === "/login" || pathname === "/register";
+
+  if (isAuthRoute) {
+    if (sessionCookie) {
+      const userRole = await getCurrentUserRole(request);
+      if (userRole) {
+        const homeSegment = getDashboardRoleRouteSegment(userRole);
+        return NextResponse.redirect(new URL(`/${homeSegment}`, request.url));
+      }
+    }
+    return NextResponse.next();
+  }
+
+  // 2. Onboarding route (/onboarding):
+  // - Unauthenticated users are redirected to login
+  // - Users who already completed onboarding (property-manager) are redirected to their dashboard
+  if (pathname === "/onboarding") {
+    if (!sessionCookie) {
+      return NextResponse.redirect(new URL("/login?from=pricing", request.url));
+    }
+    const userRole = await getCurrentUserRole(request);
+    if (userRole === "property_manager") {
+      return NextResponse.redirect(new URL("/property-manager", request.url));
+    }
+    return NextResponse.next();
+  }
+
+  // 3. Protected routes: Require session cookie
   if (!sessionCookie) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  const pathname = request.nextUrl.pathname;
   const pathSegment = pathname.split("/")[1]; 
 
   const requiredRole = getDashboardRoleFromRouteSegment(pathSegment);
@@ -79,6 +108,9 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
+    "/login",
+    "/register",
+    "/onboarding",
     "/super-admin/:path*",
     "/property-manager/:path*",
     "/treasurer/:path*",

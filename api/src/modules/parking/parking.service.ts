@@ -364,67 +364,33 @@ export const updateParkingSlot = async (
 
   const updateData: Record<string, unknown> = {};
 
-  // Level
-  if (data.level !== undefined) {
-    const level = data.level.trim();
-
-    if (!level) {
-      throw new AppError("Level cannot be empty", 400);
-    }
-
-    updateData.level = level;
-  }
-
- 
-  if (data.zoneName !== undefined) {
-    if (data.zoneName === null) {
-      updateData.zoneName = null;
-    } else {
-      const zoneName = data.zoneName.trim();
-
-      updateData.zoneName = zoneName || null;
-    }
-  }
-
-  // Vehicle type
-  if (data.vehicleType !== undefined) {
-    updateData.vehicleType = data.vehicleType;
-  }
-
-  // Usage type
   if (data.usageType !== undefined) {
     updateData.usageType = data.usageType;
   }
 
-  // Prevent an empty update
   if (Object.keys(updateData).length === 0) {
     throw new AppError("No parking slot fields provided for update", 400);
   }
 
-  try {
-    const updatedParkingSlot =
-      await ParkingSlotModel.findOneAndUpdate(
-        {
-          _id: parkingObjectId,
-          apartmentId: apartmentObjectId,
-        },
-        {
-          $set: updateData,
-        },
-        {
-          returnDocument: "after",
-          runValidators: true,
-        }
-      ).lean();
-
-    if (!updatedParkingSlot) {
-      throw new AppError("Parking slot not found", 404);
+  const updatedParkingSlot = await ParkingSlotModel.findOneAndUpdate(
+    {
+      _id: parkingObjectId,
+      apartmentId: apartmentObjectId,
+    },
+    {
+      $set: updateData,
+    },
+    {
+      returnDocument: "after",
+      runValidators: true,
     }
+  ).lean();
 
-    return updatedParkingSlot;
-  } catch (error: unknown) {
-    throw error;
+  if (!updatedParkingSlot) {
+    throw new AppError("Parking slot not found", 404);
   }
+
+  return updatedParkingSlot;
 };
 
 export const assignResidentParking = async (

@@ -11,6 +11,7 @@ import {
   useGeneratePropertyFlatsMutation,
   usePropertyBlocksQuery,
 } from "../hooks/use-property-query"
+import { Portal } from "@/components/portal"
 
 type GenerateFlatsDialogProps = {
   open: boolean
@@ -69,19 +70,19 @@ export default function GenerateFlatsDialog({
     () =>
       canPreview
         ? Array.from({ length: selectedBlock.totalFloors }, (_, floorIndex) => {
-            const floor = floorIndex + 1
+          const floor = floorIndex + 1
 
-            return {
-              floor,
-              flats: Array.from({ length: unitsPerFloor }, (_, unitIndex) => ({
-                flatNumber: `${selectedBlock.code}-${floor}${String(
-                  unitIndex + 1
-                ).padStart(2, "0")}`,
-                floorNumber: floor,
-                unitNumber: unitIndex + 1,
-              })),
-            }
-          })
+          return {
+            floor,
+            flats: Array.from({ length: unitsPerFloor }, (_, unitIndex) => ({
+              flatNumber: `${selectedBlock.code}-${floor}${String(
+                unitIndex + 1
+              ).padStart(2, "0")}`,
+              floorNumber: floor,
+              unitNumber: unitIndex + 1,
+            })),
+          }
+        })
         : [],
     [canPreview, selectedBlock, unitsPerFloor]
   )
@@ -183,7 +184,11 @@ export default function GenerateFlatsDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4 py-4">
+    <Portal>
+      <div
+        style={{ zIndex: 1000 }}
+        className="fixed inset-0 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm overflow-y-auto"
+      >
       <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-[640px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
           <div className="min-w-0">
@@ -316,11 +321,10 @@ export default function GenerateFlatsDialog({
                               type="button"
                               onClick={() => removeFlat(flat.flatNumber)}
                               disabled={!isSelected || generateFlats.isPending}
-                              className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold transition disabled:cursor-not-allowed ${
-                                isSelected
+                              className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold transition disabled:cursor-not-allowed ${isSelected
                                   ? "border-slate-200 bg-white text-slate-700 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
                                   : "border-slate-200 bg-slate-100 text-slate-400 line-through"
-                              }`}
+                                }`}
                               title={
                                 isSelected
                                   ? `Remove ${flat.flatNumber}`
@@ -366,5 +370,6 @@ export default function GenerateFlatsDialog({
         </form>
       </div>
     </div>
-  )
+  </Portal>
+)
 }

@@ -91,9 +91,6 @@ export interface ParkingFilterParams {
 }
 
 export interface UpdateParkingSlotInput {
-  level?: string
-  zoneName?: string | null
-  vehicleType?: ParkingVehicleType
   usageType?: ParkingUsageType
 }
 

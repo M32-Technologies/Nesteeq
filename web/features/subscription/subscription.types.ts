@@ -52,3 +52,31 @@ export interface VerifySubscriptionPaymentResult {
 
 export type VerifySubscriptionPaymentResponse =
   ApiResponse<VerifySubscriptionPaymentResult>;
+
+export interface CurrentSubscription {
+  _id: string;
+  apartment: string;
+  plan: SubscriptionPlan | string;
+  status:
+    | "created"
+    | "authenticated"
+    | "active"
+    | "pending"
+    | "halted"
+    | "cancelled"
+    | "completed"
+    | "expired";
+  planSnapshot?: {
+    planName: string;
+    price: number;
+    planType: SubscriptionPlanType;
+    durationMonths: number;
+  };
+  currentStart?: string;
+  currentEnd?: string;
+  paidCount?: number;
+  remainingCount?: number;
+}
+
+export type CurrentSubscriptionResponse =
+  ApiResponse<CurrentSubscription | null>;

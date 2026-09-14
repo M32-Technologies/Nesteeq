@@ -25,6 +25,7 @@ import {
   Compass,
 } from "lucide-react"
 
+import { Portal } from "@/components/portal"
 import type { ParkingSlot, ParkingVehicleType } from "../types/parking.types"
 import { useParkingSlotDetailsQuery } from "../hooks/use-parking-queries"
 import { ParkingStatusDialog } from "./parking-status-dialog"
@@ -131,16 +132,21 @@ export function ViewSlotDrawer({
 
   return (
     <>
-      {/* Backdrop */}
-      <button
-        type="button"
-        aria-label="Close drawer"
-        onClick={onClose}
-        className="fixed inset-0 z-40 bg-slate-950/25 backdrop-blur-[2px] transition-opacity"
-      />
+      <Portal>
+        {/* Backdrop */}
+        <button
+          type="button"
+          aria-label="Close drawer"
+          onClick={onClose}
+          style={{ zIndex: 999 }}
+          className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm transition-opacity"
+        />
 
-      {/* Drawer Panel */}
-      <aside className="fixed right-0 top-0 z-50 flex h-screen w-full max-w-[480px] flex-col border-l border-slate-200 bg-white shadow-2xl animate-in slide-in-from-right duration-200">
+        {/* Drawer Panel */}
+        <aside
+          style={{ zIndex: 1000, height: "100dvh" }}
+          className="fixed right-0 top-0 bottom-0 flex h-full max-h-screen w-full max-w-[480px] flex-col border-l border-slate-200 bg-white shadow-2xl animate-in slide-in-from-right duration-200"
+        >
         {/* Top Header Bar */}
         <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 px-6">
           <div className="flex items-center gap-2.5">
@@ -506,6 +512,7 @@ export function ViewSlotDrawer({
           </button>
         </div>
       </aside>
+      </Portal>
 
       {/* Canonical Status Dialog (Exact same style as FlatStatusDialog) */}
       <ParkingStatusDialog

@@ -314,89 +314,110 @@ export default function PaymentSection({
   };
 
   return (
-    <div>
-      <div className="mx-auto mb-7 flex w-fit items-center gap-2.5">
-        <span className="grid h-9 w-9 place-items-center rounded-[8px] bg-[var(--brand)] text-sm font-bold text-white">
+    <div className="w-full">
+      <div className="mx-auto mb-6 flex w-fit items-center gap-2.5">
+        <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-[#07584F] text-sm font-bold text-white shadow-sm">
           N
         </span>
 
-        <span className="text-[22px] font-semibold tracking-[-0.03em]">
+        <span className="text-[22px] font-semibold tracking-[-0.03em] text-[#111111]">
           Nesteeq
         </span>
       </div>
 
       <div className="mb-8 text-center">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[var(--brand)]">
-          Secure payment
-        </p>
+        <div className="inline-flex items-center gap-2 rounded-full border border-[#dce7e3] bg-[#f7faf8] px-3.5 py-1.5 shadow-xs">
+          <ShieldCheck className="size-3.5 text-[#07584F]" strokeWidth={2.25} />
+          <span className="text-xs font-semibold text-[#07584F]">
+            Secure checkout
+          </span>
+        </div>
 
-        <h1 className="mt-2 text-[30px] font-semibold leading-tight tracking-[-0.04em] text-[var(--ink)]">
+        <h1 className="mt-3 text-[30px] font-semibold leading-tight tracking-[-0.04em] text-[#111111] sm:text-[34px]">
           Review and activate
         </h1>
+
+        <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-[#68746f]">
+          Confirm your community registration and subscription plan to unlock your management dashboard.
+        </p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="space-y-4">
-          <section className="rounded-lg border border-[var(--border)] bg-white p-5 shadow-[0_16px_40px_rgba(4,59,53,0.06)]">
+        <div className="space-y-5">
+          {/* Plan Summary Card */}
+          <section className="rounded-2xl border border-[#dfe6e2] bg-white p-6 shadow-[0_16px_40px_rgba(7,88,79,0.06)]">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-[13px] font-semibold text-[var(--brand)]">
+                <span className="inline-flex items-center rounded-full bg-[#e7f0ed] px-2.5 py-1 text-xs font-semibold text-[#07584F]">
                   {getDurationLabel(plan.durationMonths)}
-                </p>
+                </span>
 
-                <h2 className="mt-2 text-[24px] font-semibold tracking-[-0.03em] text-[var(--brand-dark)]">
+                <h2 className="mt-2.5 text-[24px] font-semibold tracking-[-0.03em] text-[#043B35]">
                   {plan.planName}
                 </h2>
 
                 {plan.freeTrial.enabled && (
-                  <p className="mt-2 text-sm font-medium text-[var(--text)]">
-                    {plan.freeTrial.days}-day trial included
+                  <p className="mt-1 text-xs font-medium text-[#56625d]">
+                    Includes {plan.freeTrial.days}-day complimentary trial
                   </p>
                 )}
               </div>
 
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--green-soft)] text-[var(--brand)]">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#e7f0ed] text-[#07584F]">
                 <ReceiptText className="h-5 w-5" />
               </div>
             </div>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              {plan.features.slice(0, 6).map((feature) => (
-                <div
-                  key={feature}
-                  className="flex min-h-10 items-start gap-3 rounded-lg bg-[var(--surface)] px-3 py-2.5"
-                >
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[var(--brand)]" />
+            <div className="my-5 h-px bg-[#eef2f0]" />
 
-                  <span className="text-sm leading-5 text-[var(--text)]">
-                    {feature}
-                  </span>
-                </div>
-              ))}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Included with this plan
+              </p>
+
+              <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
+                {plan.features.slice(0, 6).map((feature) => (
+                  <div
+                    key={feature}
+                    className="flex min-h-10 items-center gap-2.5 rounded-xl border border-[#eef2f0] bg-[#f8faf9] px-3.5 py-2"
+                  >
+                    <div className="flex size-4 shrink-0 items-center justify-center rounded-full bg-[#eaf3ef] text-[#07584F]">
+                      <Check className="size-2.5" strokeWidth={3} />
+                    </div>
+
+                    <span className="text-xs font-medium leading-relaxed text-[#56625d]">
+                      {feature}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           </section>
 
-          <section className="rounded-lg border border-[var(--border)] bg-white p-5 shadow-[0_16px_40px_rgba(4,59,53,0.06)]">
+          {/* Registration Details Card */}
+          <section className="rounded-2xl border border-[#dfe6e2] bg-white p-6 shadow-[0_16px_40px_rgba(7,88,79,0.06)]">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--soft-blue)] text-[var(--blue)]">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#e7f0ed] text-[#07584F]">
                 <ShieldCheck className="h-5 w-5" />
               </div>
 
               <div>
-                <h2 className="text-base font-semibold text-[var(--ink)]">
-                  Registration details
+                <h2 className="text-base font-semibold text-[#111111]">
+                  Apartment registration
                 </h2>
 
-                <p className="text-sm text-[var(--text-muted)]">
-                  {user.email || "Signed-in manager"}
+                <p className="text-xs text-slate-500">
+                  Manager: {user.email || "Signed-in property manager"}
                 </p>
               </div>
             </div>
 
-            <dl className="mt-5 grid gap-3 sm:grid-cols-2">
-              <DetailItem label="Apartment" value={apartment.name} />
+            <div className="my-4 h-px bg-[#eef2f0]" />
+
+            <dl className="grid gap-2.5 sm:grid-cols-2">
+              <DetailItem label="Apartment Name" value={apartment.name} />
               <DetailItem
-                label="Contact"
+                label="Primary Contact"
                 value={apartment.contactNumber}
               />
               <DetailItem
@@ -408,35 +429,38 @@ export default function PaymentSection({
                 value={`${apartment.totalBlocks} blocks, ${apartment.totalUnits} units`}
               />
               <DetailItem
-                label="Parking"
-                value={`${apartment.parkingSlots} slots`}
+                label="Parking Capacity"
+                value={`${apartment.parkingSlots} total slots`}
               />
               <DetailItem
-                label="Emergency"
-                value={apartment.emergencyContact || "Not added"}
+                label="Emergency Contact"
+                value={apartment.emergencyContact || "Not configured"}
               />
             </dl>
           </section>
         </div>
 
-        <aside className="h-fit rounded-lg border border-[var(--border)] bg-white p-5 shadow-[0_18px_50px_rgba(4,59,53,0.08)] lg:sticky lg:top-6">
-          <div className="flex items-center justify-between gap-4 border-b border-[var(--border)] pb-4">
+        {/* Sticky Total Sidebar */}
+        <aside className="h-fit rounded-2xl border border-[#dfe6e2] bg-white p-6 shadow-[0_18px_50px_rgba(7,88,79,0.08)] lg:sticky lg:top-6">
+          <div className="flex items-center justify-between gap-4 border-b border-[#eef2f0] pb-4">
             <div>
-              <h2 className="text-lg font-semibold tracking-[-0.02em] text-[var(--ink)]">
-                Payment total
+              <h2 className="text-lg font-semibold tracking-[-0.02em] text-[#111111]">
+                Payment summary
               </h2>
 
-              <p className="mt-1 text-sm text-[var(--text-muted)]">
-                GST included at 18%
+              <p className="mt-0.5 text-xs text-slate-500">
+                GST included at standard 18%
               </p>
             </div>
 
-            <CreditCard className="h-5 w-5 text-[var(--brand)]" />
+            <div className="flex size-9 items-center justify-center rounded-lg bg-[#e7f0ed] text-[#07584F]">
+              <CreditCard className="h-4 w-4" />
+            </div>
           </div>
 
           <div className="space-y-3 py-5">
             <SummaryRow
-              label="Plan price before tax"
+              label="Base plan price"
               value={formatCurrency(priceSummary.beforeTax)}
             />
             <SummaryRow
@@ -445,12 +469,12 @@ export default function PaymentSection({
             />
           </div>
 
-          <div className="flex items-center justify-between border-t border-[var(--border)] pt-4">
-            <span className="text-base font-semibold text-[var(--ink)]">
-              Total
+          <div className="flex items-center justify-between border-t border-[#eef2f0] pt-4">
+            <span className="text-base font-semibold text-[#111111]">
+              Total amount
             </span>
 
-            <span className="text-[26px] font-semibold tracking-[-0.04em] text-[var(--brand-dark)]">
+            <span className="text-[26px] font-semibold tracking-[-0.04em] text-[#043B35]">
               {formatCurrency(priceSummary.total)}
             </span>
           </div>
@@ -459,12 +483,12 @@ export default function PaymentSection({
             type="button"
             onClick={() => void startPayment()}
             disabled={isProcessing}
-            className="mt-6 flex h-[50px] w-full items-center justify-center gap-2 rounded-lg bg-[var(--brand)] text-sm font-semibold text-white transition hover:bg-[var(--brand-hover)] focus:outline-none focus:ring-4 focus:ring-[var(--green-soft)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-6 flex h-[50px] w-full items-center justify-center gap-2 rounded-xl bg-[#07584F] text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#064C44] active:scale-[0.99] focus:outline-none focus:ring-4 focus:ring-[#07584F]/20 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isProcessing ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin" />
-                Processing
+                Processing payment...
               </>
             ) : (
               <>
@@ -473,6 +497,10 @@ export default function PaymentSection({
               </>
             )}
           </button>
+
+          <p className="mt-3.5 text-center text-[11px] text-slate-400">
+            Encrypted 256-bit checkout · Instant community activation
+          </p>
         </aside>
       </div>
     </div>
@@ -486,12 +514,12 @@ type DetailItemProps = {
 
 function DetailItem({ label, value }: DetailItemProps) {
   return (
-    <div className="rounded-lg bg-[var(--surface)] px-3 py-3">
-      <dt className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+    <div className="rounded-xl border border-[#eef2f0] bg-[#f8faf9] px-3.5 py-3">
+      <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
         {label}
       </dt>
 
-      <dd className="mt-1 text-sm font-medium leading-5 text-[var(--ink)]">
+      <dd className="mt-1 truncate text-xs font-semibold leading-relaxed text-slate-900">
         {value}
       </dd>
     </div>
@@ -505,9 +533,9 @@ type SummaryRowProps = {
 
 function SummaryRow({ label, value }: SummaryRowProps) {
   return (
-    <div className="flex items-center justify-between gap-4 text-sm">
-      <span className="text-[var(--text)]">{label}</span>
-      <span className="font-semibold text-[var(--ink)]">{value}</span>
+    <div className="flex items-center justify-between gap-4 text-xs">
+      <span className="text-slate-600">{label}</span>
+      <span className="font-semibold text-slate-900">{value}</span>
     </div>
   );
 }

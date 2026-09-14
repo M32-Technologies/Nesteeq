@@ -14,6 +14,7 @@ import {
   ChevronDown,
 } from "lucide-react"
 
+import { Portal } from "@/components/portal"
 import { useAssignResidentParkingMutation } from "../hooks/use-parking-queries"
 import {
   assignResidentSchema,
@@ -113,17 +114,21 @@ export function AssignResidentDrawer({
   const zoneDisplay = slot.zoneName || slot.zoneCode || null
 
   return (
-    <>
+    <Portal>
       {/* Backdrop */}
       <button
         type="button"
         aria-label="Close modal"
         onClick={handleClose}
-        className="fixed inset-0 z-40 bg-slate-950/25 backdrop-blur-[2px] transition-opacity"
+        style={{ zIndex: 999 }}
+        className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm transition-opacity"
       />
 
       {/* Drawer */}
-      <aside className="fixed right-0 top-0 z-50 flex h-screen w-full max-w-[440px] flex-col border-l border-slate-200 bg-white shadow-2xl animate-in slide-in-from-right duration-200">
+      <aside
+        style={{ zIndex: 1000, height: "100dvh" }}
+        className="fixed right-0 top-0 bottom-0 flex h-full max-h-screen w-full max-w-[440px] flex-col border-l border-slate-200 bg-white shadow-2xl animate-in slide-in-from-right duration-200"
+      >
         {/* Top Header */}
         <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 px-6">
           <div>
@@ -249,10 +254,10 @@ export function AssignResidentDrawer({
                     {!selectedFlatId
                       ? "Select a flat first"
                       : isResidentsLoading
-                      ? "Loading residents..."
-                      : flatResidents.length > 0
-                      ? "-- Choose resident (optional) --"
-                      : "No resident profiles for this flat"}
+                        ? "Loading residents..."
+                        : flatResidents.length > 0
+                          ? "-- Choose resident (optional) --"
+                          : "No resident profiles for this flat"}
                   </option>
                   {flatResidents.map((res) => (
                     <option key={res.id} value={res.id}>
@@ -322,6 +327,6 @@ export function AssignResidentDrawer({
           </div>
         </form>
       </aside>
-    </>
+    </Portal>
   )
 }

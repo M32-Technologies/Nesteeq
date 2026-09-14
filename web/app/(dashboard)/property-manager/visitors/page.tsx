@@ -1,7 +1,5 @@
+import VisitorPage from "@/features/dashboard/manager/visitors/components/visitor-page"
+
 export default function VisitorsPage() {
-  return (
-    <div>
-      <h1>Visitors</h1>
-    </div>
-  )
+  return <VisitorPage />
 }

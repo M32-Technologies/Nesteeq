@@ -1,10 +1,28 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { useSession } from "@/lib/auth-client";
+import {
+  getDashboardRoleRouteSegment,
+  normalizeDashboardRole,
+} from "@/features/dashboard/config/sidebar-navigation";
 
 export default function FinalCTA() {
+  const [isMounted, setIsMounted] = useState(false);
+  const { data: session } = useSession();
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const user = isMounted ? session?.user : null;
+  const dashboardHref = `/${getDashboardRoleRouteSegment(
+    normalizeDashboardRole(user?.role),
+  )}`;
+
   return (
     <section className="bg-[var(--brand-dark)] px-5 py-24 sm:px-7 lg:px-10 lg:py-32">
       <div className="mx-auto max-w-[800px] text-center">
@@ -37,10 +55,10 @@ export default function FinalCTA() {
           className="mt-12"
         >
           <Link
-            href="/pricing"
+            href={user ? dashboardHref : "/pricing"}
             className="group inline-flex h-14 items-center justify-center gap-2 rounded-full bg-white px-8 text-base font-semibold text-[var(--brand-dark)] transition-all hover:scale-105 hover:bg-white/90 active:scale-100"
           >
-            Get started
+            {user ? "Go to dashboard" : "Get started"}
             <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
           </Link>
         </motion.div>

@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import { formatCurrency, formatDate } from "@/features/dashboard/treasurer/utils/format";
 import { Bill, BillStatus, Payment } from "../types/payment-history";
+import { Portal } from "@/components/portal";
 
 const statusLabels: Record<BillStatus, string> = {
   PENDING: "Pending",
@@ -47,15 +48,19 @@ export default function PaymentDetailsSheet({
     : "Review the transaction details.";
 
   return (
-    <>
+    <Portal>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40 bg-slate-900/20 backdrop-blur-sm transition-opacity"
+        style={{ zIndex: 999 }}
+        className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
 
       {/* Sheet */}
-      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-y-auto border-l border-slate-200 bg-white p-6 shadow-xl animate-in slide-in-from-right sm:max-w-md">
+      <div
+        style={{ zIndex: 1000, height: "100dvh" }}
+        className="fixed inset-y-0 right-0 bottom-0 w-full max-w-md overflow-y-auto border-l border-slate-200 bg-white p-6 shadow-2xl animate-in slide-in-from-right sm:max-w-md"
+      >
         <div className="flex items-center justify-between pb-6">
           <div>
             <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
@@ -115,7 +120,7 @@ export default function PaymentDetailsSheet({
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                   Financial Breakdown
                 </h3>
-                
+
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-600">Base Amount</span>
                   <span className="font-medium text-slate-900">
@@ -258,6 +263,6 @@ export default function PaymentDetailsSheet({
           </button>
         </div>
       </div>
-    </>
+    </Portal>
   );
 }

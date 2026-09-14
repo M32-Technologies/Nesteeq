@@ -135,40 +135,18 @@ export type ParkingIdParams = z.infer<typeof parkingIdParamsSchema>["params"];
 
 export const updateParkingSlotBodySchema = z
   .object({
-    level: z
-      .string()
-      .trim()
-      .min(1, "Level is required")
-      .max(100, "Level cannot exceed 100 characters")
-      .optional(),
-
-    zoneName: z
-      .string()
-      .trim()
-      .max(100, "Zone name cannot exceed 100 characters")
-      .nullable()
-      .optional(),
-
-    vehicleType: z
-      .enum(["CAR", "BIKE", "EV", "OTHER"])
-      .optional(),
-
     usageType: z
       .enum(["RESIDENT", "VISITOR"])
       .optional(),
   })
   .strict()
   .refine(
-    (data) =>
-      data.level !== undefined ||
-      data.zoneName !== undefined ||
-      data.vehicleType !== undefined ||
-      data.usageType !== undefined,
+    (data) => data.usageType !== undefined,
     {
       message: "At least one field is required",
     }
   );
-
+ 
 export const updateParkingSlotSchema = z.object({
   params: z.object({
     parkingId: objectIdSchema("Parking id"),
