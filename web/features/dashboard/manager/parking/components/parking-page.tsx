@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Car, Plus, Sparkles } from "lucide-react"
+import { Car, Sparkles } from "lucide-react"
 
 import {
   useParkingSlotsQuery,
@@ -134,18 +134,10 @@ export default function ParkingPage() {
           <button
             type="button"
             onClick={() => setIsGenerateOpen(true)}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0F5F45] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0B4D38]"
           >
             <Sparkles size={16} strokeWidth={2.25} />
             Generate Slots
-          </button>
-
-          <button
-            type="button"
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0F5F45] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0B4D38]"
-          >
-            <Plus size={16} strokeWidth={2.25} />
-            Add Slot
           </button>
         </div>
       </div>

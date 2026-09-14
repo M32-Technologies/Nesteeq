@@ -1,6 +1,7 @@
 "use client"
 
 import { AlertTriangle, X } from "lucide-react"
+import { Portal } from "@/components/portal"
 import { useReleaseResidentParkingMutation } from "../hooks/use-parking-queries"
 import type { ParkingSlot } from "../types/parking.types"
 
@@ -23,12 +24,14 @@ export function ReleaseSlotDialog({ slot, onClose }: ReleaseSlotDialogProps) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/20 p-4 backdrop-blur-[1px] animate-in fade-in duration-200"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="release-slot-title"
-    >
+    <Portal>
+      <div
+        style={{ zIndex: 1000 }}
+        className="fixed inset-0 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="release-slot-title"
+      >
       <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-xl transition-all">
         {/* Header */}
         <div className="flex h-16 items-center justify-between border-b border-slate-200 px-6">
@@ -109,5 +112,6 @@ export function ReleaseSlotDialog({ slot, onClose }: ReleaseSlotDialogProps) {
         </div>
       </div>
     </div>
-  )
+  </Portal>
+)
 }

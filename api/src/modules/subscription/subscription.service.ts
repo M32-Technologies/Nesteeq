@@ -252,3 +252,15 @@ export const VerifySubscriptionPayment = async (
     status: subscription.status,
   };
 };
+
+export const GetCurrentSubscription = async (apartmentId: string) => {
+  const subscription = await Subscription.findOne({
+    apartment: apartmentId,
+    status: {
+      $in: ["created", "authenticated", "active", "pending", "halted"],
+    },
+  }).populate("plan");
+
+  return subscription;
+};
+
