@@ -189,10 +189,10 @@ export default function EditFlatDialog({
               </span>
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
                 <p className="text-sm font-semibold text-slate-900">
-                  {flat.block?.blockname ?? flat.blockId}
+                  {flat.block?.blockname || flat.block?.code || "Block"}
                 </p>
                 <p className="mt-0.5 text-xs font-medium text-slate-500">
-                  Code {flat.block?.code ?? "-"} | Read only
+                  Code {flat.block?.code || "-"} | Read only
                 </p>
               </div>
             </div>

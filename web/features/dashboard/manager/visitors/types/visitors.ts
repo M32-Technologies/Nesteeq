@@ -21,6 +21,9 @@ export interface VisitorRecord {
   notes?: string
   validUntil?: string
   securityStaffName?: string
+  vehicleType?: string
+  parkingSlotNumber?: string
+  parkingAssignmentStatus?: string
 }
 
 export interface VisitorStats {

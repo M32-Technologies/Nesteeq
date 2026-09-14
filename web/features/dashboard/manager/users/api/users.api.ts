@@ -382,13 +382,17 @@ const getBlock = (flat?: ApiResidentFlat) => {
   if (typeof flat.blockId === "string") {
     return {
       id: flat.blockId,
-      name: flat.blockId,
+      name: "-",
     }
   }
 
   return {
     id: flat.blockId._id || "",
-    name: flat.blockId.blockname || flat.blockId.name || flat.blockId._id || "-",
+    name:
+      flat.blockId.blockname ||
+      flat.blockId.name ||
+      flat.blockId.code ||
+      "-",
   }
 }
 
@@ -396,8 +400,8 @@ const getInvitationFlat = (invitation: ApiInvitation) => {
   if (!invitation.flatId) return "-"
 
   if (typeof invitation.flatId === "string") {
-    return invitation.flatId
+    return "-"
   }
 
-  return invitation.flatId.flatNumber || invitation.flatId._id || "-"
+  return invitation.flatId.flatNumber || "-"
 }

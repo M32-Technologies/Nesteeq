@@ -105,14 +105,20 @@ const getResidentDetailsForFlat = async (flat: FlatRecord, apartmentId: string,)
     return null;
   }
 
-  const user = resident.userId
-    ? await getAuthDB()
+  let user: AuthUserForFlatDetails | null = null;
+  if (resident.userId) {
+    const userFilters: Record<string, unknown>[] = [{ id: resident.userId }];
+    if (Types.ObjectId.isValid(resident.userId)) {
+      userFilters.push({ _id: new Types.ObjectId(resident.userId) });
+    }
+
+    user = await getAuthDB()
       .collection<AuthUserForFlatDetails>("user")
       .findOne(
-        { id: resident.userId },
+        { $or: userFilters },
         {
           projection: {
-            _id: 0,
+            _id: 1,
             id: 1,
             name: 1,
             email: 1,
@@ -122,8 +128,8 @@ const getResidentDetailsForFlat = async (flat: FlatRecord, apartmentId: string,)
             phone: 1,
           },
         },
-      )
-    : null;
+      );
+  }
 
   return {
     id: resident._id.toString(),

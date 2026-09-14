@@ -163,6 +163,7 @@ export default function VisitorTableSection({
             >
               <option value="ALL">All Statuses</option>
               <option value="ACTIVE">Currently Inside</option>
+              <option value="EXPECTED">Expected / Pass Active</option>
               <option value="CHECKED_OUT">Checked Out</option>
             </select>
             <ChevronDown

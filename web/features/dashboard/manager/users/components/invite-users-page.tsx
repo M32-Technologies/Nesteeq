@@ -352,9 +352,9 @@ export default function InviteUsersPage() {
                         </option>
                         {flats.map((flat) => (
                           <option key={flat.id} value={flat.id}>
-                            {selectedBlockName
-                              ? `${selectedBlockName} - ${flat.flatNumber}`
-                              : flat.flatNumber}
+                            {flat.flatNumber.toLowerCase().startsWith("flat")
+                              ? flat.flatNumber
+                              : `Flat ${flat.flatNumber}`}
                           </option>
                         ))}
                       </select>

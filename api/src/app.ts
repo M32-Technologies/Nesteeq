@@ -23,6 +23,7 @@ import securityRoutes from "./modules/security/security.routes.js";
 import deliveryRoutes from "./modules/delivery/delivery.routes.js";
 import parkingRoutes from "./modules/parking/parking.routes.js";
 import alertRoutes from "./modules/alert/alert.routes.js";
+import announcementRoutes from "./modules/announcements/announcements.routes.js";
 
 const app = express();
 
@@ -66,6 +67,7 @@ app.use("/api/security/parking", parkingRoutes);
 app.use("/api/visitors", visitorsRoutes);
 app.use("/api/security/deliveries", deliveryRoutes);
 app.use("/api/security/alerts", alertRoutes);
+app.use("/api/announcements", announcementRoutes);
 app.use("/api/security", securityRoutes);
 
 app.use(notFoundHandler);

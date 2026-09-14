@@ -116,7 +116,7 @@ export default function FlatDetailsSheet({
                       {flat.flatNumber}
                     </button>
                       <p className="mt-1 text-sm font-medium text-slate-500">
-                        {flat.block?.blockname ?? flat.blockId} | Floor{" "}
+                        {flat.block?.blockname || flat.block?.code || "Block"} | Floor{" "}
                         {flat.floorNumber || "-"}
                       </p>
                     </div>
@@ -150,12 +150,12 @@ export default function FlatDetailsSheet({
                   <DetailRow
                     icon={<Building2 size={16} />}
                     label="Block"
-                    value={flat.block?.blockname ?? flat.blockId}
+                    value={flat.block?.blockname || flat.block?.code || "-"}
                   />
                   <DetailRow
                     icon={<Building2 size={16} />}
                     label="Block Code"
-                    value={flat.block?.code ?? "-"}
+                    value={flat.block?.code || "-"}
                   />
                   <DetailRow
                     icon={<Home size={16} />}
