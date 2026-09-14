@@ -10,35 +10,35 @@ import {
 } from "@/features/dashboard/facility/shared/components/facility-ui"
 
 export function PendingActionList({
-  pendingActions = {
-    complaintsToAssign: [],
-    complaintsToApprove: [],
-    maintenanceToApprove: [],
-    maintenanceCostToReview: [],
-  },
+  pendingActions,
 }: {
   pendingActions?: {
-    complaintsToAssign: Complaint[]
-    complaintsToApprove: Complaint[]
-    maintenanceToApprove: Maintenance[]
-    maintenanceCostToReview: Maintenance[]
+    complaintsToAssign?: Complaint[]
+    complaintsToApprove?: Complaint[]
+    maintenanceToApprove?: Maintenance[]
+    maintenanceCostToReview?: Maintenance[]
   }
 }) {
+  const complaintsToAssign = pendingActions?.complaintsToAssign ?? []
+  const complaintsToApprove = pendingActions?.complaintsToApprove ?? []
+  const maintenanceToApprove = pendingActions?.maintenanceToApprove ?? []
+  const maintenanceCostToReview = pendingActions?.maintenanceCostToReview ?? []
+
   return (
     <div className="space-y-6">
       <section className="rounded-lg border border-[#E2E8EE] bg-white">
         <div className="flex items-center justify-between gap-3 border-b border-[#E2E8EE] px-4 py-4">
           <h2 className="text-[15px] font-semibold text-[#111111]">Complaints Needing Assignment</h2>
           <span className="rounded-md bg-[#EEF6FF] px-2.5 py-1 text-[12px] font-semibold text-[#2E639B]">
-            {pendingActions.complaintsToAssign.length}
+            {complaintsToAssign.length}
           </span>
         </div>
 
-        {pendingActions.complaintsToAssign.length === 0 ? (
+        {complaintsToAssign.length === 0 ? (
           <div className="px-4 py-5 text-[13px] text-[#66737F]">No pending items.</div>
         ) : (
           <div className="divide-y divide-[#EEF2F5]">
-            {pendingActions.complaintsToAssign.map((item) => (
+            {complaintsToAssign.map((item) => (
               <Link
                 key={item._id}
                 href="/facility-manager/complaints"
@@ -64,15 +64,15 @@ export function PendingActionList({
         <div className="flex items-center justify-between gap-3 border-b border-[#E2E8EE] px-4 py-4">
           <h2 className="text-[15px] font-semibold text-[#111111]">Maintenance Needing Review</h2>
           <span className="rounded-md bg-[#EEF6FF] px-2.5 py-1 text-[12px] font-semibold text-[#2E639B]">
-            {pendingActions.maintenanceToApprove.length + pendingActions.maintenanceCostToReview.length}
+            {maintenanceToApprove.length + maintenanceCostToReview.length}
           </span>
         </div>
 
-        {pendingActions.maintenanceToApprove.length === 0 && pendingActions.maintenanceCostToReview.length === 0 ? (
+        {maintenanceToApprove.length === 0 && maintenanceCostToReview.length === 0 ? (
           <div className="px-4 py-5 text-[13px] text-[#66737F]">No pending items.</div>
         ) : (
           <div className="divide-y divide-[#EEF2F5]">
-            {[...pendingActions.maintenanceToApprove, ...pendingActions.maintenanceCostToReview].map((item) => (
+            {[...maintenanceToApprove, ...maintenanceCostToReview].map((item) => (
               <Link
                 key={item._id}
                 href="/facility-manager/maintenance"
