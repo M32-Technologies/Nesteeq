@@ -8,7 +8,7 @@ import { toast } from "sonner"
 import { z } from "zod"
 
 import {
-  useCreatePropertyFlatMutation,
+  useGeneratePropertyFlatsMutation,
   usePropertyBlocksQuery,
 } from "../hooks/use-property-query"
 
@@ -37,7 +37,7 @@ export default function GenerateFlatsDialog({
   open,
   onClose,
 }: GenerateFlatsDialogProps) {
-  const createFlat = useCreatePropertyFlatMutation()
+  const generateFlats = useGeneratePropertyFlatsMutation()
   const { data: blocks = [], isLoading: isBlocksLoading } =
     usePropertyBlocksQuery({ status: "active" })
   const [formError, setFormError] = useState("")
@@ -78,6 +78,7 @@ export default function GenerateFlatsDialog({
                   unitIndex + 1
                 ).padStart(2, "0")}`,
                 floorNumber: floor,
+                unitNumber: unitIndex + 1,
               })),
             }
           })
@@ -125,7 +126,7 @@ export default function GenerateFlatsDialog({
   }
 
   const closeDialog = () => {
-    if (createFlat.isPending) return
+    if (generateFlats.isPending) return
 
     reset()
     setSelectedFlatNumbers([])
@@ -140,20 +141,23 @@ export default function GenerateFlatsDialog({
       return
     }
 
-    let createdCount = 0
-
     try {
       setFormError("")
-      for (const flat of selectedFlats) {
-        await createFlat.mutateAsync({
-          blockId: values.blockId,
-          floorNumber: flat.floorNumber,
-          flatNumber: flat.flatNumber,
-        })
-        createdCount += 1
-      }
+      const excludedUnits = flatPreview
+        .flatMap((floor) => floor.flats)
+        .filter((flat) => !selectedFlatNumberSet.has(flat.flatNumber))
+        .map((flat) => ({
+          floor: flat.floorNumber,
+          unit: flat.unitNumber,
+        }))
 
-      toast.success(`${selectedFlats.length} flats created successfully`)
+      const result = await generateFlats.mutateAsync({
+        blockId: values.blockId,
+        unitsPerFloor: Number(values.unitsPerFloor),
+        excludedUnits,
+      })
+
+      toast.success(`${result.generatedCount} flats generated successfully`)
       reset()
       setSelectedFlatNumbers([])
       clearErrors()
@@ -161,13 +165,8 @@ export default function GenerateFlatsDialog({
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to generate flats"
-      const errorMessage =
-        createdCount > 0
-          ? `${createdCount} flats created, then failed: ${message}`
-          : message
-
-      toast.error(errorMessage)
-      setFormError(errorMessage)
+      toast.error(message)
+      setFormError(message)
     }
   }
 
@@ -201,7 +200,7 @@ export default function GenerateFlatsDialog({
           <button
             type="button"
             onClick={closeDialog}
-            disabled={createFlat.isPending}
+            disabled={generateFlats.isPending}
             className="flex size-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
             aria-label="Close generate flats modal"
           >
@@ -227,7 +226,7 @@ export default function GenerateFlatsDialog({
                 </span>
                 <div className="relative">
                   <select
-                    disabled={isBlocksLoading || createFlat.isPending}
+                    disabled={isBlocksLoading || generateFlats.isPending}
                     {...register("blockId")}
                     className={`${fieldClassName} appearance-none pr-10`}
                   >
@@ -263,7 +262,7 @@ export default function GenerateFlatsDialog({
                   step="1"
                   inputMode="numeric"
                   placeholder="Example: 4"
-                  disabled={createFlat.isPending}
+                  disabled={generateFlats.isPending}
                   onKeyDown={(event) => {
                     if (["-", "+", ".", "e", "E"].includes(event.key)) {
                       event.preventDefault()
@@ -296,7 +295,7 @@ export default function GenerateFlatsDialog({
                     <button
                       type="button"
                       onClick={resetSelectedFlats}
-                      disabled={createFlat.isPending}
+                      disabled={generateFlats.isPending}
                       className="text-xs font-semibold text-[#0F5F45] transition hover:text-[#0B4D38] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Restore removed flats
@@ -318,7 +317,7 @@ export default function GenerateFlatsDialog({
                               key={flat.flatNumber}
                               type="button"
                               onClick={() => removeFlat(flat.flatNumber)}
-                              disabled={!isSelected || createFlat.isPending}
+                              disabled={!isSelected || generateFlats.isPending}
                               className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold transition disabled:cursor-not-allowed ${
                                 isSelected
                                   ? "border-slate-200 bg-white text-slate-700 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
@@ -352,7 +351,7 @@ export default function GenerateFlatsDialog({
             <button
               type="button"
               onClick={closeDialog}
-              disabled={createFlat.isPending}
+              disabled={generateFlats.isPending}
               className="flex h-11 items-center justify-center rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Cancel
@@ -360,10 +359,10 @@ export default function GenerateFlatsDialog({
 
             <button
               type="submit"
-              disabled={createFlat.isPending || selectedFlats.length === 0}
+              disabled={generateFlats.isPending || selectedFlats.length === 0}
               className="flex h-11 items-center justify-center rounded-lg bg-[#0F5F45] text-sm font-semibold text-white transition hover:bg-[#0B4D38] disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {createFlat.isPending ? "Creating..." : "Create Selected Flats"}
+              {generateFlats.isPending ? "Generating..." : "Create Selected Flats"}
             </button>
           </div>
         </form>

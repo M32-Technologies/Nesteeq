@@ -93,7 +93,7 @@ export default function ParkingTable({
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
                 placeholder="Search parking slot..."
-                className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#0F5F45] focus:ring-2 focus:ring-[#0F5F45]/10"
+                className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#0F5F45] focus:outline-none focus:ring-0"
               />
             </div>
 
@@ -117,7 +117,7 @@ export default function ParkingTable({
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-h-[400px]">
           <table className="w-full min-w-[900px] table-fixed border-collapse">
             <colgroup>
               <col className="w-[15%]" />
@@ -281,13 +281,13 @@ export default function ParkingTable({
           </table>
 
           {isLoading && (
-            <div className="flex min-h-[260px] items-center justify-center px-4 text-center text-sm font-medium text-slate-500">
+            <div className="flex min-h-[400px] items-center justify-center px-4 text-center text-sm font-medium text-slate-500">
               <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-[#0F5F45]" />
             </div>
           )}
 
           {!isLoading && slots.length === 0 && (
-            <div className="flex min-h-[260px] flex-col items-center justify-center px-4 text-center">
+            <div className="flex min-h-[400px] flex-col items-center justify-center px-4 text-center">
               <p className="text-sm font-medium text-slate-900">No parking slots found</p>
               <p className="mt-1 text-sm text-slate-500">Try changing your search or status filter.</p>
             </div>

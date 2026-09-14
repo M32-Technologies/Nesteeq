@@ -176,7 +176,7 @@ export default function FlatsTableSection({
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-h-[400px]">
           <table className="w-full min-w-[1000px] border-collapse">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/80">
@@ -292,19 +292,19 @@ export default function FlatsTableSection({
           </table>
 
           {isLoading && (
-            <div className="flex min-h-[260px] items-center justify-center px-4 text-center text-sm font-medium text-slate-500">
+            <div className="flex min-h-[400px] items-center justify-center px-4 text-center text-sm font-medium text-slate-500">
               Loading flats...
             </div>
           )}
 
           {isError && (
-            <div className="flex min-h-[260px] items-center justify-center px-4 text-center text-sm font-medium text-slate-500">
+            <div className="flex min-h-[400px] items-center justify-center px-4 text-center text-sm font-medium text-slate-500">
               {error instanceof Error ? error.message : "Failed to load flats"}
             </div>
           )}
 
           {!isLoading && !isError && flats.length === 0 && (
-            <div className="flex min-h-[260px] items-center justify-center px-4 text-center text-sm font-medium text-slate-500">
+            <div className="flex min-h-[400px] items-center justify-center px-4 text-center text-sm font-medium text-slate-500">
               No flats found
             </div>
           )}

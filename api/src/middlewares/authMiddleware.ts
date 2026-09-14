@@ -4,17 +4,11 @@ import { fromNodeHeaders } from "better-auth/node";
 import { AppError } from "../utils/AppError.js";
 import { catchAsync } from "../utils/catchAsync.js";
 
-type ApartmentIdValue =
-    | string
-    | { toString: () => string }
-    | null
-    | undefined;
+type ApartmentIdValue =| string| { toString: () => string }| null | undefined;
 
-const normalizeRole = (role: string) =>
-    role.trim().toLowerCase().replace(/[\s-]+/g, "_");
+const normalizeRole = (role: string) => role.trim().toLowerCase().replace(/[\s-]+/g, "_");
 
-const normalizeApartmentId = (apartmentId: ApartmentIdValue) =>
-    apartmentId?.toString().trim().toLowerCase();
+const normalizeApartmentId = (apartmentId: ApartmentIdValue) => apartmentId?.toString().trim().toLowerCase();
 
 export const protect = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
     const session = await auth.api.getSession({

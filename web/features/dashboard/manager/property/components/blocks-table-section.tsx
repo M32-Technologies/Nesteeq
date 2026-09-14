@@ -101,7 +101,7 @@ export default function BlocksTableSection({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto min-h-[400px]">
         <table className="w-full min-w-[900px] table-fixed border-collapse">
           <colgroup>
             <col className="w-[38%]" />
@@ -241,13 +241,13 @@ export default function BlocksTableSection({
         </table>
 
         {isLoading && (
-          <div className="flex min-h-[260px] items-center justify-center px-4 text-center text-sm font-medium text-slate-500">
+          <div className="flex min-h-[400px] items-center justify-center px-4 text-center text-sm font-medium text-slate-500">
             Loading blocks...
           </div>
         )}
 
         {!isLoading && blocks.length === 0 && (
-          <div className="flex min-h-[260px] items-center justify-center px-4 text-center text-sm font-medium text-slate-500">
+          <div className="flex min-h-[400px] items-center justify-center px-4 text-center text-sm font-medium text-slate-500">
             No blocks found
           </div>
         )}

@@ -12,7 +12,9 @@ const router = express.Router()
 
 router.get("/current", protect, getCurrentApartmentHandler)
 router.get("/pending", protect, getPendingApartmentHandler)
+
 router.post("/", protect, zodValidate(createApartmentSchema), createApartmentHandler,)
 
 
 export default router 
+

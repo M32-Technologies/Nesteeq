@@ -66,7 +66,7 @@ export default function PropertyHeader({
     },
     {
       title: "Total Flats",
-      description: "Configured apartment units",
+      description: "Total flats in property",
       value: stats?.totalFlats ?? 0,
       icon: Home,
       accent: "bg-[#0F5F45]",

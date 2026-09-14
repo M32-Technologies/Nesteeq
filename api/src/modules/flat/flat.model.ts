@@ -1,5 +1,6 @@
 import { Schema, model } from "mongoose";
-import { IFlat } from "./flat.schema.js";
+import { IFlat } from "./flat.types.js";
+
 
 const flatSchema = new Schema<IFlat>(
   {
