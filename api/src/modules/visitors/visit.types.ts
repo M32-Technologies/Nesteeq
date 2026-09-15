@@ -103,3 +103,76 @@ export type LeanVisitorVisit = IVisitorVisit & {
   flatId: ObjectIdLike
   visitorPassId?: ObjectIdLike | null
 }
+
+export type VisitorRecordParkingFields = {
+  parkingAssignmentId?: string | null
+  parkingSlotId?: string | null
+  parkingSlotNumber?: string | null
+  parkingAssignmentStatus?: string | null
+  parkingAssignedAt?: Date | null
+  parkingReleasedAt?: Date | null
+  parkingVehicleNumber?: string | null
+  parkingVehicleType?: string | null
+}
+
+export type VisitorVisitListItem = {
+  _id: string
+  apartmentId: string
+  flatId?: string
+  flatNumber: string | null
+  visitorPassId?: string | null
+  visitorName: string
+  visitorPhone?: string | null
+  purpose?: string | null
+  vehicleNumber?: string | null
+  vehicleType?: string | null
+  entryType: string
+  checkedInBy: string
+  checkedInAt: Date
+  checkedOutBy?: string | null
+  checkedOutAt?: Date | null
+  status: string
+  createdAt?: Date
+  updatedAt?: Date
+}
+
+export type VisitorVisitFacetResult = {
+  data: VisitorVisitListItem[]
+  totalCount: Array<{
+    count: number
+  }>
+}
+
+export type VisitorRecordItem = {
+  _id: string
+  source: "PASS" | "VISIT"
+  status: "UPCOMING" | "ACTIVE" | "EXITED"
+  visitId: string | null
+  visitorPassId: string | null
+  apartmentId: string
+  flatId: string | null
+  flatNumber: string | null
+  visitorName: string
+  visitorPhone?: string | null
+  purpose?: string | null
+  vehicleNumber?: string | null
+  vehicleType?: string | null
+  entryType: "PASS" | "MANUAL"
+  expectedAt?: Date | null
+  validUntil?: Date | null
+  checkedInAt?: Date | null
+  checkedOutAt?: Date | null
+} & VisitorRecordParkingFields
+
+export type VisitorRecordsFacetResult = {
+  records: VisitorRecordItem[]
+  totalCount: Array<{
+    count: number
+  }>
+}
+
+export type ReleasedParkingAssignment = {
+  assignmentId: string
+  slotId: string
+}
+

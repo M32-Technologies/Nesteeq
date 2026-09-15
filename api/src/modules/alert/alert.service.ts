@@ -8,8 +8,52 @@ import {
   getMatchingFlatIdsForSearch,
   getMatchingUserIdsForSearch,
   getUserSummariesByIds,
-} from "../../utils/security/directory.js"
-import { validateEmergencyAlertStatusTransition } from "../../utils/security/status-transitions.js"
+} from "../security/security.service.js"
+
+const alertTransitions: Record<
+  EmergencyAlertStatusType,
+  readonly EmergencyAlertStatusType[]
+> = {
+  [EmergencyAlertStatus.ACTIVE]: [
+    EmergencyAlertStatus.ACKNOWLEDGED,
+  ],
+  [EmergencyAlertStatus.ACKNOWLEDGED]: [
+    EmergencyAlertStatus.RESPONDING,
+  ],
+  [EmergencyAlertStatus.RESPONDING]: [
+    EmergencyAlertStatus.RESOLVED,
+  ],
+  [EmergencyAlertStatus.RESOLVED]: [],
+}
+
+export const canTransitionEmergencyAlertStatus = (
+  currentStatus: EmergencyAlertStatusType,
+  nextStatus: EmergencyAlertStatusType
+) => alertTransitions[currentStatus].includes(nextStatus)
+
+export const validateEmergencyAlertStatusTransition = (
+  currentStatus: EmergencyAlertStatusType,
+  nextStatus: EmergencyAlertStatusType
+) => {
+  if (currentStatus === nextStatus) {
+    throw new AppError(
+      `Emergency alert is already ${currentStatus}.`,
+      400
+    )
+  }
+
+  if (
+    !canTransitionEmergencyAlertStatus(
+      currentStatus,
+      nextStatus
+    )
+  ) {
+    throw new AppError(
+      `Invalid alert status transition from ${currentStatus} to ${nextStatus}.`,
+      400
+    )
+  }
+}
 import {
   EmergencyAlertModel,
   EmergencyAlertStatus,

@@ -158,3 +158,26 @@ export interface ParkingStatsResponse {
   residentSlots: number
   visitorSlots: number
 }
+
+export type LeanManagerParkingSlot = Pick<
+  IParkingSlot,
+  "slotNumber" | "vehicleType" | "status" | "createdAt" | "updatedAt"
+> & {
+  _id: Types.ObjectId
+  apartmentId: Types.ObjectId
+}
+
+export type SecurityParkingListInput = {
+  apartmentId: string
+  status?: "ALL" | VisitorParkingSlotStatus
+  vehicleType?: ParkingVehicleType
+  search?: string
+  page?: number
+  limit?: number
+}
+
+export type DuplicateKeyError = {
+  code?: number
+  keyPattern?: Record<string, unknown>
+}
+

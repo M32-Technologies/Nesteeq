@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import {
-  BellRing,
   CheckCircle2,
   Eye,
   RotateCcw,
@@ -58,7 +57,6 @@ const statusFilters: Array<{
   value: DeliveryStatus
 }> = [
   { label: "All", value: "ALL" },
-  { label: "Waiting", value: "WAITING" },
   { label: "Resident Notified", value: "NOTIFIED" },
   { label: "Collected", value: "COLLECTED" },
   { label: "Returned", value: "RETURNED" },
@@ -130,7 +128,7 @@ export function DeliveryParcels() {
           form.packageDescription || undefined,
       })
 
-      toast.success("Delivery recorded")
+      toast.success("Delivery recorded as resident notified")
       resetForm()
     } catch (error) {
       toast.error(
@@ -294,7 +292,6 @@ export function DeliveryParcels() {
                           updateStatusMutation.isPending
                         }
                         onConfirmStatus={setConfirmDelivery}
-                        onStatusUpdate={handleStatusUpdate}
                         onView={setSelectedDelivery}
                       />
                     </td>
@@ -359,7 +356,6 @@ function DeliveryActionsMenu({
   delivery,
   isUpdating,
   onConfirmStatus,
-  onStatusUpdate,
   onView,
 }: {
   delivery: SecurityDelivery
@@ -370,10 +366,6 @@ function DeliveryActionsMenu({
       status: Exclude<DeliveryStatus, "ALL">
     } | null
   ) => void
-  onStatusUpdate: (
-    delivery: SecurityDelivery,
-    nextStatus: Exclude<DeliveryStatus, "ALL">
-  ) => void
   onView: (delivery: SecurityDelivery) => void
 }) {
   const actions: SecurityMenuAction[] = [
@@ -383,15 +375,6 @@ function DeliveryActionsMenu({
       onClick: () => onView(delivery),
     },
   ]
-
-  if (delivery.status === "WAITING") {
-    actions.push({
-      label: "Notify Resident",
-      icon: <BellRing size={15} />,
-      disabled: isUpdating,
-      onClick: () => onStatusUpdate(delivery, "NOTIFIED"),
-    })
-  }
 
   if (
     delivery.status === "WAITING" ||

@@ -25,6 +25,12 @@ export const EmergencyAlertStatus = {
 export type EmergencyAlertStatus =
   (typeof EmergencyAlertStatus)[keyof typeof EmergencyAlertStatus]
 
+export const emergencyAlertUpdateStatuses = [
+  EmergencyAlertStatus.ACKNOWLEDGED,
+  EmergencyAlertStatus.RESPONDING,
+  EmergencyAlertStatus.RESOLVED,
+] as const
+
 export interface IEmergencyAlert {
   apartmentId: Types.ObjectId
   residentId: Types.ObjectId
