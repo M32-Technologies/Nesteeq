@@ -3,8 +3,8 @@ import { z } from "zod"
 import {
   EmergencyAlertStatus,
   EmergencyAlertType,
+  emergencyAlertUpdateStatuses,
 } from "./alert.model.js"
-import { emergencyAlertUpdateStatuses } from "../../utils/security/status-transitions.js"
 
 const objectIdSchema = z
   .string()

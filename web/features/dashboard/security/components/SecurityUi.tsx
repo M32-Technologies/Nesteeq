@@ -52,6 +52,10 @@ const statusToneClassNames: Record<string, string> = {
   RESOLVED: "bg-slate-100 text-slate-700 ring-slate-200",
 }
 
+const statusLabelOverrides: Record<string, string> = {
+  NOTIFIED: "Resident Notified",
+}
+
 export function formatDateTime(value?: string | null) {
   if (!value) return "-"
 
@@ -66,6 +70,10 @@ export function formatDateTime(value?: string | null) {
 
 export function formatLabel(value?: string | null) {
   if (!value) return "-"
+
+  if (statusLabelOverrides[value]) {
+    return statusLabelOverrides[value]
+  }
 
   return value
     .split("_")

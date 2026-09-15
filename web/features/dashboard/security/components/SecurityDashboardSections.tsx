@@ -65,7 +65,7 @@ export function SecuritySummaryCards({
         icon={<BellRing className="h-5 w-5" />}
       />
       <SummaryCard
-        label="Deliveries Waiting"
+        label="Resident Notified"
         value={summary?.deliveriesWaiting ?? 0}
         icon={<Package className="h-5 w-5" />}
       />
@@ -367,9 +367,9 @@ function getAttentionItems(summary: SecuritySummary) {
       : null,
     summary.deliveriesWaiting > 0
       ? {
-          title: `${summary.deliveriesWaiting} Parcels Waiting`,
-          description: "Deliveries are waiting at the gate.",
-          status: "WAITING",
+          title: `${summary.deliveriesWaiting} Resident Notified Parcels`,
+          description: "Residents have been notified for collection.",
+          status: "NOTIFIED",
           href: "/security/deliveries",
           urgent: false,
         }

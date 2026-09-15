@@ -30,7 +30,7 @@ import { emailService } from "../../services/EmailService.js"
 import { env } from "../../config/env.js"
 import { AppError } from "../../utils/AppError.js"
 import { getAuthDB } from "../../config/auth-db.js"
-import { parseInviteWorkbook } from "../../utils/excel/resident-parser.js"
+import { parseInviteWorkbook } from "./excel/resident-parser.js"
 
 const INVITE_EXPIRY_DAYS = 7
 

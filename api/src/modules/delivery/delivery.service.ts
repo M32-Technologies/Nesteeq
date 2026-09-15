@@ -5,8 +5,7 @@ import {
   getMatchingFlatIdsForSearch,
   getMatchingUserIdsForSearch,
   getUserSummariesByIds,
-} from "../../utils/security/directory.js"
-import { validateDeliveryStatusTransition } from "../../utils/security/status-transitions.js"
+} from "../security/security.service.js"
 import { AppError } from "../../utils/AppError.js"
 import { escapeRegExp } from "../../utils/regex.js"
 import {
@@ -17,6 +16,47 @@ import {
 } from "./delivery.interface.js"
 import { SecurityDeliveryModel } from "./delivery.model.js"
 import { ResidentModel } from "../resident/resident.model.js"
+
+const deliveryTransitions: Record<
+  DeliveryStatusType,
+  readonly DeliveryStatusType[]
+> = {
+  [DeliveryStatus.WAITING]: [
+    DeliveryStatus.NOTIFIED,
+    DeliveryStatus.COLLECTED,
+    DeliveryStatus.RETURNED,
+  ],
+  [DeliveryStatus.NOTIFIED]: [
+    DeliveryStatus.COLLECTED,
+    DeliveryStatus.RETURNED,
+  ],
+  [DeliveryStatus.COLLECTED]: [],
+  [DeliveryStatus.RETURNED]: [],
+}
+
+export const canTransitionDeliveryStatus = (
+  currentStatus: DeliveryStatusType,
+  nextStatus: DeliveryStatusType
+) => deliveryTransitions[currentStatus].includes(nextStatus)
+
+export const validateDeliveryStatusTransition = (
+  currentStatus: DeliveryStatusType,
+  nextStatus: DeliveryStatusType
+) => {
+  if (currentStatus === nextStatus) {
+    throw new AppError(
+      `Delivery is already ${currentStatus}.`,
+      400
+    )
+  }
+
+  if (!canTransitionDeliveryStatus(currentStatus, nextStatus)) {
+    throw new AppError(
+      `Invalid delivery status transition from ${currentStatus} to ${nextStatus}.`,
+      400
+    )
+  }
+}
 
 type ObjectIdLike = {
   toString: () => string
