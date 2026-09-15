@@ -69,7 +69,7 @@ export const getResident = async (data: ResidentListQuery, apartmentId: string) 
     const users = await getAuthDB()
         .collection("user")
         .find({
-            id: { $in: residents.map((resident) => resident.userId).filter(Boolean) },
+            id: { $in: residents.map((resident: any) => resident.userId).filter(Boolean) },
         })
         .project({
             _id: 0,
@@ -86,7 +86,7 @@ export const getResident = async (data: ResidentListQuery, apartmentId: string) 
     const usersById = new Map(users.map((user) => [user.id, user]));
 
     return {
-        residents: residents.map((resident) => {
+        residents: residents.map((resident: any) => {
             const user = resident.userId ? usersById.get(resident.userId) : null;
 
             return {

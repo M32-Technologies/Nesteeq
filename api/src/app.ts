@@ -1,6 +1,8 @@
 import cookieParser from "cookie-parser";
 import express from "express";
 import cors from "cors";
+import path from "path";
+
 import { toNodeHandler } from "better-auth/node";
 import { errorHandler, notFoundHandler } from "./middlewares/errorHandler.js";
 import { auth } from "./lib/auth.js";
@@ -20,9 +22,16 @@ import FlatRoute from "./modules/flat/flat.routes.js";
 import ApartmentRoute from "./modules/apartment/apartment.routes.js";
 import visitorsRoutes from "./modules/visitors/visit.routes.js";
 import securityRoutes from "./modules/security/security.routes.js";
+import maintenanceTechnicianRoutes from "./modules/maintenance-technician/maintenance-technician.routes.js";
 import deliveryRoutes from "./modules/delivery/delivery.routes.js";
 import parkingRoutes from "./modules/parking/parking.routes.js";
 import alertRoutes from "./modules/alert/alert.routes.js";
+import complaintRoutes from "./modules/complaint/complaint.routes.js";
+import maintenanceRoutes from "./modules/maintenance/maintenance.routes.js";
+import technicianRoutes from "./modules/technician/technician.routes.js";
+import facilityRoutes from "./modules/facility/facility.routes.js";
+import reportRoutes from "./modules/report/report.routes.js";
+import scheduleRoutes from "./modules/schedule/schedule.routes.js";
 
 const app = express();
 
@@ -37,6 +46,7 @@ app.all("/api/auth/*splat", toNodeHandler(auth));
 
 app.use(cookieParser());
 app.use(express.json());
+app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")));
 
 app.use("/api/v1", SubscriptionsRoute);
 app.use("/api/v1/apartment", ApartmentRoute);
@@ -67,6 +77,22 @@ app.use("/api/visitors", visitorsRoutes);
 app.use("/api/security/deliveries", deliveryRoutes);
 app.use("/api/security/alerts", alertRoutes);
 app.use("/api/security", securityRoutes);
+
+app.use("/api/maintenance-technician", maintenanceTechnicianRoutes);
+
+app.use("/api/v1", complaintRoutes);
+app.use("/api/v1", maintenanceRoutes);
+app.use("/api/v1", technicianRoutes);
+app.use("/api/v1", facilityRoutes);
+app.use("/api/v1", reportRoutes);
+app.use("/api/v1", scheduleRoutes);
+
+app.use("/api", complaintRoutes);
+app.use("/api", maintenanceRoutes);
+app.use("/api", technicianRoutes);
+app.use("/api", facilityRoutes);
+app.use("/api", reportRoutes);
+app.use("/api", scheduleRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
