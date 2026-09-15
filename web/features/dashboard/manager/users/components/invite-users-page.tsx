@@ -79,12 +79,14 @@ export default function InviteUsersPage() {
 
     if (!role && !blockId && !flatId) return
 
-    setForm((current) => ({
-      ...current,
-      role: role === "owner" || role === "resident" ? role : current.role,
-      blockId: blockId || current.blockId,
-      flatId: blockId && flatId ? flatId : current.flatId,
-    }))
+    queueMicrotask(() => {
+      setForm((current) => ({
+        ...current,
+        role: role === "owner" || role === "resident" ? role : current.role,
+        blockId: blockId || current.blockId,
+        flatId: blockId && flatId ? flatId : current.flatId,
+      }))
+    })
   }, [])
 
   const selectedBlockName = useMemo(
