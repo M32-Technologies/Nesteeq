@@ -62,9 +62,10 @@ export const complaintMaintenanceSourceStatuses = new Set<ComplaintStatus>([
 const allowedStatusTransitions: Record<MaintenanceStatus, readonly MaintenanceStatus[]> = {
   PENDING: ["ASSIGNED", "CANCELLED"],
   ASSIGNED: ["IN_PROGRESS", "CANCELLED"],
-  IN_PROGRESS: ["ON_HOLD", "AWAITING_APPROVAL", "CANCELLED"],
+  IN_PROGRESS: ["ON_HOLD", "AWAITING_APPROVAL", "WORK_COMPLETED", "COMPLETED", "CANCELLED"],
   ON_HOLD: ["IN_PROGRESS", "CANCELLED"],
-  WORK_COMPLETED: ["AWAITING_APPROVAL", "APPROVED", "REJECTED", "CANCELLED"],
+  WORK_COMPLETED: ["AWAITING_APPROVAL", "APPROVED", "REJECTED", "CANCELLED", "CLOSED"],
+  COMPLETED: ["AWAITING_APPROVAL", "APPROVED", "REJECTED", "CANCELLED", "CLOSED"],
   AWAITING_APPROVAL: ["APPROVED", "REJECTED", "CANCELLED"],
   APPROVED: ["CLOSED"],
   REJECTED: ["ASSIGNED", "IN_PROGRESS", "CANCELLED"],
@@ -85,6 +86,7 @@ export const activeMaintenanceStatuses: MaintenanceStatus[] = [
   "IN_PROGRESS",
   "ON_HOLD",
   "WORK_COMPLETED",
+  "COMPLETED",
   "AWAITING_APPROVAL",
   "REJECTED",
 ];
@@ -96,7 +98,7 @@ export const managerStatusUpdateTargets = new Set<MaintenanceStatus>([
 ]);
 
 export const staffStatusUpdateTargets = new Set<MaintenanceStatus>(["IN_PROGRESS", "ON_HOLD"]);
-export const approvalAllowedStatuses = new Set<MaintenanceStatus>(["WORK_COMPLETED", "AWAITING_APPROVAL"]);
+export const approvalAllowedStatuses = new Set<MaintenanceStatus>(["WORK_COMPLETED", "COMPLETED", "AWAITING_APPROVAL"]);
 
 const isMaintenanceStatus = (value: string): value is MaintenanceStatus =>
   (maintenanceStatuses as readonly string[]).includes(value);

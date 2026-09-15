@@ -14,7 +14,8 @@ import {
 
 export const getDashboardStatsController = catchAsync(
   async (req: Request, res: Response) => {
-    const data = await getDashboardStats()
+    const technicianId = req.user?.id
+    const data = await getDashboardStats(technicianId)
 
     res.status(200).json({
       success: true,
@@ -27,7 +28,10 @@ export const getDashboardStatsController = catchAsync(
 export const getAssignedJobsController = catchAsync(
   async (req: Request, res: Response) => {
     const status = req.query.status ? String(req.query.status) : undefined
-    const data = await getAssignedJobs(status)
+    const technicianId = req.query.technicianId
+      ? String(req.query.technicianId)
+      : req.user?.id
+    const data = await getAssignedJobs(status, technicianId)
 
     res.status(200).json({
       success: true,
@@ -53,7 +57,7 @@ export const getJobByIdController = catchAsync(
 export const startJobController = catchAsync(
   async (req: Request, res: Response) => {
     const jobId = String(req.params.jobId)
-    const data = await startJob(jobId)
+    const data = await startJob(jobId, req.user?.id)
 
     res.status(200).json({
       success: true,
@@ -67,7 +71,11 @@ export const addProgressUpdateController = catchAsync(
   async (req: Request, res: Response) => {
     const jobId = String(req.params.jobId)
     const { message } = req.body
-    const data = await addProgressUpdate(jobId, String(message || ""))
+    const data = await addProgressUpdate(
+      jobId,
+      String(message || ""),
+      req.user?.id
+    )
 
     res.status(201).json({
       success: true,
@@ -80,7 +88,7 @@ export const addProgressUpdateController = catchAsync(
 export const uploadEvidenceController = catchAsync(
   async (req: Request, res: Response) => {
     const jobId = String(req.params.jobId)
-    const data = await uploadEvidence(jobId, req.file)
+    const data = await uploadEvidence(jobId, req.file, req.user?.id)
 
     res.status(200).json({
       success: true,
@@ -97,7 +105,8 @@ export const submitCostController = catchAsync(
     const data = await submitCost(
       jobId,
       Number(amount) || 0,
-      String(description || "")
+      String(description || ""),
+      req.user?.id
     )
 
     res.status(201).json({
@@ -112,10 +121,14 @@ export const completeJobController = catchAsync(
   async (req: Request, res: Response) => {
     const jobId = String(req.params.jobId)
     const { workSummary, notes } = req.body
-    const data = await completeJob(jobId, {
-      workSummary: String(workSummary || ""),
-      notes: notes ? String(notes) : undefined,
-    })
+    const data = await completeJob(
+      jobId,
+      {
+        workSummary: String(workSummary || ""),
+        notes: notes ? String(notes) : undefined,
+      },
+      req.user?.id
+    )
 
     res.status(200).json({
       success: true,
