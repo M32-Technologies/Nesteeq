@@ -1,5 +1,3 @@
-import { Types } from "mongoose"
-
 import { AppError } from "../../utils/AppError.js"
 import { escapeRegExp } from "../../utils/regex.js"
 import { ResidentModel } from "../resident/resident.model.js"
@@ -7,9 +5,55 @@ import {
   ensureFlatInApartment,
   ensureResidentInApartment,
   getApartmentFlatsService,
+  getMatchingFlatIdsForSearch,
+  getMatchingUserIdsForSearch,
   getUserSummariesByIds,
-} from "../security/security-directory.service.js"
-import { validateEmergencyAlertStatusTransition } from "../security/security-status-transitions.js"
+} from "../security/security.service.js"
+
+const alertTransitions: Record<
+  EmergencyAlertStatusType,
+  readonly EmergencyAlertStatusType[]
+> = {
+  [EmergencyAlertStatus.ACTIVE]: [
+    EmergencyAlertStatus.ACKNOWLEDGED,
+  ],
+  [EmergencyAlertStatus.ACKNOWLEDGED]: [
+    EmergencyAlertStatus.RESPONDING,
+  ],
+  [EmergencyAlertStatus.RESPONDING]: [
+    EmergencyAlertStatus.RESOLVED,
+  ],
+  [EmergencyAlertStatus.RESOLVED]: [],
+}
+
+export const canTransitionEmergencyAlertStatus = (
+  currentStatus: EmergencyAlertStatusType,
+  nextStatus: EmergencyAlertStatusType
+) => alertTransitions[currentStatus].includes(nextStatus)
+
+export const validateEmergencyAlertStatusTransition = (
+  currentStatus: EmergencyAlertStatusType,
+  nextStatus: EmergencyAlertStatusType
+) => {
+  if (currentStatus === nextStatus) {
+    throw new AppError(
+      `Emergency alert is already ${currentStatus}.`,
+      400
+    )
+  }
+
+  if (
+    !canTransitionEmergencyAlertStatus(
+      currentStatus,
+      nextStatus
+    )
+  ) {
+    throw new AppError(
+      `Invalid alert status transition from ${currentStatus} to ${nextStatus}.`,
+      400
+    )
+  }
+}
 import {
   EmergencyAlertModel,
   EmergencyAlertStatus,
@@ -61,13 +105,13 @@ const enrichAlerts = async (
     },
     apartmentId,
   })
-    .select("_id userId phone residentType status")
+    .select("_id userId phoneNumber residentType status")
     .lean()
 
   const residentRecords = residents as unknown as Array<{
     _id: ObjectIdLike
     userId: string
-    phone?: string | null
+    phoneNumber?: string | null
     residentType: string
     status: string
   }>
@@ -94,7 +138,7 @@ const enrichAlerts = async (
       residentId: toId(alert.residentId),
       residentName: user?.name ?? null,
       residentPhone:
-        resident?.phone ?? user?.phone ?? null,
+        resident?.phoneNumber ?? user?.phone ?? null,
       flatId: toId(alert.flatId),
       flatNumber:
         flatNumberById.get(toId(alert.flatId)) ?? null,
@@ -120,53 +164,16 @@ const getResidentIdsForSearch = async (
   apartmentId: string,
   search: string
 ) => {
-  const residents = await ResidentModel.find({
+  const regex = new RegExp(escapeRegExp(search), "i")
+  const userIds = await getMatchingUserIdsForSearch(search)
+
+  return ResidentModel.distinct("_id", {
     apartmentId,
+    $or: [
+      { phoneNumber: regex },
+      ...(userIds.length ? [{ userId: { $in: userIds } }] : []),
+    ],
   })
-    .select("_id userId phone")
-    .lean()
-
-  const residentRecords = residents as unknown as Array<{
-    _id: ObjectIdLike
-    userId: string
-    phone?: string | null
-  }>
-
-  const usersById = await getUserSummariesByIds(
-    residentRecords.map((resident) => resident.userId)
-  )
-  const query = search.toLowerCase()
-
-  return residentRecords
-    .filter((resident) => {
-      const user = usersById.get(resident.userId)
-
-      return [
-        user?.name,
-        user?.email,
-        user?.phone,
-        resident.phone,
-      ]
-        .filter(Boolean)
-        .some((value) =>
-          String(value).toLowerCase().includes(query)
-        )
-    })
-    .map((resident) => new Types.ObjectId(toId(resident._id)))
-}
-
-const getFlatIdsForSearch = async (
-  apartmentId: string,
-  search: string
-) => {
-  const { flats } = await getApartmentFlatsService(apartmentId)
-  const query = search.toLowerCase()
-
-  return flats
-    .filter((flat) =>
-      flat.flatNumber.toLowerCase().includes(query)
-    )
-    .map((flat) => new Types.ObjectId(flat._id))
 }
 
 export const createEmergencyAlertService = async ({
@@ -277,7 +284,7 @@ export const listEmergencyAlertsService = async ({
       "i"
     )
     const [flatIds, residentIds] = await Promise.all([
-      getFlatIdsForSearch(apartmentId, trimmedSearch),
+      getMatchingFlatIdsForSearch(apartmentId, trimmedSearch),
       getResidentIdsForSearch(apartmentId, trimmedSearch),
     ])
 
@@ -339,7 +346,7 @@ export const updateEmergencyAlertStatusService = async ({
   const alert = await EmergencyAlertModel.findOne({
     _id: alertId,
     apartmentId,
-  })
+  }).lean()
 
   if (!alert) {
     throw new AppError("Emergency alert not found", 404)
@@ -348,36 +355,74 @@ export const updateEmergencyAlertStatusService = async ({
   validateEmergencyAlertStatusTransition(alert.status, status)
 
   const now = new Date()
+  const normalizedResolutionNotes =
+    normalizeText(resolutionNotes)
+  const statusUpdate: Record<string, string | Date> = {
+    status,
+  }
 
   if (status === EmergencyAlertStatus.ACKNOWLEDGED) {
-    alert.status = EmergencyAlertStatus.ACKNOWLEDGED
-    alert.acknowledgedBy = userId
-    alert.acknowledgedAt = now
+    statusUpdate.acknowledgedBy = userId
+    statusUpdate.acknowledgedAt = now
   }
 
   if (status === EmergencyAlertStatus.RESPONDING) {
-    alert.status = EmergencyAlertStatus.RESPONDING
-    alert.respondingBy = userId
-    alert.respondingAt = now
+    statusUpdate.respondingBy = userId
+    statusUpdate.respondingAt = now
 
     if (!alert.acknowledgedAt) {
-      alert.acknowledgedBy = userId
-      alert.acknowledgedAt = now
+      statusUpdate.acknowledgedBy = userId
+      statusUpdate.acknowledgedAt = now
     }
   }
 
   if (status === EmergencyAlertStatus.RESOLVED) {
-    alert.status = EmergencyAlertStatus.RESOLVED
-    alert.resolvedBy = userId
-    alert.resolvedAt = now
-    alert.resolutionNotes =
-      normalizeText(resolutionNotes)
+    if (!normalizedResolutionNotes) {
+      throw new AppError(
+        "Resolution notes are required",
+        400
+      )
+    }
+
+    statusUpdate.resolvedBy = userId
+    statusUpdate.resolvedAt = now
+    statusUpdate.resolutionNotes = normalizedResolutionNotes
   }
 
-  await alert.save()
+  const updatedAlert =
+    await EmergencyAlertModel.findOneAndUpdate(
+      {
+        _id: alertId,
+        apartmentId,
+        status: alert.status,
+      },
+      {
+        $set: statusUpdate,
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    )
+
+  if (!updatedAlert) {
+    const latestAlert = await EmergencyAlertModel.findOne({
+      _id: alertId,
+      apartmentId,
+    }).lean()
+
+    if (!latestAlert) {
+      throw new AppError("Emergency alert not found", 404)
+    }
+
+    throw new AppError(
+      "Emergency alert status changed. Please refresh and try again.",
+      409
+    )
+  }
 
   const enriched = await enrichAlerts(apartmentId, [
-    alert.toObject() as LeanEmergencyAlert,
+    updatedAlert.toObject() as LeanEmergencyAlert,
   ])
 
   return enriched[0]

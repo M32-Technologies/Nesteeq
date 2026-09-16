@@ -1,17 +1,9 @@
-import { randomUUID } from "crypto";
+
 import { Schema, model } from "mongoose";
 import { IApartment } from "./apartment.schema.js";
 
 const apartmentSchema = new Schema<IApartment>(
   {
-    id: {
-      type: String,
-      required: true,
-      unique: true,
-      default: () => randomUUID(),
-      trim: true,
-    },
-
     managerId: {
       type: String,
       required: true,

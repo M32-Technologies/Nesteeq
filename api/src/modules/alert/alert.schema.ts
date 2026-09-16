@@ -3,8 +3,8 @@ import { z } from "zod"
 import {
   EmergencyAlertStatus,
   EmergencyAlertType,
+  emergencyAlertUpdateStatuses,
 } from "./alert.model.js"
-import { emergencyAlertUpdateStatuses } from "../security/security-status-transitions.js"
 
 const objectIdSchema = z
   .string()
@@ -56,10 +56,23 @@ export const emergencyAlertIdParamsSchema = z.object({
 
 export const updateEmergencyAlertStatusSchema =
   emergencyAlertIdParamsSchema.extend({
-    body: z.object({
-      status: z.enum(emergencyAlertUpdateStatuses),
-      resolutionNotes: optionalString(
-        z.string().max(500)
-      ),
-    }),
+    body: z
+      .object({
+        status: z.enum(emergencyAlertUpdateStatuses),
+        resolutionNotes: optionalString(
+          z.string().max(500)
+        ),
+      })
+      .superRefine((body, ctx) => {
+        if (
+          body.status === EmergencyAlertStatus.RESOLVED &&
+          !body.resolutionNotes
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["resolutionNotes"],
+            message: "Resolution notes are required",
+          })
+        }
+      }),
   })

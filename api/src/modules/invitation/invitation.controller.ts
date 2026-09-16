@@ -15,7 +15,7 @@ import {
 } from "./invitation.service.js"
 
 import type { GetInvitationsQuery } from "./invitation.validation.js"
-import { generateResidentExcelTemplate } from "../../utils/excel/user.template.js"
+import { generateResidentExcelTemplate } from "./excel/user.template.js"
 
 export const createResidentInviteHandler = catchAsync(
   async (req: Request, res: Response) => {

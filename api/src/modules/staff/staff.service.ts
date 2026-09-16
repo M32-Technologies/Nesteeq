@@ -4,8 +4,77 @@ import { getAuthDB } from "../../config/auth-db.js"
 import { Staff, STAFF_ROLES } from "./staff.model.js"
 import type { StaffListQuery } from "./staff.validation.js"
 
+type AuthUserRecord = {
+  _id?: { toString: () => string }
+  id?: string
+  name?: string | null
+  email?: string | null
+  emailVerified?: boolean
+  image?: string | null
+  role?: string | null
+  phone?: string | null
+}
+
 const escapeRegex = (value: string) =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+
+const getAuthUserFilter = (userId: string) => {
+  const filters: Record<string, unknown>[] = [{ id: userId }]
+
+  if (Types.ObjectId.isValid(userId)) {
+    filters.push({ _id: new Types.ObjectId(userId) })
+  }
+
+  return { $or: filters }
+}
+
+const getAuthUsersFilter = (userIds: string[]) => {
+  const uniqueIds = Array.from(new Set(userIds.filter(Boolean)))
+  const objectIds = uniqueIds
+    .filter((userId) => Types.ObjectId.isValid(userId))
+    .map((userId) => new Types.ObjectId(userId))
+
+  return {
+    $or: [
+      { id: { $in: uniqueIds } },
+      ...(objectIds.length ? [{ _id: { $in: objectIds } }] : []),
+    ],
+  }
+}
+
+const mapAuthUsersById = (users: AuthUserRecord[]) => {
+  const usersById = new Map<string, AuthUserRecord>()
+
+  for (const user of users) {
+    if (user.id) usersById.set(user.id, user)
+    if (user._id) usersById.set(user._id.toString(), user)
+  }
+
+  return usersById
+}
+
+const syncStaffAuthUser = async (staff: {
+  apartmentId: { toString: () => string }
+  userId: string
+  role: string
+  phone?: string | null
+}) => {
+  const result = await getAuthDB().collection("user").updateOne(
+    getAuthUserFilter(staff.userId),
+    {
+      $set: {
+        role: staff.role,
+        apartmentId: staff.apartmentId.toString(),
+        phone: staff.phone ?? null,
+      },
+      $unset: { flatId: "" },
+    },
+  )
+
+  if (result.matchedCount === 0) {
+    throw new AppError("Staff user account not found", 404)
+  }
+}
 
 export const getStaff = async (
   query: StaffListQuery,
@@ -53,12 +122,18 @@ export const getStaff = async (
       .find({
         $or: [{ name: regex }, { email: regex }],
       })
-      .project({ _id: 0, id: 1 })
-      .toArray()
+      .project({ _id: 1, id: 1 })
+      .toArray() as Pick<AuthUserRecord, "_id" | "id">[]
 
     filter.$or = [
       { phone: regex },
-      { userId: { $in: users.map((user) => user.id).filter(Boolean) } },
+      {
+        userId: {
+          $in: users
+            .flatMap((user) => [user.id, user._id?.toString()])
+            .filter(Boolean),
+        },
+      },
     ]
   }
 
@@ -70,11 +145,9 @@ export const getStaff = async (
 
   const users = await getAuthDB()
     .collection("user")
-    .find({
-      id: { $in: staff.map((member) => member.userId).filter(Boolean) },
-    })
+    .find(getAuthUsersFilter(staff.map((member) => member.userId)))
     .project({
-      _id: 0,
+      _id: 1,
       id: 1,
       name: 1,
       email: 1,
@@ -83,9 +156,9 @@ export const getStaff = async (
       role: 1,
       phone: 1,
     })
-    .toArray()
+    .toArray() as AuthUserRecord[]
 
-  const usersById = new Map(users.map((user) => [user.id, user]))
+  const usersById = mapAuthUsersById(users)
 
   return {
     staff: staff.map((member) => {
@@ -137,10 +210,10 @@ export const getStaffDetails = async (
   }
 
   const user = await getAuthDB().collection("user").findOne(
-    { id: staff.userId },
+    getAuthUserFilter(staff.userId),
     {
       projection: {
-        _id: 0,
+        _id: 1,
         id: 1,
         name: 1,
         email: 1,
@@ -150,7 +223,7 @@ export const getStaffDetails = async (
         phone: 1,
       },
     },
-  )
+  ) as AuthUserRecord | null
 
   return {
     id: staff._id.toString(),
@@ -198,6 +271,10 @@ export const updateStaffStatus = async (
 
   staff.status = status
   await staff.save()
+
+  if (staff.status === "active") {
+    await syncStaffAuthUser(staff)
+  }
 
   return {
     id: staff._id.toString(),
@@ -280,6 +357,7 @@ export const updateStaffDetails = async (
   }
 
   await staff.save()
+  await syncStaffAuthUser(staff)
 
   return getStaffDetails(staff._id.toString(), apartmentId)
 }

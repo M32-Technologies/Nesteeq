@@ -3,8 +3,8 @@ import { z } from "zod"
 import {
   DeliveryStatus,
   DeliveryType,
+  deliveryUpdateStatuses,
 } from "./delivery.interface.js"
-import { deliveryUpdateStatuses } from "../security/security-status-transitions.js"
 
 const objectIdSchema = z
   .string()

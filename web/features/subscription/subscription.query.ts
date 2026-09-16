@@ -3,6 +3,8 @@ import api from "@/lib/axios";
 import {
   CreateSubscriptionResponse,
   CreateSubscriptionResult,
+  CurrentSubscription,
+  CurrentSubscriptionResponse,
   SubscriptionPlansResponse,
   SubscriptionPlan,
   VerifySubscriptionPaymentInput,
@@ -26,6 +28,29 @@ export const useSubscriptionPlans = () => {
     queryFn: fetchSubscriptionPlans,
     staleTime: 5 * 60 * 1000,
     retry: 1,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const fetchCurrentSubscription = async (): Promise<CurrentSubscription | null> => {
+  try {
+    const response = await api.get<CurrentSubscriptionResponse>("/api/v1/subscriptions/current");
+    if (!response.data.success) {
+      return null;
+    }
+    return response.data.data;
+  } catch {
+    return null;
+  }
+};
+
+export const useCurrentSubscription = (enabled: boolean = true) => {
+  return useQuery({
+    queryKey: ["current-subscription"],
+    queryFn: fetchCurrentSubscription,
+    enabled,
+    staleTime: 60 * 1000,
+    retry: false,
     refetchOnWindowFocus: false,
   });
 };

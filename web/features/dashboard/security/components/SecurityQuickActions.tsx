@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation"
 import {
-  Car,
   Package,
   QrCode,
   ShieldAlert,
@@ -28,12 +27,6 @@ const actions = [
     description: "Record arrivals and update collection status",
     href: "/security/deliveries",
     icon: Package,
-  },
-  {
-    title: "Parking Slots",
-    description: "Assign or release visitor parking",
-    href: "/security/parking",
-    icon: Car,
   },
   {
     title: "Emergency / SOS Alerts",

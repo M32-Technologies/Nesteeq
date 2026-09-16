@@ -8,9 +8,11 @@ import {
   createDelivery,
   getDeliveries,
   updateDeliveryStatus,
-  type CreateDeliveryPayload,
-  type DeliveryStatus,
-} from "../services/delivery.service"
+} from "../api/delivery.api"
+import type {
+  CreateDeliveryPayload,
+  DeliveryStatus,
+} from "../schemas/delivery"
 import { securityDataQueryKeys } from "./useSecurityData"
 
 export const deliveryQueryKeys = {

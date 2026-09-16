@@ -78,18 +78,8 @@ const requireAuditApartmentAccess = catchAsync(
 
 router.use(protect, requireRole("treasurer"));
 
-router.get(
-  "/",
-  zodValidate(getAuditLogsSchema),
-  requireQueryApartmentAccess,
-  getAuditLogs
-);
+router.get("/", zodValidate(getAuditLogsSchema), requireQueryApartmentAccess, getAuditLogs);
 
-router.get(
-  "/:id",
-  zodValidate(getAuditByIdSchema),
-  requireAuditApartmentAccess,
-  getAuditById
-);
+router.get("/:id", zodValidate(getAuditByIdSchema), requireAuditApartmentAccess, getAuditById);
 
 export default router;

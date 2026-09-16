@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 import {
-  useEffect,
   useMemo,
   useState,
   type ChangeEvent,
@@ -59,9 +58,31 @@ const initialForm: SingleInviteForm = {
   flatId: "",
 }
 
+function getInitialInviteForm(): SingleInviteForm {
+  if (typeof window === "undefined") {
+    return initialForm
+  }
+
+  const params = new URLSearchParams(window.location.search)
+  const role = params.get("role")
+  const blockId = params.get("blockId")
+  const flatId = params.get("flatId")
+
+  if (!role && !blockId && !flatId) {
+    return initialForm
+  }
+
+  return {
+    ...initialForm,
+    role: role === "owner" || role === "resident" ? role : "",
+    blockId: blockId ?? "",
+    flatId: blockId && flatId ? flatId : "",
+  }
+}
+
 export default function InviteUsersPage() {
   const [activeTab, setActiveTab] = useState<InviteTab>("single")
-  const [form, setForm] = useState<SingleInviteForm>(initialForm)
+  const [form, setForm] = useState<SingleInviteForm>(getInitialInviteForm)
   const [file, setFile] = useState<File | null>(null)
   const [bulkResult, setBulkResult] = useState<BulkInviteResult | null>(null)
   const { data: blocks = [], isLoading: isBlocksLoading } = useBlocksQuery()

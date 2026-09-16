@@ -40,32 +40,12 @@ const useAuthenticatedApartmentParam: RequestHandler = (
 
 router.use(protect, requireRole("treasurer" , "property_manager"));
 
-router.get(
-  "/summary",
-  useAuthenticatedApartmentParam,
-  zodValidate(getFinanceSummarySchema),
-  getFinanceSummary
-);
+router.get("/summary", useAuthenticatedApartmentParam, zodValidate(getFinanceSummarySchema), getFinanceSummary);
 
-router.get(
-  "/summary/:apartmentId",
-  zodValidate(getFinanceSummarySchema),
-  requireParamApartmentAccess,
-  getFinanceSummary
-);
+router.get("/summary/:apartmentId", zodValidate(getFinanceSummarySchema), requireParamApartmentAccess, getFinanceSummary);
 
-router.get(
-  "/monthly",
-  useAuthenticatedApartmentParam,
-  zodValidate(getMonthlyFinanceSchema),
-  getMonthlyFinance
-);
+router.get("/monthly", useAuthenticatedApartmentParam, zodValidate(getMonthlyFinanceSchema), getMonthlyFinance);
 
-router.get(
-  "/monthly/:apartmentId",
-  zodValidate(getMonthlyFinanceSchema),
-  requireParamApartmentAccess,
-  getMonthlyFinance
-);
+router.get("/monthly/:apartmentId", zodValidate(getMonthlyFinanceSchema), requireParamApartmentAccess, getMonthlyFinance);
 
 export default router;

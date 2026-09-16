@@ -14,6 +14,7 @@ import {
 import type { ReactNode } from "react"
 
 import { usePropertyFlatDetailsQuery } from "../hooks/use-property-query"
+import { Portal } from "@/components/portal"
 import type {
   PropertyFlat,
   PropertyFlatStatus,
@@ -57,15 +58,19 @@ export default function FlatDetailsSheet({
   }
 
   return (
-    <>
+    <Portal>
       <button
         type="button"
         aria-label="Close flat details"
         onClick={onClose}
-        className="fixed inset-0 z-40 bg-slate-950/20 lg:hidden"
+        style={{ zIndex: 999 }}
+        className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm transition-opacity"
       />
 
-      <aside className="fixed right-0 top-0 z-50 flex h-screen w-full max-w-[480px] flex-col border-l border-slate-200 bg-white shadow-[-12px_0_40px_rgba(15,23,42,0.08)]">
+      <aside
+        style={{ zIndex: 1000, height: "100dvh" }}
+        className="fixed right-0 top-0 bottom-0 flex h-full max-h-screen w-full max-w-[480px] flex-col border-l border-slate-200 bg-white shadow-2xl animate-in slide-in-from-right duration-200"
+      >
         <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 px-5">
           <h2 className="text-base font-semibold text-slate-900">
             Flat Details
@@ -231,7 +236,7 @@ export default function FlatDetailsSheet({
           ) : null}
         </div>
       </aside>
-    </>
+    </Portal>
   )
 }
 

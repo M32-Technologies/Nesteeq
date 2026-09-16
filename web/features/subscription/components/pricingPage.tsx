@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
@@ -9,7 +10,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import { useSubscriptionPlans } from "../subscription.query";
+import { useSubscriptionPlans, useCurrentSubscription } from "../subscription.query";
 import type { SubscriptionPlan } from "../subscription.types";
 import { useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
@@ -37,7 +38,13 @@ const getPricePeriod = (durationMonths: number) => {
 
 export default function PricingPage() {
   const router = useRouter();
+  const [isMounted, setIsMounted] = useState(false);
   const { data: session, isPending: isSessionPending } = useSession();
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const {
     data: plans = [],
     isPending,
@@ -45,6 +52,28 @@ export default function PricingPage() {
     isFetching,
     refetch,
   } = useSubscriptionPlans();
+  const { data: currentSubscription } = useCurrentSubscription(
+    Boolean(session?.user),
+  );
+
+  const user = isMounted ? session?.user : null;
+  const isPropertyManager =
+    user?.role === "property_manager" ||
+    user?.role === "property-manager";
+
+  const currentPlanId =
+    typeof currentSubscription?.plan === "string"
+      ? currentSubscription.plan
+      : currentSubscription?.plan?._id;
+
+  const hasActiveSubscription = Boolean(
+    isMounted &&
+      ((currentSubscription &&
+        ["authenticated", "active", "pending", "created", "halted"].includes(
+          currentSubscription.status,
+        )) ||
+        (isPropertyManager && Boolean(user?.apartmentId))),
+  );
 
   const monthlyPlan = plans.find((plan) => plan.planType === "MONTHLY");
 
@@ -66,8 +95,15 @@ export default function PricingPage() {
       percentage: Math.round((savedAmount / regularPrice) * 100),
     };
   };
+
   const choosePlan = (planId: string) => {
     if (isSessionPending) return;
+
+    if (hasActiveSubscription) {
+      toast.info("You already have an active subscription for your apartment.");
+      router.push("/property-manager");
+      return;
+    }
 
     const encodedPlanId = encodeURIComponent(planId);
     const onboardingUrl = `/onboarding?planId=${encodedPlanId}`;
@@ -181,8 +217,10 @@ export default function PricingPage() {
             <div className="mt-12 grid items-stretch gap-5 lg:grid-cols-3">
               {plans.map((plan, index) => {
                 const savings = calculateSavings(plan);
-
                 const isPopular = plan.planType === "SIX_MONTHS";
+                const isCurrentPlan =
+                  hasActiveSubscription &&
+                  (plan._id === currentPlanId || (!currentPlanId && isPopular));
 
                 return (
                   <motion.article
@@ -203,7 +241,9 @@ export default function PricingPage() {
                       "relative flex h-full min-h-[620px] flex-col rounded-[26px] border p-7 sm:p-8",
                       "transition-all duration-300",
 
-                      isPopular
+                      isCurrentPlan
+                        ? "border-[#07584F] bg-[#f8fbf9] shadow-[0_18px_50px_rgba(7,88,79,0.12)]"
+                        : isPopular
                         ? "border-[#07584F] bg-[#f8fbf9] shadow-[0_18px_50px_rgba(7,88,79,0.10)]"
                         : "border-[#dfe6e2] bg-white hover:border-[#b7c9c2]",
                     ].join(" ")}
@@ -217,11 +257,16 @@ export default function PricingPage() {
 
                         {/* Reserve same badge location */}
                         <div className="flex min-h-[28px] items-center">
-                          {isPopular && (
+                          {isCurrentPlan ? (
+                            <span className="flex items-center gap-1.5 rounded-full bg-[#07584F] px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm">
+                              <Check className="size-3" strokeWidth={2.5} />
+                              Active plan
+                            </span>
+                          ) : isPopular ? (
                             <span className="rounded-full bg-[#07584F] px-3 py-1.5 text-[11px] font-semibold text-white">
                               Most popular
                             </span>
-                          )}
+                          ) : null}
                         </div>
                       </div>
 
@@ -244,7 +289,7 @@ export default function PricingPage() {
 
                       {/* Always reserve badge area */}
                       <div className="mt-4 flex min-h-[30px] items-center">
-                        {plan.freeTrial.enabled ? (
+                        {plan.freeTrial.enabled && !hasActiveSubscription ? (
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e7f0ed] px-3 py-1.5 text-xs font-semibold text-[#07584F]">
                             <Sparkles className="size-3" />
                             {plan.freeTrial.days}
@@ -289,31 +334,52 @@ export default function PricingPage() {
 
                     {/* CTA pinned to bottom */}
                     <div className="mt-8">
-                      <button
-                        onClick={() => choosePlan(plan._id)}
-                        className={[
-                          "group flex h-12 w-full items-center justify-center gap-2 rounded-xl",
-                          "text-sm font-semibold transition",
+                      {isCurrentPlan ? (
+                        <button
+                          disabled
+                          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-[#07584F]/30 bg-[#eef5f2] text-sm font-semibold text-[#07584F] cursor-default opacity-95"
+                        >
+                          <Check className="size-4 text-[#07584F]" strokeWidth={2.5} />
+                          Current plan
+                        </button>
+                      ) : hasActiveSubscription ? (
+                        <button
+                          disabled
+                          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-[#e1e7e4] bg-[#f8faf9] text-sm font-medium text-[#83918b] cursor-not-allowed opacity-75"
+                        >
+                          Active on another plan
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => choosePlan(plan._id)}
+                          className={[
+                            "group flex h-12 w-full items-center justify-center gap-2 rounded-xl",
+                            "text-sm font-semibold transition",
 
-                          isPopular
-                            ? "bg-[#07584F] text-white hover:bg-[#064C44]"
-                            : "border border-[#cbd7d2] bg-white text-[#17201c] hover:border-[#07584F] hover:text-[#07584F]",
-                        ].join(" ")}
-                      >
-                        {plan.freeTrial.enabled
-                          ? `Start ${plan.freeTrial.days}-day free trial`
-                          : "Choose plan"}
+                            isPopular
+                              ? "bg-[#07584F] text-white hover:bg-[#064C44]"
+                              : "border border-[#cbd7d2] bg-white text-[#17201c] hover:border-[#07584F] hover:text-[#07584F]",
+                          ].join(" ")}
+                        >
+                          {plan.freeTrial.enabled
+                            ? `Start ${plan.freeTrial.days}-day free trial`
+                            : "Choose plan"}
 
-                        <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-                      </button>
+                          <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+                        </button>
+                      )}
 
                       {/* Reserve same footer height */}
                       <div className="mt-3 min-h-[18px] text-center">
-                        {plan.freeTrial.enabled && (
+                        {isCurrentPlan ? (
+                          <p className="text-xs font-medium text-[#07584F]">
+                            Your community is on this plan
+                          </p>
+                        ) : plan.freeTrial.enabled && !hasActiveSubscription ? (
                           <p className="text-xs text-[#89938f]">
                             Try all features free for {plan.freeTrial.days} days
                           </p>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   </motion.article>

@@ -48,11 +48,6 @@ const requireQueryApartmentAccess: RequestHandler = (
 
 router.use(protect, requireRole("treasurer" , "property_manager"));
 
-router.get(
-  "/",
-  zodValidate(getPaymentsSchema),
-  requireQueryApartmentAccess,
-  getPayments
-);
+router.get("/", zodValidate(getPaymentsSchema), requireQueryApartmentAccess, getPayments);
 
 export default router;
