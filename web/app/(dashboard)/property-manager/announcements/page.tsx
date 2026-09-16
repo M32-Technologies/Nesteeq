@@ -1,7 +1,5 @@
+import { AnnouncementsPageContent } from "@/features/announcements/components/announcements-page-content";
+
 export default function AnnouncementsPage() {
-  return (
-    <div>
-      <h1>Announcements</h1>
-    </div>
-  )
+  return <AnnouncementsPageContent />;
 }

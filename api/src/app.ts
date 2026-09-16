@@ -26,6 +26,7 @@ import maintenanceTechnicianRoutes from "./modules/maintenance-technician/mainte
 import deliveryRoutes from "./modules/delivery/delivery.routes.js";
 import parkingRoutes from "./modules/parking/parking.routes.js";
 import alertRoutes from "./modules/alert/alert.routes.js";
+import announcementRoutes from "./modules/announcements/announcements.routes.js";
 import complaintRoutes from "./modules/complaint/complaint.routes.js";
 import maintenanceRoutes from "./modules/maintenance/maintenance.routes.js";
 import technicianRoutes from "./modules/technician/technician.routes.js";
@@ -76,6 +77,8 @@ app.use("/api/security/parking", parkingRoutes);
 app.use("/api/visitors", visitorsRoutes);
 app.use("/api/security/deliveries", deliveryRoutes);
 app.use("/api/security/alerts", alertRoutes);
+app.use("/api/v1/announcements", announcementRoutes);
+app.use("/api/announcements", announcementRoutes);
 app.use("/api/security", securityRoutes);
 
 app.use("/api/maintenance-technician", maintenanceTechnicianRoutes);

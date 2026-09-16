@@ -164,6 +164,7 @@ export type ApiResidentFlat = {
         _id?: string
         blockname?: string
         name?: string
+        code?: string
       }
 }
 

@@ -244,10 +244,10 @@ export default function FlatsTableSection({
                       </td>
                       <td className="px-4 py-4">
                         <p className="text-sm font-medium text-slate-800">
-                          {flat.block?.blockname ?? flat.blockId}
+                          {flat.block?.blockname || flat.block?.code || "Block"}
                         </p>
                         <p className="mt-0.5 text-xs text-slate-500">
-                          Code {flat.block?.code ?? "-"}
+                          Code {flat.block?.code || "-"}
                         </p>
                       </td>
                       <td className="px-4 py-4 text-sm font-medium text-slate-700">

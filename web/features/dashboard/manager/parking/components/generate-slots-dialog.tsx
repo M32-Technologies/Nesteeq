@@ -268,7 +268,7 @@ export function GenerateSlotsDialog({ open, onClose }: GenerateSlotsDialogProps)
               {generateMutation.isError && (
                 <div className="flex items-start gap-2.5 rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-800">
                   <AlertCircle size={16} className="text-rose-600 shrink-0 mt-0.5" />
-                  <div>{generateMutation.error?.message || "Failed to generate slots"}</div>
+                  <div>{(generateMutation.error as Error | null)?.message || "Failed to generate slots"}</div>
                 </div>
               )}
 

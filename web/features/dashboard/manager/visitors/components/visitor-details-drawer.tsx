@@ -168,6 +168,24 @@ export default function VisitorDetailsDrawer({
                       <p className="text-xs text-slate-500">Vehicle Number</p>
                       <p className="font-medium text-slate-800">
                         {visitor.vehicleNumber}
+                        {visitor.vehicleType ? ` (${visitor.vehicleType})` : ""}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {visitor.parkingSlotNumber && (
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex size-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                      <Car size={15} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">Assigned Parking Slot</p>
+                      <p className="font-medium text-slate-800">
+                        Slot #{visitor.parkingSlotNumber}
+                        {visitor.parkingAssignmentStatus
+                          ? ` (${visitor.parkingAssignmentStatus})`
+                          : ""}
                       </p>
                     </div>
                   </div>
