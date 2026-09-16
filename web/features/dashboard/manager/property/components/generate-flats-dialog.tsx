@@ -25,8 +25,8 @@ const generateFlatsSchema = z.object({
       message: "Units per floor is required",
     })
     .int("Units per floor must be a whole number")
-    .min(1, "Units per floor must be greater than 0")
-    .max(100, "Units per floor cannot exceed 100"),
+    .min(1, "Each floor must have at least 1 unit")
+    .max(100, "Maximum 100 units allowed per floor"),
 })
 
 type GenerateFlatsFormValues = z.input<typeof generateFlatsSchema>
@@ -103,15 +103,17 @@ export default function GenerateFlatsDialog({
   )
   const removedFlatCount = totalPreviewCount - selectedFlats.length
 
-  useEffect(() => {
-    queueMicrotask(() => {
-      setSelectedFlatNumbers(
-        flatPreview.flatMap((floor) =>
-          floor.flats.map((flat) => flat.flatNumber)
-        )
-      )
-    })
-  }, [flatPreview])
+  const [prevParams, setPrevParams] = useState({
+    blockId: selectedBlockId,
+    units: unitsPerFloorValue,
+  })
+  if (
+    prevParams.blockId !== selectedBlockId ||
+    prevParams.units !== unitsPerFloorValue
+  ) {
+    setPrevParams({ blockId: selectedBlockId, units: unitsPerFloorValue })
+    setRemovedFlatNumbers([])
+  }
 
   const blockOptions = useMemo(
     () =>
