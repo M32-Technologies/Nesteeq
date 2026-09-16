@@ -35,6 +35,9 @@ export const getAnnouncements = async (
   if (filters.target && filters.target !== "all") {
     params.targetType = filters.target;
   }
+  if (filters.priority && filters.priority !== "all") {
+    params.priority = filters.priority;
+  }
 
   const response = await api.get<ApiResponse<GetAnnouncementsApiResponse>>(
     "/api/v1/announcements",

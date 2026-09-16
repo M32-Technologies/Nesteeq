@@ -29,7 +29,12 @@ router.use(protect);
 router.get("/resident-feed", getResidentAnnouncementsHandler);
 
 // List announcements (supports pagination, filtering by type/status/search/targetType)
-router.get("/", zodValidate(listAnnouncementsSchema), getAnnouncementsHandler);
+router.get(
+  "/",
+  requireRole("property_manager", "facility_manager", "security_staff"),
+  zodValidate(listAnnouncementsSchema),
+  getAnnouncementsHandler
+);
 
 // Create announcement (Property managers, facility managers, and security staff)
 router.post(
@@ -50,6 +55,7 @@ router.post(
 // Get single announcement details
 router.get(
   "/:announcementId",
+  requireRole("property_manager", "facility_manager", "security_staff"),
   zodValidate(announcementIdParamsSchema),
   getAnnouncementByIdHandler
 );

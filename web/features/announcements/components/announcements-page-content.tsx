@@ -113,7 +113,7 @@ export function AnnouncementsPageContent({
         res.estimatedAudience?.residentsCount > 0
           ? ` (${res.estimatedAudience.residentsCount} residents notified)`
           : "";
-      toast.error(`Emergency alert broadcasted live!${audienceInfo}`, {
+      toast.success(`Emergency alert broadcasted live!${audienceInfo}`, {
         icon: "🚨",
       });
       setIsEmergencyOpen(false);

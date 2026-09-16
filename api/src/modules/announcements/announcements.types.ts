@@ -60,6 +60,7 @@ export interface GetAnnouncementsResponse {
 export interface AnnouncementFilterQuery {
   apartmentId: Types.ObjectId;
   type?: AnnouncementType;
+  priority?: AnnouncementPriority;
   status?: AnnouncementStatus;
   targetType?: AnnouncementTargetType;
   $or?: Array<{ title?: RegExp; message?: RegExp }>;

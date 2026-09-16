@@ -264,6 +264,10 @@ export const getAnnouncementsService = async (
     filter.type = query.type;
   }
 
+  if (query.priority) {
+    filter.priority = query.priority;
+  }
+
   if (query.status) {
     filter.status = query.status;
   }

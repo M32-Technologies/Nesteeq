@@ -48,6 +48,7 @@ export interface GetVisitorRecordsParams {
   search?: string
   page?: number
   limit?: number
+  fetchAll?: boolean
 }
 
 export function mapApiRecordToVisitorRecord(apiRec: ApiVisitorRecord): VisitorRecord {
@@ -83,24 +84,64 @@ export function mapApiRecordToVisitorRecord(apiRec: ApiVisitorRecord): VisitorRe
 export const getManagerVisitorRecords = async (
   params: GetVisitorRecordsParams = {}
 ) => {
+  const initialPage = params.page ?? 1
+  const pageLimit = Math.min(params.limit ?? (params.fetchAll ? 100 : 50), 100)
+
+  const queryParams = {
+    page: initialPage,
+    limit: pageLimit,
+    ...(params.status && params.status !== "ALL" ? { status: params.status } : {}),
+    ...(params.entryType && params.entryType !== "ALL" ? { entryType: params.entryType } : {}),
+    ...(params.search ? { search: params.search } : {}),
+  }
+
   const response = await axiosInstance.get<{
     success: boolean
     message: string
     data: ApiVisitorRecordsResponse
   }>("/api/visitors/visits", {
-    params: {
-      page: params.page ?? 1,
-      limit: params.limit ?? 50,
-      ...(params.status && params.status !== "ALL" ? { status: params.status } : {}),
-      ...(params.entryType && params.entryType !== "ALL" ? { entryType: params.entryType } : {}),
-      ...(params.search ? { search: params.search } : {}),
-    },
+    params: queryParams,
   })
 
   const data = response.data.data
+  let allApiRecords = data?.records ?? []
+  const pagination = data?.pagination
+
+  if (params.fetchAll && pagination && pagination.totalPages > initialPage) {
+    const maxPagesToFetch = Math.min(pagination.totalPages, 50)
+    const pagePromises = []
+
+    for (let p = initialPage + 1; p <= maxPagesToFetch; p++) {
+      pagePromises.push(
+        axiosInstance.get<{
+          success: boolean
+          message: string
+          data: ApiVisitorRecordsResponse
+        }>("/api/visitors/visits", {
+          params: {
+            ...queryParams,
+            page: p,
+          },
+        })
+      )
+    }
+
+    const responses = await Promise.allSettled(pagePromises)
+    for (const res of responses) {
+      if (res.status === "fulfilled" && res.value.data?.data?.records) {
+        allApiRecords = allApiRecords.concat(res.value.data.data.records)
+      }
+    }
+  }
+
   return {
-    records: (data?.records ?? []).map(mapApiRecordToVisitorRecord),
-    pagination: data?.pagination,
+    records: allApiRecords.map(mapApiRecordToVisitorRecord),
+    pagination: pagination
+      ? {
+          ...pagination,
+          total: params.fetchAll ? Math.max(pagination.total, allApiRecords.length) : pagination.total,
+        }
+      : undefined,
   }
 }
 

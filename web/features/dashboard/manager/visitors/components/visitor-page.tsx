@@ -14,8 +14,9 @@ import {
 export default function VisitorPage() {
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null)
 
-  const { data: recordsData, isLoading, isError, refetch } = useManagerVisitorsQuery({
+  const { data: recordsData, isLoading } = useManagerVisitorsQuery({
     limit: 100,
+    fetchAll: true,
   })
   const { data: activeData } = useManagerActiveVisitorsQuery()
 

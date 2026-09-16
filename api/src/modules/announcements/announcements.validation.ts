@@ -209,6 +209,7 @@ export const updateAnnouncementStatusSchema = z.object({
 export const listAnnouncementsSchema = z.object({
   query: z.object({
     type: announcementTypeEnum.optional(),
+    priority: announcementPriorityEnum.optional(),
     status: announcementStatusEnum.optional(),
     targetType: announcementTargetTypeEnum.optional(),
     search: z.string().trim().max(100).optional(),

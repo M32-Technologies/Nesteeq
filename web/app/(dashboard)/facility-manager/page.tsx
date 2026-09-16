@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { FacilityDashboardPage } from "@/features/dashboard/facility/dashboard/components/facility-dashboard-page";
 
 export default function FacilityManagerPage() {
-  redirect("/facility-manager/announcements");
+  return <FacilityDashboardPage />;
 }
