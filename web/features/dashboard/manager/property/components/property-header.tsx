@@ -51,50 +51,50 @@ export default function PropertyHeader({
     iconColor: string;
     isValueLoading?: boolean;
   }[] = [
-    {
-      title: "Blocks",
-      description: "Created / apartment total",
-      value:
-        apartmentTotalBlocks > 0
-          ? `${activeBlockCount} / ${apartmentTotalBlocks}`
-          : activeBlockCount,
-      icon: Building2,
-      accent: "bg-slate-900",
-      iconBg: "bg-slate-100",
-      iconColor: "text-slate-700",
-      isValueLoading: isActiveBlockCountLoading || isApartmentLoading,
-    },
-    {
-      title: "Total Flats",
-      description: "Total flats in property",
-      value: stats?.totalFlats ?? 0,
-      icon: Home,
-      accent: "bg-[#0F5F45]",
-      iconBg: "bg-[#E7F4EE]",
-      iconColor: "text-[#0F5F45]",
-      isValueLoading: isLoading,
-    },
-    {
-      title: "Occupied",
-      description: "Owner and tenant flats",
-      value: stats?.occupiedFlats ?? 0,
-      icon: Users,
-      accent: "bg-sky-500",
-      iconBg: "bg-sky-50",
-      iconColor: "text-sky-700",
-      isValueLoading: isLoading,
-    },
-    {
-      title: "Vacant",
-      description: "Available flats",
-      value: stats?.vacantFlats ?? 0,
-      icon: DoorOpen,
-      accent: "bg-amber-500",
-      iconBg: "bg-amber-50",
-      iconColor: "text-amber-700",
-      isValueLoading: isLoading,
-    },
-  ];
+      {
+        title: "Blocks",
+        description: "Created / apartment total",
+        value:
+          apartmentTotalBlocks > 0
+            ? `${activeBlockCount} / ${apartmentTotalBlocks}`
+            : activeBlockCount,
+        icon: Building2,
+        accent: "bg-slate-900",
+        iconBg: "bg-slate-100",
+        iconColor: "text-slate-700",
+        isValueLoading: isActiveBlockCountLoading || isApartmentLoading,
+      },
+      {
+        title: "Total Flats",
+        description: "Total flats in property",
+        value: stats?.totalFlats ?? 0,
+        icon: Home,
+        accent: "bg-[#0F5F45]",
+        iconBg: "bg-[#E7F4EE]",
+        iconColor: "text-[#0F5F45]",
+        isValueLoading: isLoading,
+      },
+      {
+        title: "Occupied",
+        description: "Owner and tenant flats",
+        value: stats?.occupiedFlats ?? 0,
+        icon: Users,
+        accent: "bg-sky-500",
+        iconBg: "bg-sky-50",
+        iconColor: "text-sky-700",
+        isValueLoading: isLoading,
+      },
+      {
+        title: "Vacant",
+        description: "Available flats",
+        value: stats?.vacantFlats ?? 0,
+        icon: DoorOpen,
+        accent: "bg-amber-500",
+        iconBg: "bg-amber-50",
+        iconColor: "text-amber-700",
+        isValueLoading: isLoading,
+      },
+    ];
 
   return (
     <div className="space-y-7">
@@ -193,11 +193,10 @@ export default function PropertyHeader({
             role="tab"
             aria-selected={activeTab === tab}
             onClick={() => onTabChange(tab)}
-            className={`relative -mb-px pb-3 text-sm font-medium capitalize transition-colors ${
-              activeTab === tab
+            className={`relative -mb-px pb-3 text-sm font-medium capitalize transition-colors ${activeTab === tab
                 ? "text-slate-900"
                 : "text-slate-600 hover:text-slate-900"
-            }`}
+              }`}
           >
             {tab}
             {activeTab === tab && (

@@ -2,7 +2,13 @@ import { z } from "zod";
 
 // ─── Enums ───────────────────────────────────────────────
 
-export const announcementTypeEnum = z.enum(["GENERAL", "EMERGENCY"]);
+export const announcementTypeEnum = z.enum([
+  "GENERAL",
+  "MAINTENANCE",
+  "EVENTS_SOCIAL",
+  "EMERGENCY",
+  "COMMUNITY_COUNCIL",
+]);
 
 export const announcementTargetTypeEnum = z.enum([
   "ALL_RESIDENTS",
@@ -63,7 +69,11 @@ export const createAnnouncementSchema = z.object({
         .string()
         .datetime({ message: "Invalid date format" })
         .nullable()
-        .optional(),
+        .optional()
+        .refine(
+          (val) => !val || new Date(val) > new Date(),
+          { message: "Expiration date must be in the future" }
+        ),
     })
     .strict()
     .superRefine((data, ctx) => {
@@ -141,7 +151,11 @@ export const updateAnnouncementSchema = z.object({
         .string()
         .datetime({ message: "Invalid date format" })
         .nullable()
-        .optional(),
+        .optional()
+        .refine(
+          (val) => !val || new Date(val) > new Date(),
+          { message: "Expiration date must be in the future" }
+        ),
     })
     .strict()
     .superRefine((data, ctx) => {
@@ -211,6 +225,51 @@ export const announcementIdParamsSchema = z.object({
   }),
 });
 
+// ─── Emergency Broadcast ───────────────────────────────
+
+export const emergencyCategoryEnum = z.enum([
+  "FIRE",
+  "GAS_LEAK",
+  "MEDICAL",
+  "SECURITY",
+  "WEATHER",
+  "INFRASTRUCTURE",
+  "WATER_CONTAMINATION",
+  "OTHER",
+]);
+
+export const emergencyBroadcastSchema = z.object({
+  body: z
+    .object({
+      category: emergencyCategoryEnum,
+      title: z
+        .string()
+        .trim()
+        .min(3, "Title must be at least 3 characters")
+        .max(150, "Title must not exceed 150 characters"),
+      message: z
+        .string()
+        .trim()
+        .min(10, "Message must be at least 10 characters")
+        .max(2000, "Message must not exceed 2000 characters"),
+      targetType: announcementTargetTypeEnum,
+      targetIds: z.array(objectIdSchema).optional(),
+      actionInstructions: z.string().trim().max(1000).optional(),
+      contactPhone: z.string().trim().max(30).optional(),
+    })
+    .superRefine((data, ctx) => {
+      if (data.targetType === "BLOCK") {
+        if (!data.targetIds || data.targetIds.length === 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Target block IDs are required when targeting specific blocks",
+            path: ["targetIds"],
+          });
+        }
+      }
+    }),
+});
+
 // ─── Types ───────────────────────────────────────────────
 
 export type CreateAnnouncementInput = z.infer<typeof createAnnouncementSchema>["body"];
@@ -218,3 +277,4 @@ export type UpdateAnnouncementBody = z.infer<typeof updateAnnouncementSchema>["b
 export type UpdateAnnouncementStatusBody = z.infer<typeof updateAnnouncementStatusSchema>["body"];
 export type ListAnnouncementsQuery = z.infer<typeof listAnnouncementsSchema>["query"];
 export type AnnouncementIdParams = z.infer<typeof announcementIdParamsSchema>["params"];
+export type EmergencyBroadcastBody = z.infer<typeof emergencyBroadcastSchema>["body"];

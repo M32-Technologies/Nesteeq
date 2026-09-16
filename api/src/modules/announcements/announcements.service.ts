@@ -1,8 +1,8 @@
 import { Types } from "mongoose";
 
+import { getAuthDB } from "../../config/auth-db.js";
 import { AppError } from "../../utils/AppError.js";
 import { escapeRegExp } from "../../utils/regex.js";
-import { getUserSummariesByIds } from "../../utils/security/directory.js";
 import { Block } from "../block/block.model.js";
 import { Flat } from "../flat/flat.model.js";
 import { ResidentModel } from "../resident/resident.model.js";
@@ -17,11 +17,13 @@ import {
 import type {
   AnnouncementResponse,
   CreatorSummary,
+  EmergencyBroadcastResponse,
   GetAnnouncementsResponse,
   TargetBlockSummary,
 } from "./announcements.types.js";
 import type {
   CreateAnnouncementInput,
+  EmergencyBroadcastBody,
   ListAnnouncementsQuery,
   UpdateAnnouncementBody,
 } from "./announcements.validation.js";
@@ -32,48 +34,95 @@ const validateObjectId = (id: string, label: string) => {
   }
 };
 
+const assertApartmentAndAnnouncementIds = (
+  apartmentId: string,
+  announcementId?: string
+) => {
+  if (!apartmentId) {
+    throw new AppError("Apartment context is required", 400);
+  }
+  validateObjectId(apartmentId, "Apartment ID");
+
+  if (announcementId !== undefined) {
+    validateObjectId(announcementId, "Announcement ID");
+  }
+};
+
 const validateTargetBlocks = async (
   apartmentId: string,
   targetIds: string[]
-) => {
-  if (!targetIds || targetIds.length === 0) {
+): Promise<string[]> => {
+  const uniqueIds = Array.from(new Set((targetIds || []).filter(Boolean)));
+  if (uniqueIds.length === 0) {
     throw new AppError(
       "targetIds must not be empty when targetType is BLOCK",
       400
     );
   }
 
-  for (const id of targetIds) {
+  for (const id of uniqueIds) {
     if (!Types.ObjectId.isValid(id)) {
       throw new AppError(`Invalid block ID: ${id}`, 400);
     }
   }
 
-  const validObjectIds = targetIds.map((id) => new Types.ObjectId(id));
+  const validObjectIds = uniqueIds.map((id) => new Types.ObjectId(id));
   const blocks = await Block.find({
     _id: { $in: validObjectIds },
     apartmentId: new Types.ObjectId(apartmentId),
   }).select("_id");
 
-  if (blocks.length !== targetIds.length) {
+  if (blocks.length !== uniqueIds.length) {
     throw new AppError(
       "One or more target blocks do not exist in this apartment",
       400
     );
   }
+
+  return uniqueIds;
 };
 
-const enrichAnnouncements = async (
+type AuthUserSummary = {
+  _id?: Types.ObjectId | string;
+  id?: string;
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+};
+
+const getUserSummariesByIds = async (
+  userIds: string[]
+): Promise<Map<string, AuthUserSummary>> => {
+  const unique = Array.from(new Set(userIds.filter(Boolean)));
+  if (!unique.length) return new Map();
+
+  const objIds = unique
+    .filter((id) => Types.ObjectId.isValid(id))
+    .map((id) => new Types.ObjectId(id));
+
+  const users = (await getAuthDB()
+    .collection("user")
+    .find({
+      $or: [
+        { id: { $in: unique } },
+        ...(objIds.length ? [{ _id: { $in: objIds } }] : []),
+      ],
+    })
+    .project({ _id: 1, id: 1, name: 1, email: 1, phone: 1 })
+    .toArray()) as AuthUserSummary[];
+
+  const map = new Map<string, AuthUserSummary>();
+  for (const u of users) {
+    if (u.id) map.set(u.id, u);
+    if (u._id) map.set(u._id.toString(), u);
+  }
+  return map;
+};
+
+const getBlockSummariesByIds = async (
   apartmentId: string,
   announcements: Array<IAnnouncement & { _id: Types.ObjectId }>
-): Promise<AnnouncementResponse[]> => {
-  if (announcements.length === 0) {
-    return [];
-  }
-
-  const creatorIds = announcements.map((a) => a.createdBy);
-  const usersById = await getUserSummariesByIds(creatorIds);
-
+): Promise<Map<string, TargetBlockSummary>> => {
   const allTargetBlockIds = Array.from(
     new Set(
       announcements
@@ -86,11 +135,11 @@ const enrichAnnouncements = async (
   const blockObjectIds = allTargetBlockIds.map((id) => new Types.ObjectId(id));
   const blocks = blockObjectIds.length
     ? await Block.find({
-        _id: { $in: blockObjectIds },
-        apartmentId: new Types.ObjectId(apartmentId),
-      })
-        .select("_id blockname code")
-        .lean()
+      _id: { $in: blockObjectIds },
+      apartmentId: new Types.ObjectId(apartmentId),
+    })
+      .select("_id blockname code")
+      .lean()
     : [];
 
   const blockMap = new Map<string, TargetBlockSummary>();
@@ -101,16 +150,32 @@ const enrichAnnouncements = async (
       code: block.code,
     });
   }
+  return blockMap;
+};
+
+const enrichAnnouncements = async (
+  apartmentId: string,
+  announcements: Array<IAnnouncement & { _id: Types.ObjectId }>
+): Promise<AnnouncementResponse[]> => {
+  if (announcements.length === 0) {
+    return [];
+  }
+
+  const creatorIds = announcements.map((a) => a.createdBy);
+  const [usersById, blockMap] = await Promise.all([
+    getUserSummariesByIds(creatorIds),
+    getBlockSummariesByIds(apartmentId, announcements),
+  ]);
 
   return announcements.map((announcement) => {
     const creatorUser = usersById.get(announcement.createdBy);
     const creator: CreatorSummary | null = creatorUser
       ? {
-          id: announcement.createdBy,
-          name: creatorUser.name ?? null,
-          email: creatorUser.email ?? null,
-          phone: creatorUser.phone ?? null,
-        }
+        id: announcement.createdBy,
+        name: creatorUser.name ?? null,
+        email: creatorUser.email ?? null,
+        phone: creatorUser.phone ?? null,
+      }
       : null;
 
     const targetBlocks: TargetBlockSummary[] = (announcement.targetIds || [])
@@ -145,22 +210,24 @@ export const createAnnouncementService = async (
   createdBy: string,
   data: CreateAnnouncementInput
 ): Promise<AnnouncementResponse> => {
-  if (!apartmentId) {
-    throw new AppError("Apartment context is required", 400);
-  }
-  validateObjectId(apartmentId, "Apartment ID");
+  assertApartmentAndAnnouncementIds(apartmentId);
 
   if (!createdBy) {
     throw new AppError("Creator user is required", 400);
   }
 
+  let targetIds: string[] = [];
   if (data.targetType === AnnouncementTargetType.BLOCK) {
-    await validateTargetBlocks(apartmentId, data.targetIds || []);
+    targetIds = await validateTargetBlocks(apartmentId, data.targetIds || []);
   }
 
-  const expiresAt = data.expiresAt ? new Date(data.expiresAt) : null;
-  if (expiresAt && isNaN(expiresAt.getTime())) {
-    throw new AppError("Invalid expiresAt date format", 400);
+  let expiresAt: Date | null = null;
+  if (data.expiresAt) {
+    const parsedDate = new Date(data.expiresAt);
+    if (isNaN(parsedDate.getTime()) || parsedDate <= new Date()) {
+      throw new AppError("Expiration date must be a valid future date", 400);
+    }
+    expiresAt = parsedDate;
   }
 
   const announcement = await Announcement.create({
@@ -172,7 +239,7 @@ export const createAnnouncementService = async (
     priority: data.priority,
     status: data.status,
     targetType: data.targetType,
-    targetIds: data.targetIds || [],
+    targetIds,
     expiresAt,
   });
 
@@ -187,12 +254,9 @@ export const getAnnouncementsService = async (
   apartmentId: string,
   query: ListAnnouncementsQuery
 ): Promise<GetAnnouncementsResponse> => {
-  if (!apartmentId) {
-    throw new AppError("Apartment context is required", 400);
-  }
-  validateObjectId(apartmentId, "Apartment ID");
+  assertApartmentAndAnnouncementIds(apartmentId);
 
-  const filter: any = {
+  const filter: Record<string, unknown> = {
     apartmentId: new Types.ObjectId(apartmentId),
   };
 
@@ -220,14 +284,32 @@ export const getAnnouncementsService = async (
       : 10;
   const skip = (page - 1) * limit;
 
-  const [total, rawAnnouncements] = await Promise.all([
+  const [total, rawAnnouncements, statsCounts] = await Promise.all([
     Announcement.countDocuments(filter),
     Announcement.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean(),
+    Announcement.aggregate<{ _id: string; count: number }>([
+      { $match: { apartmentId: new Types.ObjectId(apartmentId) } },
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]),
   ]);
+
+  const stats = {
+    total: 0,
+    published: 0,
+    draft: 0,
+    archived: 0,
+  };
+
+  for (const s of statsCounts) {
+    if (s._id === AnnouncementStatus.PUBLISHED) stats.published = s.count;
+    else if (s._id === AnnouncementStatus.DRAFT) stats.draft = s.count;
+    else if (s._id === AnnouncementStatus.ARCHIVED) stats.archived = s.count;
+    stats.total += s.count;
+  }
 
   const announcements = await enrichAnnouncements(
     apartmentId,
@@ -242,6 +324,7 @@ export const getAnnouncementsService = async (
       limit,
       totalPages: Math.ceil(total / limit) || 1,
     },
+    stats,
   };
 };
 
@@ -249,11 +332,7 @@ export const getAnnouncementByIdService = async (
   apartmentId: string,
   announcementId: string
 ): Promise<AnnouncementResponse> => {
-  if (!apartmentId) {
-    throw new AppError("Apartment context is required", 400);
-  }
-  validateObjectId(apartmentId, "Apartment ID");
-  validateObjectId(announcementId, "Announcement ID");
+  assertApartmentAndAnnouncementIds(apartmentId, announcementId);
 
   const rawAnnouncement = await Announcement.findOne({
     _id: new Types.ObjectId(announcementId),
@@ -276,11 +355,7 @@ export const updateAnnouncementService = async (
   announcementId: string,
   data: UpdateAnnouncementBody
 ): Promise<AnnouncementResponse> => {
-  if (!apartmentId) {
-    throw new AppError("Apartment context is required", 400);
-  }
-  validateObjectId(apartmentId, "Apartment ID");
-  validateObjectId(announcementId, "Announcement ID");
+  assertApartmentAndAnnouncementIds(apartmentId, announcementId);
 
   const announcement = await Announcement.findOne({
     _id: new Types.ObjectId(announcementId),
@@ -291,23 +366,51 @@ export const updateAnnouncementService = async (
     throw new AppError("Announcement not found in this apartment", 404);
   }
 
-  const effectiveTargetType = data.targetType ?? announcement.targetType;
-  const effectiveTargetIds = data.targetIds ?? announcement.targetIds ?? [];
-
-  if (effectiveTargetType === AnnouncementTargetType.BLOCK) {
-    await validateTargetBlocks(apartmentId, effectiveTargetIds);
-  }
-
+  // Apply plain field updates first, unconditionally, so the EMERGENCY
+  // branch below only has to decide targeting/priority/status overrides —
+  // it can no longer silently interact with title/message ordering.
   if (data.title !== undefined) announcement.title = data.title;
   if (data.message !== undefined) announcement.message = data.message;
-  if (data.type !== undefined) announcement.type = data.type;
-  if (data.priority !== undefined) announcement.priority = data.priority;
-  if (data.status !== undefined) announcement.status = data.status;
-  if (data.targetType !== undefined) announcement.targetType = data.targetType;
-  if (data.targetIds !== undefined) announcement.targetIds = data.targetIds;
 
   if (data.expiresAt !== undefined) {
-    announcement.expiresAt = data.expiresAt ? new Date(data.expiresAt) : null;
+    if (data.expiresAt) {
+      const expDate = new Date(data.expiresAt);
+      if (isNaN(expDate.getTime()) || expDate <= new Date()) {
+        throw new AppError("Expiration date must be a valid future date", 400);
+      }
+      announcement.expiresAt = expDate;
+    } else {
+      announcement.expiresAt = null;
+    }
+  }
+
+  const effectiveType = data.type ?? announcement.type;
+
+  if (effectiveType === AnnouncementType.EMERGENCY) {
+    announcement.type = AnnouncementType.EMERGENCY;
+    announcement.priority = AnnouncementPriority.URGENT;
+    announcement.status = AnnouncementStatus.PUBLISHED;
+    announcement.targetType = AnnouncementTargetType.ALL_RESIDENTS;
+    announcement.targetIds = [];
+  } else {
+    if (data.type !== undefined) announcement.type = data.type;
+    if (data.priority !== undefined) announcement.priority = data.priority;
+    if (data.status !== undefined) announcement.status = data.status;
+
+    const effectiveTargetType = data.targetType ?? announcement.targetType;
+    let effectiveTargetIds = data.targetIds ?? announcement.targetIds ?? [];
+
+    if (effectiveTargetType === AnnouncementTargetType.BLOCK) {
+      effectiveTargetIds = await validateTargetBlocks(
+        apartmentId,
+        effectiveTargetIds
+      );
+      announcement.targetType = AnnouncementTargetType.BLOCK;
+      announcement.targetIds = effectiveTargetIds;
+    } else {
+      announcement.targetType = AnnouncementTargetType.ALL_RESIDENTS;
+      announcement.targetIds = [];
+    }
   }
 
   await announcement.save();
@@ -324,11 +427,7 @@ export const updateAnnouncementStatusService = async (
   announcementId: string,
   status: AnnouncementStatus
 ): Promise<AnnouncementResponse> => {
-  if (!apartmentId) {
-    throw new AppError("Apartment context is required", 400);
-  }
-  validateObjectId(apartmentId, "Apartment ID");
-  validateObjectId(announcementId, "Announcement ID");
+  assertApartmentAndAnnouncementIds(apartmentId, announcementId);
 
   const announcement = await Announcement.findOne({
     _id: new Types.ObjectId(announcementId),
@@ -353,11 +452,7 @@ export const deleteAnnouncementService = async (
   apartmentId: string,
   announcementId: string
 ): Promise<{ id: string; deleted: true }> => {
-  if (!apartmentId) {
-    throw new AppError("Apartment context is required", 400);
-  }
-  validateObjectId(apartmentId, "Apartment ID");
-  validateObjectId(announcementId, "Announcement ID");
+  assertApartmentAndAnnouncementIds(apartmentId, announcementId);
 
   const deleted = await Announcement.findOneAndDelete({
     _id: new Types.ObjectId(announcementId),
@@ -375,48 +470,55 @@ export const getResidentAnnouncementsService = async (
   apartmentId: string,
   userId: string
 ): Promise<AnnouncementResponse[]> => {
-  if (!apartmentId) {
-    throw new AppError("Apartment context is required", 400);
-  }
-  validateObjectId(apartmentId, "Apartment ID");
+  assertApartmentAndAnnouncementIds(apartmentId);
 
-  let residentBlockId: string | null = null;
+  const residentBlockIds: string[] = [];
   if (userId) {
-    const resident = await ResidentModel.findOne({
+    const residents = await ResidentModel.find({
       userId,
       apartmentId: new Types.ObjectId(apartmentId),
       status: "active",
-    }).select("flatId");
+    })
+      .select("flatId")
+      .lean();
 
-    if (resident?.flatId) {
-      const flat = await Flat.findById(resident.flatId).select("blockId").lean();
-      if (flat?.blockId) {
-        residentBlockId = flat.blockId.toString();
+    const flatIds = residents.map((r) => r.flatId).filter(Boolean);
+    if (flatIds.length > 0) {
+      const flats = await Flat.find({
+        _id: { $in: flatIds },
+        apartmentId: new Types.ObjectId(apartmentId),
+      })
+        .select("blockId")
+        .lean();
+
+      for (const flat of flats) {
+        if (flat?.blockId) {
+          residentBlockIds.push(flat.blockId.toString());
+        }
       }
     }
   }
 
+  const uniqueResidentBlockIds = Array.from(new Set(residentBlockIds));
+
   const now = new Date();
-  const targetConditions: any[] = [
+  const targetConditions: Array<Record<string, unknown>> = [
     { targetType: AnnouncementTargetType.ALL_RESIDENTS },
   ];
 
-  if (residentBlockId) {
+  if (uniqueResidentBlockIds.length > 0) {
     targetConditions.push({
       targetType: AnnouncementTargetType.BLOCK,
-      targetIds: residentBlockId,
+      targetIds: { $in: uniqueResidentBlockIds },
     });
   }
 
-  const filter: any = {
+  const filter: Record<string, unknown> = {
     apartmentId: new Types.ObjectId(apartmentId),
     status: AnnouncementStatus.PUBLISHED,
     $and: [
       {
-        $or: [
-          { expiresAt: null },
-          { expiresAt: { $gt: now } },
-        ],
+        $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
       },
       {
         $or: targetConditions,
@@ -425,13 +527,140 @@ export const getResidentAnnouncementsService = async (
   };
 
   const rawAnnouncements = await Announcement.find(filter)
-    .sort({
-      createdAt: -1,
-    })
+    .sort({ createdAt: -1 })
     .lean();
 
   return enrichAnnouncements(
     apartmentId,
     rawAnnouncements as unknown as Array<IAnnouncement & { _id: Types.ObjectId }>
   );
+};
+
+export const broadcastEmergencyService = async (
+  apartmentId: string,
+  createdBy: string,
+  data: EmergencyBroadcastBody
+): Promise<EmergencyBroadcastResponse> => {
+  assertApartmentAndAnnouncementIds(apartmentId);
+
+  if (!createdBy) {
+    throw new AppError("Creator user is required", 400);
+  }
+
+  // Edge case 1: Anti-spam / duplicate broadcast protection within 60 seconds
+  const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
+  const recentDuplicate = await Announcement.findOne({
+    apartmentId: new Types.ObjectId(apartmentId),
+    type: AnnouncementType.EMERGENCY,
+    title: data.title.trim(),
+    createdAt: { $gte: oneMinuteAgo },
+  }).lean();
+
+  if (recentDuplicate) {
+    throw new AppError(
+      "A similar emergency broadcast was sent less than 60 seconds ago. Please wait before broadcasting again.",
+      429
+    );
+  }
+
+  // Target block validation
+  let targetIds: string[] = [];
+  let targetBlocks: TargetBlockSummary[] = [];
+
+  if (data.targetType === AnnouncementTargetType.BLOCK) {
+    targetIds = await validateTargetBlocks(apartmentId, data.targetIds || []);
+    const blockDocs = await Block.find({
+      _id: { $in: targetIds.map((id) => new Types.ObjectId(id)) },
+      apartmentId: new Types.ObjectId(apartmentId),
+    })
+      .select("_id blockname code")
+      .lean();
+
+    targetBlocks = blockDocs.map((b) => ({
+      id: b._id.toString(),
+      blockname: b.blockname,
+      code: b.code,
+    }));
+  }
+
+  // Edge case 2: Calculate estimated audience (active residents and flats count)
+  let residentsCount = 0;
+  let flatsCount = 0;
+
+  if (data.targetType === AnnouncementTargetType.ALL_RESIDENTS) {
+    const [resCount, flCount] = await Promise.all([
+      ResidentModel.countDocuments({
+        apartmentId: new Types.ObjectId(apartmentId),
+        status: "active",
+      }),
+      Flat.countDocuments({
+        apartmentId: new Types.ObjectId(apartmentId),
+      }),
+    ]);
+    residentsCount = resCount;
+    flatsCount = flCount;
+  } else {
+    // Specific blocks targeted
+    const targetBlockObjectIds = targetIds.map((id) => new Types.ObjectId(id));
+    const flatsInBlocks = await Flat.find({
+      apartmentId: new Types.ObjectId(apartmentId),
+      blockId: { $in: targetBlockObjectIds },
+    })
+      .select("_id")
+      .lean();
+
+    const flatObjectIds = flatsInBlocks.map((f) => f._id);
+    flatsCount = flatObjectIds.length;
+
+    if (flatObjectIds.length > 0) {
+      residentsCount = await ResidentModel.countDocuments({
+        apartmentId: new Types.ObjectId(apartmentId),
+        flatId: { $in: flatObjectIds },
+        status: "active",
+      });
+    }
+  }
+
+  // Format emergency message with immediate action instructions & emergency contact if provided
+  let fullMessage = data.message.trim();
+  if (data.actionInstructions?.trim()) {
+    fullMessage += `\n\nImmediate Actions Required:\n${data.actionInstructions.trim()}`;
+  }
+  if (data.contactPhone?.trim()) {
+    fullMessage += `\n\nEmergency Control Contact: ${data.contactPhone.trim()}`;
+  }
+
+  // Invariants: EMERGENCY type, URGENT priority, PUBLISHED status, no silent auto-expiry
+  const announcement = await Announcement.create({
+    apartmentId: new Types.ObjectId(apartmentId),
+    createdBy,
+    title: data.title.trim(),
+    message: fullMessage,
+    type: AnnouncementType.EMERGENCY,
+    priority: AnnouncementPriority.URGENT,
+    status: AnnouncementStatus.PUBLISHED,
+    targetType: data.targetType,
+    targetIds,
+    expiresAt: null,
+  });
+
+  return {
+    id: announcement._id.toString(),
+    apartmentId,
+    category: data.category,
+    title: announcement.title,
+    message: announcement.message,
+    priority: announcement.priority,
+    status: announcement.status,
+    targetType: announcement.targetType,
+    targetBlocks: targetBlocks.length ? targetBlocks : undefined,
+    actionInstructions: data.actionInstructions,
+    contactPhone: data.contactPhone,
+    createdBy,
+    publishedAt: announcement.createdAt || new Date(),
+    estimatedAudience: {
+      residentsCount,
+      flatsCount,
+    },
+  };
 };

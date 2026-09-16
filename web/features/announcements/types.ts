@@ -1,16 +1,21 @@
-import type { Types } from "mongoose";
-import type {
-  AnnouncementPriority,
-  AnnouncementStatus,
-  AnnouncementTargetType,
-  AnnouncementType,
-} from "./announcements.model.js";
+export type AnnouncementType =
+  | "GENERAL"
+  | "MAINTENANCE"
+  | "EVENTS_SOCIAL"
+  | "EMERGENCY"
+  | "COMMUNITY_COUNCIL";
+
+export type AnnouncementPriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
+
+export type AnnouncementStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
+
+export type AnnouncementTargetType = "ALL_RESIDENTS" | "BLOCK";
 
 export interface CreatorSummary {
   id: string;
   name: string | null;
   email: string | null;
-  phone?: string | null;
+  phone: string | null;
 }
 
 export interface TargetBlockSummary {
@@ -19,25 +24,27 @@ export interface TargetBlockSummary {
   code: string;
 }
 
-export interface AnnouncementResponse {
+export interface AnnouncementItem {
   id: string;
-  apartmentId: string;
+  apartmentId?: string;
   title: string;
   message: string;
   type: AnnouncementType;
   priority: AnnouncementPriority;
   status: AnnouncementStatus;
   targetType: AnnouncementTargetType;
-  targetIds: string[];
+  targetIds?: string[];
   targetBlocks?: TargetBlockSummary[];
   createdBy: string;
   creator?: CreatorSummary | null;
-  expiresAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
+  creatorRole?: string;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string | null;
+  readCount?: number;
 }
 
-export interface AnnouncementPagination {
+export interface PaginationMeta {
   total: number;
   page: number;
   limit: number;
@@ -51,34 +58,41 @@ export interface AnnouncementStats {
   archived: number;
 }
 
-export interface GetAnnouncementsResponse {
-  announcements: AnnouncementResponse[];
-  pagination: AnnouncementPagination;
+export interface GetAnnouncementsApiResponse {
+  announcements: AnnouncementItem[];
+  pagination: PaginationMeta;
   stats?: AnnouncementStats;
 }
 
-export interface AnnouncementFilterQuery {
-  apartmentId: Types.ObjectId;
-  type?: AnnouncementType;
-  status?: AnnouncementStatus;
-  targetType?: AnnouncementTargetType;
-  $or?: Array<{ title?: RegExp; message?: RegExp }>;
-  expiresAt?: { $gt: Date } | null | { $ne: null };
+export interface AnnouncementFilterState {
+  search: string;
+  status: "all" | AnnouncementStatus;
+  type: "all" | AnnouncementType;
+  target: "all" | AnnouncementTargetType;
+  priority: "all" | AnnouncementPriority;
+  page: number;
+  limit: number;
 }
 
-export interface UpdateAnnouncementInput {
-  title?: string;
-  message?: string;
-  type?: AnnouncementType;
-  priority?: AnnouncementPriority;
-  status?: AnnouncementStatus;
-  targetType?: AnnouncementTargetType;
-  targetIds?: string[];
-  expiresAt?: string | null;
-}
-
-export interface UpdateAnnouncementStatusInput {
+export interface CreateAnnouncementFormData {
+  title: string;
+  message: string;
+  type: AnnouncementType;
+  priority: AnnouncementPriority;
+  targetType: AnnouncementTargetType;
+  targetIds: string[];
+  hasExpiry: boolean;
+  expiresAt: string;
   status: AnnouncementStatus;
+}
+
+export interface BlockItem {
+  id: string;
+  _id?: string;
+  blockname: string;
+  code: string;
+  totalFloors?: number;
+  status?: "active" | "inactive";
 }
 
 export const EmergencyAlertCategory = {
@@ -95,12 +109,12 @@ export const EmergencyAlertCategory = {
 export type EmergencyAlertCategory =
   (typeof EmergencyAlertCategory)[keyof typeof EmergencyAlertCategory];
 
-export interface EmergencyBroadcastInput {
+export interface EmergencyBroadcastFormData {
   category: EmergencyAlertCategory;
   title: string;
   message: string;
   targetType: AnnouncementTargetType;
-  targetIds?: string[];
+  targetIds: string[];
   actionInstructions?: string;
   contactPhone?: string;
 }
@@ -118,9 +132,10 @@ export interface EmergencyBroadcastResponse {
   actionInstructions?: string;
   contactPhone?: string;
   createdBy: string;
-  publishedAt: Date;
+  publishedAt: string;
   estimatedAudience: {
     residentsCount: number;
     flatsCount: number;
   };
 }
+

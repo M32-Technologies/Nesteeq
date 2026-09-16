@@ -265,6 +265,11 @@ export const sidebarNavigation: Record<
           href: "/dashboard/reports",
           icon: BarChart3,
         },
+        {
+          title: "Announcements",
+          href: "/dashboard/announcements",
+          icon: Bell,
+        },
       ],
     },
   ],
@@ -297,6 +302,11 @@ export const sidebarNavigation: Record<
           title: "Residents Directory",
           href: "/dashboard/residents",
           icon: UserRound,
+        },
+        {
+          title: "Announcements",
+          href: "/dashboard/announcements",
+          icon: Bell,
         },
       ],
     },

@@ -2,7 +2,10 @@ import mongoose, { Schema, model, type Model, type Types } from "mongoose";
 
 export const AnnouncementType = {
   GENERAL: "GENERAL",
+  MAINTENANCE: "MAINTENANCE",
+  EVENTS_SOCIAL: "EVENTS_SOCIAL",
   EMERGENCY: "EMERGENCY",
+  COMMUNITY_COUNCIL: "COMMUNITY_COUNCIL",
 } as const;
 
 export type AnnouncementType =
@@ -121,10 +124,16 @@ const announcementSchema = new Schema<IAnnouncement>(
   }
 );
 
+// Fast query: "Show all announcements for this apartment, newest first"
+announcementSchema.index({ apartmentId: 1, createdAt: -1 });
+
 // Fast query: "Show all published announcements for this apartment, newest first"
 announcementSchema.index({ apartmentId: 1, status: 1, createdAt: -1 });
 
-// Fast query: "Show all emergency announcements for this apartment"
+// Fast query: "Show all active published announcements by expiry"
+announcementSchema.index({ apartmentId: 1, status: 1, expiresAt: 1 });
+
+// Fast query: "Show all announcements by type for this apartment"
 announcementSchema.index({ apartmentId: 1, type: 1, createdAt: -1 });
 
 export const Announcement = model<IAnnouncement>("Announcement", announcementSchema);

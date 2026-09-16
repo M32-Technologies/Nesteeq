@@ -80,8 +80,8 @@ export default function DashboardSidebar({
         />
       )}
 
-    <aside
-      className={`
+      <aside
+        className={`
         peer/sidebar
         group/sidebar
 
@@ -110,15 +110,15 @@ export default function DashboardSidebar({
         lg:translate-x-0
         lg:hover:w-[264px]
       `}
-    >
-      {/* =========================
+      >
+        {/* =========================
           LOGO
       ========================== */}
 
-      <div className="flex h-[76px] shrink-0 items-center">
-        <div className="flex w-[76px] shrink-0 items-center justify-center">
-          <div
-            className="
+        <div className="flex h-[76px] shrink-0 items-center">
+          <div className="flex w-[76px] shrink-0 items-center justify-center">
+            <div
+              className="
               flex
               size-10
               items-center
@@ -130,15 +130,15 @@ export default function DashboardSidebar({
               ring-1
               ring-white/10
             "
-          >
-            <span className="text-lg font-bold text-white">
-              N
-            </span>
+            >
+              <span className="text-lg font-bold text-white">
+                N
+              </span>
+            </div>
           </div>
-        </div>
 
-        <div
-          className="
+          <div
+            className="
             w-[172px]
             min-w-0
 
@@ -153,9 +153,9 @@ export default function DashboardSidebar({
             lg:group-hover/sidebar:translate-x-0
             lg:group-hover/sidebar:opacity-100
           "
-        >
-          <p
-            className="
+          >
+            <p
+              className="
               truncate
               whitespace-nowrap
 
@@ -165,12 +165,12 @@ export default function DashboardSidebar({
 
               text-white
             "
-          >
-            Nesteeq
-          </p>
+            >
+              Nesteeq
+            </p>
 
-          <p
-            className="
+            <p
+              className="
               truncate
               whitespace-nowrap
 
@@ -179,16 +179,16 @@ export default function DashboardSidebar({
 
               text-[#8BA2BB]
             "
-          >
-            {roleLabel} Dashboard
-          </p>
-        </div>
+            >
+              {roleLabel} Dashboard
+            </p>
+          </div>
 
-        <button
-          type="button"
-          aria-label="Close navigation"
-          onClick={onMobileClose}
-          className="
+          <button
+            type="button"
+            aria-label="Close navigation"
+            onClick={onMobileClose}
+            className="
             ml-auto
             mr-4
             flex
@@ -203,16 +203,16 @@ export default function DashboardSidebar({
             hover:text-white
             lg:hidden
           "
-        >
-          <X className="size-5" />
-        </button>
-      </div>
-      {/* =========================
+          >
+            <X className="size-5" />
+          </button>
+        </div>
+        {/* =========================
           NAVIGATION
       ========================== */}
 
-      <nav
-        className="
+        <nav
+          className="
           mt-5
           flex-1
 
@@ -223,15 +223,15 @@ export default function DashboardSidebar({
 
           [&::-webkit-scrollbar]:hidden
         "
-      >
-        <div className="space-y-5">
-          {navigation.map((section, sectionIndex) => (
-            <div key={`${section.title}-${sectionIndex}`}>
-              {/* SECTION TITLE */}
+        >
+          <div className="space-y-5">
+            {navigation.map((section, sectionIndex) => (
+              <div key={`${section.title}-${sectionIndex}`}>
+                {/* SECTION TITLE */}
 
-              {section.title ? (
-                <div
-                  className="
+                {section.title ? (
+                  <div
+                    className="
                     mb-2
                     ml-[15px]
 
@@ -257,30 +257,30 @@ export default function DashboardSidebar({
                   lg:group-hover/sidebar:mb-2
                   lg:group-hover/sidebar:opacity-100
                 "
-              >
-                {section.title}
-              </div>
-              ) : null}
+                  >
+                    {section.title}
+                  </div>
+                ) : null}
 
-              {/* ITEMS */}
+                {/* ITEMS */}
 
-              <div className="space-y-[4px]">
-                {section.items.map((item) => {
-                  const Icon = item.icon
-                  const href = getDashboardItemHref(role, item.href)
+                <div className="space-y-[4px]">
+                  {section.items.map((item) => {
+                    const Icon = item.icon
+                    const href = getDashboardItemHref(role, item.href)
 
-                  const isActive =
-                    pathname === href ||
-                    (href !== roleHomePath &&
-                      pathname.startsWith(`${href}/`))
+                    const isActive =
+                      pathname === href ||
+                      (href !== roleHomePath &&
+                        pathname.startsWith(`${href}/`))
 
-                  return (
-                    <Link
-                      key={href}
-                      href={href}
-                      title={item.title}
-                      onClick={onMobileClose}
-                      className={`
+                    return (
+                      <Link
+                        key={href}
+                        href={href}
+                        title={item.title}
+                        onClick={onMobileClose}
+                        className={`
                         relative
 
                         flex
@@ -295,18 +295,17 @@ export default function DashboardSidebar({
                         transition-all
                         duration-200
 
-                        ${
-                          isActive
+                        ${isActive
                             ? "bg-[#16477C] text-white"
                             : "text-[#C3D2E3] hover:bg-white/[0.07] hover:text-white"
-                        }
+                          }
                       `}
-                    >
-                      {/* ACTIVE INDICATOR */}
+                      >
+                        {/* ACTIVE INDICATOR */}
 
-                      {isActive && (
-                        <span
-                          className="
+                        {isActive && (
+                          <span
+                            className="
                             absolute
                             left-0
                             top-1/2
@@ -320,32 +319,32 @@ export default function DashboardSidebar({
 
                             bg-[#3D91FF]
                           "
-                        />
-                      )}
+                          />
+                        )}
 
-                      {/* ICON */}
+                        {/* ICON */}
 
-                      <div
-                        className="
+                        <div
+                          className="
                           flex
                           w-[56px]
                           shrink-0
                           items-center
                           justify-center
                         "
-                      >
-                        <Icon
-                          className="
+                        >
+                          <Icon
+                            className="
                             size-[19px]
                             stroke-[1.8]
                           "
-                        />
-                      </div>
+                          />
+                        </div>
 
-                      {/* TITLE */}
+                        {/* TITLE */}
 
-                      <div
-                        className="
+                        <div
+                          className="
                           flex
                           min-w-0
                           flex-1
@@ -358,9 +357,9 @@ export default function DashboardSidebar({
                           lg:opacity-0
                           lg:group-hover/sidebar:opacity-100
                         "
-                      >
-                        <span
-                          className="
+                        >
+                          <span
+                            className="
                             flex-1
 
                             truncate
@@ -370,52 +369,51 @@ export default function DashboardSidebar({
                             text-[13px]
                             font-medium
                           "
-                        >
-                          {item.title}
-                        </span>
+                          >
+                            {item.title}
+                          </span>
 
-                        <ChevronRight
-                          className={`
+                          <ChevronRight
+                            className={`
                             mr-3
                             size-[15px]
                             shrink-0
 
-                            ${
-                              isActive
+                            ${isActive
                                 ? "text-white/60"
                                 : "text-[#AFC0D2]"
-                            }
+                              }
                           `}
-                        />
-                      </div>
-                    </Link>
-                  )
-                })}
+                          />
+                        </div>
+                      </Link>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </nav>
+            ))}
+          </div>
+        </nav>
 
-      {/* =========================
+        {/* =========================
           BOTTOM SECTION
       ========================== */}
 
-      <div className="shrink-0 px-[10px] pb-[10px]">
-        <div
-          className="
+        <div className="shrink-0 px-[10px] pb-[10px]">
+          <div
+            className="
             mb-2
             border-t
             border-white/[0.08]
             pt-2
           "
-        >
-          {/* NOTIFICATIONS */}
+          >
+            {/* NOTIFICATIONS */}
 
-          <button
-            type="button"
-            aria-label="Notifications"
-            className="
+            <button
+              type="button"
+              aria-label="Notifications"
+              className="
               flex
               h-[44px]
               w-full
@@ -434,9 +432,9 @@ export default function DashboardSidebar({
               hover:bg-white/[0.07]
               hover:text-white
             "
-          >
-            <div
-              className="
+            >
+              <div
+                className="
                 relative
                 flex
                 w-[56px]
@@ -444,17 +442,17 @@ export default function DashboardSidebar({
                 items-center
                 justify-center
               "
-            >
-              <Bell className="size-[18px] stroke-[1.8]" />
-              {/* notification badge — mirrors the navbar bell */}
-              <span
-                className="absolute right-3 top-[3px] size-[7px] rounded-full bg-red-400 ring-[1.5px] ring-[#071D35]"
-                aria-hidden="true"
-              />
-            </div>
+              >
+                <Bell className="size-[18px] stroke-[1.8]" />
+                {/* notification badge — mirrors the navbar bell */}
+                <span
+                  className="absolute right-3 top-[3px] size-[7px] rounded-full bg-red-400 ring-[1.5px] ring-[#071D35]"
+                  aria-hidden="true"
+                />
+              </div>
 
-            <span
-              className="
+              <span
+                className="
                 whitespace-nowrap
 
                 text-[13px]
@@ -467,17 +465,17 @@ export default function DashboardSidebar({
                 lg:opacity-0
                 lg:group-hover/sidebar:opacity-100
               "
-            >
-              Notifications
-            </span>
-          </button>
+              >
+                Notifications
+              </span>
+            </button>
 
-          {/* SETTINGS */}
+            {/* SETTINGS */}
 
-          <button
-            type="button"
-            aria-label="Settings"
-            className="
+            <button
+              type="button"
+              aria-label="Settings"
+              className="
               flex
               h-[44px]
               w-full
@@ -496,21 +494,21 @@ export default function DashboardSidebar({
               hover:bg-white/[0.07]
               hover:text-white
             "
-          >
-            <div
-              className="
+            >
+              <div
+                className="
                 flex
                 w-[56px]
                 shrink-0
                 items-center
                 justify-center
               "
-            >
-              <Settings className="size-[18px] stroke-[1.8]" />
-            </div>
+              >
+                <Settings className="size-[18px] stroke-[1.8]" />
+              </div>
 
-            <span
-              className="
+              <span
+                className="
                 whitespace-nowrap
 
                 text-[13px]
@@ -523,19 +521,19 @@ export default function DashboardSidebar({
                 lg:opacity-0
                 lg:group-hover/sidebar:opacity-100
               "
-            >
-              Settings
-            </span>
-          </button>
+              >
+                Settings
+              </span>
+            </button>
 
-        </div>
+          </div>
 
-        {/* =========================
+          {/* =========================
             PROFILE
         ========================== */}
 
-        <div
-          className="
+          <div
+            className="
             flex
             h-[62px]
             w-full
@@ -552,26 +550,26 @@ export default function DashboardSidebar({
 
             hover:bg-white/[0.07]
           "
-        >
-          {/* AVATAR */}
+          >
+            {/* AVATAR */}
 
-          <div
-            className="
+            <div
+              className="
               flex
               w-[56px]
               shrink-0
               items-center
               justify-center
             "
-          >
-            {user.image ? (
-              <Image
-                src={user.image}
-                alt={user.name}
-                width={36}
-                height={36}
-                unoptimized
-                className="
+            >
+              {user.image ? (
+                <Image
+                  src={user.image}
+                  alt={user.name}
+                  width={36}
+                  height={36}
+                  unoptimized
+                  className="
                   size-9
                   rounded-full
                   object-cover
@@ -579,10 +577,10 @@ export default function DashboardSidebar({
                   ring-2
                   ring-white/10
                 "
-              />
-            ) : (
-              <div
-                className="
+                />
+              ) : (
+                <div
+                  className="
                   flex
                   size-9
                   items-center
@@ -600,16 +598,16 @@ export default function DashboardSidebar({
                   ring-2
                   ring-white/10
                 "
-              >
-                {getInitials(user.name)}
-              </div>
-            )}
-          </div>
+                >
+                  {getInitials(user.name)}
+                </div>
+              )}
+            </div>
 
-          {/* USER DETAILS */}
+            {/* USER DETAILS */}
 
-          <div
-            className="
+            <div
+              className="
               flex
               min-w-0
               flex-1
@@ -622,10 +620,10 @@ export default function DashboardSidebar({
               lg:opacity-0
               lg:group-hover/sidebar:opacity-100
             "
-          >
-            <div className="min-w-0 flex-1">
-              <p
-                className="
+            >
+              <div className="min-w-0 flex-1">
+                <p
+                  className="
                   truncate
 
                   text-[12px]
@@ -633,12 +631,12 @@ export default function DashboardSidebar({
 
                   text-white
                 "
-              >
-                {user.name}
-              </p>
+                >
+                  {user.name}
+                </p>
 
-              <p
-                className="
+                <p
+                  className="
                   mt-[2px]
 
                   truncate
@@ -647,16 +645,16 @@ export default function DashboardSidebar({
 
                   text-[#8194AA]
                 "
-              >
-                {roleLabel}
-              </p>
-            </div>
-            <button
-              type="button"
-              title="Sign out"
-              aria-label="Sign out"
-              onClick={() => void handleSignOut()}
-              className="
+                >
+                  {roleLabel}
+                </p>
+              </div>
+              <button
+                type="button"
+                title="Sign out"
+                aria-label="Sign out"
+                onClick={() => void handleSignOut()}
+                className="
                 mr-2
 
                 flex
@@ -676,13 +674,13 @@ export default function DashboardSidebar({
                 hover:bg-red-500/10
                 hover:text-red-400
               "
-            >
-              <LogOut className="size-4" />
-            </button>
+              >
+                <LogOut className="size-4" />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    </aside>
+      </aside>
     </>
   )
 }

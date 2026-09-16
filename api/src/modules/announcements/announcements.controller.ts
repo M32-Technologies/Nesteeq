@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import { AppError } from "../../utils/AppError.js";
 import { catchAsync } from "../../utils/catchAsync.js";
 import {
+  broadcastEmergencyService,
   createAnnouncementService,
   deleteAnnouncementService,
   getAnnouncementByIdService,
@@ -34,6 +35,28 @@ export const createAnnouncementHandler = catchAsync(
     res.status(201).json({
       success: true,
       message: "Announcement created successfully",
+      data: result,
+    });
+  }
+);
+
+export const broadcastEmergencyHandler = catchAsync(
+  async (req: Request, res: Response) => {
+    const apartmentId = req.user?.apartmentId;
+    const userId = req.user?.id;
+
+    if (!userId) throw new AppError("Unauthorized", 401);
+    if (!apartmentId) throw new AppError("Apartment context not found", 403);
+
+    const result = await broadcastEmergencyService(
+      apartmentId,
+      userId,
+      req.body
+    );
+
+    res.status(201).json({
+      success: true,
+      message: "Emergency alert broadcasted successfully",
       data: result,
     });
   }
