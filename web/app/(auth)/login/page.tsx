@@ -3,7 +3,7 @@ import { Suspense } from "react"
 import { Loader2 } from "lucide-react"
 
 import LoginForm from "@/features/auth/components/loginform"
-
+ 
 function LoginPage() {
   return (
     <Suspense fallback={<LoginFallback />}>

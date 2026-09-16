@@ -10,14 +10,29 @@ import PricingPreview from "@/features/landing/home/PricingPreview";
 import FinalCTA from "@/features/landing/home/FinalCTA";
 import ApartmentImage from "@/public/images/home/hero-apartment.png";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useSession } from "@/lib/auth-client";
+import {
+  getDashboardRoleRouteSegment,
+  normalizeDashboardRole,
+} from "@/features/dashboard/config/sidebar-navigation";
 
 export default function HomePage() {
+  const [isMounted, setIsMounted] = useState(false);
+  const { data: session } = useSession();
 
-  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const user = isMounted ? session?.user : null;
+  const dashboardHref = `/${getDashboardRoleRouteSegment(
+    normalizeDashboardRole(user?.role),
+  )}`;
 
   return (
     <>
@@ -46,21 +61,32 @@ export default function HomePage() {
                 </p>
 
                 <div className="mt-8 flex flex-wrap items-center gap-3">
-                  <Link
-                    href="/pricing"
-                    className="group inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[var(--brand)] px-6 text-sm font-semibold text-white transition hover:bg-[var(--brand-hover)]"
-                  >
-                    Get started
+                  {user ? (
+                    <Link
+                      href={dashboardHref}
+                      className="group inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[var(--brand)] px-7 text-sm font-semibold text-white transition hover:bg-[var(--brand-hover)]"
+                    >
+                      Go to Dashboard
+                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                    </Link>
+                  ) : (
+                    <>
+                      <Link
+                        href="/pricing"
+                        className="group inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[var(--brand)] px-6 text-sm font-semibold text-white transition hover:bg-[var(--brand-hover)]"
+                      >
+                        Get started
+                        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                      </Link>
 
-                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                  </Link>
-
-                  <Link
-                    href="/login"
-                    className="inline-flex h-12 items-center justify-center rounded-full border border-[var(--border)] bg-white px-6 text-sm font-semibold text-[var(--ink)] transition hover:border-[var(--brand)] hover:text-[var(--brand)]"
-                  >
-                    Log in
-                  </Link>
+                      <Link
+                        href="/login"
+                        className="inline-flex h-12 items-center justify-center rounded-full border border-[var(--border)] bg-white px-6 text-sm font-semibold text-[var(--ink)] transition hover:border-[var(--brand)] hover:text-[var(--brand)]"
+                      >
+                        Log in
+                      </Link>
+                    </>
+                  )}
                 </div>
               </div>
             </motion.div>

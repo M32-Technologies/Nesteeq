@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import {
-  BellRing,
   CheckCircle2,
   Eye,
   RotateCcw,
@@ -22,7 +21,7 @@ import type {
   DeliveryStatus,
   DeliveryType,
   SecurityDelivery,
-} from "../services/delivery.service"
+} from "../schemas/delivery"
 import {
   EmptyState,
   ErrorState,
@@ -46,6 +45,10 @@ import {
   DeliveryForm,
   type DeliveryFormState,
 } from "./DeliveryForm"
+import {
+  SecurityActionsMenu,
+  type SecurityMenuAction,
+} from "./SecurityActionsMenu"
 
 const PAGE_SIZE = 10
 
@@ -54,7 +57,6 @@ const statusFilters: Array<{
   value: DeliveryStatus
 }> = [
   { label: "All", value: "ALL" },
-  { label: "Waiting", value: "WAITING" },
   { label: "Resident Notified", value: "NOTIFIED" },
   { label: "Collected", value: "COLLECTED" },
   { label: "Returned", value: "RETURNED" },
@@ -75,13 +77,10 @@ export function DeliveryParcels() {
   const [form, setForm] = useState<DeliveryFormState>({
     deliveryType: "PARCEL" as DeliveryType,
     flatId: "",
-    residentId: "",
     deliveryCompany: "",
     deliveryPersonName: "",
     deliveryPersonPhone: "",
-    trackingId: "",
     packageDescription: "",
-    notes: "",
   })
 
   const flatsQuery = useSecurityFlats()
@@ -103,13 +102,10 @@ export function DeliveryParcels() {
     setForm({
       deliveryType: "PARCEL",
       flatId: "",
-      residentId: "",
       deliveryCompany: "",
       deliveryPersonName: "",
       deliveryPersonPhone: "",
-      trackingId: "",
       packageDescription: "",
-      notes: "",
     })
   }
 
@@ -123,19 +119,16 @@ export function DeliveryParcels() {
       await createMutation.mutateAsync({
         deliveryType: form.deliveryType,
         flatId: form.flatId,
-        residentId: form.residentId || undefined,
         deliveryCompany: form.deliveryCompany,
         deliveryPersonName:
           form.deliveryPersonName || undefined,
         deliveryPersonPhone:
           form.deliveryPersonPhone || undefined,
-        trackingId: form.trackingId || undefined,
         packageDescription:
           form.packageDescription || undefined,
-        notes: form.notes || undefined,
       })
 
-      toast.success("Delivery recorded")
+      toast.success("Delivery recorded as resident notified")
       resetForm()
     } catch (error) {
       toast.error(
@@ -215,7 +208,7 @@ export function DeliveryParcels() {
               onChange={(event) =>
                 setSearchQuery(event.target.value)
               }
-              placeholder="Search flat, resident, company, person, or tracking ID"
+              placeholder="Search flat, resident, company, or person"
             />
           </div>
 
@@ -269,13 +262,11 @@ export function DeliveryParcels() {
                       {formatLabel(delivery.deliveryType)}
                     </td>
                     <td className={tdClassName}>
-                      {delivery.flatNumber || delivery.flatId}
+                      {delivery.flatNumber || "-"}
                     </td>
                     <td className={tdClassName}>
                       <p>
-                        {delivery.residentName ||
-                          delivery.residentId ||
-                          "-"}
+                        {delivery.residentName || "-"}
                       </p>
                       {delivery.residentPhone ? (
                         <p className="text-xs text-[#637083]">
@@ -287,11 +278,6 @@ export function DeliveryParcels() {
                       <p className="font-medium">
                         {delivery.deliveryCompany}
                       </p>
-                      {delivery.trackingId ? (
-                        <p className="text-xs text-[#637083]">
-                          {delivery.trackingId}
-                        </p>
-                      ) : null}
                     </td>
                     <td className={tdClassName}>
                       {formatDateTime(delivery.receivedAt)}
@@ -300,75 +286,14 @@ export function DeliveryParcels() {
                       <StatusBadge status={delivery.status} />
                     </td>
                     <td className={tdClassName}>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          className={outlineButtonClassName}
-                          onClick={() =>
-                            setSelectedDelivery(delivery)
-                          }
-                        >
-                          <Eye className="h-4 w-4" />
-                          View
-                        </button>
-
-                        {delivery.status === "WAITING" ? (
-                          <button
-                            type="button"
-                            className={outlineButtonClassName}
-                            disabled={
-                              updateStatusMutation.isPending
-                            }
-                            onClick={() =>
-                              handleStatusUpdate(
-                                  delivery,
-                                  "NOTIFIED"
-                                )
-                            }
-                          >
-                            <BellRing className="h-4 w-4" />
-                            Notify
-                          </button>
-                        ) : null}
-
-                        {delivery.status === "WAITING" ||
-                        delivery.status === "NOTIFIED" ? (
-                          <>
-                            <button
-                              type="button"
-                              className={primaryButtonClassName}
-                              disabled={
-                                updateStatusMutation.isPending
-                              }
-                              onClick={() =>
-                                setConfirmDelivery({
-                                  delivery,
-                                  status: "COLLECTED",
-                                })
-                              }
-                            >
-                              <CheckCircle2 className="h-4 w-4" />
-                              Collected
-                            </button>
-                            <button
-                              type="button"
-                              className={outlineButtonClassName}
-                              disabled={
-                                updateStatusMutation.isPending
-                              }
-                              onClick={() =>
-                                setConfirmDelivery({
-                                  delivery,
-                                  status: "RETURNED",
-                                })
-                              }
-                            >
-                              <RotateCcw className="h-4 w-4" />
-                              Returned
-                            </button>
-                          </>
-                        ) : null}
-                      </div>
+                      <DeliveryActionsMenu
+                        delivery={delivery}
+                        isUpdating={
+                          updateStatusMutation.isPending
+                        }
+                        onConfirmStatus={setConfirmDelivery}
+                        onView={setSelectedDelivery}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -424,5 +349,66 @@ export function DeliveryParcels() {
         }
       />
     </div>
+  )
+}
+
+function DeliveryActionsMenu({
+  delivery,
+  isUpdating,
+  onConfirmStatus,
+  onView,
+}: {
+  delivery: SecurityDelivery
+  isUpdating: boolean
+  onConfirmStatus: (
+    value: {
+      delivery: SecurityDelivery
+      status: Exclude<DeliveryStatus, "ALL">
+    } | null
+  ) => void
+  onView: (delivery: SecurityDelivery) => void
+}) {
+  const actions: SecurityMenuAction[] = [
+    {
+      label: "View Details",
+      icon: <Eye size={15} />,
+      onClick: () => onView(delivery),
+    },
+  ]
+
+  if (
+    delivery.status === "WAITING" ||
+    delivery.status === "NOTIFIED"
+  ) {
+    actions.push(
+      {
+        label: "Mark Collected",
+        icon: <CheckCircle2 size={15} />,
+        disabled: isUpdating,
+        onClick: () =>
+          onConfirmStatus({
+            delivery,
+            status: "COLLECTED",
+          }),
+      },
+      {
+        label: "Mark Returned",
+        icon: <RotateCcw size={15} />,
+        tone: "danger",
+        disabled: isUpdating,
+        onClick: () =>
+          onConfirmStatus({
+            delivery,
+            status: "RETURNED",
+          }),
+      }
+    )
+  }
+
+  return (
+    <SecurityActionsMenu
+      actions={actions}
+      label={`Open actions for ${delivery.deliveryCompany}`}
+    />
   )
 }

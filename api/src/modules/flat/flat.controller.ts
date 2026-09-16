@@ -29,7 +29,7 @@ export const createFlatHandler = catchAsync(
     async(req : Request , res : Response) =>{
         const apartmentId = req.user?.apartmentId!
         const result = await createFlat(req.body, apartmentId);
-
+        
         res.status(201).json({
             success: true,
             data: {

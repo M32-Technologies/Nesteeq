@@ -5,14 +5,14 @@ import { residentListQuerySchema } from "./resident.validation.js";
 import { getResidentDetailsHandler, getResidentHandler, getResidentStatsHandler, updateResidentDetailsHandler, updateResidentStatusHandler } from "./resident.controller.js";
 const router = express.Router() ;
 
-router.get("/" , protect , zodValidate(residentListQuerySchema) , getResidentHandler)
+router.get("/", protect, zodValidate(residentListQuerySchema), getResidentHandler)
 
 router.get("/stats", protect, requireRole("property_manager"), getResidentStatsHandler)
 
-router.patch("/:id/status" , protect , requireRole("property_manager") , updateResidentStatusHandler)
+router.patch("/:id/status", protect, requireRole("property_manager"), updateResidentStatusHandler)
 
 router.patch("/:id" , protect , updateResidentDetailsHandler)
 
-router.get("/:id" , protect , getResidentDetailsHandler)
+router.get("/:id", protect, getResidentDetailsHandler)
 
 export default router

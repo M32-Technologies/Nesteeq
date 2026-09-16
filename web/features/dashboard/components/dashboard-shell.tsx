@@ -25,7 +25,7 @@ export default function DashboardShell({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
   return (
-    <div className="min-h-svh" style={{ background: 'var(--background)' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--background)' }}>
       <DashboardSidebar
         role={role}
         user={user}
@@ -35,7 +35,8 @@ export default function DashboardShell({
 
       <main
         className="
-          min-h-svh
+          flex-1
+          min-h-screen
           pb-6
           pt-0
           transition-[padding-left]

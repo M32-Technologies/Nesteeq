@@ -1,7 +1,5 @@
-export default function MaintenancePage() {
-  return (
-    <div>
-      <h1>Maintenance</h1>
-    </div>
-  )
+import MaintenancePage from "@/features/dashboard/manager/maintenance/components/maintenance-page"
+
+export default function Maintenance() {
+  return <MaintenancePage />
 }

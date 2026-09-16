@@ -1,6 +1,6 @@
 "use client"
 
-import type { SecurityDelivery } from "../services/delivery.service"
+import type { SecurityDelivery } from "../schemas/delivery"
 import {
   DetailGrid,
   DetailModal,
@@ -36,14 +36,7 @@ export function DeliveryDetails({
           },
           {
             label: "Flat / Unit",
-            value: delivery.flatNumber ?? delivery.flatId,
-          },
-          {
-            label: "Resident",
-            value:
-              delivery.residentName ??
-              delivery.residentId ??
-              "-",
+            value: delivery.flatNumber ?? "-",
           },
           {
             label: "Delivery Person",
@@ -52,10 +45,6 @@ export function DeliveryDetails({
           {
             label: "Delivery Phone",
             value: delivery.deliveryPersonPhone ?? "-",
-          },
-          {
-            label: "Tracking / Order ID",
-            value: delivery.trackingId ?? "-",
           },
           {
             label: "Description",
@@ -76,10 +65,6 @@ export function DeliveryDetails({
           {
             label: "Returned",
             value: formatDateTime(delivery.returnedAt),
-          },
-          {
-            label: "Notes",
-            value: delivery.notes ?? "-",
           },
         ]}
       />

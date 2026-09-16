@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { ChevronDown, X } from "lucide-react"
 import { useForm, useWatch } from "react-hook-form"
@@ -11,6 +11,7 @@ import {
   useGeneratePropertyFlatsMutation,
   usePropertyBlocksQuery,
 } from "../hooks/use-property-query"
+import { Portal } from "@/components/portal"
 
 type GenerateFlatsDialogProps = {
   open: boolean
@@ -24,8 +25,8 @@ const generateFlatsSchema = z.object({
       message: "Units per floor is required",
     })
     .int("Units per floor must be a whole number")
-    .min(1, "Units per floor must be greater than 0")
-    .max(100, "Units per floor cannot exceed 100"),
+    .min(1, "Each floor must have at least 1 unit")
+    .max(100, "Maximum 100 units allowed per floor"),
 })
 
 type GenerateFlatsFormValues = z.input<typeof generateFlatsSchema>
@@ -41,7 +42,7 @@ export default function GenerateFlatsDialog({
   const { data: blocks = [], isLoading: isBlocksLoading } =
     usePropertyBlocksQuery({ status: "active" })
   const [formError, setFormError] = useState("")
-  const [selectedFlatNumbers, setSelectedFlatNumbers] = useState<string[]>([])
+  const [removedFlatNumbers, setRemovedFlatNumbers] = useState<string[]>([])
   const {
     register,
     handleSubmit,
@@ -69,19 +70,19 @@ export default function GenerateFlatsDialog({
     () =>
       canPreview
         ? Array.from({ length: selectedBlock.totalFloors }, (_, floorIndex) => {
-            const floor = floorIndex + 1
+          const floor = floorIndex + 1
 
-            return {
-              floor,
-              flats: Array.from({ length: unitsPerFloor }, (_, unitIndex) => ({
-                flatNumber: `${selectedBlock.code}-${floor}${String(
-                  unitIndex + 1
-                ).padStart(2, "0")}`,
-                floorNumber: floor,
-                unitNumber: unitIndex + 1,
-              })),
-            }
-          })
+          return {
+            floor,
+            flats: Array.from({ length: unitsPerFloor }, (_, unitIndex) => ({
+              flatNumber: `${selectedBlock.code}-${floor}${String(
+                unitIndex + 1
+              ).padStart(2, "0")}`,
+              floorNumber: floor,
+              unitNumber: unitIndex + 1,
+            })),
+          }
+        })
         : [],
     [canPreview, selectedBlock, unitsPerFloor]
   )
@@ -89,28 +90,30 @@ export default function GenerateFlatsDialog({
     (total, floor) => total + floor.flats.length,
     0
   )
-  const selectedFlatNumberSet = useMemo(
-    () => new Set(selectedFlatNumbers),
-    [selectedFlatNumbers]
+  const removedFlatNumberSet = useMemo(
+    () => new Set(removedFlatNumbers),
+    [removedFlatNumbers]
   )
   const selectedFlats = useMemo(
     () =>
       flatPreview
         .flatMap((floor) => floor.flats)
-        .filter((flat) => selectedFlatNumberSet.has(flat.flatNumber)),
-    [flatPreview, selectedFlatNumberSet]
+        .filter((flat) => !removedFlatNumberSet.has(flat.flatNumber)),
+    [flatPreview, removedFlatNumberSet]
   )
   const removedFlatCount = totalPreviewCount - selectedFlats.length
 
-  useEffect(() => {
-    queueMicrotask(() => {
-      setSelectedFlatNumbers(
-        flatPreview.flatMap((floor) =>
-          floor.flats.map((flat) => flat.flatNumber)
-        )
-      )
-    })
-  }, [flatPreview])
+  const [prevParams, setPrevParams] = useState({
+    blockId: selectedBlockId,
+    units: unitsPerFloorValue,
+  })
+  if (
+    prevParams.blockId !== selectedBlockId ||
+    prevParams.units !== unitsPerFloorValue
+  ) {
+    setPrevParams({ blockId: selectedBlockId, units: unitsPerFloorValue })
+    setRemovedFlatNumbers([])
+  }
 
   const blockOptions = useMemo(
     () =>
@@ -129,7 +132,7 @@ export default function GenerateFlatsDialog({
     if (generateFlats.isPending) return
 
     reset()
-    setSelectedFlatNumbers([])
+    setRemovedFlatNumbers([])
     setFormError("")
     clearErrors()
     onClose()
@@ -145,7 +148,7 @@ export default function GenerateFlatsDialog({
       setFormError("")
       const excludedUnits = flatPreview
         .flatMap((floor) => floor.flats)
-        .filter((flat) => !selectedFlatNumberSet.has(flat.flatNumber))
+        .filter((flat) => removedFlatNumberSet.has(flat.flatNumber))
         .map((flat) => ({
           floor: flat.floorNumber,
           unit: flat.unitNumber,
@@ -159,7 +162,7 @@ export default function GenerateFlatsDialog({
 
       toast.success(`${result.generatedCount} flats generated successfully`)
       reset()
-      setSelectedFlatNumbers([])
+      setRemovedFlatNumbers([])
       clearErrors()
       onClose()
     } catch (error) {
@@ -171,21 +174,23 @@ export default function GenerateFlatsDialog({
   }
 
   const resetSelectedFlats = () => {
-    setSelectedFlatNumbers(
-      flatPreview.flatMap((floor) =>
-        floor.flats.map((flat) => flat.flatNumber)
-      )
-    )
+    setRemovedFlatNumbers([])
   }
 
   const removeFlat = (flatNumber: string) => {
-    setSelectedFlatNumbers((currentFlatNumbers) =>
-      currentFlatNumbers.filter((currentFlatNumber) => currentFlatNumber !== flatNumber)
+    setRemovedFlatNumbers((currentFlatNumbers) =>
+      currentFlatNumbers.includes(flatNumber)
+        ? currentFlatNumbers
+        : [...currentFlatNumbers, flatNumber]
     )
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4 py-4">
+    <Portal>
+      <div
+        style={{ zIndex: 1000 }}
+        className="fixed inset-0 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm overflow-y-auto"
+      >
       <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-[640px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
           <div className="min-w-0">
@@ -308,7 +313,7 @@ export default function GenerateFlatsDialog({
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {floor.flats.map((flat) => {
-                          const isSelected = selectedFlatNumberSet.has(
+                          const isSelected = !removedFlatNumberSet.has(
                             flat.flatNumber
                           )
 
@@ -318,11 +323,10 @@ export default function GenerateFlatsDialog({
                               type="button"
                               onClick={() => removeFlat(flat.flatNumber)}
                               disabled={!isSelected || generateFlats.isPending}
-                              className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold transition disabled:cursor-not-allowed ${
-                                isSelected
+                              className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold transition disabled:cursor-not-allowed ${isSelected
                                   ? "border-slate-200 bg-white text-slate-700 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
                                   : "border-slate-200 bg-slate-100 text-slate-400 line-through"
-                              }`}
+                                }`}
                               title={
                                 isSelected
                                   ? `Remove ${flat.flatNumber}`
@@ -368,5 +372,6 @@ export default function GenerateFlatsDialog({
         </form>
       </div>
     </div>
-  )
+  </Portal>
+)
 }

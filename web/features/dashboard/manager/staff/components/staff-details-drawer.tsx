@@ -18,6 +18,7 @@ import {
 import { toast } from "sonner"
 
 import { staffRoleOptions } from "../api/staff.api"
+import { Portal } from "@/components/portal"
 import {
   useStaffDetailsQuery,
   useUpdateStaffMutation,
@@ -156,15 +157,19 @@ export default function StaffDetailsDrawer({
   }
 
   return (
-    <>
+    <Portal>
       <button
         type="button"
         aria-label="Close drawer"
         onClick={onClose}
-        className="fixed inset-0 z-40 bg-slate-950/20 lg:hidden"
+        style={{ zIndex: 999 }}
+        className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm transition-opacity"
       />
 
-      <aside className="fixed right-0 top-0 z-50 flex h-screen w-full max-w-[440px] flex-col border-l border-slate-200 bg-white shadow-[-12px_0_40px_rgba(15,23,42,0.08)]">
+      <aside
+        style={{ zIndex: 1000, height: "100dvh" }}
+        className="fixed right-0 top-0 bottom-0 flex h-full max-h-screen w-full max-w-[440px] flex-col border-l border-slate-200 bg-white shadow-2xl animate-in slide-in-from-right duration-200"
+      >
         <div className="flex h-[70px] shrink-0 items-center justify-between border-b border-slate-200 px-6">
           <h2 className="text-lg font-semibold text-slate-900">
             {mode === "edit" ? "Edit Staff" : "Staff Details"}
@@ -413,7 +418,7 @@ export default function StaffDetailsDrawer({
           </div>
         )}
       </aside>
-    </>
+    </Portal>
   )
 }
 

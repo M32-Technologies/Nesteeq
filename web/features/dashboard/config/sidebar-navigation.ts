@@ -265,6 +265,11 @@ export const sidebarNavigation: Record<
           href: "/dashboard/reports",
           icon: BarChart3,
         },
+        {
+          title: "Announcements",
+          href: "/dashboard/announcements",
+          icon: Bell,
+        },
       ],
     },
   ],
@@ -289,11 +294,6 @@ export const sidebarNavigation: Record<
           icon: Package,
         },
         {
-          title: "Parking Slots",
-          href: "/dashboard/parking",
-          icon: Car,
-        },
-        {
           title: "Emergency / SOS Alerts",
           href: "/dashboard/alerts",
           icon: MessageSquareWarning,
@@ -302,6 +302,11 @@ export const sidebarNavigation: Record<
           title: "Residents Directory",
           href: "/dashboard/residents",
           icon: UserRound,
+        },
+        {
+          title: "Announcements",
+          href: "/dashboard/announcements",
+          icon: Bell,
         },
       ],
     },

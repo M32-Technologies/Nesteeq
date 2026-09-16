@@ -5,7 +5,7 @@ import { Eye, Search } from "lucide-react"
 
 import { useDebouncedValue } from "../hooks/useDebouncedValue"
 import { useSecurityResidents } from "../hooks/useSecurityData"
-import type { SecurityResidentDirectoryRecord } from "../services/security.interface"
+import type { SecurityResidentDirectoryRecord } from "../schemas/security"
 import {
   DetailGrid,
   DetailModal,
@@ -102,7 +102,7 @@ export function ResidentsDirectory() {
                   <tr key={resident._id}>
                     <td className={tdClassName}>
                       <p className="font-medium">
-                        {resident.name || resident.userId}
+                        {resident.name || "Unnamed Resident"}
                       </p>
                       {resident.email ? (
                         <p className="text-xs text-[#637083]">
@@ -111,7 +111,7 @@ export function ResidentsDirectory() {
                       ) : null}
                     </td>
                     <td className={tdClassName}>
-                      {resident.flatNumber || resident.flatId}
+                      {resident.flatNumber || "-"}
                     </td>
                     <td className={tdClassName}>
                       {resident.phone || "-"}
@@ -156,7 +156,7 @@ export function ResidentsDirectory() {
 
       {selectedResident ? (
         <DetailModal
-          title={selectedResident.name ?? selectedResident.userId}
+          title={selectedResident.name ?? "-"}
           subtitle="Read-only resident details"
           onClose={() => setSelectedResident(null)}
         >
@@ -164,15 +164,11 @@ export function ResidentsDirectory() {
             items={[
               {
                 label: "Resident Name",
-                value:
-                  selectedResident.name ??
-                  selectedResident.userId,
+                value: selectedResident.name ?? "-",
               },
               {
                 label: "Flat / Unit",
-                value:
-                  selectedResident.flatNumber ??
-                  selectedResident.flatId,
+                value: selectedResident.flatNumber ?? "-",
               },
               {
                 label: "Phone",

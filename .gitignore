@@ -27,3 +27,4 @@ Thumbs.db
 
 # AI agent configs (local only)
 .agents/
+skills-lock.json

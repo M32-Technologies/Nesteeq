@@ -29,7 +29,7 @@ const router = express.Router()
 const managerOnly = requireRole("property_manager")
 router.get("/validate/:token", zodValidate(validateInvitationParamSchema), validateInvitationHandler)
 
-router.post("/:token/accept", protect , zodValidate(acceptInvitationParamSchema), acceptInvitationHandler)
+router.post("/:token/accept", protect, zodValidate(acceptInvitationParamSchema), acceptInvitationHandler)
 
 router.post("/residents", protect, managerOnly, zodValidate(createResidentInviteSchema), createResidentInviteHandler)
 
@@ -41,6 +41,6 @@ router.patch("/:id/revoke", protect, managerOnly, zodValidate(invitationIdParamS
 
 // excel importing means buik 
 
-router.get("/residents/template" ,getResidentExcelTemplate)
-router.post("/residents/bulk-invite" , protect , uploadInviteFile, bulkCreateInvitationsHandler  )
-export default router 
+router.get("/residents/template", getResidentExcelTemplate)
+router.post("/residents/bulk-invite", protect, uploadInviteFile, bulkCreateInvitationsHandler)
+export default router

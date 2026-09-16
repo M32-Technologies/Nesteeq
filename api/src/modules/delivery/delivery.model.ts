@@ -84,7 +84,7 @@ const securityDeliverySchema =
       status: {
         type: String,
         enum: Object.values(DeliveryStatus),
-        default: DeliveryStatus.WAITING,
+        default: DeliveryStatus.NOTIFIED,
         required: true,
         index: true,
       },

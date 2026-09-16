@@ -14,7 +14,7 @@ import {
   UserX,
 } from "lucide-react"
 
-import { useResidentsQuery } from "../hooks/use-residents-query"
+import { useBlocksQuery, useResidentsQuery } from "../hooks/use-residents-query"
 import type {
   ResidentStatus,
   ResidentType,
@@ -56,8 +56,17 @@ export default function UsersTableSection() {
     error,
   } = useResidentsQuery(params)
 
+  const { data: blocksData } = useBlocksQuery()
   const users = useMemo(() => data?.residents ?? [], [data?.residents])
-  const blockOptions = useMemo(() => getBlockOptions(users, blockId), [users, blockId])
+  const blockOptions = useMemo(() => {
+    if (blocksData && blocksData.length > 0) {
+      return blocksData.map((b) => ({
+        value: b.id,
+        label: b.name,
+      }))
+    }
+    return getBlockOptions(users, blockId)
+  }, [blocksData, users, blockId])
   const totalPages = data?.totalPages ?? 1
 
   const resetFilters = () => {
@@ -418,13 +427,13 @@ function getBlockOptions(users: ResidentUser[], selectedBlockId: string) {
   const blockOptions = new Map<string, string>()
 
   for (const user of users) {
-    if (user.blockId) {
+    if (user.blockId && user.block && user.block !== "-" && user.block !== user.blockId) {
       blockOptions.set(user.blockId, user.block)
     }
   }
 
   if (selectedBlockId !== "all" && !blockOptions.has(selectedBlockId)) {
-    blockOptions.set(selectedBlockId, selectedBlockId)
+    blockOptions.set(selectedBlockId, "Selected Block")
   }
 
   return Array.from(blockOptions.entries()).map(([value, label]) => ({
