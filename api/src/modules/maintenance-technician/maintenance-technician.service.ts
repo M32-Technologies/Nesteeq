@@ -1,4 +1,4 @@
-import { Types } from "mongoose"
+import mongoose, { Types } from "mongoose"
 
 import { AppError } from "../../utils/AppError.js"
 import { Complaint } from "../complaint/complaint.model.js"
@@ -85,7 +85,7 @@ const deriveFloor = (flat?: string | null): string => {
 }
 
 const buildTechnicianScope = (
-  technicianId?: string
+  technicianId: string
 ): Record<string, unknown> => {
   if (!technicianId) return {}
   return {
@@ -96,7 +96,20 @@ const buildTechnicianScope = (
   }
 }
 
-export const getDashboardStats = async (technicianId?: string) => {
+const buildJobLookupFilter = (
+  jobId: string,
+  technicianId: string
+): Record<string, unknown> => {
+  const idCondition = Types.ObjectId.isValid(jobId)
+    ? { _id: new Types.ObjectId(jobId) }
+    : { $or: [{ _id: jobId }, { jobId }] }
+
+  return {
+    $and: [idCondition, buildTechnicianScope(technicianId)],
+  }
+}
+
+export const getDashboardStats = async (technicianId: string) => {
   const scopeFilter = buildTechnicianScope(technicianId)
 
   const [totalAssigned, pending, inProgress, completed] = await Promise.all([
@@ -134,8 +147,8 @@ export const getDashboardStats = async (technicianId?: string) => {
 }
 
 export const getAssignedJobs = async (
-  status?: string,
-  technicianId?: string
+  status: string | undefined,
+  technicianId: string
 ): Promise<AssignedJob[]> => {
   const filter: Record<string, unknown> = {
     ...buildTechnicianScope(technicianId),
@@ -185,21 +198,14 @@ export const getAssignedJobs = async (
   })
 }
 
-export const getJobById = async (jobId: string): Promise<JobDetails> => {
-  let doc: any = null
-
-  if (Types.ObjectId.isValid(jobId)) {
-    doc = await Maintenance.findById(jobId).populate("complaint").lean()
-  }
-
-  if (!doc) {
-    doc = await Maintenance.findOne({
-      $or: [{ _id: jobId }, { jobId: jobId }],
-    })
-      .populate("complaint")
-      .lean()
-      .catch(() => null)
-  }
+export const getJobById = async (
+  jobId: string,
+  technicianId: string
+): Promise<JobDetails> => {
+  const query = buildJobLookupFilter(jobId, technicianId)
+  const doc: any = await Maintenance.findOne(query)
+    .populate("complaint")
+    .lean()
 
   if (!doc) {
     throw new AppError("Maintenance job not found", 404)
@@ -246,55 +252,71 @@ export const getJobById = async (jobId: string): Promise<JobDetails> => {
   }
 }
 
-export const startJob = async (jobId: string, technicianId?: string) => {
-  const query = Types.ObjectId.isValid(jobId) ? { _id: jobId } : { jobId }
+export const startJob = async (jobId: string, technicianId: string) => {
+  const query = buildJobLookupFilter(jobId, technicianId)
   const now = new Date()
 
-  const job = await Maintenance.findOneAndUpdate(
-    query,
-    {
-      $set: {
-        status: "IN_PROGRESS",
-        startedAt: now,
-        updatedBy: technicianId || "Technician",
-      },
-      $push: {
-        progressUpdates: {
-          details: "Maintenance work started by technician",
+  const session = await mongoose.startSession()
+  try {
+    session.startTransaction()
+
+    const job = await Maintenance.findOneAndUpdate(
+      query,
+      {
+        $set: {
           status: "IN_PROGRESS",
-          remarks: "Status changed to IN_PROGRESS",
-          by: technicianId || "Technician",
-          role: "maintenance_technician",
-          createdAt: now,
+          startedAt: now,
+          updatedBy: technicianId,
+        },
+        $push: {
+          progressUpdates: {
+            details: "Maintenance work started by technician",
+            status: "IN_PROGRESS",
+            remarks: "Status changed to IN_PROGRESS",
+            by: technicianId,
+            role: "maintenance_technician",
+            createdAt: now,
+          },
         },
       },
-    },
-    { new: true }
-  )
+      { new: true, session }
+    )
 
-  if (!job) {
-    throw new AppError("Maintenance job not found", 404)
-  }
+    if (!job) {
+      throw new AppError("Maintenance job not found", 404)
+    }
 
-  if (job.complaint) {
-    await Complaint.findByIdAndUpdate(job.complaint, {
-      $set: { status: "IN_PROGRESS" },
-    }).catch(() => null)
-  }
+    if (job.complaint) {
+      await Complaint.findByIdAndUpdate(
+        job.complaint,
+        {
+          $set: { status: "IN_PROGRESS" },
+        },
+        { session }
+      )
+    }
 
-  return {
-    success: true,
-    status: "IN_PROGRESS",
-    startedAt: now.toISOString(),
+    await session.commitTransaction()
+
+    return {
+      success: true,
+      status: "IN_PROGRESS",
+      startedAt: now.toISOString(),
+    }
+  } catch (error) {
+    await session.abortTransaction()
+    throw error
+  } finally {
+    await session.endSession()
   }
 }
 
 export const addProgressUpdate = async (
   jobId: string,
   message: string,
-  technicianId?: string
+  technicianId: string
 ) => {
-  const query = Types.ObjectId.isValid(jobId) ? { _id: jobId } : { jobId }
+  const query = buildJobLookupFilter(jobId, technicianId)
   const now = new Date()
 
   const job = await Maintenance.findOneAndUpdate(
@@ -305,19 +327,19 @@ export const addProgressUpdate = async (
           details: message,
           status: "IN_PROGRESS",
           remarks: message,
-          by: technicianId || "Technician",
+          by: technicianId,
           role: "maintenance_technician",
           createdAt: now,
         },
         workNotes: {
           message,
-          by: technicianId || "Technician",
+          by: technicianId,
           role: "maintenance_technician",
           createdAt: now,
         },
       },
       $set: {
-        updatedBy: technicianId || "Technician",
+        updatedBy: technicianId,
       },
     },
     { new: true }
@@ -336,12 +358,16 @@ export const addProgressUpdate = async (
 
 export const uploadEvidence = async (
   jobId: string,
-  file?: Express.Multer.File,
-  technicianId?: string
+  file: Express.Multer.File | undefined,
+  technicianId: string
 ) => {
-  const query = Types.ObjectId.isValid(jobId) ? { _id: jobId } : { jobId }
-  const filename = file?.filename || `evidence-${Date.now()}.jpg`
-  const originalname = file?.originalname || "evidence.jpg"
+  if (!file) {
+    throw new AppError("Evidence file is required", 400)
+  }
+
+  const query = buildJobLookupFilter(jobId, technicianId)
+  const filename = file.filename
+  const originalname = file.originalname || file.filename
   const fileUrl = `/uploads/${filename}`
   const now = new Date()
 
@@ -351,13 +377,13 @@ export const uploadEvidence = async (
       $push: {
         workNotes: {
           message: `Evidence uploaded: ${originalname} (${fileUrl})`,
-          by: technicianId || "Technician",
+          by: technicianId,
           role: "maintenance_technician",
           createdAt: now,
         },
       },
       $set: {
-        updatedBy: technicianId || "Technician",
+        updatedBy: technicianId,
       },
     },
     { new: true }
@@ -378,124 +404,156 @@ export const submitCost = async (
   jobId: string,
   amount: number,
   description: string,
-  technicianId?: string
+  technicianId: string
 ) => {
-  const query = Types.ObjectId.isValid(jobId) ? { _id: jobId } : { jobId }
+  const query = buildJobLookupFilter(jobId, technicianId)
   const now = new Date()
   const numAmount = Number(amount) || 0
 
-  const job = await Maintenance.findOneAndUpdate(
-    query,
-    {
-      $set: {
-        finalCost: numAmount,
-        costReview: {
-          status: "SUBMITTED",
-          submittedAmount: numAmount,
-          submittedBy: technicianId || "Technician",
-          submittedAt: now,
-          remarks: description || null,
+  const session = await mongoose.startSession()
+  try {
+    session.startTransaction()
+
+    const job = await Maintenance.findOneAndUpdate(
+      query,
+      {
+        $set: {
+          finalCost: numAmount,
+          costReview: {
+            status: "SUBMITTED",
+            submittedAmount: numAmount,
+            submittedBy: technicianId,
+            submittedAt: now,
+            remarks: description || null,
+          },
+          updatedBy: technicianId,
         },
-        updatedBy: technicianId || "Technician",
-      },
-      $push: {
-        workNotes: {
-          message: `Maintenance cost estimate submitted: ₹${numAmount}${
-            description ? ` - ${description}` : ""
-          }`,
-          by: technicianId || "Technician",
-          role: "maintenance_technician",
-          createdAt: now,
+        $push: {
+          workNotes: {
+            message: `Maintenance cost estimate submitted: ₹${numAmount}${
+              description ? ` - ${description}` : ""
+            }`,
+            by: technicianId,
+            role: "maintenance_technician",
+            createdAt: now,
+          },
         },
       },
-    },
-    { new: true }
-  )
+      { new: true, session }
+    )
 
-  if (!job) {
-    throw new AppError("Maintenance job not found", 404)
-  }
+    if (!job) {
+      throw new AppError("Maintenance job not found", 404)
+    }
 
-  if (job.complaint) {
-    await Complaint.findByIdAndUpdate(job.complaint, {
-      $set: { finalCost: numAmount },
-    }).catch(() => null)
-  }
+    if (job.complaint) {
+      await Complaint.findByIdAndUpdate(
+        job.complaint,
+        {
+          $set: { finalCost: numAmount },
+        },
+        { session }
+      )
+    }
 
-  return {
-    success: true,
-    amount: numAmount,
-    description,
-    submittedAt: now.toISOString(),
+    await session.commitTransaction()
+
+    return {
+      success: true,
+      amount: numAmount,
+      description,
+      submittedAt: now.toISOString(),
+    }
+  } catch (error) {
+    await session.abortTransaction()
+    throw error
+  } finally {
+    await session.endSession()
   }
 }
 
 export const completeJob = async (
   jobId: string,
   payload: { workSummary: string; notes?: string },
-  technicianId?: string
+  technicianId: string
 ) => {
-  const query = Types.ObjectId.isValid(jobId) ? { _id: jobId } : { jobId }
+  const query = buildJobLookupFilter(jobId, technicianId)
   const now = new Date()
 
-  const job = await Maintenance.findOneAndUpdate(
-    query,
-    {
-      $set: {
-        status: "COMPLETED",
-        completedAt: now,
-        completionDetails: {
-          details: payload.workSummary,
-          workNotes: payload.notes || null,
-          completedBy: technicianId || "Technician",
-          completedAt: now,
-        },
-        updatedBy: technicianId || "Technician",
-      },
-      $push: {
-        progressUpdates: {
-          details: `Work completed: ${payload.workSummary}`,
+  const session = await mongoose.startSession()
+  try {
+    session.startTransaction()
+
+    const job = await Maintenance.findOneAndUpdate(
+      query,
+      {
+        $set: {
           status: "COMPLETED",
-          remarks: payload.notes || null,
-          by: technicianId || "Technician",
-          role: "maintenance_technician",
-          createdAt: now,
-        },
-        workNotes: {
-          message: `Work completed: ${payload.workSummary}${
-            payload.notes ? ` - Notes: ${payload.notes}` : ""
-          }`,
-          by: technicianId || "Technician",
-          role: "maintenance_technician",
-          createdAt: now,
-        },
-      },
-    },
-    { new: true }
-  )
-
-  if (!job) {
-    throw new AppError("Maintenance job not found", 404)
-  }
-
-  if (job.complaint) {
-    await Complaint.findByIdAndUpdate(job.complaint, {
-      $set: {
-        status: "WORK_COMPLETED",
-        completionDetails: {
-          details: payload.workSummary,
-          completedBy: technicianId || "Technician",
           completedAt: now,
+          completionDetails: {
+            details: payload.workSummary,
+            workNotes: payload.notes || null,
+            completedBy: technicianId,
+            completedAt: now,
+          },
+          updatedBy: technicianId,
+        },
+        $push: {
+          progressUpdates: {
+            details: `Work completed: ${payload.workSummary}`,
+            status: "COMPLETED",
+            remarks: payload.notes || null,
+            by: technicianId,
+            role: "maintenance_technician",
+            createdAt: now,
+          },
+          workNotes: {
+            message: `Work completed: ${payload.workSummary}${
+              payload.notes ? ` - Notes: ${payload.notes}` : ""
+            }`,
+            by: technicianId,
+            role: "maintenance_technician",
+            createdAt: now,
+          },
         },
       },
-    }).catch(() => null)
-  }
+      { new: true, session }
+    )
 
-  return {
-    success: true,
-    status: "COMPLETED",
-    workSummary: payload.workSummary,
-    notes: payload.notes,
-    completedAt: now.toISOString(),
+    if (!job) {
+      throw new AppError("Maintenance job not found", 404)
+    }
+
+    if (job.complaint) {
+      await Complaint.findByIdAndUpdate(
+        job.complaint,
+        {
+          $set: {
+            status: "WORK_COMPLETED",
+            completionDetails: {
+              details: payload.workSummary,
+              completedBy: technicianId,
+              completedAt: now,
+            },
+          },
+        },
+        { session }
+      )
+    }
+
+    await session.commitTransaction()
+
+    return {
+      success: true,
+      status: "COMPLETED",
+      workSummary: payload.workSummary,
+      notes: payload.notes,
+      completedAt: now.toISOString(),
+    }
+  } catch (error) {
+    await session.abortTransaction()
+    throw error
+  } finally {
+    await session.endSession()
   }
 }
