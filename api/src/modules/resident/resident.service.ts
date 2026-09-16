@@ -125,7 +125,7 @@ export const getResident = async (data: ResidentListQuery, apartmentId: string) 
     }
 
     return {
-        residents: residents.map((resident) => {
+        residents: residents.map((resident: any) => {
             const user = resident.userId ? usersById.get(resident.userId) : null;
 
             return {

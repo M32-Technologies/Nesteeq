@@ -92,6 +92,24 @@ export default function InviteUsersPage() {
   const bulkInvite = useBulkCreateResidentInvitationsMutation()
   const downloadTemplate = useDownloadResidentInviteTemplateMutation()
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const role = params.get("role")
+    const blockId = params.get("blockId")
+    const flatId = params.get("flatId")
+
+    if (!role && !blockId && !flatId) return
+
+    queueMicrotask(() => {
+      setForm((current) => ({
+        ...current,
+        role: role === "owner" || role === "resident" ? role : current.role,
+        blockId: blockId || current.blockId,
+        flatId: blockId && flatId ? flatId : current.flatId,
+      }))
+    })
+  }, [])
+
   const selectedBlockName = useMemo(
     () => blocks.find((block) => block.id === form.blockId)?.name ?? "",
     [blocks, form.blockId]

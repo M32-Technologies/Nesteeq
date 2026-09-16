@@ -340,61 +340,34 @@ export default function ParkingTable({
             <span className="font-semibold text-slate-800">{endItem}</span> of{" "}
             <span className="font-semibold text-slate-800">{totalCount}</span> slots
           </div>
-
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span className="shrink-0 text-xs font-medium text-slate-500">
-                Sort by
-              </span>
-              <div className="relative w-[165px]">
-                <select
-                  value={sortOption}
-                  onChange={(event) =>
-                    onSortChange(event.target.value as ParkingSortOption)
-                  }
-                  className="h-8 w-full appearance-none rounded-lg border border-slate-300 bg-white pl-3 pr-8 text-xs font-medium text-slate-800 outline-none transition hover:border-slate-400"
-                >
-                  <option value="slot_asc">Slot number (A-Z)</option>
-                  <option value="slot_desc">Slot number (Z-A)</option>
-                  <option value="newest">Recently Updated</option>
-                  <option value="oldest">Oldest first</option>
-                </select>
-                <ChevronDown
-                  size={13}
-                  className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600"
-                />
-              </div>
+          {onViewModeChange && (
+            <div className="flex items-center rounded-lg border border-slate-300 bg-slate-100 p-0.5">
+              <button
+                type="button"
+                onClick={() => onViewModeChange("table")}
+                className={`flex h-8 w-8 items-center justify-center rounded-md transition ${
+                  viewMode === "table"
+                    ? "bg-[#0F5F45] text-white shadow-sm"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+                title="Table view"
+              >
+                <List size={15} />
+              </button>
+              <button
+                type="button"
+                onClick={() => onViewModeChange("grid")}
+                className={`flex h-8 w-8 items-center justify-center rounded-md transition ${
+                  viewMode === "grid"
+                    ? "bg-[#0F5F45] text-white shadow-sm"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+                title="Grid view"
+              >
+                <LayoutGrid size={15} />
+              </button>
             </div>
-
-            {onViewModeChange && (
-              <div className="flex items-center rounded-lg border border-slate-300 bg-slate-100 p-0.5">
-                <button
-                  type="button"
-                  onClick={() => onViewModeChange("table")}
-                  className={`flex h-8 w-8 items-center justify-center rounded-md transition ${
-                    viewMode === "table"
-                      ? "bg-[#0F5F45] text-white shadow-sm"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                  title="Table view"
-                >
-                  <List size={15} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onViewModeChange("grid")}
-                  className={`flex h-8 w-8 items-center justify-center rounded-md transition ${
-                    viewMode === "grid"
-                      ? "bg-[#0F5F45] text-white shadow-sm"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                  title="Grid view"
-                >
-                  <LayoutGrid size={15} />
-                </button>
-              </div>
-            )}
-          </div>
+          )}
         </div>
       </div>
 
@@ -487,97 +460,96 @@ export default function ParkingTable({
                                 {slot.slotNumber}
                               </button>
                               <p className="mt-0.5 truncate text-xs capitalize text-slate-500">
-                                {slot.vehicleType.toLowerCase()}
-                              </p>
-                            </div>
+                            {slot.vehicleType.toLowerCase()}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 align-middle text-sm font-medium text-slate-800">
+                      {slot.usageType === "RESIDENT" ? "Resident" : "Visitor"}
+                    </td>
+                    <td className="px-4 py-4 align-middle">
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeStyles[slot.status] ||
+                          "bg-slate-100 text-slate-700"
+                          }`}
+                      >
+                        {statusDisplay[slot.status] || slot.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 align-middle text-sm text-slate-700">
+                      <span className="font-medium text-slate-900">
+                        {slot.level || "-"}
+                      </span>
+                      {zoneDisplay && (
+                        <span className="block text-xs text-slate-500">
+                          Zone: {zoneDisplay}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 align-middle text-sm text-slate-600">
+                      {flatNumber ? (
+                        <div>
+                          <div className="font-medium text-slate-900">
+                            Flat {flatNumber}
                           </div>
-                        </td>
-                        <td className="px-4 py-4 align-middle text-sm font-medium text-slate-800">
-                          {slot.usageType === "RESIDENT" ? "Resident" : "Visitor"}
-                        </td>
-                        <td className="px-4 py-4 align-middle">
-                          <span
-                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                              statusBadgeStyles[slot.status] ||
-                              "bg-slate-100 text-slate-700"
-                            }`}
-                          >
-                            {statusDisplay[slot.status] || slot.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 align-middle text-sm text-slate-700">
-                          <span className="font-medium text-slate-900">
-                            {slot.level || "-"}
-                          </span>
-                          {zoneDisplay && (
-                            <span className="block text-xs text-slate-500">
-                              Zone: {zoneDisplay}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-4 align-middle text-sm text-slate-600">
-                          {flatNumber ? (
-                            <div>
-                              <div className="font-medium text-slate-900">
-                                Flat {flatNumber}
-                              </div>
-                              {residentPhone && (
-                                <div className="mt-0.5 text-xs text-slate-500">
-                                  {residentPhone}
-                                </div>
-                              )}
+                          {residentPhone && (
+                            <div className="mt-0.5 text-xs text-slate-500">
+                              {residentPhone}
                             </div>
-                          ) : (
-                            "-"
                           )}
-                        </td>
-                        <td className="px-4 py-4 align-middle text-sm text-slate-600">
-                          {slot.vehicleNumber ? (
-                            <span className="font-mono text-xs font-semibold text-slate-800">
-                              {slot.vehicleNumber}
-                            </span>
-                          ) : (
-                            "-"
-                          )}
-                        </td>
-                        <td className="px-4 py-4 align-middle text-sm font-medium text-slate-600">
-                          {formatDisplayDate(slot.updatedAt || slot.createdAt)}
-                        </td>
-                        <td className="px-6 py-4 text-right align-middle">
-                          <ActionsMenu
-                            slot={slot}
-                            open={openActionSlotId === slot._id}
-                            onToggle={() =>
-                              setOpenActionSlotId((current) =>
-                                current === slot._id ? null : slot._id
-                              )
-                            }
-                            onView={() => openViewDrawer(slot)}
-                            onEdit={() => {
-                              setEditSlot(slot)
-                              setOpenActionSlotId(null)
-                            }}
-                            onAssign={() => openAssignDrawer(slot)}
-                            onRelease={() => {
-                              setReleaseSlot(slot)
-                              setOpenActionSlotId(null)
-                            }}
-                            onStatus={() => handleToggleStatus(slot)}
-                          />
-                        </td>
-                      </tr>
-                    )
-                  })}
-              </tbody>
-            </table>
+                        </div>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                    <td className="px-4 py-4 align-middle text-sm text-slate-600">
+                      {slot.vehicleNumber ? (
+                        <span className="font-mono text-xs font-semibold text-slate-800">
+                          {slot.vehicleNumber}
+                        </span>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                    <td className="px-4 py-4 align-middle text-sm font-medium text-slate-600">
+                      {formatDisplayDate(slot.updatedAt || slot.createdAt)}
+                    </td>
+                    <td className="px-6 py-4 text-right align-middle">
+                      <ActionsMenu
+                        slot={slot}
+                        open={openActionSlotId === slot._id}
+                        onToggle={() =>
+                          setOpenActionSlotId((current) =>
+                            current === slot._id ? null : slot._id
+                          )
+                        }
+                        onView={() => openViewDrawer(slot)}
+                        onEdit={() => {
+                          setEditSlot(slot)
+                          setOpenActionSlotId(null)
+                        }}
+                        onAssign={() => openAssignDrawer(slot)}
+                        onRelease={() => {
+                          setReleaseSlot(slot)
+                          setOpenActionSlotId(null)
+                        }}
+                        onStatus={() => handleToggleStatus(slot)}
+                      />
+                    </td>
+                  </tr>
+                )
+              })}
+          </tbody>
+        </table>
 
-            {!isLoading && slots.length === 0 && (
-              <EmptyState hasActiveFilters={hasActiveFilters} onClearFilters={onClearFilters} />
-            )}
-          </div>
-          {renderPagination()}
-        </div>
-      )}
+        {!isLoading && slots.length === 0 && (
+          <EmptyState hasActiveFilters={hasActiveFilters} onClearFilters={onClearFilters} />
+        )}
+      </div>
+      {renderPagination()}
+      </div>
+    )}
 
       {editSlot && (
         <EditSlotDialog slot={editSlot} onClose={() => setEditSlot(null)} />

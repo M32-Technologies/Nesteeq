@@ -331,11 +331,7 @@ export const sidebarNavigation: Record<
           href: "/dashboard/completed",
           icon: ClipboardList,
         },
-        {
-          title: "Schedule",
-          href: "/dashboard/schedule",
-          icon: CalendarDays,
-        },
+       
       ],
     },
   ],

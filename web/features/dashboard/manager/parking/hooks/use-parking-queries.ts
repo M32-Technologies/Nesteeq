@@ -44,11 +44,18 @@ export function useParkingSlotDetailsQuery(parkingId: string | null) {
   })
 }
 
-export function useParkingStatsQuery() {
-  return useQuery({
-    queryKey: PARKING_QUERY_KEYS.stats(),
-    queryFn: getParkingStats,
-    staleTime: 30 * 1000,
+  return useMutation({
+    mutationFn: (payload: GenerateParkingSlotsPayload) =>
+      generateParkingSlots(payload),
+    onSuccess: (data) => {
+      toast.success((data as { message?: string })?.message || "Parking slots generated successfully")
+      queryClient.invalidateQueries({ queryKey: PARKING_QUERY_KEYS.all })
+    },
+    onError: (error: unknown) => {
+      toast.error(
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to generate parking slots"
+      )
+    },
   })
 }
 
@@ -67,8 +74,10 @@ export function useUpdateParkingSlotMutation() {
       toast.success(`Slot ${data.slotNumber} updated successfully`)
       queryClient.invalidateQueries({ queryKey: PARKING_QUERY_KEYS.all })
     },
-    onError: (error: Error) => {
-      toast.error(error.message || "Failed to update parking slot")
+    onError: (error: unknown) => {
+      toast.error(
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to update parking slot"
+      )
     },
   })
 }
@@ -92,62 +101,10 @@ export function useUpdateParkingStatusMutation() {
       toast.success(message)
       queryClient.invalidateQueries({ queryKey: PARKING_QUERY_KEYS.all })
     },
-    onError: (error: Error) => {
-      toast.error(error.message || "Failed to update parking slot status")
-    },
-  })
-}
-
-export function useAssignResidentParkingMutation() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: ({
-      parkingId,
-      input,
-    }: {
-      parkingId: string
-      input: AssignResidentParkingInput
-    }) => assignResidentParking(parkingId, input),
-    onSuccess: (data) => {
-      toast.success(`Slot ${data.slotNumber} assigned successfully`)
-      queryClient.invalidateQueries({ queryKey: PARKING_QUERY_KEYS.all })
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || "Failed to assign resident parking")
-    },
-  })
-}
-
-export function useReleaseResidentParkingMutation() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: (parkingId: string) => releaseResidentParking(parkingId),
-    onSuccess: (data) => {
-      toast.success(`Slot ${data.slotNumber} released successfully`)
-      queryClient.invalidateQueries({ queryKey: PARKING_QUERY_KEYS.all })
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || "Failed to release parking slot")
-    },
-  })
-}
-
-export function useGenerateParkingSlotsMutation() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: (input: GenerateParkingSlotsInput) =>
-      generateParkingSlots(input),
-    onSuccess: (data) => {
-      toast.success(
-        `${data.totalSlotsGenerated} parking slots generated successfully`
+    onError: (error: unknown) => {
+      toast.error(
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to update parking status"
       )
-      queryClient.invalidateQueries({ queryKey: PARKING_QUERY_KEYS.all })
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || "Failed to generate parking slots")
     },
   })
 }
