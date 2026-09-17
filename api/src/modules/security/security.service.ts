@@ -17,11 +17,7 @@ import {
   type ParkingSummary,
   type VisitorParkingSlotStatus as VisitorParkingSlotStatusType,
 } from "../parking/parking.interface.js"
-import {
-  ParkingSlotModel,
-  VisitorParkingAssignmentModel,
-  VisitorParkingSlotModel,
-} from "../parking/parking.model.js"
+import { ParkingSlotModel } from "../parking/parking.model.js"
 import { ResidentModel } from "../resident/resident.model.js"
 import {
   GuestPassModel,
@@ -235,10 +231,10 @@ const getTodayRange = () => {
 
 export const getSecurityActivityService = async ({ apartmentId, limit = 8 }: SecurityActivityQuery) => {
   const mId = toMongoId(apartmentId)
-  const [visits, deliveries, parkings, alerts] = await Promise.all([
+  const [visits, deliveries, parkingVisits, alerts] = await Promise.all([
     VisitorVisitModel.find({ apartmentId: mId }).sort({ checkedInAt: -1 }).limit(limit).lean(),
     SecurityDeliveryModel.find({ apartmentId: mId }).sort({ receivedAt: -1 }).limit(limit).lean(),
-    VisitorParkingAssignmentModel.find({ apartmentId: mId }).sort({ assignedAt: -1 }).limit(limit).lean(),
+    VisitorVisitModel.find({ apartmentId: mId, parkingSlotId: { $ne: null } }).sort({ checkedInAt: -1 }).limit(limit).lean(),
     EmergencyAlertModel.find({ apartmentId: mId }).sort({ triggeredAt: -1 }).limit(limit).lean(),
   ])
 
@@ -247,18 +243,16 @@ export const getSecurityActivityService = async ({ apartmentId, limit = 8 }: Sec
     ...deliveries.map((d) => toId(d.flatId)),
     ...alerts.map((a) => toId(a.flatId)),
   ].filter(Boolean)))
-  const slotIds = parkings.map((p) => toId(p.slotId)).filter(Boolean)
+  const slotIds = parkingVisits.map((p) => toId(p.parkingSlotId)).filter(Boolean)
 
-  const [flats, visitorSlots, managerSlots] = await Promise.all([
+  const [flats, managerSlots] = await Promise.all([
     flatIds.length ? Flat.find({ _id: { $in: flatIds } }).select("_id flatNumber").lean<{ _id: Types.ObjectId; flatNumber: string }[]>() : [],
-    slotIds.length ? VisitorParkingSlotModel.find({ _id: { $in: slotIds } }).select("_id slotNumber").lean<{ _id: Types.ObjectId; slotNumber: string }[]>() : [],
     slotIds.length ? ParkingSlotModel.find({ _id: { $in: slotIds } }).select("_id slotNumber").lean<{ _id: Types.ObjectId; slotNumber: string }[]>() : [],
   ])
 
   const flatMap = new Map(flats.map((f) => [toId(f._id), f.flatNumber]))
   const slotMap = new Map([
     ...managerSlots.map((s) => [toId(s._id), s.slotNumber] as const),
-    ...visitorSlots.map((s) => [toId(s._id), s.slotNumber] as const),
   ])
 
   const descFlat = (primary: string, fId: unknown) => {
@@ -338,29 +332,29 @@ export const getSecurityActivityService = async ({ apartmentId, limit = 8 }: Sec
     }
   }
 
-  for (const p of parkings) {
+  for (const p of parkingVisits) {
     const entId = toId(p._id)
-    const slotNo = slotMap.get(toId(p.slotId)) ?? "Visitor Parking"
-    const desc = `${slotNo} - ${p.vehicleNumber}`
+    const slotNo = p.parkingSlotId ? (slotMap.get(toId(p.parkingSlotId)) ?? "Visitor Parking") : "Visitor Parking"
+    const desc = `${slotNo} - ${p.vehicleNumber || p.visitorName}`
     events.push({
       id: `${entId}-assigned`,
       type: "PARKING_ASSIGNED",
       title: "Parking Assigned",
       description: desc,
-      timestamp: p.assignedAt,
+      timestamp: p.checkedInAt,
       status: VisitorParkingSlotStatus.OCCUPIED,
       relatedEntityId: entId,
       actionLabel: "View Parking",
       href: "/security/parking",
     })
-    if (p.releasedAt) {
+    if (p.checkedOutAt) {
       events.push({
         id: `${entId}-released`,
         type: "PARKING_RELEASED",
         title: "Parking Released",
         description: desc,
-        timestamp: p.releasedAt,
-        status: p.status === VisitorParkingAssignmentStatus.RELEASED ? VisitorParkingSlotStatus.AVAILABLE : p.status,
+        timestamp: p.checkedOutAt,
+        status: VisitorParkingSlotStatus.AVAILABLE,
         relatedEntityId: entId,
         actionLabel: "View Parking",
         href: "/security/parking",
@@ -401,25 +395,12 @@ export const getSecurityActivityService = async ({ apartmentId, limit = 8 }: Sec
 
 const getSecurityVisitorParkingSummary = async (apartmentId: string): Promise<ParkingSummary> => {
   const aptId = toObjectId(apartmentId, "apartment context")
-  const [legacy, manager] = await Promise.all([
-    VisitorParkingSlotModel.aggregate<{ _id: VisitorParkingSlotStatusType; count: number }>([
-      { $match: { apartmentId: aptId } },
-      { $group: { _id: "$status", count: { $sum: 1 } } },
-    ]),
-    ParkingSlotModel.aggregate<{ _id: IParkingSlot["status"]; count: number }>([
-      { $match: { apartmentId: aptId, usageType: ParkingUsageType.VISITOR } },
-      { $group: { _id: "$status", count: { $sum: 1 } } },
-    ]),
+  const rows = await ParkingSlotModel.aggregate<{ _id: IParkingSlot["status"]; count: number }>([
+    { $match: { apartmentId: aptId, usageType: ParkingUsageType.VISITOR } },
+    { $group: { _id: "$status", count: { $sum: 1 } } },
   ])
   const summary: ParkingSummary = { totalVisitorSlots: 0, available: 0, occupied: 0, reserved: 0, unavailable: 0 }
-  for (const { _id, count } of legacy) {
-    summary.totalVisitorSlots += count
-    if (_id === VisitorParkingSlotStatus.AVAILABLE) summary.available += count
-    if (_id === VisitorParkingSlotStatus.OCCUPIED) summary.occupied += count
-    if (_id === VisitorParkingSlotStatus.RESERVED) summary.reserved += count
-    if (_id === VisitorParkingSlotStatus.UNAVAILABLE) summary.unavailable += count
-  }
-  for (const { _id, count } of manager) {
+  for (const { _id, count } of rows) {
     summary.totalVisitorSlots += count
     if (_id === ParkingSlotStatus.AVAILABLE) summary.available += count
     else if (_id === ParkingSlotStatus.INACTIVE) summary.unavailable += count

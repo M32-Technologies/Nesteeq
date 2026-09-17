@@ -39,6 +39,14 @@ export function DeliveryDetails({
             value: delivery.flatNumber ?? "-",
           },
           {
+            label: "Resident",
+            value: delivery.residentName ?? "-",
+          },
+          {
+            label: "Resident Phone",
+            value: delivery.residentPhone ?? "-",
+          },
+          {
             label: "Delivery Person",
             value: delivery.deliveryPersonName ?? "-",
           },

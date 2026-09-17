@@ -35,7 +35,6 @@ export interface ISecurityDelivery {
   deliveryCompany: string
   deliveryPersonName?: string | null
   deliveryPersonPhone?: string | null
-  trackingId?: string | null
   packageDescription?: string | null
   notes?: string | null
   status: DeliveryStatus

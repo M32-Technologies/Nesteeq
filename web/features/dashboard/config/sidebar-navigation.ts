@@ -164,6 +164,11 @@ export const sidebarNavigation: Record<
           href: "/dashboard/parking",
           icon: Car,
         },
+        {
+          title: "Deliveries",
+          href: "/dashboard/deliveries",
+          icon: Package,
+        },
       ],
     },
     {

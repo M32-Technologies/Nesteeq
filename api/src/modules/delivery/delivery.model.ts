@@ -60,13 +60,6 @@ const securityDeliverySchema =
         default: null,
       },
 
-      trackingId: {
-        type: String,
-        trim: true,
-        maxlength: 80,
-        default: null,
-      },
-
       packageDescription: {
         type: String,
         trim: true,
@@ -145,11 +138,6 @@ securityDeliverySchema.index({
   apartmentId: 1,
   flatId: 1,
   receivedAt: -1,
-})
-
-securityDeliverySchema.index({
-  apartmentId: 1,
-  trackingId: 1,
 })
 
 export const SecurityDeliveryModel: Model<ISecurityDelivery> =

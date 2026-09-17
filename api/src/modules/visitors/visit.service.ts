@@ -3,10 +3,10 @@ import QRCode from "qrcode"
 import { Types, type PipelineStage } from "mongoose"
 
 import { Flat } from "../flat/flat.model.js"
-import { normalizeVehicleNumber, releaseSecurityVisitorParkingSlot } from "../parking/parking.service.js"
+import { normalizeVehicleNumber } from "../parking/parking.service.js"
 import { ResidentModel } from "../resident/resident.model.js"
-import { VisitorParkingAssignmentStatus } from "../parking/parking.interface.js"
-import { ParkingSlotModel, VisitorParkingAssignmentModel, VisitorParkingSlotModel } from "../parking/parking.model.js"
+import { ParkingSlotStatus } from "../parking/parking.interface.js"
+import { ParkingSlotModel } from "../parking/parking.model.js"
 import {
   GuestPassModel,
   GuestPassStatus,
@@ -86,21 +86,33 @@ export const releaseActiveParkingForVisit = async ({
 }: {
   apartmentId: string; userId: string; visitId: string; releasedAt: Date
 }): Promise<ReleasedParkingAssignment | null> => {
-  const assignment = await VisitorParkingAssignmentModel.findOneAndUpdate(
-    { apartmentId, visitorVisitId: visitId, status: VisitorParkingAssignmentStatus.ACTIVE },
-    { $set: { status: VisitorParkingAssignmentStatus.RELEASED, releasedBy: userId, releasedAt } },
-    { new: true }
-  )
-  if (!assignment) return null
-  const released = await releaseSecurityVisitorParkingSlot(apartmentId, assignment.slotId.toString())
-  if (!released) {
-    await VisitorParkingAssignmentModel.updateOne(
-      { _id: assignment._id, apartmentId },
-      { $set: { status: VisitorParkingAssignmentStatus.ACTIVE, releasedBy: null, releasedAt: null } }
-    )
-    throw new AppError("Unable to release visitor parking slot", 500)
-  }
-  return { assignmentId: assignment._id.toString(), slotId: assignment.slotId.toString() }
+  const aptObjectId = new Types.ObjectId(apartmentId)
+  const visitObjectId = new Types.ObjectId(visitId)
+
+  const slot = await ParkingSlotModel.findOneAndUpdate(
+    {
+      apartmentId: aptObjectId,
+      visitorVisitId: visitObjectId,
+      status: ParkingSlotStatus.OCCUPIED,
+    },
+    {
+      $set: {
+        status: ParkingSlotStatus.AVAILABLE,
+        flatId: null,
+        residentId: null,
+        visitorId: null,
+        visitorVisitId: null,
+        visitorName: null,
+        vehicleNumber: null,
+        assignedBy: null,
+        assignedAt: null,
+        notes: null,
+      },
+    }
+  ).lean()
+
+  if (!slot) return null
+  return { assignmentId: slot._id.toString(), slotId: slot._id.toString() }
 }
 
 // --- Guest Pass Services ---
@@ -224,20 +236,36 @@ export const getVisitorRecordsService = async ({
   const parkingLookup: PipelineStage[] = [
     {
       $lookup: {
-        from: VisitorParkingAssignmentModel.collection.name,
-        let: { visitId: "$_id", aptId: "$apartmentId" },
-        pipeline: [
-          { $match: { $expr: { $and: [{ $eq: ["$visitorVisitId", "$$visitId"] }, { $eq: ["$apartmentId", "$$aptId"] }] } } },
-          { $sort: { assignedAt: -1 } },
-          { $limit: 1 },
-          { $lookup: { from: VisitorParkingSlotModel.collection.name, localField: "slotId", foreignField: "_id", as: "slot" } },
-          { $lookup: { from: ParkingSlotModel.collection.name, localField: "slotId", foreignField: "_id", as: "mSlot" } },
-          { $set: { slot: { $ifNull: [{ $arrayElemAt: ["$slot", 0] }, { $arrayElemAt: ["$mSlot", 0] }] } } },
-        ],
-        as: "parking",
+        from: ParkingSlotModel.collection.name,
+        localField: "parkingSlotId",
+        foreignField: "_id",
+        as: "parkingSlot",
       },
     },
-    { $unwind: { path: "$parking", preserveNullAndEmptyArrays: true } },
+    { $unwind: { path: "$parkingSlot", preserveNullAndEmptyArrays: true } },
+    {
+      $addFields: {
+        parking: {
+          $cond: {
+            if: { $ifNull: ["$parkingSlot", false] },
+            then: {
+              _id: "$parkingSlot._id",
+              slotId: "$parkingSlot._id",
+              slotNumber: "$parkingSlot.slotNumber",
+              vehicleNumber: "$vehicleNumber",
+              vehicleType: "$vehicleType",
+              status: "$status",
+              assignedAt: "$checkedInAt",
+              assignedBy: "$checkedInBy",
+              releasedAt: "$checkedOutAt",
+              releasedBy: "$checkedOutBy",
+              slot: "$parkingSlot",
+            },
+            else: null,
+          },
+        },
+      },
+    },
   ]
 
   const searchStage: PipelineStage.Match[] = sRegex
