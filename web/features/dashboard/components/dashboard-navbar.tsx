@@ -1,8 +1,9 @@
 "use client"
 
 import Image from "next/image"
+import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Bell, Menu, UserRound } from "lucide-react"
+import { Bell, Menu, ShieldAlert, UserRound } from "lucide-react"
 
 import {
   dashboardRoleLabels,
@@ -129,6 +130,35 @@ export default function DashboardNavbar({
 
       {/* RIGHT — notifications + profile */}
       <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+
+        {/* Resident Emergency SOS Button */}
+        {role === "resident" && (
+          <Link
+            href="/resident/alerts"
+            aria-label="Emergency SOS Alert"
+            className="
+              inline-flex
+              h-9
+              items-center
+              gap-1.5
+              rounded-xl
+              bg-red-600
+              px-2.5
+              text-xs
+              font-bold
+              text-white
+              shadow-xs
+              transition-all
+              hover:bg-red-700
+              active:scale-95
+              sm:px-3
+            "
+          >
+            <ShieldAlert className="size-4 animate-pulse text-white" />
+            <span className="hidden sm:inline tracking-wide">Emergency SOS</span>
+            <span className="sm:hidden">SOS</span>
+          </Link>
+        )}
 
         {/* Notification bell */}
         <button

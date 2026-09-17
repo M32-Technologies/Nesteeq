@@ -373,6 +373,12 @@ export default function DashboardSidebar({
                             {item.title}
                           </span>
 
+                          {item.badge && (
+                            <span className="mr-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#3D91FF] text-white">
+                              {item.badge}
+                            </span>
+                          )}
+
                           <ChevronRight
                             className={`
                             mr-3

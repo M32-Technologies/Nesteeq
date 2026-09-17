@@ -201,7 +201,11 @@ export const createEmergencyAlertService = async ({
   let resolvedResidentId = residentId
   let resolvedFlatId = flatId
 
-  if (normalizedRole === "resident") {
+  if (
+    normalizedRole === "resident" ||
+    normalizedRole === "owner" ||
+    normalizedRole === "tenant"
+  ) {
     const resident = await ResidentModel.findOne({
       userId,
       apartmentId,
@@ -217,6 +221,26 @@ export const createEmergencyAlertService = async ({
 
     resolvedResidentId = resident._id.toString()
     resolvedFlatId = resident.flatId.toString()
+  } else if (!resolvedResidentId || !resolvedFlatId) {
+    const resident = await ResidentModel.findOne({
+      userId,
+      apartmentId,
+      status: "active",
+    })
+
+    if (resident) {
+      resolvedResidentId = resident._id.toString()
+      resolvedFlatId = resident.flatId.toString()
+    } else {
+      const anyResident = await ResidentModel.findOne({
+        apartmentId,
+        status: "active",
+      })
+      if (anyResident) {
+        resolvedResidentId = anyResident._id.toString()
+        resolvedFlatId = anyResident.flatId.toString()
+      }
+    }
   }
 
   if (!resolvedResidentId || !resolvedFlatId) {
