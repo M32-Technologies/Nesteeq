@@ -193,3 +193,31 @@ export const broadcastEmergency = async (
 
   return response.data.data;
 };
+
+export const getResidentFeed = async (): Promise<AnnouncementItem[]> => {
+  try {
+    const response = await api.get<ApiResponse<AnnouncementItem[]>>(
+      "/api/v1/announcements/resident-feed"
+    );
+
+    if (response.data.success && Array.isArray(response.data.data)) {
+      return response.data.data;
+    }
+  } catch {
+    // If resident-feed is restricted or empty, fallback to published notices from general announcements endpoint
+    try {
+      const fallback = await api.get<ApiResponse<GetAnnouncementsApiResponse>>(
+        "/api/v1/announcements",
+        { params: { status: "PUBLISHED" } }
+      );
+      if (fallback.data.success && Array.isArray(fallback.data.data?.announcements)) {
+        return fallback.data.data.announcements.filter(
+          (a) => a.status === "PUBLISHED"
+        );
+      }
+    } catch {
+      // Fallback failed
+    }
+  }
+  return [];
+};
