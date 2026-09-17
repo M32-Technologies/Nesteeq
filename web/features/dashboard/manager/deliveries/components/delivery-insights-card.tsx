@@ -16,11 +16,11 @@ interface DeliveryInsightsCardProps {
   isLoading?: boolean
 }
 
-// Color palette matching the user's reference screenshot
+// Unified color palette matching Deliveries Overview (Green = Delivered, Blue = Pending, Rose = Returned)
 const colors = {
   delivered: "#10B981", // Emerald green
-  pending: "#93C5FD",   // Sky blue
-  returned: "#FCA5A5",  // Soft rose coral
+  pending: "#60A5FA",   // Vibrant sky blue
+  returned: "#F87171",  // Coral rose
 }
 
 interface CustomTooltipProps {
@@ -104,7 +104,7 @@ export default function DeliveryInsightsCard({
       {/* Main Body: Donut chart on left, Metrics list on right */}
       <div className="flex flex-1 items-center justify-between gap-4 py-1">
         {/* Donut Chart with Centered Total Number (enlarged & prominent) */}
-        <div className="relative size-[195px] shrink-0">
+        <div className="relative size-[195px] shrink-0 outline-none select-none [&_.recharts-surface]:outline-none [&_.recharts-wrapper]:outline-none [&_.recharts-layer]:outline-none [&_svg]:outline-none">
           {isLoading ? (
             <div className="flex h-full w-full items-center justify-center">
               <div className="size-36 animate-pulse rounded-full bg-slate-100" />

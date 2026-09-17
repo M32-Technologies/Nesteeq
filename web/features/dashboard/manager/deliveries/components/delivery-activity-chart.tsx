@@ -31,11 +31,11 @@ const rangeLabels: Record<DeliveryAnalyticsRange, string> = {
   lastMonth: "Last Month",
 }
 
-// Color palette matching the reference screenshot
+// Unified color palette matching Delivery Status (Green = Delivered, Blue = Pending, Rose = Returned)
 const colors = {
-  delivered: "#1D70B8", // Darker blue bottom segment
-  pending: "#93C5FD",   // Light sky blue middle segment
-  returned: "#FCA5A5",  // Soft rose coral top segment
+  delivered: "#10B981", // Emerald green (Delivered / Collected)
+  pending: "#60A5FA",   // Vibrant sky blue (Pending / Waiting / Notified)
+  returned: "#F87171",  // Coral rose (Returned)
 }
 
 // Clean single-line date formatter (never overlaps)
@@ -46,12 +46,12 @@ function formatDateLabel(dateStr: string, is7DayView: boolean): string {
     const d = new Date(Date.UTC(year, month - 1, day))
 
     if (is7DayView) {
-      // "Fri 11", "Sat 12", "Thu 17"
-      return d.toLocaleDateString("en-US", {
+      // "Fri 11", "Thu 17"
+      const weekday = d.toLocaleDateString("en-US", {
         weekday: "short",
-        day: "numeric",
         timeZone: "UTC",
       })
+      return `${weekday} ${day}`
     }
     // "Aug 19", "Sep 17"
     return d.toLocaleDateString("en-US", {
@@ -290,7 +290,7 @@ export default function DeliveryActivityChart({
       </div>
 
       {/* Stacked Bar Chart Area (height 205px for perfect 300px card balance) */}
-      <div className="h-[205px] w-full pt-1">
+      <div className="h-[205px] w-full pt-1 outline-none select-none [&_.recharts-surface]:outline-none [&_.recharts-wrapper]:outline-none [&_.recharts-layer]:outline-none [&_svg]:outline-none">
         {isLoading ? (
           <div className="flex h-full w-full items-center justify-center">
             <div className="h-32 w-full animate-pulse rounded-xl bg-slate-100" />
