@@ -67,6 +67,7 @@ export default function DashboardNavbar({
   const pathname = usePathname()
   const breadcrumb = getBreadcrumb(role, pathname)
   const initials = getInitials(user.name)
+  const settingsHref = getDashboardItemHref(role, "/dashboard/settings")
 
   return (
     <header
@@ -191,9 +192,9 @@ export default function DashboardNavbar({
         <div className="hidden h-7 w-px bg-[#E2E8F0] sm:block" />
 
         {/* Profile button */}
-        <button
-          type="button"
-          aria-label="Profile menu"
+        <Link
+          href={settingsHref}
+          aria-label="Profile settings"
           className="
             flex
             h-10
@@ -253,7 +254,7 @@ export default function DashboardNavbar({
               {dashboardRoleLabels[role]}
             </span>
           </span>
-        </button>
+        </Link>
       </div>
     </header>
   )

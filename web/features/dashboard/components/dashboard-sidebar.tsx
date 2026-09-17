@@ -46,6 +46,9 @@ export default function DashboardSidebar({
   const navigation = sidebarNavigation[role]
   const roleLabel = dashboardRoleLabels[role]
   const roleHomePath = `/${getDashboardRoleRouteSegment(role)}`
+  const settingsHref = getDashboardItemHref(role, "/dashboard/settings")
+  const isSettingsActive =
+    pathname === settingsHref || pathname.endsWith("/settings")
 
   const handleSignOut = async () => {
     await signOut()
@@ -478,29 +481,43 @@ export default function DashboardSidebar({
 
             {/* SETTINGS */}
 
-            <button
-              type="button"
-              aria-label="Settings"
-              className="
+            <Link
+              href={settingsHref}
+              onClick={onMobileClose}
+              title="Settings"
+              className={`
+              relative
               flex
               h-[44px]
               w-full
               cursor-pointer
               items-center
-
               overflow-hidden
-
               rounded-xl
-
-              text-[#C3D2E3]
-
               transition-colors
               duration-150
-
-              hover:bg-white/[0.07]
-              hover:text-white
-            "
+              ${
+                isSettingsActive
+                  ? "bg-[#16477C] text-white"
+                  : "text-[#C3D2E3] hover:bg-white/[0.07] hover:text-white"
+              }
+            `}
             >
+              {isSettingsActive && (
+                <span
+                  className="
+                  absolute
+                  left-0
+                  top-1/2
+                  h-6
+                  w-[3px]
+                  -translate-y-1/2
+                  rounded-r-full
+                  bg-[#3D91FF]
+                "
+                />
+              )}
+
               <div
                 className="
                 flex
@@ -516,13 +533,10 @@ export default function DashboardSidebar({
               <span
                 className="
                 whitespace-nowrap
-
                 text-[13px]
                 font-medium
-
                 transition-opacity
                 duration-200
-
                 opacity-100
                 lg:opacity-0
                 lg:group-hover/sidebar:opacity-100
@@ -530,7 +544,7 @@ export default function DashboardSidebar({
               >
                 Settings
               </span>
-            </button>
+            </Link>
 
           </div>
 
