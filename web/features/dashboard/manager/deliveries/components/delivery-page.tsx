@@ -59,7 +59,7 @@ export default function DeliveryPage() {
   const totalRecords = deliveriesData?.pagination?.total ?? 0
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-5 pb-8">
       {/* Top Header */}
       <div>
         <h1 className="text-[26px] font-bold leading-tight tracking-tight text-slate-900">

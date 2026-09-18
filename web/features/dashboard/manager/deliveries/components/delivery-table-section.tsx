@@ -139,7 +139,7 @@ export default function DeliveryTableSection({
                 type="text"
                 value={search}
                 onChange={(e) => onSearchChange(e.target.value)}
-                placeholder="Search by flat, resident, company, tracking ID..."
+                placeholder="Search by flat, resident, company..."
                 className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-xs text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#0F5F45] focus:ring-2 focus:ring-[#0F5F45]/10"
               />
             </div>

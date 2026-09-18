@@ -2,10 +2,6 @@
 
 @import "tailwindcss";
 
-@import "tw-animate-css";
-
-@import "shadcn/tailwind.css";
-
 @custom-variant dark (&:is(.dark *));
 
 :root {
@@ -145,6 +141,27 @@ textarea:focus,
 textarea:focus-visible {
   outline: none !important;
   outline-offset: 0 !important;
+}
+
+/* Prevent focus outline on recharts SVG and container elements */
+.recharts-wrapper,
+.recharts-surface,
+.recharts-layer,
+.recharts-responsive-container,
+.recharts-wrapper *,
+svg.recharts-surface,
+svg.recharts-surface * {
+  outline: none !important;
+}
+
+.recharts-wrapper:focus,
+.recharts-surface:focus,
+.recharts-responsive-container:focus,
+svg.recharts-surface:focus,
+.recharts-wrapper:focus-visible,
+.recharts-surface:focus-visible,
+svg.recharts-surface:focus-visible {
+  outline: none !important;
 }
 
 @theme inline {
