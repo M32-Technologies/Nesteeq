@@ -14,6 +14,7 @@ import {
 export interface DeliveryFormState {
   deliveryType: DeliveryType
   flatId: string
+  residentId?: string
   deliveryCompany: string
   deliveryPersonName: string
   deliveryPersonPhone: string
@@ -46,6 +47,9 @@ export function DeliveryForm({
   onFormChange: (form: DeliveryFormState) => void
   onSubmit: () => void
 }) {
+  const selectedFlat = flats.find((f) => f._id === form.flatId)
+  const primaryResident = selectedFlat?.residents?.[0]
+
   return (
     <div className={panelClassName}>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -78,23 +82,37 @@ export function DeliveryForm({
           <select
             className={selectClassName}
             value={form.flatId}
-            onChange={(event) =>
+            onChange={(event) => {
+              const nextFlatId = event.target.value
+              const flat = flats.find((f) => f._id === nextFlatId)
               onFormChange({
                 ...form,
-                flatId: event.target.value,
+                flatId: nextFlatId,
+                residentId: flat?.residents?.[0]?._id || "",
               })
-            }
+            }}
             disabled={flatsLoading}
           >
             <option value="">
               {flatsLoading ? "Loading flats..." : "Select flat"}
             </option>
-            {flats.map((flat) => (
-              <option key={flat._id} value={flat._id}>
-                {flat.flatNumber}
-              </option>
-            ))}
+            {flats.map((flat) => {
+              const resName = flat.residents?.[0]?.name
+              return (
+                <option key={flat._id} value={flat._id}>
+                  {flat.flatNumber} {resName ? `• ${resName}` : ""}
+                </option>
+              )
+            })}
           </select>
+          {primaryResident && (
+            <p className="mt-1.5 text-xs text-slate-600">
+              Resident: <span className="font-semibold text-slate-900">{primaryResident.name}</span>
+              {primaryResident.phone && (
+                <span className="text-slate-500"> ({primaryResident.phone})</span>
+              )}
+            </p>
+          )}
         </div>
 
         <div>
@@ -110,7 +128,7 @@ export function DeliveryForm({
                 deliveryCompany: event.target.value,
               })
             }
-            placeholder="Company or partner"
+            placeholder="e.g. Amazon, Swiggy, Ekart"
           />
         </div>
 
@@ -148,7 +166,7 @@ export function DeliveryForm({
           />
         </div>
 
-        <div>
+        <div className="md:col-span-2">
           <label className="mb-2 block text-sm font-medium text-[#111111]">
             Package Description
           </label>
@@ -161,7 +179,7 @@ export function DeliveryForm({
                 packageDescription: event.target.value,
               })
             }
-            placeholder="Optional description"
+            placeholder="e.g. Cardboard box, Document envelope"
           />
         </div>
       </div>

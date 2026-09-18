@@ -144,6 +144,7 @@ export interface IVisitorVisit {
   flatId: Types.ObjectId
 
   visitorPassId?: Types.ObjectId | null
+  parkingSlotId?: Types.ObjectId | null
 
   visitorName: string
   visitorPhone?: string | null
@@ -185,6 +186,13 @@ const visitorVisitSchema = new Schema<IVisitorVisit>(
       type: Schema.Types.ObjectId,
       ref: "GuestPass",
       default: null,
+    },
+
+    parkingSlotId: {
+      type: Schema.Types.ObjectId,
+      ref: "ParkingSlot",
+      default: null,
+      index: true,
     },
 
     visitorName: {

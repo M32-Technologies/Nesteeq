@@ -75,6 +75,7 @@ app.use("/api/v1/parking", parkingRoutes);
 app.use("/api/security/parking", parkingRoutes);
 
 app.use("/api/visitors", visitorsRoutes);
+app.use("/api/deliveries", deliveryRoutes);
 app.use("/api/security/deliveries", deliveryRoutes);
 app.use("/api/security/alerts", alertRoutes);
 app.use("/api/v1/announcements", announcementRoutes);

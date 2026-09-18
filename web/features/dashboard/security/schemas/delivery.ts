@@ -26,7 +26,6 @@ export interface SecurityDelivery {
   deliveryCompany: string
   deliveryPersonName?: string | null
   deliveryPersonPhone?: string | null
-  trackingId?: string | null
   packageDescription?: string | null
   notes?: string | null
   status: Exclude<DeliveryStatus, "ALL">
@@ -52,7 +51,6 @@ export interface CreateDeliveryPayload {
   deliveryCompany: string
   deliveryPersonName?: string
   deliveryPersonPhone?: string
-  trackingId?: string
   packageDescription?: string
   notes?: string
 }

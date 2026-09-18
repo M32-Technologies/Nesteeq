@@ -139,3 +139,18 @@ export interface EmergencyBroadcastResponse {
   };
 }
 
+export interface CriticalAlertData {
+  id: string;
+  badgeText: string;
+  scheduleText: string;
+  title: string;
+  description: string;
+  affectedBlocks: string[];
+  actionGuidelines: string[];
+  hotlineNumbers: Array<{
+    label: string;
+    number: string;
+    description: string;
+  }>;
+}
+

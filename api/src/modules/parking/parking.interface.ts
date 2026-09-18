@@ -59,8 +59,12 @@ export interface IParkingSlot {
   flatId?: Types.ObjectId | null
   residentId?: Types.ObjectId | null
   visitorId?: Types.ObjectId | null
+  visitorVisitId?: Types.ObjectId | null
+  visitorName?: string | null
   vehicleNumber?: string | null
+  assignedBy?: string | null
   assignedAt?: Date | null
+  notes?: string | null
   createdAt?: Date
   updatedAt?: Date
 }
@@ -98,18 +102,35 @@ export type ObjectIdLike = {
   toString: () => string
 }
 
-export type LeanParkingSlot = IVisitorParkingSlot & {
-  _id: ObjectIdLike
-  apartmentId: ObjectIdLike
+export type LeanParkingSlot = {
+  _id: ObjectIdLike | string
+  apartmentId: ObjectIdLike | string
+  slotNumber: string
+  vehicleType?: ParkingVehicleType | null
+  status: VisitorParkingSlotStatus
+  notes?: string | null
+  createdAt?: Date
+  updatedAt?: Date
+  currentAssignment?: LeanParkingAssignment | null
 }
 
-export type LeanParkingAssignment = IVisitorParkingAssignment & {
-  _id: ObjectIdLike
-  apartmentId: ObjectIdLike
-  slotId: ObjectIdLike
-  flatId: ObjectIdLike
-  visitorVisitId?: ObjectIdLike | null
-  guestPassId?: ObjectIdLike | null
+export type LeanParkingAssignment = {
+  _id: ObjectIdLike | string
+  apartmentId: ObjectIdLike | string
+  slotId: ObjectIdLike | string
+  flatId?: ObjectIdLike | string | null
+  flatNumber?: string | null
+  visitorVisitId?: ObjectIdLike | string | null
+  guestPassId?: ObjectIdLike | string | null
+  visitorName: string
+  vehicleNumber: string
+  vehicleType?: ParkingVehicleType | null
+  notes?: string | null
+  status: VisitorParkingAssignmentStatus
+  assignedBy: string
+  assignedAt: Date
+  releasedBy?: string | null
+  releasedAt?: Date | null
 }
 
 export type LinkedVisitorVisit = {

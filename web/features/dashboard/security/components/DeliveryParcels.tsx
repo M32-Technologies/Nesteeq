@@ -77,6 +77,7 @@ export function DeliveryParcels() {
   const [form, setForm] = useState<DeliveryFormState>({
     deliveryType: "PARCEL" as DeliveryType,
     flatId: "",
+    residentId: "",
     deliveryCompany: "",
     deliveryPersonName: "",
     deliveryPersonPhone: "",
@@ -102,6 +103,7 @@ export function DeliveryParcels() {
     setForm({
       deliveryType: "PARCEL",
       flatId: "",
+      residentId: "",
       deliveryCompany: "",
       deliveryPersonName: "",
       deliveryPersonPhone: "",
@@ -119,6 +121,7 @@ export function DeliveryParcels() {
       await createMutation.mutateAsync({
         deliveryType: form.deliveryType,
         flatId: form.flatId,
+        residentId: form.residentId || undefined,
         deliveryCompany: form.deliveryCompany,
         deliveryPersonName:
           form.deliveryPersonName || undefined,
@@ -262,10 +265,12 @@ export function DeliveryParcels() {
                       {formatLabel(delivery.deliveryType)}
                     </td>
                     <td className={tdClassName}>
-                      {delivery.flatNumber || "-"}
+                      <span className="font-semibold text-slate-900">
+                        {delivery.flatNumber || "-"}
+                      </span>
                     </td>
                     <td className={tdClassName}>
-                      <p>
+                      <p className="font-medium text-slate-900">
                         {delivery.residentName || "-"}
                       </p>
                       {delivery.residentPhone ? (
