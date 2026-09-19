@@ -10,6 +10,7 @@ export type ResidentUser = {
   type: ResidentType
   blockId: string
   block: string
+  flatId?: string
   flat: string
   status: ResidentStatus
 }
@@ -17,6 +18,7 @@ export type ResidentUser = {
 export type ResidentListParams = {
   search?: string
   residentType?: ResidentType
+  flatId?: string
   blockId?: string
   status?: ResidentStatus
   page?: number

@@ -97,7 +97,7 @@ export interface UpdateParkingSlotInput {
 export interface AssignResidentParkingInput {
   flatId: string
   residentId?: string
-  vehicleNumber: string
+  vehicleNumber?: string
 }
 
 export interface GenerateParkingSlotsInput {

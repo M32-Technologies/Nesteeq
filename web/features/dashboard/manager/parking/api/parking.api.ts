@@ -145,13 +145,17 @@ export const assignResidentParking = async (
   input: AssignResidentParkingInput
 ): Promise<ParkingSlot> => {
   try {
+    const payload: Record<string, unknown> = {
+      flatId: input.flatId,
+    }
+    if (input.residentId) payload.residentId = input.residentId
+    if (input.vehicleNumber?.trim()) {
+      payload.vehicleNumber = input.vehicleNumber.trim().toUpperCase()
+    }
+
     const response = await api.post<ApiResponse<ParkingSlot>>(
       `/api/v1/parking/${parkingId}/assign-resident`,
-      {
-        flatId: input.flatId,
-        residentId: input.residentId || undefined,
-        vehicleNumber: input.vehicleNumber.trim().toUpperCase(),
-      }
+      payload
     )
 
     if (!response.data.success) {
