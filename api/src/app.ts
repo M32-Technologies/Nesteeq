@@ -34,7 +34,7 @@ import facilityRoutes from "./modules/facility/facility.routes.js";
 import reportRoutes from "./modules/report/report.routes.js";
 import scheduleRoutes from "./modules/schedule/schedule.routes.js";
 import uploadRoutes from "./modules/upload/upload.routes.js";
-
+import adminRoutes from "./modules/admin/admin.routes.js"
 const app = express();
 
 app.use(
@@ -52,6 +52,8 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
 
 app.use("/api/v1/upload", uploadRoutes);
 app.use("/api/upload", uploadRoutes);
+
+app.use("/api/v1/admin" , adminRoutes)
 
 app.use("/api/v1", SubscriptionsRoute);
 app.use("/api/v1/apartment", ApartmentRoute);

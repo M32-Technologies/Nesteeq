@@ -137,6 +137,7 @@ subscriptionSchema.index({
   apartment: 1,
   status: 1,
 });
+subscriptionSchema.index({ createdAt: 1 });
 
 export type SubscriptionDocument =
   InferSchemaType<typeof subscriptionSchema>;
@@ -144,4 +145,4 @@ export type SubscriptionDocument =
 export const Subscription = model(
   "Subscription",
   subscriptionSchema
-);
+);

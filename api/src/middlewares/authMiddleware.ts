@@ -4,8 +4,18 @@ import { fromNodeHeaders } from "better-auth/node";
 import { AppError } from "../utils/AppError.js";
 import { catchAsync } from "../utils/catchAsync.js";
 
-type ApartmentIdValue =| string| { toString: () => string }| null | undefined;
+type ApartmentIdValue = | string | { toString: () => string } | null | undefined;
 
+export type UserRole =
+    | "super_admin"
+    | "property_manager"
+    | "facility_manager"
+    | "treasurer"
+    | "security_staff"
+    | "maintenance_technician"
+    | "resident"
+    | "owner"
+    | "tenant";
 const normalizeRole = (role: string) => role.trim().toLowerCase().replace(/[\s-]+/g, "_");
 
 const normalizeApartmentId = (apartmentId: ApartmentIdValue) => apartmentId?.toString().trim().toLowerCase();
@@ -25,7 +35,7 @@ export const protect = catchAsync(async (req: Request, res: Response, next: Next
     next();
 });
 
-export const requireRole = (...allowedRoles: string[]) => {
+export const requireRole = (...allowedRoles: UserRole[]) => {
     return (req: Request, res: Response, next: NextFunction) => {
         if (!req.user) {
             return next(new AppError("You are not logged in. Please sign in to continue.", 401));
@@ -74,3 +84,5 @@ export const ensureApartmentAccess = (
 
     return authenticatedApartmentId;
 };
+
+
