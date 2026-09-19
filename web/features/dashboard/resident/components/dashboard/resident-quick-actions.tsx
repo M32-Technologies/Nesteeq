@@ -10,18 +10,9 @@ import {
   PhoneCall,
   CalendarCheck2,
   Bell,
-  Sparkles,
 } from "lucide-react";
 
-interface ResidentQuickActionsProps {
-  onOpenVisitorPassModal?: () => void;
-  onOpenComplaintModal?: () => void;
-}
-
-export function ResidentQuickActions({
-  onOpenVisitorPassModal,
-  onOpenComplaintModal,
-}: ResidentQuickActionsProps) {
+export function ResidentQuickActions() {
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-xs backdrop-blur-xs lg:flex-row lg:items-center lg:justify-between">
       <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 pl-1">
@@ -58,7 +49,7 @@ export function ResidentQuickActions({
           <span>Pay Dues (₹2,500)</span>
         </Link>
 
-        {/* Gate Intercom / Emergency */}
+        {/* Gate Intercom */}
         <Link
           href="/resident/alerts"
           className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-bold text-blue-700 shadow-2xs hover:bg-blue-100 transition active:scale-95 cursor-pointer"
@@ -67,13 +58,13 @@ export function ResidentQuickActions({
           <span>Gate Intercom</span>
         </Link>
 
-        {/* Notice Board */}
+        {/* Book Clubhouse / Court */}
         <Link
-          href="/resident/announcements"
-          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-100 transition active:scale-95 cursor-pointer"
+          href="/resident/parking"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-teal-200 bg-teal-50 px-3.5 py-2 text-xs font-bold text-teal-800 shadow-2xs hover:bg-teal-100 transition active:scale-95 cursor-pointer"
         >
-          <Bell className="size-3.5 text-slate-600" />
-          <span>Notice Board</span>
+          <CalendarCheck2 className="size-3.5 text-teal-600" />
+          <span>Book Clubhouse / Court</span>
         </Link>
       </div>
     </div>

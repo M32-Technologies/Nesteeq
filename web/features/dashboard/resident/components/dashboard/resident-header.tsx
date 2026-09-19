@@ -13,7 +13,7 @@ interface ResidentHeaderProps {
 
 export function ResidentHeader({
   userName,
-  unitText = "Unit A-204",
+  unitText = "Assigned Flat",
   hasCriticalAlert = false,
   onRefresh,
   isRefreshing = false,
@@ -40,20 +40,12 @@ export function ResidentHeader({
         {/* Resident & Unit Context Chips */}
         <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
           <span className="inline-flex items-center rounded-lg bg-blue-50 px-2.5 py-1 font-bold text-blue-700 border border-blue-200/70 shadow-2xs">
-            BLOCK A • FLOOR 2 • {unitText}
+            {unitText}
           </span>
 
           <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1 text-emerald-700 border border-emerald-200/70 shadow-2xs">
             <ShieldCheck className="size-3.5 text-emerald-600" />
-            <span>Primary Owner</span>
-          </span>
-
-          <span className="inline-flex items-center rounded-lg bg-purple-50 px-2.5 py-1 text-purple-700 border border-purple-200/70 shadow-2xs">
-            Self-Occupied
-          </span>
-
-          <span className="hidden sm:inline-block text-slate-400 font-normal">
-            • Greenwood Heights Residency
+            <span>Verified Resident</span>
           </span>
         </div>
       </div>

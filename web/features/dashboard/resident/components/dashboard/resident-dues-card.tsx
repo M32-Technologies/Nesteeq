@@ -6,12 +6,13 @@ import {
   ShieldCheck,
   CheckCircle2,
   CreditCard,
-  Receipt,
   FileCheck2,
-  Calendar,
 } from "lucide-react";
+import { useResidentDashboard } from "../../hooks/use-resident-dashboard";
 
 export function ResidentDuesCard() {
+  const { apartmentName, flatUnitName } = useResidentDashboard();
+
   return (
     <div className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-[0_2px_8px_rgba(15,23,42,0.03)] space-y-4">
       {/* Header */}
@@ -22,55 +23,52 @@ export function ResidentDuesCard() {
           </div>
           <div>
             <h3 className="text-[15px] sm:text-base font-bold text-slate-900">
-              Verified Ownership & Dues Summary
+              Ownership & Society Dues Summary
             </h3>
             <p className="text-xs text-slate-500 font-medium">
-              Monthly society maintenance breakdown
+              Maintenance account for {flatUnitName}
             </p>
           </div>
         </div>
 
         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200/70 shadow-2xs">
           <CheckCircle2 className="size-3 text-emerald-600" />
-          <span>No Penalty</span>
+          <span>All Cleared</span>
         </span>
       </div>
 
       {/* Charges Breakdown Table */}
       <div className="rounded-2xl border border-slate-200/80 bg-slate-50/40 p-4 space-y-2.5 text-xs sm:text-[13px]">
         <div className="flex items-center justify-between text-slate-600 font-medium">
-          <span>Society Maintenance (₹1.14 / sq.ft • 1,840 sq.ft)</span>
-          <span className="font-bold text-slate-900">₹2,100.00</span>
+          <span>Apartment Community</span>
+          <span className="font-bold text-slate-900">{apartmentName}</span>
         </div>
 
         <div className="flex items-center justify-between text-slate-600 font-medium">
-          <span>Sinking & Repair Reserve Fund</span>
-          <span className="font-bold text-slate-900">₹400.00</span>
+          <span>Assigned Flat Unit</span>
+          <span className="font-bold text-slate-900">{flatUnitName}</span>
         </div>
 
         <div className="border-t border-slate-200 pt-2.5 flex items-center justify-between">
-          <span className="font-bold text-slate-900">Total Payable</span>
-          <span className="text-lg sm:text-xl font-black text-indigo-600">
-            ₹2,500.00
+          <span className="font-bold text-slate-900">Total Payable Dues</span>
+          <span className="text-lg sm:text-xl font-black text-emerald-700">
+            ₹0.00
           </span>
         </div>
       </div>
 
-      {/* Footer Info & Instant Pay CTA */}
+      {/* Footer Info */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500 font-medium">Last paid:</span>
-          <span className="inline-flex items-center rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200/70">
-            ₹2,500 on Aug 24 (via UPI)
-          </span>
-        </div>
+        <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1.5">
+          <ShieldCheck className="size-4 text-emerald-600" />
+          <span>Compliant society membership verified</span>
+        </span>
 
         <Link
           href="/resident/bills"
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-xs shadow-indigo-600/20 hover:bg-indigo-700 transition active:scale-95 cursor-pointer"
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition active:scale-95 cursor-pointer"
         >
-          <CreditCard className="size-3.5" />
-          <span>Pay ₹2,500 Instantly</span>
+          <span>View Statements</span>
         </Link>
       </div>
     </div>

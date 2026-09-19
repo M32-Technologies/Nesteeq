@@ -35,55 +35,24 @@ export function ResidentComplaintsCard({
   complaints = [],
   isLoading = false,
 }: ResidentComplaintsCardProps) {
-  // Use real backend complaints if present, otherwise fallback to the high-detail defaults from design mockup
-  const displayItems =
-    complaints.length > 0
-      ? complaints.slice(0, 2).map((c, idx) => ({
-          id: c._id || String(idx),
-          reqId: c.ticketNumber || `#REQ-${c._id.slice(-4).toUpperCase()}`,
-          title: c.title,
-          status: c.status.replace("_", " "),
-          statusClass:
-            c.status === "IN_PROGRESS" || c.status === "ASSIGNED"
-              ? "bg-amber-100 text-amber-800"
-              : c.status === "RESOLVED"
-              ? "bg-emerald-100 text-emerald-800"
-              : "bg-blue-100 text-blue-800",
-          assignedText: "Assigned recently",
-          assignedTo: c.assignedStaff?.name || "Facility Technician",
-          assignedRole: c.assignedStaff?.role || "Plumber • ★ 4.9",
-          staffPhone: c.assignedStaff?.phone || "+91 98765 43210",
-          otp: "5819",
-          note: c.description,
-        }))
-      : [
-          {
-            id: "1",
-            reqId: "#REQ-8831",
-            title: "Kitchen Sink Pipe Leakage",
-            status: "In Progress",
-            statusClass: "bg-amber-100 text-amber-800",
-            assignedText: "Assigned 2h ago",
-            assignedTo: "Ramesh Patel",
-            assignedRole: "Facility Plumber • ★ 4.9",
-            staffPhone: "+91 98765 43210",
-            otp: "5819",
-            note: "Plumber on way to inspect main drainage seal.",
-          },
-          {
-            id: "2",
-            reqId: "#REQ-8794",
-            title: "Elevator B2 Call Button Lag",
-            status: "Under Review",
-            statusClass: "bg-blue-100 text-blue-800",
-            assignedText: "Yesterday",
-            assignedTo: "Otis Technical Support",
-            assignedRole: "Elevator AMC Partner",
-            staffPhone: "+91 98765 00000",
-            otp: null,
-            note: "Escalated to Otis Maintenance Vendor. Expected resolution by Sep 24, 6:00 PM.",
-          },
-        ];
+  const displayItems = complaints.slice(0, 3).map((c, idx) => ({
+    id: c._id || String(idx),
+    reqId: c.ticketNumber || `#REQ-${c._id.slice(-4).toUpperCase()}`,
+    title: c.title,
+    status: c.status.replace("_", " "),
+    statusClass:
+      c.status === "IN_PROGRESS" || c.status === "ASSIGNED"
+        ? "bg-amber-100 text-amber-800"
+        : c.status === "RESOLVED"
+        ? "bg-emerald-100 text-emerald-800"
+        : "bg-blue-100 text-blue-800",
+    assignedText: "Assigned recently",
+    assignedTo: c.assignedStaff?.name || "Facility Technician",
+    assignedRole: c.assignedStaff?.role || null,
+    staffPhone: c.assignedStaff?.phone || null,
+    otp: null,
+    note: c.description,
+  }));
 
   return (
     <div className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-[0_2px_8px_rgba(15,23,42,0.03)] space-y-4">
@@ -113,71 +82,75 @@ export function ResidentComplaintsCard({
       </div>
 
       {/* List of Tickets */}
-      <div className="space-y-3 pt-1">
-        {displayItems.map((item) => (
-          <div
-            key={item.id}
-            className="rounded-2xl border border-slate-200/80 bg-slate-50/40 p-4 space-y-3 transition-all hover:border-slate-300 hover:bg-white"
-          >
-            {/* Top Row: Ticket ID + Title + Status */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-mono text-xs font-extrabold text-slate-500">
-                  {item.reqId}:
-                </span>
-                <h4 className="text-sm font-bold text-slate-900">
-                  {item.title}
-                </h4>
-                <span
-                  className={`rounded-md px-2 py-0.5 text-[10.5px] font-bold ${item.statusClass}`}
-                >
-                  {item.status}
-                </span>
-              </div>
-
-              <span className="text-xs font-medium text-slate-400">
-                {item.assignedText}
-              </span>
-            </div>
-
-            {/* Middle Row: Assignee & Description */}
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-slate-700">Assigned to:</span>
-                <span className="font-bold text-slate-900">{item.assignedTo}</span>
-                <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10.5px] font-bold text-amber-700 border border-amber-200/60">
-                  {item.assignedRole}
-                </span>
-              </div>
-
-              {item.otp && (
-                <div className="flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-900 border border-amber-200">
-                  <KeyRound className="size-3 text-amber-600" />
-                  <span>Work Completion OTP:</span>
-                  <span className="font-mono text-amber-700 tracking-wider font-extrabold">
-                    {item.otp}
+      {displayItems.length > 0 ? (
+        <div className="space-y-3 pt-1">
+          {displayItems.map((item) => (
+            <div
+              key={item.id}
+              className="rounded-2xl border border-slate-200/80 bg-slate-50/40 p-4 space-y-3 transition-all hover:border-slate-300 hover:bg-white"
+            >
+              {/* Top Row: Ticket ID + Title + Status */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-xs font-extrabold text-slate-500">
+                    {item.reqId}:
+                  </span>
+                  <h4 className="text-sm font-bold text-slate-900">
+                    {item.title}
+                  </h4>
+                  <span
+                    className={`rounded-md px-2 py-0.5 text-[10.5px] font-bold ${item.statusClass}`}
+                  >
+                    {item.status}
                   </span>
                 </div>
-              )}
-            </div>
 
-            {/* Note & Action */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-slate-200/60 pt-2.5">
-              <p className="text-xs text-slate-500 line-clamp-1">
-                {item.note}
-              </p>
+                <span className="text-xs font-medium text-slate-400">
+                  {item.assignedText}
+                </span>
+              </div>
 
-              <a
-                href={`tel:${item.staffPhone}`}
-                className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-xl border border-slate-200/90 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition active:scale-95"
-              >
-                <PhoneCall className="size-3.5 text-indigo-600" />
-                <span>Call Technician</span>
-              </a>
+              {/* Middle Row: Assignee & Description */}
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-slate-700">Assigned to:</span>
+                  <span className="font-bold text-slate-900">{item.assignedTo}</span>
+                  {item.assignedRole && (
+                    <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10.5px] font-bold text-amber-700 border border-amber-200/60">
+                      {item.assignedRole}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Note & Action */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-slate-200/60 pt-2.5">
+                <p className="text-xs text-slate-500 line-clamp-1">
+                  {item.note}
+                </p>
+
+                {item.staffPhone && (
+                  <a
+                    href={`tel:${item.staffPhone}`}
+                    className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-xl border border-slate-200/90 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition active:scale-95"
+                  >
+                    <PhoneCall className="size-3.5 text-indigo-600" />
+                    <span>Call Technician</span>
+                  </a>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center space-y-2">
+          <Wrench className="size-6 text-slate-400 mx-auto" />
+          <p className="text-xs font-bold text-slate-700">No active maintenance complaints</p>
+          <p className="text-[11px] text-slate-400">
+            Everything in your flat is running smoothly. Log a request whenever needed.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

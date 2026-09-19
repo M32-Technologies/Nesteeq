@@ -44,24 +44,103 @@ export interface ResidentComplaintsResponse {
   };
 }
 
-export interface ResidentDuesSummary {
-  unitNumber: string;
-  block: string;
-  floor: string;
-  bhk: string;
-  areaSqFt: number;
-  carpetSqFt: number;
-  maintenancePerSqFt: number;
-  societyMaintenance: number;
-  sinkingFund: number;
-  totalPayable: number;
-  dueDate: string;
-  lastPayment: {
-    amount: number;
-    date: string;
-    method: string;
-  };
-  complianceStatus: string;
+export interface CurrentApartment {
+  _id: string;
+  name: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  totalUnits?: number;
+  status?: string;
+}
+
+export interface ResidentFlatInfo {
+  _id: string;
+  flatNumber: string;
+  floorNumber?: number;
+  occupancyStatus?: string;
+  blockId?: {
+    _id: string;
+    blockname?: string;
+    code?: string;
+  } | null;
+}
+
+export interface ResidentProfileItem {
+  id: string;
+  apartmentId: string;
+  userId: string;
+  name?: string;
+  email?: string | null;
+  role?: string;
+  residentType?: "owner" | "resident";
+  phone?: string | null;
+  status?: string;
+  flat?: ResidentFlatInfo | null;
+  joinedAt?: string;
+}
+
+export async function fetchCurrentApartment(): Promise<CurrentApartment | null> {
+  try {
+    const res = await api.get<{
+      success: boolean;
+      data: CurrentApartment;
+    }>("/api/v1/apartment/current");
+    return res.data?.data || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchCurrentResidentProfile(
+  userEmail?: string,
+  userId?: string
+): Promise<ResidentProfileItem | null> {
+  try {
+    const res = await api.get<{
+      success: boolean;
+      data: {
+        residents: ResidentProfileItem[];
+      };
+    }>("/api/v1/residents", {
+      params: userEmail ? { search: userEmail } : undefined,
+    });
+
+    const list = res.data?.data?.residents || [];
+    if (list.length > 0) {
+      if (userEmail) {
+        const found = list.find(
+          (r) =>
+            r.email?.toLowerCase() === userEmail.toLowerCase() ||
+            (userId && r.userId === userId)
+        );
+        if (found) return found;
+      }
+      return list[0];
+    }
+
+    if (userEmail || userId) {
+      const fallbackRes = await api.get<{
+        success: boolean;
+        data: {
+          residents: ResidentProfileItem[];
+        };
+      }>("/api/v1/residents", { params: { limit: 50 } });
+
+      const fallbackList = fallbackRes.data?.data?.residents || [];
+      const match = fallbackList.find(
+        (r) =>
+          (userEmail && r.email?.toLowerCase() === userEmail.toLowerCase()) ||
+          (userId && r.userId === userId)
+      );
+      if (match) return match;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchResidentGuestPasses(params?: {

@@ -61,7 +61,7 @@ export function ResidentAnnouncementsPage() {
   };
 
   return (
-    <div className="space-y-6 pb-14 max-w-7xl mx-auto">
+    <div className="w-full space-y-6 pb-14">
       {/* ===================================================================== */}
       {/* 1. TOP PAGE HEADER                                                    */}
       {/* ===================================================================== */}

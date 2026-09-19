@@ -23,9 +23,9 @@ interface ResidentMetricsBarProps {
 }
 
 export function ResidentMetricsBar({
-  unitNumber = "Unit A-204",
-  activeComplaintsCount = 2,
-  activeVisitorsCount = 2,
+  unitNumber = "Assigned Flat",
+  activeComplaintsCount = 0,
+  activeVisitorsCount = 0,
   latestComplaintTitle,
   latestVisitorName,
 }: ResidentMetricsBarProps) {
@@ -49,7 +49,7 @@ export function ResidentMetricsBar({
           </h3>
 
           <p className="mt-1 text-xs text-slate-500 font-medium">
-            3 BHK • 1,840 sq.ft (Carpet: 1,510)
+            Active Society Resident Membership
           </p>
         </div>
 
@@ -63,36 +63,36 @@ export function ResidentMetricsBar({
 
       {/* 2. MAINTENANCE DUE */}
       <div className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-5 shadow-[0_2px_8px_rgba(15,23,42,0.03)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-amber-300">
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 to-orange-500" />
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-500" />
         <div>
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
               MAINTENANCE DUE
             </span>
-            <div className="flex size-8 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+            <div className="flex size-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
               <ReceiptText className="size-4" />
             </div>
           </div>
 
           <h3 className="mt-3 text-xl font-black tracking-tight text-slate-900">
-            ₹2,500
+            ₹0
           </h3>
 
-          <p className="mt-1 text-xs text-slate-500 font-medium">
-            Due Sep 25 • Q2 Society Dues
+          <p className="mt-1 text-xs text-emerald-700 font-semibold">
+            All dues cleared for current cycle
           </p>
         </div>
 
         <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
           <Link
             href="/resident/bills"
-            className="inline-flex items-center gap-1.5 text-xs font-extrabold text-amber-700 hover:text-amber-800 transition group-hover:translate-x-0.5"
+            className="inline-flex items-center gap-1.5 text-xs font-extrabold text-slate-700 hover:text-slate-900 transition group-hover:translate-x-0.5"
           >
-            <span>Pay Now</span>
+            <span>Statement</span>
             <ChevronRight className="size-3.5" />
           </Link>
-          <span className="text-[11px] font-semibold text-slate-400">
-            No Surcharge
+          <span className="text-[11px] font-semibold text-emerald-600">
+            No Dues
           </span>
         </div>
       </div>
@@ -132,7 +132,7 @@ export function ResidentMetricsBar({
             <span className="size-1.5 rounded-full bg-purple-600" />
             <span>
               {activeComplaintsCount > 0
-                ? "Plumber Assigned (Arriving 3 PM)"
+                ? "Review Active Tickets"
                 : "No Pending Issues"}
             </span>
           </Link>
@@ -153,16 +153,18 @@ export function ResidentMetricsBar({
           </div>
 
           <h3 className="mt-3 text-xl font-black tracking-tight text-slate-900">
-            {activeVisitorsCount > 0 ? activeVisitorsCount : 2}{" "}
+            {activeVisitorsCount}{" "}
             <span className="text-sm font-bold text-slate-600">
-              Expected Today
+              Active Passes
             </span>
           </h3>
 
           <p className="mt-1 text-xs text-slate-500 font-medium truncate">
             {latestVisitorName
-              ? `${latestVisitorName} • Delivery expected`
-              : "Rahul (Guest) • Swiggy Delivery"}
+              ? `${latestVisitorName} • Pre-authorized pass`
+              : activeVisitorsCount > 0
+              ? `${activeVisitorsCount} passes valid today`
+              : "No upcoming visitors logged"}
           </p>
         </div>
 
@@ -172,7 +174,7 @@ export function ResidentMetricsBar({
             className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 border border-emerald-200/70 hover:bg-emerald-100 transition"
           >
             <span className="size-1.5 rounded-full bg-emerald-600" />
-            <span>Gate Pass QR Pre-Approved</span>
+            <span>Manage Gate Passes</span>
           </Link>
         </div>
       </div>
