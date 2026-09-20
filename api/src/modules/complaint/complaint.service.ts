@@ -320,17 +320,13 @@ const applySharedFilters = (
   }
 };
 
-const applyManagerFilters = (
 const applyManagerFilters = async (
   filter: ComplaintFilter,
   query: GetComplaintsQuery,
-  user: AuthenticatedComplaintUser
-): void => {
   user: AuthenticatedComplaintUser,
   authUser?: AuthUserRecord | null
 ): Promise<void> => {
   const role = normalizeRole(user.role);
-  const managerApartmentId = normalizeOptionalString(user.apartmentId);
   const managerApartmentId = await resolveManagerApartmentId(user, authUser);
   const queryApartment =
     normalizeOptionalString(query.apartment) ??
@@ -342,21 +338,15 @@ const applyManagerFilters = async (
       return;
     }
 
-    if (query.apartment && query.apartment !== managerApartmentId) {
     if (queryApartment && queryApartment.toLowerCase() !== managerApartmentId.toLowerCase()) {
       throw new AppError("You do not have permission to view complaints for this apartment", 403);
     }
 
-    filter.apartment = managerApartmentId;
-  } else if (query.apartment) {
-    filter.apartment = query.apartment;
     addOrCondition(filter, buildApartmentQuery(managerApartmentId).$or as Record<string, unknown>[]);
   } else if (queryApartment) {
     addOrCondition(filter, buildApartmentQuery(queryApartment).$or as Record<string, unknown>[]);
   }
 
-  if (query.flat) {
-    filter.flat = query.flat;
   const flat = query.flat ?? (query as any).flatId;
   if (flat) {
     const flatStr = String(flat).trim();
@@ -370,8 +360,6 @@ const applyManagerFilters = async (
     ]);
   }
 
-  if (query.resident) {
-    filter.resident = query.resident;
   const resident = query.resident ?? (query as any).residentId;
   if (resident) {
     const resStr = String(resident).trim();
@@ -385,8 +373,6 @@ const applyManagerFilters = async (
     ]);
   }
 
-  if (query.assignedStaff) {
-    filter.assignedStaff = query.assignedStaff;
   const assignedStaff = query.assignedStaff ?? (query as any).assignedTo;
   if (assignedStaff) {
     const staffStr = String(assignedStaff).trim();
@@ -405,15 +391,12 @@ export const createComplaint = async (
   data: CreateComplaintInput,
   user: AuthenticatedComplaintUser
 ) => {
-  await ensureCurrentUserExists(user);
   const authUser = await ensureCurrentUserExists(user);
 
   if (!isResidentRole(user.role)) {
     throw new AppError("Only residents can create complaints", 403);
   }
 
-  const apartment = normalizeOptionalString(user.apartmentId);
-  const flat = normalizeOptionalString(user.flatId);
   const apartment =
     normalizeOptionalString(user.apartmentId) ??
     normalizeOptionalString(authUser.apartmentId);
@@ -436,8 +419,6 @@ export const createComplaint = async (
     status: "PENDING",
   });
 
-
-
   return complaint;
 };
 
@@ -445,7 +426,6 @@ export const getComplaints = async (
   query: GetComplaintsQuery,
   user: AuthenticatedComplaintUser
 ) => {
-  await ensureCurrentUserExists(user);
   const authUser = await ensureCurrentUserExists(user);
 
   if (!user.apartmentId && authUser.apartmentId) {
@@ -458,10 +438,8 @@ export const getComplaints = async (
   applySharedFilters(filter, query);
 
   if (managementRoles.has(role)) {
-    applyManagerFilters(filter, query, user);
     await applyManagerFilters(filter, query, user, authUser);
   } else if (maintenanceRoles.has(role)) {
-    filter.assignedStaff = user.id;
     const staffValues: unknown[] = [user.id];
     if (Types.ObjectId.isValid(user.id)) staffValues.push(new Types.ObjectId(user.id));
     addOrCondition(filter, [
@@ -469,7 +447,6 @@ export const getComplaints = async (
       { assignedTo: { $in: staffValues } },
     ]);
   } else if (residentRoles.has(role)) {
-    filter.resident = user.id;
     const resValues: unknown[] = [user.id];
     if (Types.ObjectId.isValid(user.id)) resValues.push(new Types.ObjectId(user.id));
     addOrCondition(filter, [
@@ -480,13 +457,11 @@ export const getComplaints = async (
     throw new AppError("You do not have permission to access complaints", 403);
   }
 
-  const skip = (query.page - 1) * query.limit;
   const page = Number(query.page) > 0 ? Number(query.page) : 1;
   const limit = Number(query.limit) > 0 ? Number(query.limit) : 20;
   const skip = (page - 1) * limit;
 
   const [complaints, total] = await Promise.all([
-    Complaint.find(filter).sort({ createdAt: -1 }).skip(skip).limit(query.limit).lean(),
     Complaint.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
     Complaint.countDocuments(filter),
   ]);
@@ -494,12 +469,9 @@ export const getComplaints = async (
   return {
     complaints,
     pagination: {
-      page: query.page,
-      limit: query.limit,
       page,
       limit,
       total,
-      pages: Math.ceil(total / query.limit),
       pages: Math.ceil(total / limit) || 1,
     },
   };

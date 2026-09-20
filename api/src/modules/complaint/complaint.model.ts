@@ -154,10 +154,8 @@ const complaintSchema = new Schema(
       index: true,
     },
     apartment: {
-      type: String,
       type: Schema.Types.Mixed,
       required: true,
-      trim: true,
       index: true,
     },
     apartmentId: {

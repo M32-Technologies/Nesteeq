@@ -34,10 +34,6 @@ const getAuthenticatedUser = (req: Request): AuthenticatedComplaintUser => {
   const rawFlatId = user?.flatId ?? user?.flat ?? null;
 
   return {
-    id: req.user?.id!,
-    role: req.user?.role!,
-    apartmentId: req.user?.apartmentId ?? null,
-    flatId: req.user?.flatId ?? null,
     id: req.user?.id ? String(req.user.id).trim() : "",
     role: req.user?.role ? String(req.user.role).trim() : "",
     apartmentId: rawApartmentId ? String(rawApartmentId).trim() : null,

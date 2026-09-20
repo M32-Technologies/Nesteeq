@@ -140,9 +140,6 @@ const preprocessEnumFilter = <T extends readonly string[]>(
 
 export const getComplaintsQuerySchema = z
   .object({
-    status: z.enum(complaintStatuses).optional(),
-    category: z.enum(complaintCategories).optional(),
-    priority: z.enum(complaintPriorities).optional(),
     status: preprocessEnumFilter(complaintStatuses, (s) =>
       s.toUpperCase().replace(/[\s-]+/g, "_")
     ),
@@ -160,7 +157,6 @@ export const getComplaintsQuerySchema = z
     page: z.coerce.number().int("Page must be a whole number").min(1).default(1),
     limit: z.coerce.number().int("Limit must be a whole number").min(1).max(100).default(20),
   })
-  .strict();
   .passthrough();
 
 export const createComplaintSchema = z.object({
