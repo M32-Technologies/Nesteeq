@@ -125,19 +125,43 @@ export const confirmComplaintResolutionBodySchema = z
   })
   .strict();
 
+const preprocessEnumFilter = <T extends readonly string[]>(
+  allowedValues: T,
+  transform?: (val: string) => string
+) =>
+  z.preprocess((val) => {
+    if (typeof val === "string") {
+      const trimmed = val.trim();
+      if (!trimmed || trimmed.toLowerCase() === "all") return undefined;
+      return transform ? transform(trimmed) : trimmed;
+    }
+    return val;
+  }, z.enum(allowedValues as unknown as [string, ...string[]]).optional());
+
 export const getComplaintsQuerySchema = z
   .object({
     status: z.enum(complaintStatuses).optional(),
     category: z.enum(complaintCategories).optional(),
     priority: z.enum(complaintPriorities).optional(),
+    status: preprocessEnumFilter(complaintStatuses, (s) =>
+      s.toUpperCase().replace(/[\s-]+/g, "_")
+    ),
+    category: preprocessEnumFilter(complaintCategories, (c) => c.toUpperCase()),
+    priority: preprocessEnumFilter(complaintPriorities, (p) => p.toUpperCase()),
     apartment: z.string().trim().min(1, "Apartment ID cannot be empty").optional(),
+    apartmentId: z.string().trim().min(1, "Apartment ID cannot be empty").optional(),
     flat: z.string().trim().min(1, "Flat ID cannot be empty").optional(),
+    flatId: z.string().trim().min(1, "Flat ID cannot be empty").optional(),
     resident: authUserIdSchema.optional(),
+    residentId: authUserIdSchema.optional(),
     assignedStaff: authUserIdSchema.optional(),
+    assignedTo: authUserIdSchema.optional(),
+    search: z.string().trim().optional(),
     page: z.coerce.number().int("Page must be a whole number").min(1).default(1),
     limit: z.coerce.number().int("Limit must be a whole number").min(1).max(100).default(20),
   })
   .strict();
+  .passthrough();
 
 export const createComplaintSchema = z.object({
   body: createComplaintBodySchema,

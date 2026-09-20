@@ -37,6 +37,9 @@ export const assertManagerCanManageComplaint = (
 
   const managerApartmentId = normalizeOptionalString(user.apartmentId);
   const complaintApartmentId = normalizeOptionalString(complaint.apartment);
+  const managerApartmentId = normalizeOptionalString(user.apartmentId?.toString());
+  const rawComplaintApartment = (complaint as any).apartment ?? (complaint as any).apartmentId;
+  const complaintApartmentId = normalizeOptionalString(rawComplaintApartment?.toString());
 
   if (!globalManagementRoles.has(role)) {
     if (!managerApartmentId) {
@@ -44,6 +47,7 @@ export const assertManagerCanManageComplaint = (
     }
 
     if (!complaintApartmentId || complaintApartmentId !== managerApartmentId) {
+    if (!complaintApartmentId || complaintApartmentId.toLowerCase() !== managerApartmentId.toLowerCase()) {
       throw new AppError("You do not have permission to manage this complaint", 403);
     }
   }

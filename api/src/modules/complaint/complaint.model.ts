@@ -155,8 +155,13 @@ const complaintSchema = new Schema(
     },
     apartment: {
       type: String,
+      type: Schema.Types.Mixed,
       required: true,
       trim: true,
+      index: true,
+    },
+    apartmentId: {
+      type: Schema.Types.Mixed,
       index: true,
     },
     flat: {
@@ -270,6 +275,7 @@ const complaintSchema = new Schema(
 
 complaintSchema.index({ resident: 1, createdAt: -1 });
 complaintSchema.index({ apartment: 1, status: 1, createdAt: -1 });
+complaintSchema.index({ apartmentId: 1, status: 1, createdAt: -1 });
 complaintSchema.index({ assignedStaff: 1, status: 1, createdAt: -1 });
 
 export type ComplaintDocument = InferSchemaType<typeof complaintSchema>;
