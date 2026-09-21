@@ -34,6 +34,7 @@ export type NavigationItem = {
   title: string
   href: string
   icon: LucideIcon
+  badge?: string
 }
 
 export type NavigationSection = {
@@ -164,6 +165,11 @@ export const sidebarNavigation: Record<
           href: "/dashboard/parking",
           icon: Car,
         },
+        {
+          title: "Deliveries",
+          href: "/dashboard/deliveries",
+          icon: Package,
+        },
       ],
     },
     {
@@ -265,6 +271,11 @@ export const sidebarNavigation: Record<
           href: "/dashboard/reports",
           icon: BarChart3,
         },
+        {
+          title: "Announcements",
+          href: "/dashboard/announcements",
+          icon: Bell,
+        },
       ],
     },
   ],
@@ -289,11 +300,6 @@ export const sidebarNavigation: Record<
           icon: Package,
         },
         {
-          title: "Parking Slots",
-          href: "/dashboard/parking",
-          icon: Car,
-        },
-        {
           title: "Emergency / SOS Alerts",
           href: "/dashboard/alerts",
           icon: MessageSquareWarning,
@@ -302,6 +308,11 @@ export const sidebarNavigation: Record<
           title: "Residents Directory",
           href: "/dashboard/residents",
           icon: UserRound,
+        },
+        {
+          title: "Announcements",
+          href: "/dashboard/announcements",
+          icon: Bell,
         },
       ],
     },
@@ -326,41 +337,77 @@ export const sidebarNavigation: Record<
           href: "/dashboard/completed",
           icon: ClipboardList,
         },
-        {
-          title: "Schedule",
-          href: "/dashboard/schedule",
-          icon: CalendarDays,
-        },
+
       ],
     },
   ],
 
   resident: [
     {
-      title: "My Apartment",
+      title: "Overview",
       items: [
         {
           title: "Dashboard",
           href: "/dashboard",
           icon: LayoutDashboard,
         },
+      ],
+    },
+    {
+      title: "Residence",
+      items: [
         {
           title: "My Flat",
           href: "/dashboard/my-flat",
           icon: Building2,
         },
         {
+          title: "Tenants",
+          href: "/dashboard/tenants",
+          icon: Users,
+        },
+        {
+          title: "My Parking",
+          href: "/dashboard/parking",
+          icon: Car,
+        },
+      ],
+    },
+    {
+      title: "Desk & Service",
+      items: [
+        {
           title: "Complaints",
           href: "/dashboard/complaints",
           icon: MessageSquareWarning,
         },
         {
-          title: "Bills",
+          title: "Maintenance",
+          href: "/dashboard/maintenance",
+          icon: Wrench,
+        },
+        {
+          title: "Visitors & Passes",
+          href: "/dashboard/visitors",
+          icon: QrCode,
+        },
+        {
+          title: "Emergency / SOS Alerts",
+          href: "/dashboard/alerts",
+          icon: MessageSquareWarning,
+        },
+      ],
+    },
+    {
+      title: "Accounts",
+      items: [
+        {
+          title: "Maintenance Bills",
           href: "/dashboard/bills",
           icon: ReceiptText,
         },
         {
-          title: "Payments",
+          title: "Payment History",
           href: "/dashboard/payments",
           icon: WalletCards,
         },
@@ -370,24 +417,30 @@ export const sidebarNavigation: Record<
       title: "Community",
       items: [
         {
-          title: "Visitors",
-          href: "/dashboard/visitors",
-          icon: QrCode,
-        },
-        {
-          title: "Parking",
-          href: "/dashboard/parking",
-          icon: Car,
-        },
-        {
           title: "Announcements",
           href: "/dashboard/announcements",
           icon: Bell,
+          badge: "NEW",
         },
+        {
+          title: "Notifications",
+          href: "/dashboard/notifications",
+          icon: Bell,
+        },
+      ],
+    },
+    {
+      title: "Account",
+      items: [
         {
           title: "Profile",
           href: "/dashboard/profile",
           icon: UserRound,
+        },
+        {
+          title: "Settings",
+          href: "/dashboard/settings",
+          icon: Settings,
         },
       ],
     },

@@ -1,6 +1,8 @@
 import cookieParser from "cookie-parser";
 import express from "express";
 import cors from "cors";
+import path from "path";
+
 import { toNodeHandler } from "better-auth/node";
 import { errorHandler, notFoundHandler } from "./middlewares/errorHandler.js";
 import { auth } from "./lib/auth.js";
@@ -18,12 +20,13 @@ import StaffRoute from "./modules/staff/staff.routes.js";
 import BlockRoute from "./modules/block/block.routes.js";
 import FlatRoute from "./modules/flat/flat.routes.js";
 import ApartmentRoute from "./modules/apartment/apartment.routes.js";
-import visitorsRoutes from "./modules/visitors/routes.js";
+import visitorsRoutes from "./modules/visitors/visit.routes.js";
 import securityRoutes from "./modules/security/security.routes.js";
 import maintenanceTechnicianRoutes from "./modules/maintenance-technician/maintenance-technician.routes.js";
 import deliveryRoutes from "./modules/delivery/delivery.routes.js";
 import parkingRoutes from "./modules/parking/parking.routes.js";
 import alertRoutes from "./modules/alert/alert.routes.js";
+import announcementRoutes from "./modules/announcements/announcements.routes.js";
 import complaintRoutes from "./modules/complaint/complaint.routes.js";
 import maintenanceRoutes from "./modules/maintenance/maintenance.routes.js";
 import technicianRoutes from "./modules/technician/technician.routes.js";
@@ -68,10 +71,15 @@ app.use("/api/expenses", expenseRoutes);
 app.use("/api/wallets", walletRoutes);
 app.use("/api/audit", auditRoutes);
 
-app.use("/api/visitors", visitorsRoutes);
-app.use("/api/security/deliveries", deliveryRoutes);
+app.use("/api/v1/parking", parkingRoutes);
 app.use("/api/security/parking", parkingRoutes);
+
+app.use("/api/visitors", visitorsRoutes);
+app.use("/api/deliveries", deliveryRoutes);
+app.use("/api/security/deliveries", deliveryRoutes);
 app.use("/api/security/alerts", alertRoutes);
+app.use("/api/v1/announcements", announcementRoutes);
+app.use("/api/announcements", announcementRoutes);
 app.use("/api/security", securityRoutes);
 
 app.use("/api/maintenance-technician", maintenanceTechnicianRoutes);

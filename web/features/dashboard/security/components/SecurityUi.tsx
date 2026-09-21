@@ -46,10 +46,14 @@ const statusToneClassNames: Record<string, string> = {
   AVAILABLE: "bg-emerald-50 text-emerald-700 ring-emerald-100",
   OCCUPIED: "bg-amber-50 text-amber-700 ring-amber-100",
   RESERVED: "bg-blue-50 text-blue-700 ring-blue-100",
-  OUT_OF_SERVICE: "bg-red-50 text-red-700 ring-red-100",
+  UNAVAILABLE: "bg-red-50 text-red-700 ring-red-100",
   ACKNOWLEDGED: "bg-blue-50 text-blue-700 ring-blue-100",
   RESPONDING: "bg-amber-50 text-amber-700 ring-amber-100",
   RESOLVED: "bg-slate-100 text-slate-700 ring-slate-200",
+}
+
+const statusLabelOverrides: Record<string, string> = {
+  NOTIFIED: "Resident Notified",
 }
 
 export function formatDateTime(value?: string | null) {
@@ -66,6 +70,10 @@ export function formatDateTime(value?: string | null) {
 
 export function formatLabel(value?: string | null) {
   if (!value) return "-"
+
+  if (statusLabelOverrides[value]) {
+    return statusLabelOverrides[value]
+  }
 
   return value
     .split("_")

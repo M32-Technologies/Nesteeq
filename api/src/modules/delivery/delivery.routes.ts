@@ -2,11 +2,14 @@ import { Router } from "express"
 
 import {
   createDelivery,
+  getDeliveryAnalytics,
+  getDeliveryById,
   listDeliveries,
   updateDeliveryStatus,
 } from "./delivery.controller.js"
 import {
   createDeliverySchema,
+  deliveryAnalyticsQuerySchema,
   listDeliveriesSchema,
   updateDeliveryStatusSchema,
 } from "./delivery.schema.js"
@@ -19,14 +22,40 @@ import { zodValidate } from "../../middlewares/zodValidate.js"
 const router = Router()
 
 router.use(protect)
-router.use(requireRole("security_staff"))
 
-router.get("/", zodValidate(listDeliveriesSchema), listDeliveries)
-router.post("/", zodValidate(createDeliverySchema), createDelivery)
+router.get(
+  "/analytics",
+  requireRole("property_manager", "security_staff"),
+  zodValidate(deliveryAnalyticsQuerySchema),
+  getDeliveryAnalytics
+)
+
+router.get(
+  "/",
+  requireRole("property_manager", "security_staff"),
+  zodValidate(listDeliveriesSchema),
+  listDeliveries
+)
+
+router.get(
+  "/:deliveryId",
+  requireRole("property_manager", "security_staff"),
+  getDeliveryById
+)
+
+router.post(
+  "/",
+  requireRole("security_staff"),
+  zodValidate(createDeliverySchema),
+  createDelivery
+)
+
 router.patch(
   "/:deliveryId/status",
+  requireRole("security_staff"),
   zodValidate(updateDeliveryStatusSchema),
   updateDeliveryStatus
 )
 
 export default router
+

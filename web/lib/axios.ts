@@ -28,7 +28,7 @@ api.interceptors.response.use(
       );
 
       if (!isAuthRoute) {
-        window.location.href = "/login";
+        window.location.assign(new URL("/login", window.location.origin));
       }
     }
 

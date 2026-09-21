@@ -12,6 +12,7 @@ import {
   usePropertyBlocksQuery,
 } from "../hooks/use-property-query"
 import type { CreatePropertyFlatInput } from "../types/property"
+import { Portal } from "@/components/portal"
 
 type AddFlatDialogProps = {
   open: boolean
@@ -68,9 +69,9 @@ export default function AddFlatDialog({ open, onClose }: AddFlatDialogProps) {
   const selectedBlock = blocks.find((block) => block.id === selectedBlockId)
   const floorOptions = selectedBlock
     ? Array.from(
-        { length: selectedBlock.totalFloors },
-        (_, index) => index + 1
-      )
+      { length: selectedBlock.totalFloors },
+      (_, index) => index + 1
+    )
     : []
 
   const generatedPreview = useMemo(() => {
@@ -129,7 +130,11 @@ export default function AddFlatDialog({ open, onClose }: AddFlatDialogProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/35 px-4 py-8 sm:items-center">
+    <Portal>
+      <div
+        style={{ zIndex: 1000 }}
+        className="fixed inset-0 flex items-start justify-center overflow-y-auto bg-slate-950/40 p-4 backdrop-blur-sm sm:items-center"
+      >
       <div className="w-full max-w-[520px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex min-h-[82px] items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
           <div className="min-w-0">
@@ -290,5 +295,6 @@ export default function AddFlatDialog({ open, onClose }: AddFlatDialogProps) {
         </form>
       </div>
     </div>
-  )
+  </Portal>
+)
 }

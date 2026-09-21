@@ -5,7 +5,7 @@ import { Search } from "lucide-react"
 import type {
   VisitorRecordEntryType,
   VisitorRecordStatus,
-} from "../services/visitor.service"
+} from "../schemas/visitor"
 import {
   inputClassName,
   outlineButtonClassName,

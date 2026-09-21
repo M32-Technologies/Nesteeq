@@ -12,6 +12,7 @@ import {
   useUpdatePropertyFlatMutation,
 } from "../hooks/use-property-query"
 import type { PropertyFlat, UpdatePropertyFlatInput } from "../types/property"
+import { Portal } from "@/components/portal"
 
 type EditFlatDialogProps = {
   flat: PropertyFlat | null
@@ -150,7 +151,11 @@ export default function EditFlatDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/35 px-4 py-8 sm:items-center">
+    <Portal>
+      <div
+        style={{ zIndex: 1000 }}
+        className="fixed inset-0 flex items-start justify-center overflow-y-auto bg-slate-950/40 p-4 backdrop-blur-sm sm:items-center"
+      >
       <div className="w-full max-w-[520px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex min-h-[82px] items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
           <div className="min-w-0">
@@ -187,10 +192,10 @@ export default function EditFlatDialog({
               </span>
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
                 <p className="text-sm font-semibold text-slate-900">
-                  {flat.block?.blockname ?? flat.blockId}
+                  {flat.block?.blockname || flat.block?.code || "Block"}
                 </p>
                 <p className="mt-0.5 text-xs font-medium text-slate-500">
-                  Code {flat.block?.code ?? "-"} | Read only
+                  Code {flat.block?.code || "-"} | Read only
                 </p>
               </div>
             </div>
@@ -266,5 +271,6 @@ export default function EditFlatDialog({
         </form>
       </div>
     </div>
-  )
+  </Portal>
+)
 }

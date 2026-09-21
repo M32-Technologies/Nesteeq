@@ -5,7 +5,7 @@ import {
   getSecurityFlats,
   getSecurityResidents,
   getSecuritySummary,
-} from "../services/security.service"
+} from "../api/security.api"
 
 export const securityDataQueryKeys = {
   summary: ["security", "summary"] as const,

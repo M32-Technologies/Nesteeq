@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { Eye, LogIn, LogOut } from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -12,32 +11,33 @@ import {
   useVerifyVisitorPass,
   useVisitorRecords,
 } from "../hooks/useVisitors"
+import {
+  useAssignParkingSlot,
+  useParkingSlots,
+} from "../hooks/useParking"
+import { toParkingVehicleType } from "../constants/parking-vehicle-types"
 import { useDebouncedValue } from "../hooks/useDebouncedValue"
 import { useSecurityFlats } from "../hooks/useSecurityData"
 import { getSecurityApiErrorMessage } from "../utils/api-error"
+import {
+  isValidVehicleNumber,
+  normalizeVehicleNumber,
+} from "../utils/vehicle-validation"
 import type {
   VisitorPass,
   VisitorRecord,
   VisitorRecordEntryType,
   VisitorRecordStatus,
-} from "../services/visitor.service"
+} from "../schemas/visitor"
 import {
   EmptyState,
   ErrorState,
   LoadingState,
-  PaginationControls,
-  StatusBadge,
-  formatDateTime,
-  outlineButtonClassName,
-  primaryButtonClassName,
-  tableClassName,
-  tableWrapClassName,
-  tdClassName,
-  thClassName,
 } from "./SecurityUi"
 import { ConfirmActionModal } from "./ConfirmActionModal"
 import { VisitorDetails } from "./VisitorDetails"
 import { VisitorFilters } from "./VisitorFilters"
+import { VisitorRecordsTable } from "./VisitorRecordsTable"
 import {
   ManualVisitorPanel,
   VisitorEntryModeButtons,
@@ -46,6 +46,14 @@ import {
 } from "./VisitorEntryPanels"
 
 const PAGE_SIZE = 10
+const indianMobileNumberRegex =
+  /^(?:\+91|91|0)?[6-9]\d{9}$/
+
+const normalizePhoneNumber = (value: string) =>
+  value.replace(/[\s-]/g, "")
+
+const isValidIndianPhoneNumber = (value: string) =>
+  indianMobileNumberRegex.test(normalizePhoneNumber(value))
 
 export function SecurityVisitors() {
   const searchParams = useSearchParams()
@@ -70,6 +78,8 @@ export function SecurityVisitors() {
     visitorPhone: "",
     purpose: "",
     vehicleNumber: "",
+    vehicleType: "",
+    parkingSlotId: "",
   })
 
   const initialMode =
@@ -89,29 +99,53 @@ export function SecurityVisitors() {
     page,
     limit: PAGE_SIZE,
   })
-
+  const manualVehicleType = toParkingVehicleType(manualForm.vehicleType)
+  const manualAvailableSlotsQuery = useParkingSlots({
+    status: "AVAILABLE",
+    vehicleType: manualVehicleType,
+    limit: 100,
+  }, {
+    enabled: Boolean(manualVehicleType),
+  })
   const verifyPassMutation = useVerifyVisitorPass()
   const checkInMutation = useCheckInVisitor()
   const checkoutMutation = useCheckoutVisitor()
   const manualEntryMutation = useRegisterManualVisitor()
+  const assignParkingMutation = useAssignParkingSlot()
 
   const flats = flatsQuery.data?.flats ?? []
   const records = visitorRecordsQuery.data?.records ?? []
+  const manualAvailableSlots = (
+    manualAvailableSlotsQuery.data?.slots ?? []
+  ).filter(
+    (slot) =>
+      slot.status === "AVAILABLE" && !slot.currentAssignment
+  )
   const pagination = visitorRecordsQuery.data?.pagination
 
   const handleVerify = async () => {
-    if (!token.trim()) {
+    await verifyToken(token)
+  }
+
+  const verifyToken = async (tokenValue: string) => {
+    const trimmedToken = tokenValue.trim()
+
+    if (!trimmedToken) {
       toast.error("Enter or scan a visitor token")
-      return
+      return false
     }
+
+    setToken(trimmedToken)
+    setVerifiedPass(null)
 
     try {
       const result = await verifyPassMutation.mutateAsync(
-        token.trim()
+        trimmedToken
       )
 
       setVerifiedPass(result)
       toast.success("Visitor pass verified")
+      return true
     } catch (error) {
       toast.error(
         getSecurityApiErrorMessage(
@@ -119,6 +153,7 @@ export function SecurityVisitors() {
           "Unable to verify visitor pass"
         )
       )
+      return false
     }
   }
 
@@ -131,10 +166,14 @@ export function SecurityVisitors() {
   }
 
   const handleVerifiedCheckIn = async () => {
-    if (!verifiedPass?._id) return
+    const trimmedToken = token.trim()
+
+    if (!verifiedPass || !trimmedToken) return
 
     try {
-      await checkInMutation.mutateAsync(verifiedPass._id)
+      await checkInMutation.mutateAsync({
+        token: trimmedToken,
+      })
       toast.success("Visitor checked in successfully")
       setToken("")
       setVerifiedPass(null)
@@ -152,7 +191,9 @@ export function SecurityVisitors() {
     if (!record.visitorPassId) return
 
     try {
-      await checkInMutation.mutateAsync(record.visitorPassId)
+      await checkInMutation.mutateAsync({
+        visitorPassId: record.visitorPassId,
+      })
       toast.success("Visitor checked in successfully")
     } catch (error) {
       toast.error(
@@ -185,6 +226,13 @@ export function SecurityVisitors() {
   const handleManualEntry = async () => {
     if (manualEntryMutation.isPending) return
 
+    const trimmedVisitorPhone =
+      manualForm.visitorPhone.trim()
+    const normalizedVehicleNumber = normalizeVehicleNumber(
+      manualForm.vehicleNumber
+    )
+    const vehicleType = toParkingVehicleType(manualForm.vehicleType)
+
     if (
       !manualForm.flatId ||
       !manualForm.visitorName.trim()
@@ -193,18 +241,84 @@ export function SecurityVisitors() {
       return
     }
 
+    if (
+      trimmedVisitorPhone &&
+      !isValidIndianPhoneNumber(trimmedVisitorPhone)
+    ) {
+      toast.error("Enter a valid mobile number")
+      return
+    }
+
+    if (
+      normalizedVehicleNumber &&
+      !isValidVehicleNumber(normalizedVehicleNumber)
+    ) {
+      toast.error("Enter a valid vehicle number")
+      return
+    }
+
+    if (normalizedVehicleNumber && !vehicleType) {
+      toast.error("Vehicle type is required when vehicle number is added")
+      return
+    }
+
+    if (manualForm.vehicleType && !normalizedVehicleNumber) {
+      toast.error("Vehicle number is required when vehicle type is added")
+      return
+    }
+
+    if (
+      manualForm.parkingSlotId &&
+      !normalizedVehicleNumber
+    ) {
+      toast.error("Vehicle number is required for parking")
+      return
+    }
+
+    if (manualForm.parkingSlotId && !vehicleType) {
+      toast.error("Vehicle type is required for parking")
+      return
+    }
+
     try {
-      await manualEntryMutation.mutateAsync({
+      const visit = await manualEntryMutation.mutateAsync({
         flatId: manualForm.flatId,
         visitorName: manualForm.visitorName,
         visitorPhone:
-          manualForm.visitorPhone || undefined,
+          trimmedVisitorPhone || undefined,
         purpose: manualForm.purpose || undefined,
         vehicleNumber:
-          manualForm.vehicleNumber || undefined,
+          normalizedVehicleNumber || undefined,
+        vehicleType: vehicleType || undefined,
       })
 
-      toast.success("Visitor registered and checked in")
+      if (manualForm.parkingSlotId) {
+        if (!vehicleType) {
+          toast.error("Vehicle type is required for parking")
+          return
+        }
+
+        try {
+          await assignParkingMutation.mutateAsync({
+            slotId: manualForm.parkingSlotId,
+            flatId: manualForm.flatId,
+            visitorVisitId: visit._id,
+            visitorName: manualForm.visitorName,
+            vehicleNumber: normalizedVehicleNumber,
+            vehicleType,
+          })
+          toast.success("Visitor registered and parking assigned")
+        } catch (error) {
+          toast.error(
+            getSecurityApiErrorMessage(
+              error,
+              "Visitor registered, but unable to assign parking"
+            )
+          )
+        }
+      } else {
+        toast.success("Visitor registered and checked in")
+      }
 
       setManualForm({
         flatId: "",
@@ -212,6 +326,8 @@ export function SecurityVisitors() {
         visitorPhone: "",
         purpose: "",
         vehicleNumber: "",
+        vehicleType: "",
+        parkingSlotId: "",
       })
     } catch (error) {
       toast.error(
@@ -264,6 +380,7 @@ export function SecurityVisitors() {
           isCheckingIn={checkInMutation.isPending}
           isVerifying={verifyPassMutation.isPending}
           onCheckIn={handleVerifiedCheckIn}
+          onScan={verifyToken}
           onTokenChange={handleTokenChange}
           onVerify={handleVerify}
         />
@@ -272,7 +389,12 @@ export function SecurityVisitors() {
           flats={flats}
           flatsLoading={flatsQuery.isLoading}
           form={manualForm}
-          isSubmitting={manualEntryMutation.isPending}
+          availableSlots={manualAvailableSlots}
+          availableSlotsLoading={manualAvailableSlotsQuery.isLoading}
+          isSubmitting={
+            manualEntryMutation.isPending ||
+            assignParkingMutation.isPending
+          }
           onFormChange={setManualForm}
           onSubmit={handleManualEntry}
         />
@@ -297,128 +419,18 @@ export function SecurityVisitors() {
           description="Try a different search or filter."
         />
       ) : (
-        <>
-          <div className={tableWrapClassName}>
-            <table className={tableClassName}>
-              <thead>
-                <tr>
-                  <th className={thClassName}>Visitor</th>
-                  <th className={thClassName}>Phone</th>
-                  <th className={thClassName}>Flat / Unit</th>
-                  <th className={thClassName}>Purpose</th>
-                  <th className={thClassName}>Entry Type</th>
-                  <th className={thClassName}>
-                    Expected / Check-In Time
-                  </th>
-                  <th className={thClassName}>Check-Out Time</th>
-                  <th className={thClassName}>Vehicle Number</th>
-                  <th className={thClassName}>Status</th>
-                  <th className={thClassName}>Actions</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {records.map((record) => (
-                  <tr key={record._id}>
-                    <td className={tdClassName}>
-                      <p className="font-medium">
-                        {record.visitorName}
-                      </p>
-                    </td>
-                    <td className={tdClassName}>
-                      {record.visitorPhone || "-"}
-                    </td>
-                    <td className={tdClassName}>
-                      {record.flatNumber || record.flatId}
-                    </td>
-                    <td className={tdClassName}>
-                      {record.purpose || "-"}
-                    </td>
-                    <td className={tdClassName}>
-                      {record.entryType === "PASS"
-                        ? "Pre-Approved / Pass"
-                        : "Manual"}
-                    </td>
-                    <td className={tdClassName}>
-                      {formatDateTime(
-                        record.status === "UPCOMING"
-                          ? record.expectedAt
-                          : record.checkedInAt
-                      )}
-                    </td>
-                    <td className={tdClassName}>
-                      {formatDateTime(record.checkedOutAt)}
-                    </td>
-                    <td className={tdClassName}>
-                      {record.vehicleNumber || "-"}
-                    </td>
-                    <td className={tdClassName}>
-                      <StatusBadge status={record.status} />
-                    </td>
-                    <td className={tdClassName}>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          className={outlineButtonClassName}
-                          onClick={() =>
-                            setSelectedRecord(record)
-                          }
-                        >
-                          <Eye className="h-4 w-4" />
-                          View
-                        </button>
-
-                        {record.status === "UPCOMING" ? (
-                          <button
-                            type="button"
-                            className={primaryButtonClassName}
-                            onClick={() =>
-                              handleRecordCheckIn(record)
-                            }
-                            disabled={
-                              checkInMutation.isPending ||
-                              !record.visitorPassId
-                            }
-                          >
-                            <LogIn className="h-4 w-4" />
-                            Check In
-                          </button>
-                        ) : null}
-
-                        {record.status === "ACTIVE" ? (
-                          <button
-                            type="button"
-                            className={primaryButtonClassName}
-                            onClick={() =>
-                              setCheckoutRecord(record)
-                            }
-                            disabled={
-                              checkoutMutation.isPending ||
-                              !record.visitId
-                            }
-                          >
-                            <LogOut className="h-4 w-4" />
-                            Check Out
-                          </button>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {pagination ? (
-            <PaginationControls
-              page={pagination.page}
-              totalPages={pagination.totalPages}
-              hasPreviousPage={pagination.hasPreviousPage}
-              hasNextPage={pagination.hasNextPage}
-              onPageChange={setPage}
-            />
-          ) : null}
-        </>
+        <VisitorRecordsTable
+          records={records}
+          pagination={pagination}
+          availableSlots={[]}
+          availableSlotsLoading={false}
+          isCheckingIn={checkInMutation.isPending}
+          isCheckingOut={checkoutMutation.isPending}
+          onCheckIn={handleRecordCheckIn}
+          onCheckout={setCheckoutRecord}
+          onPageChange={setPage}
+          onView={setSelectedRecord}
+        />
       )}
 
       <VisitorDetails
@@ -432,7 +444,7 @@ export function SecurityVisitors() {
         isSubmitting={checkoutMutation.isPending}
         message={
           checkoutRecord
-            ? `Are you sure you want to check out ${checkoutRecord.visitorName} from Flat ${checkoutRecord.flatNumber || checkoutRecord.flatId}?`
+            ? `Are you sure you want to check out ${checkoutRecord.visitorName} from Flat ${checkoutRecord.flatNumber || "-"}?`
             : ""
         }
         title="Check Out Visitor"

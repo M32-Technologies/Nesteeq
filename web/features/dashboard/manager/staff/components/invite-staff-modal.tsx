@@ -9,6 +9,7 @@ import { toast } from "sonner"
 import { staffRoleOptions } from "../api/staff.api"
 import { useCreateStaffInvitationMutation } from "../hooks/use-staff-query"
 import type { CreateStaffInviteInput, StaffRole } from "../types/staff"
+import { Portal } from "@/components/portal"
 
 type InviteStaffModalProps = {
   open: boolean
@@ -85,7 +86,11 @@ export default function InviteStaffModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-4 py-6">
+    <Portal>
+      <div
+        style={{ zIndex: 1000 }}
+        className="fixed inset-0 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm overflow-y-auto"
+      >
       <div className="w-full max-w-[560px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex min-h-[76px] items-center justify-between gap-4 border-b border-slate-200 px-7">
           <div>
@@ -215,7 +220,8 @@ export default function InviteStaffModal({
         </form>
       </div>
     </div>
-  )
+  </Portal>
+)
 }
 
 function FormField({

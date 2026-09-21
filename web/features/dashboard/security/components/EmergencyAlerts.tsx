@@ -19,7 +19,7 @@ import { getSecurityApiErrorMessage } from "../utils/api-error"
 import type {
   EmergencyAlert,
   EmergencyAlertStatus,
-} from "../services/alert.service"
+} from "../schemas/alert"
 import {
   DetailGrid,
   DetailModal,
@@ -40,6 +40,10 @@ import {
   thClassName,
 } from "./SecurityUi"
 import { ResolveAlertModal } from "./ResolveAlertModal"
+import {
+  SecurityActionsMenu,
+  type SecurityMenuAction,
+} from "./SecurityActionsMenu"
 
 const PAGE_SIZE = 10
 
@@ -71,11 +75,18 @@ export function EmergencyAlerts() {
     page,
     limit: PAGE_SIZE,
   })
+  const activeAlertsQuery = useEmergencyAlerts({
+    status: "ACTIVE",
+    page: 1,
+    limit: 1,
+  })
   const updateStatusMutation =
     useUpdateEmergencyAlertStatus()
 
   const alerts = alertsQuery.data?.alerts ?? []
   const pagination = alertsQuery.data?.pagination
+  const activeAlertCount =
+    activeAlertsQuery.data?.pagination.total ?? 0
 
   const handleStatusUpdate = async (
     alert: EmergencyAlert,
@@ -178,6 +189,20 @@ export function EmergencyAlerts() {
         </div>
       </div>
 
+      {activeAlertCount > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <div>
+            <p className="font-semibold">
+              {activeAlertCount} active SOS alert
+              {activeAlertCount === 1 ? "" : "s"} need immediate response
+            </p>
+            <p className="text-xs text-red-700">
+              Auto-checking every 5 seconds
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       {alertsQuery.isLoading ? (
         <LoadingState label="Loading emergency alerts..." />
       ) : alertsQuery.isError ? (
@@ -220,8 +245,7 @@ export function EmergencyAlerts() {
                     </td>
                     <td className={tdClassName}>
                       <p>
-                        {alert.residentName ||
-                          alert.residentId}
+                        {alert.residentName || "-"}
                       </p>
                       {alert.residentPhone ? (
                         <p className="text-xs text-[#637083]">
@@ -230,7 +254,7 @@ export function EmergencyAlerts() {
                       ) : null}
                     </td>
                     <td className={tdClassName}>
-                      {alert.flatNumber || alert.flatId}
+                      {alert.flatNumber || "-"}
                     </td>
                     <td className={tdClassName}>
                       {formatDateTime(alert.triggeredAt)}
@@ -242,71 +266,15 @@ export function EmergencyAlerts() {
                       {alert.message || "-"}
                     </td>
                     <td className={tdClassName}>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          className={outlineButtonClassName}
-                          onClick={() =>
-                            setSelectedAlert(alert)
-                          }
-                        >
-                          <Eye className="h-4 w-4" />
-                          View
-                        </button>
-
-                        {alert.status === "ACTIVE" ? (
-                          <button
-                            type="button"
-                            className={outlineButtonClassName}
-                            disabled={
-                              updateStatusMutation.isPending
-                            }
-                            onClick={() =>
-                              handleStatusUpdate(
-                                alert,
-                                "ACKNOWLEDGED"
-                              )
-                            }
-                          >
-                            <BellRing className="h-4 w-4" />
-                            Acknowledge
-                          </button>
-                        ) : null}
-
-                        {alert.status === "ACTIVE" ||
-                        alert.status === "ACKNOWLEDGED" ? (
-                          <button
-                            type="button"
-                            className={primaryButtonClassName}
-                            disabled={
-                              updateStatusMutation.isPending
-                            }
-                            onClick={() =>
-                              handleStatusUpdate(
-                                alert,
-                                "RESPONDING"
-                              )
-                            }
-                          >
-                            <ShieldCheck className="h-4 w-4" />
-                            Responding
-                          </button>
-                        ) : null}
-
-                        {alert.status !== "RESOLVED" ? (
-                          <button
-                            type="button"
-                            className={outlineButtonClassName}
-                            disabled={
-                              updateStatusMutation.isPending
-                            }
-                            onClick={() => setResolvingAlert(alert)}
-                          >
-                            <CheckCircle2 className="h-4 w-4" />
-                            Resolve
-                          </button>
-                        ) : null}
-                      </div>
+                      <EmergencyAlertActionsMenu
+                        alert={alert}
+                        isUpdating={
+                          updateStatusMutation.isPending
+                        }
+                        onResolve={setResolvingAlert}
+                        onStatusUpdate={handleStatusUpdate}
+                        onView={setSelectedAlert}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -340,9 +308,7 @@ export function EmergencyAlerts() {
               },
               {
                 label: "Resident",
-                value:
-                  selectedAlert.residentName ??
-                  selectedAlert.residentId,
+                value: selectedAlert.residentName ?? "-",
               },
               {
                 label: "Phone",
@@ -350,9 +316,7 @@ export function EmergencyAlerts() {
               },
               {
                 label: "Flat / Unit",
-                value:
-                  selectedAlert.flatNumber ??
-                  selectedAlert.flatId,
+                value: selectedAlert.flatNumber ?? "-",
               },
               {
                 label: "Triggered",
@@ -398,5 +362,65 @@ export function EmergencyAlerts() {
         onResolve={handleResolveAlert}
       />
     </div>
+  )
+}
+
+function EmergencyAlertActionsMenu({
+  alert,
+  isUpdating,
+  onResolve,
+  onStatusUpdate,
+  onView,
+}: {
+  alert: EmergencyAlert
+  isUpdating: boolean
+  onResolve: (alert: EmergencyAlert) => void
+  onStatusUpdate: (
+    alert: EmergencyAlert,
+    nextStatus: Exclude<EmergencyAlertStatus, "ALL">
+  ) => void
+  onView: (alert: EmergencyAlert) => void
+}) {
+  const actions: SecurityMenuAction[] = [
+    {
+      label: "View Details",
+      icon: <Eye size={15} />,
+      onClick: () => onView(alert),
+    },
+  ]
+
+  if (alert.status === "ACTIVE") {
+    actions.push({
+      label: "Acknowledge",
+      icon: <BellRing size={15} />,
+      disabled: isUpdating,
+      onClick: () =>
+        onStatusUpdate(alert, "ACKNOWLEDGED"),
+    })
+  }
+
+  if (alert.status === "ACKNOWLEDGED") {
+    actions.push({
+      label: "Mark Responding",
+      icon: <ShieldCheck size={15} />,
+      disabled: isUpdating,
+      onClick: () => onStatusUpdate(alert, "RESPONDING"),
+    })
+  }
+
+  if (alert.status === "RESPONDING") {
+    actions.push({
+      label: "Resolve Alert",
+      icon: <CheckCircle2 size={15} />,
+      disabled: isUpdating,
+      onClick: () => onResolve(alert),
+    })
+  }
+
+  return (
+    <SecurityActionsMenu
+      actions={actions}
+      label={`Open actions for ${formatLabel(alert.alertType)} alert`}
+    />
   )
 }

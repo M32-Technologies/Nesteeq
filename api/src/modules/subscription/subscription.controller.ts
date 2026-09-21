@@ -4,6 +4,7 @@ import { AppError } from "../../utils/AppError.js";
 import {
   CreateSubscription,
   CreateSubscriptionPlan,
+  GetCurrentSubscription,
   GetSubscriptionPlans,
   VerifySubscriptionPayment,
 } from "./subscription.service.js";
@@ -23,6 +24,26 @@ export const CreateSubscriptionPlanHandler = catchAsync(
 export const GetSubscriptionPlansHandler = catchAsync(
   async (_req: Request, res: Response) => {
     const result = await GetSubscriptionPlans();
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  },
+);
+
+export const GetCurrentSubscriptionHandler = catchAsync(
+  async (req: Request, res: Response) => {
+    const apartmentId = req.user?.apartmentId;
+
+    if (!apartmentId) {
+      return res.status(200).json({
+        success: true,
+        data: null,
+      });
+    }
+
+    const result = await GetCurrentSubscription(apartmentId);
 
     res.status(200).json({
       success: true,

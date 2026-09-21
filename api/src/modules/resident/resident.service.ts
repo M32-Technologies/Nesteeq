@@ -10,6 +10,30 @@ import { Invite } from "../invitation/invitation.model.js";
 const escapeRegex = (value: string) =>
     value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+const getAuthUserFilter = (userId: string) => {
+    const filters: Record<string, unknown>[] = [{ id: userId }];
+
+    if (Types.ObjectId.isValid(userId)) {
+        filters.push({ _id: new Types.ObjectId(userId) });
+    }
+
+    return { $or: filters };
+};
+
+const getAuthUsersFilter = (userIds: string[]) => {
+    const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
+    const objectIds = uniqueIds
+        .filter((userId) => Types.ObjectId.isValid(userId))
+        .map((userId) => new Types.ObjectId(userId));
+
+    return {
+        $or: [
+            { id: { $in: uniqueIds } },
+            ...(objectIds.length ? [{ _id: { $in: objectIds } }] : []),
+        ],
+    };
+};
+
 export const getResident = async (data: ResidentListQuery, apartmentId: string) => {
     const { search, page, blockId, residentType, status, limit } = data;
 
@@ -37,7 +61,7 @@ export const getResident = async (data: ResidentListQuery, apartmentId: string) 
                         { email: regex },
                     ],
                 })
-                .project({ _id: 0, id: 1 })
+                .project({ _id: 1, id: 1 })
                 .toArray(),
             Flat.find({
                 apartmentId,
@@ -45,9 +69,13 @@ export const getResident = async (data: ResidentListQuery, apartmentId: string) 
             }).select("_id").lean(),
         ]);
 
+        const matchedUserIds = (users as Array<{ _id?: { toString: () => string }; id?: string }>)
+            .flatMap((user) => [user.id, user._id?.toString()])
+            .filter(Boolean);
+
         filter.$or = [
             { phoneNumber: regex },
-            { userId: { $in: users.map((user) => user.id).filter(Boolean) } },
+            { userId: { $in: matchedUserIds } },
             { flatId: { $in: flats.map((flat) => flat._id) } },
         ];
     }
@@ -58,7 +86,13 @@ export const getResident = async (data: ResidentListQuery, apartmentId: string) 
 
     const [residents, totalCount] = await Promise.all([
         Resident.find(filter)
-            .populate("flatId")
+            .populate({
+                path: "flatId",
+                populate: {
+                    path: "blockId",
+                    select: "blockname code",
+                },
+            })
             .skip(Skip)
             .limit(Limit)
             .sort({ createdAt: -1 })
@@ -66,24 +100,29 @@ export const getResident = async (data: ResidentListQuery, apartmentId: string) 
         Resident.countDocuments(filter),
     ]);
 
-    const users = await getAuthDB()
-        .collection("user")
-        .find({
-            id: { $in: residents.map((resident: any) => resident.userId).filter(Boolean) },
-        })
-        .project({
-            _id: 0,
-            id: 1,
-            name: 1,
-            email: 1,
-            emailVerified: 1,
-            image: 1,
-            role: 1,
-            phone: 1,
-        })
-        .toArray();
+    const userIds = residents.map((resident) => resident.userId).filter(Boolean) as string[];
+    const users = userIds.length
+        ? await getAuthDB()
+            .collection("user")
+            .find(getAuthUsersFilter(userIds))
+            .project({
+                _id: 1,
+                id: 1,
+                name: 1,
+                email: 1,
+                emailVerified: 1,
+                image: 1,
+                role: 1,
+                phone: 1,
+            })
+            .toArray()
+        : [];
 
-    const usersById = new Map(users.map((user) => [user.id, user]));
+    const usersById = new Map<string, any>();
+    for (const user of users) {
+        if (user.id) usersById.set(user.id, user);
+        if (user._id) usersById.set(user._id.toString(), user);
+    }
 
     return {
         residents: residents.map((resident: any) => {
@@ -160,7 +199,13 @@ export const getResidentDetails = async (residentId: string, apartmentId: string
         _id: new Types.ObjectId(residentId),
         apartmentId,
     })
-        .populate("flatId")
+        .populate({
+            path: "flatId",
+            populate: {
+                path: "blockId",
+                select: "blockname code",
+            },
+        })
         .lean();
 
     if (!resident) {
@@ -171,10 +216,10 @@ export const getResidentDetails = async (residentId: string, apartmentId: string
         ? await getAuthDB()
             .collection("user")
             .findOne(
-                { id: resident.userId },
+                getAuthUserFilter(resident.userId),
                 {
                     projection: {
-                        _id: 0,
+                        _id: 1,
                         id: 1,
                         name: 1,
                         email: 1,
@@ -324,7 +369,7 @@ export const updateResidentDetails = async (
             await getAuthDB()
                 .collection("user")
                 .updateOne(
-                    { id: resident.userId },
+                    getAuthUserFilter(resident.userId),
                     { $set: { name: data.name.trim() } }
                 );
         }

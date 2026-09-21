@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import { QueryProvider } from "@/app/provider";
 import { Toaster } from "sonner";
 import "./globals.css";
+import { Geist } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: "Nesteeq",
@@ -10,7 +14,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en">
+    <html lang="en" className={cn("font-sans", geist.variable)}>
       <body>
         <QueryProvider>{children}</QueryProvider>
         <Toaster richColors position="top-right" duration={3000} />

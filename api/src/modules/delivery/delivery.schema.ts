@@ -3,8 +3,9 @@ import { z } from "zod"
 import {
   DeliveryStatus,
   DeliveryType,
+  deliveryUpdateStatuses,
 } from "./delivery.interface.js"
-import { deliveryUpdateStatuses } from "../security/security-status-transitions.js"
+import { DELIVERY_ANALYTICS_RANGES } from "./delivery.types.js"
 
 const objectIdSchema = z
   .string()
@@ -37,7 +38,6 @@ export const createDeliverySchema = z.object({
     deliveryPersonPhone: optionalString(
       z.string().max(20)
     ),
-    trackingId: optionalString(z.string().max(80)),
     packageDescription: optionalString(
       z.string().max(300)
     ),
@@ -50,7 +50,12 @@ export const listDeliveriesSchema = z.object({
     status: z
       .enum(["ALL", ...Object.values(DeliveryStatus)])
       .optional(),
+    deliveryType: z
+      .enum(["ALL", ...Object.values(DeliveryType)])
+      .optional(),
     search: z.string().trim().max(100).optional(),
+    startDate: z.string().trim().optional(),
+    endDate: z.string().trim().optional(),
     page: z.coerce.number().int().positive().optional(),
     limit: z.coerce
       .number()
@@ -74,3 +79,9 @@ export const updateDeliveryStatusSchema =
       notes: optionalString(z.string().max(500)),
     }),
   })
+
+export const deliveryAnalyticsQuerySchema = z.object({
+  query: z.object({
+    range: z.enum(DELIVERY_ANALYTICS_RANGES).default("30d"),
+  }),
+})

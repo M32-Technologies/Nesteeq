@@ -10,6 +10,7 @@ export const maintenanceStatuses = [
   "IN_PROGRESS",
   "ON_HOLD",
   "WORK_COMPLETED",
+  "COMPLETED",
   "AWAITING_APPROVAL",
   "APPROVED",
   "REJECTED",

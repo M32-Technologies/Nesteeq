@@ -2,30 +2,53 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import {
+  assignResidentParking,
   generateParkingSlots,
+  getParkingSlotById,
   getParkingSlots,
+  getParkingStats,
+  releaseResidentParking,
   updateParkingSlot,
   updateParkingSlotStatus,
-  type GenerateParkingSlotsPayload,
-  type UpdateParkingSlotPayload,
-  type VisitorParkingSlotStatus,
-} from "../../../security/services/parking.service"
+} from "../api/parking.api"
+import type {
+  AssignResidentParkingInput,
+  GenerateParkingSlotsInput,
+  ParkingFilterParams,
+  UpdateParkingSlotInput,
+} from "../types/parking.types"
 
 export const PARKING_QUERY_KEYS = {
   all: ["parking-slots"] as const,
-  list: (filters: { status?: VisitorParkingSlotStatus; search?: string; page?: number; limit?: number }) =>
-    [...PARKING_QUERY_KEYS.all, filters] as const,
+  list: (filters: ParkingFilterParams) =>
+    [...PARKING_QUERY_KEYS.all, "list", filters] as const,
+  details: (parkingId: string) =>
+    [...PARKING_QUERY_KEYS.all, "details", parkingId] as const,
+  stats: () => [...PARKING_QUERY_KEYS.all, "stats"] as const,
 }
 
-export function useParkingSlotsQuery(filters: {
-  status?: VisitorParkingSlotStatus
-  search?: string
-  page?: number
-  limit?: number
-}) {
+export function useParkingSlotsQuery(filters: ParkingFilterParams = {}) {
   return useQuery({
     queryKey: PARKING_QUERY_KEYS.list(filters),
     queryFn: () => getParkingSlots(filters),
+    staleTime: 30 * 1000,
+  })
+}
+
+export function useParkingStatsQuery() {
+  return useQuery({
+    queryKey: PARKING_QUERY_KEYS.stats(),
+    queryFn: () => getParkingStats(),
+    staleTime: 30 * 1000,
+  })
+}
+
+export function useParkingSlotDetailsQuery(parkingId: string | null) {
+  return useQuery({
+    queryKey: PARKING_QUERY_KEYS.details(parkingId ?? ""),
+    queryFn: () => getParkingSlotById(parkingId!),
+    enabled: Boolean(parkingId),
+    staleTime: 30 * 1000,
   })
 }
 
@@ -33,15 +56,19 @@ export function useGenerateParkingSlotsMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (payload: GenerateParkingSlotsPayload) =>
+    mutationFn: (payload: GenerateParkingSlotsInput) =>
       generateParkingSlots(payload),
     onSuccess: (data) => {
-      toast.success((data as { message?: string })?.message || "Parking slots generated successfully")
+      toast.success(
+        (data as { message?: string })?.message ||
+          "Parking slots generated successfully"
+      )
       queryClient.invalidateQueries({ queryKey: PARKING_QUERY_KEYS.all })
     },
     onError: (error: unknown) => {
       toast.error(
-        (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to generate parking slots"
+        (error as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message || "Failed to generate parking slots"
       )
     },
   })
@@ -51,15 +78,21 @@ export function useUpdateParkingSlotMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (payload: UpdateParkingSlotPayload) =>
-      updateParkingSlot(payload),
-    onSuccess: () => {
-      toast.success("Parking slot updated successfully")
+    mutationFn: ({
+      parkingId,
+      input,
+    }: {
+      parkingId: string
+      input: UpdateParkingSlotInput
+    }) => updateParkingSlot(parkingId, input),
+    onSuccess: (data) => {
+      toast.success(`Slot ${data.slotNumber} updated successfully`)
       queryClient.invalidateQueries({ queryKey: PARKING_QUERY_KEYS.all })
     },
     onError: (error: unknown) => {
       toast.error(
-        (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to update parking slot"
+        (error as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message || "Failed to update parking slot"
       )
     },
   })
@@ -69,18 +102,67 @@ export function useUpdateParkingStatusMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (payload: {
-      slotId: string
-      status: Exclude<VisitorParkingSlotStatus, "ALL" | "OCCUPIED">
-      notes?: string
-    }) => updateParkingSlotStatus(payload),
-    onSuccess: () => {
-      toast.success("Parking slot status updated successfully")
+    mutationFn: ({
+      parkingId,
+      status,
+    }: {
+      parkingId: string
+      status: "AVAILABLE" | "INACTIVE"
+    }) => updateParkingSlotStatus(parkingId, status),
+    onSuccess: (data) => {
+      const message =
+        data.status === "INACTIVE"
+          ? `Slot ${data.slotNumber} deactivated`
+          : `Slot ${data.slotNumber} activated`
+      toast.success(message)
       queryClient.invalidateQueries({ queryKey: PARKING_QUERY_KEYS.all })
     },
     onError: (error: unknown) => {
       toast.error(
-        (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to update parking status"
+        (error as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message || "Failed to update parking status"
+      )
+    },
+  })
+}
+
+export function useAssignResidentParkingMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      parkingId,
+      input,
+    }: {
+      parkingId: string
+      input: AssignResidentParkingInput
+    }) => assignResidentParking(parkingId, input),
+    onSuccess: (data) => {
+      toast.success(`Slot ${data.slotNumber} assigned successfully`)
+      queryClient.invalidateQueries({ queryKey: PARKING_QUERY_KEYS.all })
+    },
+    onError: (error: unknown) => {
+      toast.error(
+        (error as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message || "Failed to assign parking slot"
+      )
+    },
+  })
+}
+
+export function useReleaseResidentParkingMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (parkingId: string) => releaseResidentParking(parkingId),
+    onSuccess: (data) => {
+      toast.success(`Slot ${data.slotNumber} released successfully`)
+      queryClient.invalidateQueries({ queryKey: PARKING_QUERY_KEYS.all })
+    },
+    onError: (error: unknown) => {
+      toast.error(
+        (error as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message || "Failed to release parking slot"
       )
     },
   })

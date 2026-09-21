@@ -1,35 +1,40 @@
 "use client"
 
-import { useState } from "react"
+import { Fragment, useState } from "react"
 import {
-  Ban,
-  Car,
   Eye,
   LogOut,
+  MoreVertical,
   Search,
-  Wrench,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { useActiveVisitors } from "../hooks/useVisitors"
 import {
   useAssignParkingSlot,
-  useCreateParkingSlot,
   useParkingSlots,
   useReleaseParkingSlot,
-  useUpdateParkingSlotStatus,
 } from "../hooks/useParking"
 import { useDebouncedValue } from "../hooks/useDebouncedValue"
 import { useSecurityFlats } from "../hooks/useSecurityData"
 import { getSecurityApiErrorMessage } from "../utils/api-error"
+import {
+  isValidVehicleNumber,
+  normalizeVehicleNumber,
+} from "../utils/vehicle-validation"
+import {
+  parkingVehicleTypeOptions,
+  toParkingVehicleType,
+} from "../constants/parking-vehicle-types"
 import type {
   VisitorParkingSlot,
   VisitorParkingSlotStatus,
-} from "../services/parking.service"
+} from "../schemas/parking"
 import {
   EmptyState,
   ErrorState,
   LoadingState,
+  PaginationControls,
   StatusBadge,
   formatDateTime,
   inputClassName,
@@ -41,12 +46,10 @@ import {
   tdClassName,
   thClassName,
 } from "./SecurityUi"
-import { ConfirmActionModal } from "./ConfirmActionModal"
 import { ParkingDetails } from "./ParkingDetails"
 import {
   ParkingForms,
   type ParkingAssignFormState,
-  type ParkingSlotFormState,
 } from "./ParkingForms"
 import { ParkingSummaryCards } from "./ParkingSummaryCards"
 
@@ -58,26 +61,22 @@ const statusFilters: Array<{
   { label: "Available", value: "AVAILABLE" },
   { label: "Occupied", value: "OCCUPIED" },
   { label: "Reserved", value: "RESERVED" },
-  { label: "Out of Service", value: "OUT_OF_SERVICE" },
+  { label: "Unavailable", value: "UNAVAILABLE" },
 ]
+
+const PARKING_PAGE_SIZE = 10
+const ASSIGNMENT_SLOT_LIMIT = 100
+const PARKING_TABLE_COLUMN_COUNT = 7
 
 export function ParkingSlots() {
   const [status, setStatus] =
     useState<VisitorParkingSlotStatus>("ALL")
   const [search, setSearch] = useState("")
+  const [page, setPage] = useState(1)
   const [selectedSlot, setSelectedSlot] =
     useState<VisitorParkingSlot | null>(null)
-  const [releaseSlot, setReleaseSlot] =
-    useState<VisitorParkingSlot | null>(null)
-  const [slotForm, setSlotForm] =
-    useState<ParkingSlotFormState>({
-    slotNumber: "",
-    status: "AVAILABLE" as Exclude<
-      VisitorParkingSlotStatus,
-      "ALL" | "OCCUPIED"
-    >,
-    notes: "",
-  })
+  const [openActionSlotId, setOpenActionSlotId] =
+    useState<string | null>(null)
   const [assignForm, setAssignForm] =
     useState<ParkingAssignFormState>({
     slotId: "",
@@ -90,65 +89,66 @@ export function ParkingSlots() {
   })
 
   const debouncedSearch = useDebouncedValue(search, 350)
+  const assignVehicleType = toParkingVehicleType(assignForm.vehicleType)
   const parkingQuery = useParkingSlots({
     status,
     search: debouncedSearch.trim() || undefined,
+    page,
+    limit: PARKING_PAGE_SIZE,
   })
   const availableSlotsQuery = useParkingSlots({
     status: "AVAILABLE",
+    vehicleType: assignVehicleType,
+    limit: ASSIGNMENT_SLOT_LIMIT,
+  }, {
+    enabled: Boolean(assignVehicleType),
   })
   const activeVisitorsQuery = useActiveVisitors(1, 100)
   const flatsQuery = useSecurityFlats()
-  const createSlotMutation = useCreateParkingSlot()
   const assignMutation = useAssignParkingSlot()
   const releaseMutation = useReleaseParkingSlot()
-  const updateStatusMutation = useUpdateParkingSlotStatus()
 
   const slots = parkingQuery.data?.slots ?? []
   const summary = parkingQuery.data?.summary
   const flats = flatsQuery.data?.flats ?? []
+  const pagination = parkingQuery.data?.pagination
 
-  const availableSlots = availableSlotsQuery.data?.slots ?? []
-
-  const handleCreateSlot = async () => {
-    if (!slotForm.slotNumber.trim()) {
-      toast.error("Slot number is required")
-      return
-    }
-
-    try {
-      await createSlotMutation.mutateAsync({
-        slotNumber: slotForm.slotNumber,
-        status: slotForm.status,
-        notes: slotForm.notes || undefined,
-      })
-
-      toast.success("Parking slot created")
-      setSlotForm({
-        slotNumber: "",
-        status: "AVAILABLE",
-        notes: "",
-      })
-    } catch (error) {
-      toast.error(
-        getSecurityApiErrorMessage(
-          error,
-          "Unable to create parking slot"
-        )
-      )
-    }
-  }
+  const availableSlots = (
+    availableSlotsQuery.data?.slots ?? []
+  ).filter(
+    (slot) =>
+      slot.status === "AVAILABLE" && !slot.currentAssignment
+  )
+  const parkingSections = parkingVehicleTypeOptions.map((vehicleType) => ({
+    ...vehicleType,
+    slots: slots.filter((slot) =>
+      vehicleType.value === "OTHER"
+        ? !slot.vehicleType || slot.vehicleType === vehicleType.value
+        : slot.vehicleType === vehicleType.value
+    ),
+  }))
 
   const handleAssign = async () => {
     if (assignMutation.isPending) return
+
+    const normalizedVehicleNumber = normalizeVehicleNumber(
+      assignForm.vehicleNumber
+    )
+    const vehicleType = toParkingVehicleType(assignForm.vehicleType)
 
     if (
       !assignForm.slotId ||
       !assignForm.flatId ||
       !assignForm.visitorName.trim() ||
-      !assignForm.vehicleNumber.trim()
+      !normalizedVehicleNumber ||
+      !vehicleType
     ) {
-      toast.error("Slot, flat, visitor, and vehicle are required")
+      toast.error("Slot, flat, visitor, vehicle number, and vehicle type are required")
+      return
+    }
+
+    if (!isValidVehicleNumber(normalizedVehicleNumber)) {
+      toast.error("Enter a valid vehicle number")
       return
     }
 
@@ -159,8 +159,8 @@ export function ParkingSlots() {
         visitorVisitId:
           assignForm.visitorVisitId || undefined,
         visitorName: assignForm.visitorName,
-        vehicleNumber: assignForm.vehicleNumber,
-        vehicleType: assignForm.vehicleType || undefined,
+        vehicleNumber: normalizedVehicleNumber,
+        vehicleType,
         notes: assignForm.notes || undefined,
       })
 
@@ -184,44 +184,26 @@ export function ParkingSlots() {
     }
   }
 
-  const handleRelease = async () => {
-    if (!releaseSlot) return
+  const setFilterStatus = (value: VisitorParkingSlotStatus) => {
+    setStatus(value)
+    setPage(1)
+  }
 
+  const setSearchQuery = (value: string) => {
+    setSearch(value)
+    setPage(1)
+  }
+
+  const handleReleaseSlot = async (slot: VisitorParkingSlot) => {
     try {
-      await releaseMutation.mutateAsync(releaseSlot._id)
+      await releaseMutation.mutateAsync(slot._id)
       toast.success("Parking slot released")
-      setReleaseSlot(null)
+      setOpenActionSlotId(null)
     } catch (error) {
       toast.error(
         getSecurityApiErrorMessage(
           error,
           "Unable to release parking slot"
-        )
-      )
-      throw error
-    }
-  }
-
-  const handleSlotStatus = async (
-    slot: VisitorParkingSlot,
-    nextStatus: Exclude<
-      VisitorParkingSlotStatus,
-      "ALL" | "OCCUPIED"
-    >
-  ) => {
-    try {
-      await updateStatusMutation.mutateAsync({
-        slotId: slot._id,
-        status: nextStatus,
-        notes: slot.notes || undefined,
-      })
-
-      toast.success("Parking slot updated")
-    } catch (error) {
-      toast.error(
-        getSecurityApiErrorMessage(
-          error,
-          "Unable to update parking slot"
         )
       )
     }
@@ -234,7 +216,7 @@ export function ParkingSlots() {
           Parking Slots
         </h1>
         <p className="text-sm text-[#637083]">
-          Manage visitor parking availability, assignments, and releases.
+          Assign visitors to property manager-created parking slots and release active assignments.
         </p>
       </div>
 
@@ -251,12 +233,8 @@ export function ParkingSlots() {
         flats={flats}
         flatsLoading={flatsQuery.isLoading}
         isAssigning={assignMutation.isPending}
-        isCreating={createSlotMutation.isPending}
         onAssign={handleAssign}
         onAssignFormChange={setAssignForm}
-        onCreateSlot={handleCreateSlot}
-        onSlotFormChange={setSlotForm}
-        slotForm={slotForm}
       />
 
       <div className={panelClassName}>
@@ -267,7 +245,9 @@ export function ParkingSlots() {
               type="search"
               className={`${inputClassName} pl-9`}
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) =>
+                setSearchQuery(event.target.value)
+              }
               placeholder="Search slot number"
             />
           </div>
@@ -282,7 +262,7 @@ export function ParkingSlots() {
                     ? primaryButtonClassName
                     : outlineButtonClassName
                 }
-                onClick={() => setStatus(filter.value)}
+                onClick={() => setFilterStatus(filter.value)}
               >
                 {filter.label}
               </button>
@@ -298,153 +278,147 @@ export function ParkingSlots() {
       ) : slots.length === 0 ? (
         <EmptyState
           title="No visitor parking slots found"
-          description="Add visitor parking slots to start assigning vehicles."
+          description="Property manager-created visitor parking slots will appear here."
         />
       ) : (
-        <div className={tableWrapClassName}>
-          <table className={tableClassName}>
-            <thead>
-              <tr>
-                <th className={thClassName}>Slot Number</th>
-                <th className={thClassName}>Vehicle Number</th>
-                <th className={thClassName}>Visitor</th>
-                <th className={thClassName}>Visiting Flat</th>
-                <th className={thClassName}>Assigned Time</th>
-                <th className={thClassName}>Status</th>
-                <th className={thClassName}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {slots.map((slot) => (
-                <tr key={slot._id}>
-                  <td className={tdClassName}>
-                    <p className="font-medium">{slot.slotNumber}</p>
-                  </td>
-                  <td className={tdClassName}>
-                    {slot.currentAssignment?.vehicleNumber ?? "-"}
-                  </td>
-                  <td className={tdClassName}>
-                    {slot.currentAssignment?.visitorName ?? "-"}
-                  </td>
-                  <td className={tdClassName}>
-                    {slot.currentAssignment?.flatNumber ??
-                      slot.currentAssignment?.flatId ??
-                      "-"}
-                  </td>
-                  <td className={tdClassName}>
-                    {formatDateTime(
-                      slot.currentAssignment?.assignedAt
-                    )}
-                  </td>
-                  <td className={tdClassName}>
-                    <StatusBadge status={slot.status} />
-                  </td>
-                  <td className={tdClassName}>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        className={outlineButtonClassName}
-                        onClick={() => setSelectedSlot(slot)}
-                      >
-                        <Eye className="h-4 w-4" />
-                        View
-                      </button>
-
-                      {slot.status === "OCCUPIED" ? (
-                        <button
-                          type="button"
-                          className={primaryButtonClassName}
-                          disabled={releaseMutation.isPending}
-                          onClick={() => setReleaseSlot(slot)}
-                        >
-                          <LogOut className="h-4 w-4" />
-                          Release
-                        </button>
-                      ) : null}
-
-                      {slot.status === "AVAILABLE" ? (
-                        <>
-                          <button
-                            type="button"
-                            className={outlineButtonClassName}
-                            disabled={
-                              updateStatusMutation.isPending
-                            }
-                            onClick={() =>
-                              handleSlotStatus(
-                                slot,
-                                "RESERVED"
-                              )
-                            }
-                          >
-                            <Ban className="h-4 w-4" />
-                            Reserve
-                          </button>
-                          <button
-                            type="button"
-                            className={outlineButtonClassName}
-                            disabled={
-                              updateStatusMutation.isPending
-                            }
-                            onClick={() =>
-                              handleSlotStatus(
-                                slot,
-                                "OUT_OF_SERVICE"
-                              )
-                            }
-                          >
-                            <Wrench className="h-4 w-4" />
-                            Unavailable
-                          </button>
-                        </>
-                      ) : null}
-
-                      {slot.status === "RESERVED" ||
-                      slot.status === "OUT_OF_SERVICE" ? (
-                        <button
-                          type="button"
-                          className={outlineButtonClassName}
-                          disabled={
-                            updateStatusMutation.isPending
-                          }
-                          onClick={() =>
-                            handleSlotStatus(
-                              slot,
-                              "AVAILABLE"
-                            )
-                          }
-                        >
-                          <Car className="h-4 w-4" />
-                          Available
-                        </button>
-                      ) : null}
-                    </div>
-                  </td>
+        <>
+          <div className={tableWrapClassName}>
+            <table className={tableClassName}>
+              <thead>
+                <tr>
+                  <th className={thClassName}>Slot Number</th>
+                  <th className={thClassName}>Vehicle Number</th>
+                  <th className={thClassName}>Visitor</th>
+                  <th className={thClassName}>Visiting Flat</th>
+                  <th className={thClassName}>Assigned Time</th>
+                  <th className={thClassName}>Status</th>
+                  <th className={thClassName}>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {parkingSections.map((section) => (
+                  <Fragment key={section.value}>
+                    <tr>
+                      <td
+                        className="bg-[#F7F8F5] px-4 py-3 text-sm font-semibold text-[#111111]"
+                        colSpan={PARKING_TABLE_COLUMN_COUNT}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span>{section.label} Parking</span>
+                          <span className="text-xs font-medium text-[#637083]">
+                            {section.slots.length} slots
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+
+                    {section.slots.length === 0 ? (
+                      <tr>
+                        <td
+                          className="px-4 py-5 text-sm text-[#637083]"
+                          colSpan={PARKING_TABLE_COLUMN_COUNT}
+                        >
+                          No {section.label.toLowerCase()} parking slots
+                        </td>
+                      </tr>
+                    ) : (
+                      section.slots.map((slot) => (
+                        <tr key={slot._id}>
+                          <td className={tdClassName}>
+                            <p className="font-medium">{slot.slotNumber}</p>
+                          </td>
+                          <td className={tdClassName}>
+                            {slot.currentAssignment?.vehicleNumber ?? "-"}
+                          </td>
+                          <td className={tdClassName}>
+                            {slot.currentAssignment?.visitorName ?? "-"}
+                          </td>
+                          <td className={tdClassName}>
+                            {slot.currentAssignment?.flatNumber ?? "-"}
+                          </td>
+                          <td className={tdClassName}>
+                            {formatDateTime(
+                              slot.currentAssignment?.assignedAt
+                            )}
+                          </td>
+                          <td className={tdClassName}>
+                            <StatusBadge status={slot.status} />
+                          </td>
+                          <td className={tdClassName}>
+                            <div className="relative flex justify-end">
+                              <button
+                                type="button"
+                                aria-label={`Open actions for parking slot ${slot.slotNumber}`}
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE3DF] bg-white text-[#111111] transition hover:bg-[#F7F8F5]"
+                                onClick={() =>
+                                  setOpenActionSlotId((currentSlotId) =>
+                                    currentSlotId === slot._id
+                                      ? null
+                                      : slot._id
+                                  )
+                                }
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </button>
+
+                              {openActionSlotId === slot._id ? (
+                                <div className="absolute right-0 top-10 z-20 w-56 rounded-lg border border-[#DDE3DF] bg-white p-1 shadow-lg">
+                                  <button
+                                    type="button"
+                                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-[#111111] transition hover:bg-[#F7F8F5]"
+                                    onClick={() => {
+                                      setSelectedSlot(slot)
+                                      setOpenActionSlotId(null)
+                                    }}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                    View Details
+                                  </button>
+
+                                  {slot.status === "OCCUPIED" ? (
+                                    <>
+                                      <div className="my-1 border-t border-[#EEF1F4]" />
+                                      <button
+                                        type="button"
+                                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-[#111111] transition hover:bg-[#F7F8F5] disabled:cursor-not-allowed disabled:opacity-60"
+                                        disabled={releaseMutation.isPending}
+                                        onClick={() => handleReleaseSlot(slot)}
+                                      >
+                                        <LogOut className="h-4 w-4" />
+                                        Release Slot
+                                      </button>
+                                    </>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {pagination ? (
+            <PaginationControls
+              page={pagination.page}
+              totalPages={pagination.totalPages}
+              hasPreviousPage={pagination.page > 1}
+              hasNextPage={
+                pagination.page < pagination.totalPages
+              }
+              onPageChange={setPage}
+            />
+          ) : null}
+        </>
       )}
 
       <ParkingDetails
         slot={selectedSlot}
         onClose={() => setSelectedSlot(null)}
-      />
-
-      <ConfirmActionModal
-        actionLabel="Release Slot"
-        isOpen={Boolean(releaseSlot)}
-        isSubmitting={releaseMutation.isPending}
-        message={
-          releaseSlot
-            ? `Release parking slot ${releaseSlot.slotNumber} for vehicle ${releaseSlot.currentAssignment?.vehicleNumber ?? "-"}?`
-            : ""
-        }
-        title="Release Parking Slot"
-        variant="danger"
-        onClose={() => setReleaseSlot(null)}
-        onConfirm={handleRelease}
       />
     </div>
   )

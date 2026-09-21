@@ -21,7 +21,7 @@ import type {
   SecurityActivity,
   SecurityActivityType,
   SecuritySummary,
-} from "../services/security.interface"
+} from "../schemas/security"
 import {
   StatusBadge,
   outlineButtonClassName,
@@ -65,7 +65,7 @@ export function SecuritySummaryCards({
         icon={<BellRing className="h-5 w-5" />}
       />
       <SummaryCard
-        label="Deliveries Waiting"
+        label="Resident Notified"
         value={summary?.deliveriesWaiting ?? 0}
         icon={<Package className="h-5 w-5" />}
       />
@@ -353,7 +353,7 @@ function getAttentionItems(summary: SecuritySummary) {
   const parkingIssues =
     summary.occupiedVisitorParking +
     summary.reservedVisitorParking +
-    summary.outOfServiceVisitorParking
+    summary.unavailableVisitorParking
 
   return [
     summary.activeSosAlerts > 0
@@ -367,9 +367,9 @@ function getAttentionItems(summary: SecuritySummary) {
       : null,
     summary.deliveriesWaiting > 0
       ? {
-          title: `${summary.deliveriesWaiting} Parcels Waiting`,
-          description: "Deliveries are waiting at the gate.",
-          status: "WAITING",
+          title: `${summary.deliveriesWaiting} Resident Notified Parcels`,
+          description: "Residents have been notified for collection.",
+          status: "NOTIFIED",
           href: "/security/deliveries",
           urgent: false,
         }
@@ -389,10 +389,10 @@ function getAttentionItems(summary: SecuritySummary) {
           description: [
             `${summary.occupiedVisitorParking} occupied`,
             `${summary.reservedVisitorParking} reserved`,
-            `${summary.outOfServiceVisitorParking} unavailable`,
+            `${summary.unavailableVisitorParking} unavailable`,
           ].join(", "),
           status: "OCCUPIED",
-          href: "/security/parking",
+          href: "/security/visitors",
           urgent: false,
         }
       : null,

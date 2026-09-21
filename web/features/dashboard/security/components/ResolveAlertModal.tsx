@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react"
 import { CheckCircle2 } from "lucide-react"
 import { z } from "zod"
 
-import type { EmergencyAlert } from "../services/alert.service"
+import type { EmergencyAlert } from "../schemas/alert"
 import { getSecurityApiErrorMessage } from "../utils/api-error"
 import {
   DetailGrid,
@@ -97,11 +97,11 @@ export function ResolveAlertModal({
             },
             {
               label: "Resident",
-              value: alert.residentName ?? alert.residentId,
+              value: alert.residentName ?? "-",
             },
             {
               label: "Flat / Unit",
-              value: alert.flatNumber ?? alert.flatId,
+              value: alert.flatNumber ?? "-",
             },
             {
               label: "Message",

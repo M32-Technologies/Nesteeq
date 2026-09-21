@@ -222,7 +222,7 @@ export const updateExpenseService = async (
         expenseId,
         input,
         {
-          new: true,
+          returnDocument: "after",
           runValidators: true,
           session,
         }

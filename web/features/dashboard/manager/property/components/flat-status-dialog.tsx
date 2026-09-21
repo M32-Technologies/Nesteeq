@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { AlertTriangle, CheckCircle2, X } from "lucide-react"
 import { toast } from "sonner"
+import { Portal } from "@/components/portal"
 
 import { useUpdatePropertyFlatStatusMutation } from "../hooks/use-property-query"
 import type { PropertyFlat, PropertyFlatStatus } from "../types/property"
@@ -59,7 +60,11 @@ export default function FlatStatusDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/35 px-4 py-8 sm:items-center">
+    <Portal>
+      <div
+        style={{ zIndex: 1000 }}
+        className="fixed inset-0 flex items-start justify-center overflow-y-auto bg-slate-950/40 p-4 backdrop-blur-sm sm:items-center"
+      >
       <div className="w-full max-w-[480px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex min-h-[82px] items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
           <div className="min-w-0">
@@ -92,11 +97,10 @@ export default function FlatStatusDialog({
           )}
 
           <div
-            className={`flex gap-3 rounded-lg px-4 py-3 ${
-              isActivating
+            className={`flex gap-3 rounded-lg px-4 py-3 ${isActivating
                 ? "border border-emerald-100 bg-emerald-50"
                 : "border border-red-100 bg-red-50"
-            }`}
+              }`}
           >
             {isActivating ? (
               <CheckCircle2
@@ -111,16 +115,14 @@ export default function FlatStatusDialog({
             )}
             <div>
               <p
-                className={`text-sm font-semibold ${
-                  isActivating ? "text-emerald-800" : "text-red-700"
-                }`}
+                className={`text-sm font-semibold ${isActivating ? "text-emerald-800" : "text-red-700"
+                  }`}
               >
                 {flat.flatNumber} will be marked as {status}.
               </p>
               <p
-                className={`mt-1 text-xs font-medium leading-5 ${
-                  isActivating ? "text-emerald-700" : "text-red-600"
-                }`}
+                className={`mt-1 text-xs font-medium leading-5 ${isActivating ? "text-emerald-700" : "text-red-600"
+                  }`}
               >
                 {isActivating
                   ? "The flat will appear again in active flat workflows."
@@ -144,11 +146,10 @@ export default function FlatStatusDialog({
             type="button"
             onClick={submitStatusChange}
             disabled={updateStatus.isPending}
-            className={`flex h-11 items-center justify-center rounded-lg text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-70 ${
-              isActivating
+            className={`flex h-11 items-center justify-center rounded-lg text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-70 ${isActivating
                 ? "bg-[#0F5F45] hover:bg-[#0B4D38]"
                 : "bg-red-600 hover:bg-red-700"
-            }`}
+              }`}
           >
             {updateStatus.isPending
               ? isActivating
@@ -159,5 +160,6 @@ export default function FlatStatusDialog({
         </div>
       </div>
     </div>
-  )
+  </Portal>
+)
 }

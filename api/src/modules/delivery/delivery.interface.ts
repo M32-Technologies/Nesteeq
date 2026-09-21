@@ -21,6 +21,12 @@ export const DeliveryStatus = {
 export type DeliveryStatus =
   (typeof DeliveryStatus)[keyof typeof DeliveryStatus]
 
+export const deliveryUpdateStatuses = [
+  DeliveryStatus.NOTIFIED,
+  DeliveryStatus.COLLECTED,
+  DeliveryStatus.RETURNED,
+] as const
+
 export interface ISecurityDelivery {
   apartmentId: Types.ObjectId
   flatId: Types.ObjectId
@@ -29,7 +35,6 @@ export interface ISecurityDelivery {
   deliveryCompany: string
   deliveryPersonName?: string | null
   deliveryPersonPhone?: string | null
-  trackingId?: string | null
   packageDescription?: string | null
   notes?: string | null
   status: DeliveryStatus
