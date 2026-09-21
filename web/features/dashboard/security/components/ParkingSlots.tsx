@@ -98,10 +98,7 @@ export function ParkingSlots() {
   })
   const availableSlotsQuery = useParkingSlots({
     status: "AVAILABLE",
-    vehicleType: assignVehicleType,
     limit: ASSIGNMENT_SLOT_LIMIT,
-  }, {
-    enabled: Boolean(assignVehicleType),
   })
   const activeVisitorsQuery = useActiveVisitors(1, 100)
   const flatsQuery = useSecurityFlats()

@@ -3,7 +3,7 @@ import QRCode from "qrcode"
 import { Types, type PipelineStage } from "mongoose"
 
 import { Flat } from "../flat/flat.model.js"
-import { normalizeVehicleNumber } from "../parking/parking.service.js"
+import { normalizeVehicleNumber, assignParkingSlotService } from "../parking/parking.service.js"
 import { ResidentModel } from "../resident/resident.model.js"
 import { ParkingSlotStatus } from "../parking/parking.interface.js"
 import { ParkingSlotModel } from "../parking/parking.model.js"
@@ -130,7 +130,7 @@ const expireOldGuestPasses = (apartmentId: unknown, residentId: unknown) =>
   )
 
 export const createGuestPassService = async ({
-  userId, flatId, visitorName, visitorPhone, purpose, vehicleNumber, validFrom, validUntil,
+  userId, flatId, visitorName, visitorPhone, purpose, vehicleNumber, vehicleType, validFrom, validUntil,
 }: CreateGuestPassInput) => {
   const resident = await getActiveResidentByUserId(userId)
   if (resident.flatId.toString() !== flatId) throw new AppError("You are not authorized to create a guest pass for this flat", 403)
@@ -149,10 +149,12 @@ export const createGuestPassService = async ({
     apartmentId: resident.apartmentId, createdByResidentId: resident._id, flatId: flat._id,
     visitorName, visitorPhone: visitorPhone?.trim() || null, purpose: purpose?.trim() || null,
     vehicleNumber: vehicleNumber ? normalizeVehicleNumber(vehicleNumber) : null,
+    vehicleType: vehicleType ? vehicleType.toUpperCase() : null,
+    rawToken, qrCodeDataUrl,
     tokenHash, validFrom, validUntil, status: GuestPassStatus.ACTIVE,
   })
   const { tokenHash: _, ...safePass } = pass.toObject()
-  return { guestPass: safePass, token: rawToken, qrCodeDataUrl }
+  return { guestPass: { ...safePass, token: rawToken }, token: rawToken, qrCodeDataUrl }
 }
 
 export const getGuestPassesService = async ({ userId, page = 1, limit = 10, status }: ListGuestPassesInput) => {
@@ -298,7 +300,7 @@ export const getVisitorRecordsService = async ({
     _id: { $concat: ["pass-", { $toString: "$_id" }] }, source: { $literal: "PASS" }, status: { $literal: "UPCOMING" },
     visitId: { $literal: null }, visitorPassId: { $toString: "$_id" }, apartmentId: { $toString: "$apartmentId" },
     flatId: { $toString: "$flatId" }, flatNumber: { $ifNull: ["$flat.flatNumber", null] }, visitorName: 1, visitorPhone: 1,
-    purpose: 1, vehicleNumber: 1, vehicleType: { $literal: null }, entryType: { $literal: VisitorEntryType.PASS },
+    purpose: 1, vehicleNumber: 1, vehicleType: { $ifNull: ["$vehicleType", null] }, entryType: { $literal: VisitorEntryType.PASS },
     expectedAt: "$validFrom", validUntil: 1, checkedInAt: { $literal: null }, checkedOutAt: { $literal: null },
     parkingAssignmentId: { $literal: null }, parkingSlotId: { $literal: null }, parkingSlotNumber: { $literal: null },
     parkingAssignmentStatus: { $literal: null }, parkingAssignedAt: { $literal: null }, parkingReleasedAt: { $literal: null },
@@ -377,6 +379,7 @@ export const checkInVisitorService = async ({ apartmentId, userId, visitorPassId
       apartmentId: claimed.apartmentId, flatId: claimed.flatId, visitorPassId: claimed._id,
       visitorName: claimed.visitorName, visitorPhone: claimed.visitorPhone ?? null,
       purpose: claimed.purpose ?? null, vehicleNumber: claimed.vehicleNumber ?? null,
+      vehicleType: (claimed as any).vehicleType ?? null,
       entryType: VisitorEntryType.PASS, checkedInBy: userId, checkedInAt: now,
       checkedOutBy: null, checkedOutAt: null, status: VisitorVisitStatus.ACTIVE,
     })
@@ -390,7 +393,7 @@ export const checkInVisitorService = async ({ apartmentId, userId, visitorPassId
 }
 
 export const createManualVisitorEntryService = async ({
-  apartmentId, userId, flatId, visitorName, visitorPhone, purpose, vehicleNumber, vehicleType,
+  apartmentId, userId, flatId, visitorName, visitorPhone, purpose, vehicleNumber, vehicleType, parkingSlotId,
 }: ManualVisitorEntryInput) => {
   const normVehicle = vehicleNumber ? normalizeVehicleNumber(vehicleNumber) : null
   const flat = await Flat.findOne({ _id: flatId, apartmentId }).lean()
@@ -401,12 +404,33 @@ export const createManualVisitorEntryService = async ({
   ).select("_id").lean()
   if (dup) throw new AppError("A matching active or recent visitor entry already exists.", 409)
 
-  return VisitorVisitModel.create({
+  const visit = await VisitorVisitModel.create({
     apartmentId, flatId, visitorPassId: null, visitorName,
     visitorPhone: visitorPhone?.trim() || null, purpose: purpose?.trim() || null,
     vehicleNumber: normVehicle, vehicleType: vehicleType || null, entryType: VisitorEntryType.MANUAL,
     checkedInBy: userId, checkedInAt: new Date(), checkedOutBy: null, checkedOutAt: null, status: VisitorVisitStatus.ACTIVE,
   })
+
+  if (parkingSlotId && normVehicle && vehicleType) {
+    try {
+      await assignParkingSlotService({
+        apartmentId,
+        userId,
+        slotId: parkingSlotId,
+        flatId,
+        visitorVisitId: visit._id.toString(),
+        visitorName,
+        vehicleNumber: normVehicle,
+        vehicleType: vehicleType as any,
+        notes: purpose?.trim() || undefined,
+      })
+    } catch (parkingError) {
+      await VisitorVisitModel.deleteOne({ _id: visit._id })
+      throw parkingError
+    }
+  }
+
+  return visit
 }
 
 export const checkoutVisitorService = async ({ apartmentId, userId, visitId }: CheckoutVisitorInput) => {

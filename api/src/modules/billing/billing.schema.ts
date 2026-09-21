@@ -25,7 +25,7 @@ export const createBillSchema = z.object({
   body: z.object({
     apartmentId: objectIdSchema,
 
-    residentId: objectIdSchema,
+    residentId: objectIdSchema.optional(),
 
     unitId: objectIdSchema,
 
@@ -104,6 +104,9 @@ export const recordBillPaymentSchema = z.object({
     amount: z
       .number()
       .positive("Payment amount must be greater than 0"),
+    paymentMethod: z.string().trim().optional(),
+    referenceNo: z.string().trim().optional(),
+    description: z.string().trim().optional(),
   }),
 });
 

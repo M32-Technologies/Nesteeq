@@ -1,6 +1,20 @@
 import { catchAsync } from "../../utils/catchAsync.js";
 import { Request, Response } from "express";
-import { getResident, getResidentDetails, getResidentStats, updateResidentDetails, updateResidentStatus } from "./resident.service.js";
+import {
+    getResident,
+    getResidentDetails,
+    getResidentStats,
+    updateResidentDetails,
+    updateResidentStatus,
+    getMyVehiclesAndParkingService,
+    registerVehicleService,
+    deleteVehicleService,
+    createResidentGuestPassService,
+    getResidentGuestPassesService,
+    cancelResidentGuestPassService,
+    getCurrentResidentProfileService,
+    getResidentDashboardFeedService,
+} from "./resident.service.js";
 import { ResidentListQuery } from "./resident.validation.js";
 import { AppError } from "../../utils/AppError.js";
 
@@ -83,3 +97,88 @@ export const updateResidentDetailsHandler = catchAsync(async (req: Request, res:
         data: result,
     })
 })
+
+export const getMyVehiclesAndParkingHandler = catchAsync(async (req: Request, res: Response) => {
+    const apartmentId = req.user?.apartmentId || undefined;
+    const result = await getMyVehiclesAndParkingService(req.user, apartmentId);
+
+    res.status(200).json({
+        success: true,
+        data: result,
+    });
+});
+
+export const registerVehicleHandler = catchAsync(async (req: Request, res: Response) => {
+    const apartmentId = req.user?.apartmentId || undefined;
+    const result = await registerVehicleService(req.user, req.body, apartmentId);
+
+    res.status(201).json({
+        success: true,
+        data: result,
+        message: "Vehicle registered successfully",
+    });
+});
+
+export const deleteVehicleHandler = catchAsync(async (req: Request, res: Response) => {
+    const apartmentId = req.user?.apartmentId || undefined;
+    const vehicleId = String(req.params.vehicleId);
+    const result = await deleteVehicleService(req.user, vehicleId, apartmentId);
+
+    res.status(200).json({
+        success: true,
+        data: result,
+    });
+});
+
+export const createResidentGuestPassHandler = catchAsync(async (req: Request, res: Response) => {
+    const apartmentId = req.user?.apartmentId || undefined;
+    const result = await createResidentGuestPassService(req.user, req.body, apartmentId);
+
+    res.status(201).json({
+        success: true,
+        data: result,
+        message: "Visitor pass created successfully",
+    });
+});
+
+export const getResidentGuestPassesHandler = catchAsync(async (req: Request, res: Response) => {
+    const apartmentId = req.user?.apartmentId || undefined;
+    const result = await getResidentGuestPassesService(req.user, req.query as any, apartmentId);
+
+    res.status(200).json({
+        success: true,
+        data: result,
+    });
+});
+
+export const cancelResidentGuestPassHandler = catchAsync(async (req: Request, res: Response) => {
+    const apartmentId = req.user?.apartmentId || undefined;
+    const passId = String(req.params.passId);
+    const result = await cancelResidentGuestPassService(req.user, passId, apartmentId);
+
+    res.status(200).json({
+        success: true,
+        data: result,
+    });
+});
+
+export const getCurrentResidentProfileHandler = catchAsync(async (req: Request, res: Response) => {
+    const apartmentId = req.user?.apartmentId || undefined;
+    const result = await getCurrentResidentProfileService(req.user, apartmentId);
+
+    res.status(200).json({
+        success: true,
+        data: result,
+    });
+});
+
+export const getResidentDashboardFeedHandler = catchAsync(async (req: Request, res: Response) => {
+    const apartmentId = req.user?.apartmentId || undefined;
+    const result = await getResidentDashboardFeedService(req.user, apartmentId);
+
+    res.status(200).json({
+        success: true,
+        data: result,
+    });
+});
+

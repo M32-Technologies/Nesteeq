@@ -53,7 +53,12 @@ export function ResidentNavbar({ user }: ResidentNavbarProps) {
   };
 
   // Sub-navbar navigation pages matching the application's resident modules
-  const navTabs = [
+  const navTabs: Array<{
+    label: string;
+    href: string;
+    icon: React.ComponentType<{ className?: string }>;
+    badge?: string;
+  }> = [
     {
       label: "Dashboard",
       href: "/resident",
@@ -83,7 +88,6 @@ export function ResidentNavbar({ user }: ResidentNavbarProps) {
       label: "Announcements",
       href: "/resident/announcements",
       icon: Bell,
-      badge: "NEW",
     },
     {
       label: "Emergency SOS",

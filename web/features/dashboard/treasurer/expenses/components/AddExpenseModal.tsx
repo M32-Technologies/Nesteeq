@@ -47,6 +47,7 @@ export default function AddExpenseModal({
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<ExpenseCategory | "">("");
   const [amount, setAmount] = useState("");
+  const [invoiceRef, setInvoiceRef] = useState("");
   const [vendorName, setVendorName] = useState("");
   const [expenseDate, setExpenseDate] = useState("");
   const [error, setError] = useState("");
@@ -60,6 +61,7 @@ export default function AddExpenseModal({
     setDescription("");
     setCategory("");
     setAmount("");
+    setInvoiceRef("");
     setVendorName("");
     setExpenseDate("");
     setError("");
@@ -93,6 +95,7 @@ export default function AddExpenseModal({
     try {
       await onAdd({
         title: title.trim(),
+        invoiceRef: invoiceRef.trim() || undefined,
         description: description.trim() || undefined,
         category,
         amount: parsedAmount,
@@ -183,14 +186,28 @@ export default function AddExpenseModal({
             </label>
 
             <label className="text-sm font-medium text-slate-700">
-              Vendor
+              Vendor / Payee
               <input
                 type="text"
                 value={vendorName}
                 onChange={(event) =>
                   setVendorName(event.target.value)
                 }
-                className="mt-2 w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                placeholder="e.g. Otis Elevators"
+                className="mt-2 w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400"
+              />
+            </label>
+
+            <label className="text-sm font-medium text-slate-700">
+              Invoice / Ref No. (Optional)
+              <input
+                type="text"
+                value={invoiceRef}
+                onChange={(event) =>
+                  setInvoiceRef(event.target.value)
+                }
+                placeholder="e.g. INV-2026-091"
+                className="mt-2 w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400"
               />
             </label>
 

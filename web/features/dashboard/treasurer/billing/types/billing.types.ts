@@ -1,6 +1,7 @@
 export type {
   AdditionalCharge,
   Bill,
+  BillRecipient,
   BillStatus,
   CreateBillPayload,
   GetBillsParams,

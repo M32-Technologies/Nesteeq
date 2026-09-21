@@ -15,8 +15,8 @@ export const assignResidentSchema = z.object({
   vehicleNumber: z
     .string()
     .trim()
-    .min(1, "Vehicle plate number is required")
-    .max(20, "Vehicle number cannot exceed 20 characters"),
+    .max(20, "Vehicle number cannot exceed 20 characters")
+    .optional(),
 })
 
 export type AssignResidentFormValues = z.infer<typeof assignResidentSchema>

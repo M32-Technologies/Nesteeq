@@ -113,6 +113,7 @@ export interface ManualVisitorInput {
   purpose?: string
   vehicleNumber?: string
   vehicleType?: string
+  parkingSlotId?: string
 }
 
 export interface CheckInVisitorInput {

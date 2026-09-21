@@ -276,8 +276,10 @@ export const assignResidentParkingSchema =
         vehicleNumber: z
           .string()
           .trim()
-          .min(1, "Vehicle number is required")
-          .max(20, "Vehicle number cannot exceed 20 characters"),
+          .max(20, "Vehicle number cannot exceed 20 characters")
+          .optional()
+          .nullable()
+          .or(z.literal("")),
       })
       .strict(),
   })

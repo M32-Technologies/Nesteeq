@@ -62,6 +62,7 @@ export const createGuestPassSchema = z.object({
       vehicleNumber: optionalString(
         z.string().max(20, "Vehicle number cannot exceed 20 characters")
       ),
+      vehicleType: optionalVehicleType,
       validFrom: z.coerce.date(),
       validUntil: z.coerce.date(),
     })
@@ -142,6 +143,7 @@ export const manualVisitorEntrySchema = z.object({
       ),
 
       vehicleType: optionalVehicleType,
+      parkingSlotId: optionalString(objectIdSchema),
     })
     .refine((data) => !data.vehicleNumber || data.vehicleType, {
       path: ["vehicleType"],
@@ -150,6 +152,14 @@ export const manualVisitorEntrySchema = z.object({
     .refine((data) => !data.vehicleType || data.vehicleNumber, {
       path: ["vehicleNumber"],
       message: "Vehicle number is required when vehicle type is provided",
+    })
+    .refine((data) => !data.parkingSlotId || data.vehicleNumber, {
+      path: ["vehicleNumber"],
+      message: "Vehicle number is required when assigning a parking slot",
+    })
+    .refine((data) => !data.parkingSlotId || data.vehicleType, {
+      path: ["vehicleType"],
+      message: "Vehicle type is required when assigning a parking slot",
     }),
 })
 

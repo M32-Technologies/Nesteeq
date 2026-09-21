@@ -12,6 +12,7 @@ export type CreateGuestPassInput = {
   visitorPhone?: string
   purpose?: string
   vehicleNumber?: string
+  vehicleType?: string
   validFrom: Date
   validUntil: Date
 }
@@ -49,6 +50,7 @@ export type ManualVisitorEntryInput = {
   purpose?: string
   vehicleNumber?: string
   vehicleType?: string
+  parkingSlotId?: string
 }
 
 export type CheckoutVisitorInput = {

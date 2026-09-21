@@ -9,27 +9,106 @@ import {
   CheckCircle2,
   KeyRound,
   LifeBuoy,
+  X,
+  CircleDollarSign,
+  ShieldCheck,
+  FileText,
+  AlertCircle,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { fetchResidentComplaints } from "../api/resident-dashboard.api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import {
+  fetchResidentComplaints,
+  createResidentComplaint,
+} from "../api/resident-dashboard.api";
+
+const CATEGORIES = [
+  { value: "PLUMBING", label: "Plumbing (Pipes, Taps, Leakage)" },
+  { value: "ELECTRICAL", label: "Electrical (Wiring, Lights, MCB)" },
+  { value: "WATER", label: "Water Supply & Pressure" },
+  { value: "LIFT", label: "Elevator / Lift Issues" },
+  { value: "CLEANING", label: "Sanitation & Cleaning" },
+  { value: "SECURITY", label: "Security & Access" },
+  { value: "MAINTENANCE", label: "General Maintenance & Carpentry" },
+  { value: "OTHER", label: "Other Society Requests" },
+];
+
+const PRIORITIES = [
+  { value: "LOW", label: "Low Priority" },
+  { value: "NORMAL", label: "Normal (Standard)" },
+  { value: "HIGH", label: "High Priority" },
+  { value: "URGENT", label: "Urgent (Immediate Attention)" },
+];
 
 export function ResidentComplaintsPage() {
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"ALL" | "IN_PROGRESS" | "RESOLVED">("ALL");
 
+  // Create Complaint Modal State
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newCategory, setNewCategory] = useState("PLUMBING");
+  const [newPriority, setNewPriority] = useState<"LOW" | "NORMAL" | "HIGH" | "URGENT">("NORMAL");
+  const [newDescription, setNewDescription] = useState("");
+
   const { data: complaintsData, isLoading } = useQuery({
-    queryKey: ["resident", "complaints", activeTab],
+    queryKey: ["resident", "complaints", activeTab, searchQuery],
     queryFn: () =>
       fetchResidentComplaints({
         status: activeTab === "ALL" ? undefined : activeTab,
+        search: searchQuery.trim() || undefined,
+        limit: 50,
       }),
   });
 
+  const createMutation = useMutation({
+    mutationFn: async (payload: {
+      title: string;
+      description: string;
+      category: string;
+      priority: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+    }) => {
+      return createResidentComplaint(payload);
+    },
+    onSuccess: () => {
+      toast.success("Maintenance request submitted to Facility Manager!");
+      setIsCreateOpen(false);
+      setNewTitle("");
+      setNewDescription("");
+      setNewCategory("PLUMBING");
+      setNewPriority("NORMAL");
+      queryClient.invalidateQueries({ queryKey: ["resident", "complaints"] });
+    },
+    onError: (err: any) => {
+      toast.error(
+        err?.response?.data?.message || err?.message || "Failed to log complaint."
+      );
+    },
+  });
+
+  const handleCreateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTitle.trim()) {
+      toast.error("Please enter a ticket title.");
+      return;
+    }
+    if (newDescription.trim().length < 10) {
+      toast.error("Please describe the issue in at least 10 characters.");
+      return;
+    }
+
+    createMutation.mutate({
+      title: newTitle.trim(),
+      description: newDescription.trim(),
+      category: newCategory,
+      priority: newPriority,
+    });
+  };
+
   const complaintsList = complaintsData?.complaints || [];
 
-  const displayList = complaintsList;
-
-  const filtered = displayList.filter((c) => {
+  const filtered = complaintsList.filter((c) => {
     if (activeTab === "IN_PROGRESS" && (c.status === "RESOLVED" || c.status === "CLOSED")) return false;
     if (activeTab === "RESOLVED" && c.status !== "RESOLVED" && c.status !== "CLOSED") return false;
     if (searchQuery.trim()) {
@@ -52,13 +131,13 @@ export function ResidentComplaintsPage() {
             Complaints & Maintenance Requests
           </h1>
           <p className="mt-1 text-sm text-[#637083]">
-            Track ongoing repairs, request facility help, and verify completion OTPs.
+            Track ongoing repairs, request facility technician help, and verify completion OTPs.
           </p>
         </div>
 
         <button
           type="button"
-          onClick={() => alert("Log complaint form modal opened.")}
+          onClick={() => setIsCreateOpen(true)}
           className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#07584F] px-4 text-xs sm:text-sm font-medium text-white shadow-xs transition-colors hover:bg-[#064C44] cursor-pointer active:scale-95 self-start sm:self-auto"
         >
           <Plus className="size-4" />
@@ -116,7 +195,7 @@ export function ResidentComplaintsPage() {
           <div className="pt-2">
             <button
               type="button"
-              onClick={() => alert("Log complaint form modal opened.")}
+              onClick={() => setIsCreateOpen(true)}
               className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#07584F] px-4 text-xs sm:text-sm font-medium text-white shadow-xs hover:bg-[#064C44] transition cursor-pointer"
             >
               <Plus className="size-4" />
@@ -130,6 +209,7 @@ export function ResidentComplaintsPage() {
             const isResolved = ticket.status === "RESOLVED" || ticket.status === "CLOSED";
             const isInProgress = ticket.status === "IN_PROGRESS";
             const completionOtp = (ticket as Record<string, any>).completionOtp;
+            const maintenance = ticket.maintenance;
 
             return (
               <div
@@ -158,6 +238,9 @@ export function ResidentComplaintsPage() {
                           {ticket.priority}
                         </span>
                       )}
+                      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-600">
+                        {ticket.category}
+                      </span>
                     </div>
                     <h3 className="text-base font-semibold text-[#111111]">
                       {ticket.title}
@@ -190,6 +273,7 @@ export function ResidentComplaintsPage() {
                   </div>
                 )}
 
+                {/* Completion OTP */}
                 {completionOtp && (
                   <div className="flex items-center gap-2 rounded-md bg-amber-50 border border-amber-200 p-2 text-xs text-amber-900">
                     <KeyRound className="size-3.5 text-amber-600" />
@@ -202,9 +286,177 @@ export function ResidentComplaintsPage() {
                     </span>
                   </div>
                 )}
+
+                {/* Treasurer & Facility Finance Flow Integration */}
+                {maintenance?.costReview && (
+                  <div className="space-y-1.5">
+                    {maintenance.costReview.forwardedToRole === "TREASURER" && (
+                      <div className="rounded-lg bg-amber-50/80 border border-amber-200 p-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 text-xs text-amber-950">
+                        <div className="flex items-center gap-2">
+                          <CircleDollarSign className="size-4 text-amber-700 shrink-0" />
+                          <span>
+                            <strong>Treasurer Society Review: </strong>
+                            Cost of ₹{maintenance.costReview.submittedAmount || maintenance.finalCost || 0} approved by Facility Manager, awaiting treasurer payout disbursement.
+                          </span>
+                        </div>
+                        <span className="rounded bg-amber-200/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-900 self-start sm:self-auto">
+                          Treasurer Review
+                        </span>
+                      </div>
+                    )}
+
+                    {maintenance.costReview.forwardedToRole === "SETTLED" && (
+                      <div className="rounded-lg bg-emerald-50/80 border border-emerald-200 p-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 text-xs text-emerald-950">
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className="size-4 text-emerald-700 shrink-0" />
+                          <span>
+                            <strong>Society Settled: </strong>
+                            Cost of ₹{maintenance.costReview.submittedAmount || maintenance.finalCost || 0} disbursed & settled by Society Treasurer as official Society Maintenance Expense.
+                          </span>
+                        </div>
+                        <span className="rounded bg-emerald-200/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-900 self-start sm:self-auto">
+                          Treasurer Settled
+                        </span>
+                      </div>
+                    )}
+
+                    {maintenance.finalCost && !maintenance.isSocietyCovered && maintenance.costReview.forwardedToRole !== "SETTLED" && (
+                      <div className="rounded-lg bg-blue-50/80 border border-blue-200 p-2.5 flex items-center gap-2 text-xs text-blue-950">
+                        <FileText className="size-4 text-blue-700 shrink-0" />
+                        <span>
+                          <strong>Flat Maintenance: </strong>
+                          Repair charges of ₹{maintenance.finalCost} included in flat maintenance cycle.
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Log New Complaint Modal */}
+      {isCreateOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-[#07584F] border border-emerald-200">
+                  <LifeBuoy className="size-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Log Maintenance Complaint
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Your request will be assigned to a facility technician
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateOpen(false)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateSubmit} className="my-4 space-y-3.5 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Issue Title
+                </label>
+                <input
+                  type="text"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder="e.g. Water pipe leaking under kitchen sink"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#07584F]"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Category
+                  </label>
+                  <select
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none transition focus:border-[#07584F]"
+                  >
+                    {CATEGORIES.map((cat) => (
+                      <option key={cat.value} value={cat.value}>
+                        {cat.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Priority
+                  </label>
+                  <select
+                    value={newPriority}
+                    onChange={(e) => setNewPriority(e.target.value as any)}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none transition focus:border-[#07584F]"
+                  >
+                    {PRIORITIES.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Detailed Description
+                </label>
+                <textarea
+                  rows={4}
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  placeholder="Please describe the issue, specific location inside your unit, and when technician can visit..."
+                  className="w-full rounded-lg border border-slate-200 p-2.5 text-xs text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#07584F]"
+                  required
+                />
+              </div>
+
+              <div className="rounded-lg bg-slate-50 p-2.5 text-[11px] text-slate-600 border border-slate-200/70 space-y-1">
+                <span className="font-semibold text-slate-800 block">Workflow Notice:</span>
+                <p>
+                  1. Facility Manager assigns a technician to inspect and resolve your issue.
+                </p>
+                <p>
+                  2. Technician submits work notes & costs, which are reviewed by Facility Manager and forwarded to the Society Treasurer for payout disbursement.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2.5 border-t border-slate-100 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateOpen(false)}
+                  className="rounded-lg border border-slate-200 px-3.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={createMutation.isPending}
+                  className="rounded-lg bg-[#07584F] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#064C44] transition cursor-pointer"
+                >
+                  {createMutation.isPending ? "Submitting..." : "Submit Complaint"}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

@@ -150,7 +150,9 @@ export const assignResidentParking = async (
       {
         flatId: input.flatId,
         residentId: input.residentId || undefined,
-        vehicleNumber: input.vehicleNumber.trim().toUpperCase(),
+        vehicleNumber: input.vehicleNumber?.trim()
+          ? input.vehicleNumber.trim().toUpperCase()
+          : undefined,
       }
     )
 

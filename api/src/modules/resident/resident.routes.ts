@@ -1,18 +1,50 @@
 import express from "express"
 import { protect, requireRole } from "../../middlewares/authMiddleware.js";
 import { zodValidate } from "../../middlewares/zodValidate.js";
-import { residentListQuerySchema } from "./resident.validation.js";
-import { getResidentDetailsHandler, getResidentHandler, getResidentStatsHandler, updateResidentDetailsHandler, updateResidentStatusHandler } from "./resident.controller.js";
-const router = express.Router() ;
+import {
+  getResidentDetailsHandler,
+  getResidentHandler,
+  getResidentStatsHandler,
+  updateResidentDetailsHandler,
+  updateResidentStatusHandler,
+  getMyVehiclesAndParkingHandler,
+  registerVehicleHandler,
+  deleteVehicleHandler,
+  createResidentGuestPassHandler,
+  getResidentGuestPassesHandler,
+  cancelResidentGuestPassHandler,
+  getCurrentResidentProfileHandler,
+  getResidentDashboardFeedHandler,
+} from "./resident.controller.js";
+import {
+  residentListQuerySchema,
+  registerVehicleSchema,
+  vehicleIdParamsSchema,
+  createResidentGuestPassSchema,
+  residentGuestPassParamsSchema,
+  listResidentGuestPassesQuerySchema,
+} from "./resident.validation.js";
 
-router.get("/", protect, zodValidate(residentListQuerySchema), getResidentHandler)
+const router = express.Router();
 
-router.get("/stats", protect, requireRole("property_manager"), getResidentStatsHandler)
+router.get("/me", protect, getCurrentResidentProfileHandler);
+router.get("/dashboard/feed", protect, getResidentDashboardFeedHandler);
+router.get("/me/parking-info", protect, getMyVehiclesAndParkingHandler);
+router.post("/vehicles", protect, zodValidate(registerVehicleSchema), registerVehicleHandler);
+router.delete("/vehicles/:vehicleId", protect, zodValidate(vehicleIdParamsSchema), deleteVehicleHandler);
 
-router.patch("/:id/status", protect, requireRole("property_manager"), updateResidentStatusHandler)
+router.post("/passes", protect, zodValidate(createResidentGuestPassSchema), createResidentGuestPassHandler);
+router.get("/passes", protect, zodValidate(listResidentGuestPassesQuerySchema), getResidentGuestPassesHandler);
+router.patch("/passes/:passId/cancel", protect, zodValidate(residentGuestPassParamsSchema), cancelResidentGuestPassHandler);
 
-router.patch("/:id" , protect , updateResidentDetailsHandler)
+router.get("/", protect, zodValidate(residentListQuerySchema), getResidentHandler);
 
-router.get("/:id", protect, getResidentDetailsHandler)
+router.get("/stats", protect, requireRole("property_manager"), getResidentStatsHandler);
 
-export default router
+router.patch("/:id/status", protect, requireRole("property_manager"), updateResidentStatusHandler);
+
+router.patch("/:id", protect, updateResidentDetailsHandler);
+
+router.get("/:id", protect, getResidentDetailsHandler);
+
+export default router;

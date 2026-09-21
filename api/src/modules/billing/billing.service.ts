@@ -22,7 +22,9 @@ import { ResidentModel } from "../resident/resident.model.js";
 import { Wallet } from "../wallet/wallet.model.js";
 import { WalletTransactionType } from "../wallet/wallet.interface.js";
 import { PaymentSource } from "../payment/payment.interface.js";
+import { Payment } from "../payment/payment.model.js";
 import { createPaymentRecordService } from "../payment/payment.service.js";
+import { getAuthDB } from "../../config/auth-db.js";
 
 import { AppError } from "../../utils/AppError.js";
 
@@ -32,7 +34,7 @@ interface AuditActor {
 
 interface CreateBillInput {
   apartmentId: string;
-  residentId: string;
+  residentId?: string;
   unitId: string;
   baseAmount: number;
   additionalCharges?: IAdditionalCharge[];
@@ -40,6 +42,20 @@ interface CreateBillInput {
   dueDate: Date;
   createdBy?: string;
 }
+
+const getAuthUsersFilter = (userIds: string[]) => {
+  const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
+  const objectIds = uniqueIds
+    .filter((userId) => Types.ObjectId.isValid(userId))
+    .map((userId) => new Types.ObjectId(userId));
+
+  return {
+    $or: [
+      { id: { $in: uniqueIds } },
+      ...(objectIds.length ? [{ _id: { $in: objectIds } }] : []),
+    ],
+  };
+};
 
 interface UpdateBillInput {
   baseAmount?: number;
@@ -87,22 +103,21 @@ const validateResidentAndUnitOwnership = async (
   unitId: Types.ObjectId,
   session?: ClientSession
 ) => {
-  const [resident, flat] = await Promise.all([
-    ResidentModel.findOne({
-      _id: residentId,
-      apartmentId,
-    })
-      .select("_id flatId")
-      .session(session ?? null)
-      .lean(),
-    Flat.findOne({
-      _id: unitId,
-      apartmentId,
-    })
-      .select("_id")
-      .session(session ?? null)
-      .lean(),
-  ]);
+  const resident = await ResidentModel.findOne({
+    _id: residentId,
+    apartmentId,
+  })
+    .select("_id flatId")
+    .session(session ?? null)
+    .lean();
+
+  const flat = await Flat.findOne({
+    _id: unitId,
+    apartmentId,
+  })
+    .select("_id residentId")
+    .session(session ?? null)
+    .lean();
 
   if (!resident) {
     throw new AppError(
@@ -118,7 +133,10 @@ const validateResidentAndUnitOwnership = async (
     );
   }
 
-  if (resident.flatId?.toString() !== unitId.toString()) {
+  if (
+    resident.flatId?.toString() !== unitId.toString() &&
+    flat.residentId?.toString() !== resident._id.toString()
+  ) {
     throw new AppError(
       "Resident is not assigned to this unit",
       403
@@ -290,8 +308,28 @@ export const createBillService = async (
   const additionalCharges = input.additionalCharges ?? [];
   const lateFeePerDay = input.lateFeePerDay ?? 0;
   const apartmentId = toObjectId(input.apartmentId, "apartmentId");
-  const residentId = toObjectId(input.residentId, "residentId");
   const unitId = toObjectId(input.unitId, "unitId");
+
+  let residentId: Types.ObjectId;
+  if (input.residentId) {
+    residentId = toObjectId(input.residentId, "residentId");
+  } else {
+    const resident = await ResidentModel.findOne({
+      apartmentId,
+      flatId: unitId,
+      status: { $ne: "inactive" },
+    });
+    if (!resident) {
+      const flat = await Flat.findOne({ _id: unitId, apartmentId });
+      if (flat?.residentId) {
+        residentId = flat.residentId;
+      } else {
+        throw new AppError("No active resident assigned to this unit", 400);
+      }
+    } else {
+      residentId = resident._id;
+    }
+  }
 
   let createdBill: BillingDocument | null = null;
 
@@ -329,9 +367,10 @@ export const createBillService = async (
             balanceAmount: values.balanceAmount,
             dueDate: input.dueDate,
             status: values.status,
-            createdBy: input.createdBy
-              ? toObjectId(input.createdBy, "createdBy")
-              : undefined,
+            createdBy:
+              input.createdBy && Types.ObjectId.isValid(input.createdBy)
+                ? new Types.ObjectId(input.createdBy)
+                : undefined,
           },
         ],
         { session }
@@ -357,11 +396,12 @@ export const createBillService = async (
     await session.endSession();
   }
 
-  if (!createdBill) {
+  const finalBill = createdBill as BillingDocument | null;
+  if (!finalBill) {
     throw new AppError("Unable to create bill", 500);
   }
 
-  return createdBill;
+  return getBillByIdService(finalBill._id.toString());
 };
 
 export const getBillsService = async (
@@ -395,10 +435,111 @@ export const getBillsService = async (
     .sort({ createdAt: -1 })
     .lean();
 
-  return bills.map((bill) => ({
-    ...bill,
-    ...calculateBillValues(bill),
-  }));
+  if (bills.length === 0) {
+    return [];
+  }
+
+  const unitIds = bills.map((b) => b.unitId);
+  const residentIds = bills.map((b) => b.residentId);
+
+  const [flats, residents] = await Promise.all([
+    Flat.find({ _id: { $in: unitIds } }, "flatNumber").lean(),
+    ResidentModel.find({ _id: { $in: residentIds } }, "_id userId").lean(),
+  ]);
+
+  const flatMap = new Map(flats.map((f) => [f._id.toString(), f.flatNumber]));
+  const userIds = residents
+    .map((r) => r.userId)
+    .filter((id): id is string => Boolean(id));
+
+  let userMap = new Map<string, string>();
+  if (userIds.length > 0) {
+    const authUsers = await getAuthDB()
+      .collection("user")
+      .find(getAuthUsersFilter(userIds))
+      .toArray();
+    userMap = new Map(
+      authUsers.map((u) => [u.id || u._id.toString(), u.name || "Resident"])
+    );
+  }
+
+  const residentNameMap = new Map(
+    residents.map((r) => [
+      r._id.toString(),
+      r.userId ? userMap.get(r.userId) || "Resident" : "Resident",
+    ])
+  );
+
+  return bills.map((bill) => {
+    const values = calculateBillValues(bill);
+    const flatNum = flatMap.get(bill.unitId.toString());
+    const unitName = flatNum
+      ? `Flat ${flatNum}`
+      : `Unit ${bill.unitId.toString().slice(-4).toUpperCase()}`;
+    const residentName =
+      residentNameMap.get(bill.residentId.toString()) ||
+      `Resident #${bill.residentId.toString().slice(-4).toUpperCase()}`;
+
+    return {
+      ...bill,
+      ...values,
+      unitName,
+      flatNumber: flatNum || "",
+      residentName,
+    };
+  });
+};
+
+export const getBillRecipientsService = async (apartmentId: string) => {
+  const aptId = toObjectId(apartmentId, "apartmentId");
+
+  const [flats, residents] = await Promise.all([
+    Flat.find({ apartmentId: aptId, status: { $ne: "inactive" } })
+      .sort({ flatNumber: 1 })
+      .lean(),
+    ResidentModel.find({
+      apartmentId: aptId,
+      status: { $ne: "inactive" },
+    }).lean(),
+  ]);
+
+  const userIds = residents
+    .map((r) => r.userId)
+    .filter((id): id is string => Boolean(id));
+  let userMap = new Map<string, string>();
+  if (userIds.length > 0) {
+    const authUsers = await getAuthDB()
+      .collection("user")
+      .find(getAuthUsersFilter(userIds))
+      .toArray();
+    userMap = new Map(
+      authUsers.map((u) => [u.id || u._id.toString(), u.name || "Resident"])
+    );
+  }
+
+  const residentById = new Map(
+    residents.map((r) => [r._id.toString(), r])
+  );
+  const residentByFlat = new Map(
+    residents.map((r) => [r.flatId?.toString(), r])
+  );
+
+  return flats.map((flat) => {
+    const res =
+      (flat.residentId
+        ? residentById.get(flat.residentId.toString())
+        : null) || residentByFlat.get(flat._id.toString());
+    const resName = res?.userId ? userMap.get(res.userId) : null;
+    return {
+      unitId: flat._id.toString(),
+      flatNumber: flat.flatNumber,
+      unitName: `Flat ${flat.flatNumber}`,
+      residentId: res?._id ? res._id.toString() : null,
+      residentName: resName || (res ? "Resident" : "Vacant / No Resident"),
+      hasResident: Boolean(res?._id),
+      residentType: res?.residentType || null,
+    };
+  });
 };
 
 export const getBillByIdService = async (
@@ -411,9 +552,32 @@ export const getBillByIdService = async (
     throw new AppError("Bill not found", 404);
   }
 
+  const [flat, resident] = await Promise.all([
+    Flat.findById(bill.unitId, "flatNumber").lean(),
+    ResidentModel.findById(bill.residentId, "userId").lean(),
+  ]);
+
+  let residentName = "Resident";
+  if (resident?.userId) {
+    const user = await getAuthDB()
+      .collection("user")
+      .findOne(getAuthUsersFilter([resident.userId]));
+    if (user?.name) {
+      residentName = user.name;
+    }
+  }
+
+  const flatNum = flat?.flatNumber;
+  const unitName = flatNum
+    ? `Flat ${flatNum}`
+    : `Unit ${bill.unitId.toString().slice(-4).toUpperCase()}`;
+
   return {
     ...bill,
     ...calculateBillValues(bill),
+    unitName,
+    flatNumber: flatNum || "",
+    residentName,
   };
 };
 
@@ -497,11 +661,17 @@ export const updateBillService = async (
 export const recordBillPaymentService = async (
   billId: string,
   amount: number,
-  actor: AuditActor
+  actor: AuditActor,
+  options?: {
+    paymentMethod?: string;
+    referenceNo?: string;
+    description?: string;
+  }
 ) => {
   const session = await mongoose.startSession();
   const id = toObjectId(billId, "billId");
   let updatedBill: BillingDocument | null = null;
+  let paymentId: string | undefined = undefined;
 
   try {
     await session.withTransaction(async () => {
@@ -511,26 +681,40 @@ export const recordBillPaymentService = async (
         throw new AppError("Bill not found", 404);
       }
 
-      await applyPaymentToBill(
+      const methodText = options?.paymentMethod ? `Method: ${options.paymentMethod}` : "";
+      const refText = options?.referenceNo ? `Ref: ${options.referenceNo}` : "";
+      const customDesc = options?.description?.trim();
+      const meta = [methodText, refText, customDesc].filter(Boolean).join(" | ");
+      const paymentDescription = meta
+        ? `Payment of ${amount} recorded (${meta})`
+        : `Payment of ${amount} recorded for bill ${bill._id.toString()}`;
+
+      const payment = await applyPaymentToBill(
         bill,
         amount,
         PaymentSource.MANUAL,
         actor,
-        `Payment of ${amount} recorded for bill ${bill._id.toString()}`,
+        paymentDescription,
         session
       );
 
+      paymentId = payment._id.toString();
       updatedBill = bill;
     });
   } finally {
     await session.endSession();
   }
 
-  if (!updatedBill) {
+  const finalBill = updatedBill as BillingDocument | null;
+  if (!finalBill) {
     throw new AppError("Bill not found", 404);
   }
 
-  return updatedBill;
+  const detailedBill = await getBillByIdService(finalBill._id.toString());
+  return {
+    ...detailedBill,
+    latestPaymentId: paymentId,
+  };
 };
 
 export const waiveLateFeeService = async (
@@ -636,28 +820,226 @@ export const getBillingSummaryService = async (
     "apartmentId"
   );
 
-  const bills = await Billing.find({
-    apartmentId: apartmentObjectId,
-  }).lean();
-
-  return bills.reduce(
-    (summary, bill) => {
-      const values = calculateBillValues(bill);
-
-      summary.totalBilled += values.totalAmount;
-      summary.totalCollected += bill.paidAmount;
-      summary.totalOutstanding += values.balanceAmount;
-      summary.totalLateFees += values.lateFeeAmount;
-      summary.totalBills += 1;
-
-      return summary;
+  const [agg] = await Billing.aggregate([
+    {
+      $match: {
+        apartmentId: apartmentObjectId,
+      },
     },
     {
-      totalBilled: 0,
-      totalCollected: 0,
-      totalOutstanding: 0,
-      totalLateFees: 0,
-      totalBills: 0,
-    }
-  );
+      $group: {
+        _id: null,
+        totalBilled: { $sum: "$totalAmount" },
+        totalCollected: { $sum: "$paidAmount" },
+        totalOutstanding: { $sum: "$balanceAmount" },
+        totalLateFees: { $sum: "$lateFeeAmount" },
+        totalOverdue: {
+          $sum: {
+            $cond: [
+              { $eq: ["$status", "OVERDUE"] },
+              "$balanceAmount",
+              0,
+            ],
+          },
+        },
+        totalBills: { $sum: 1 },
+      },
+    },
+  ]);
+
+  return {
+    totalBilled: agg?.totalBilled || 0,
+    totalCollected: agg?.totalCollected || 0,
+    totalOutstanding: agg?.totalOutstanding || 0,
+    totalLateFees: agg?.totalLateFees || 0,
+    totalOverdue: agg?.totalOverdue || 0,
+    totalBills: agg?.totalBills || 0,
+  };
 };
+
+export const getMyResidentBillsService = async (user: {
+  id: string;
+  role: string;
+  apartmentId?: string | null;
+  flatId?: string | null;
+}) => {
+  const apartmentId = user.apartmentId;
+  if (!apartmentId) {
+    return {
+      summary: {
+        totalOutstanding: 0,
+        totalPaid: 0,
+        pendingCount: 0,
+        overdueCount: 0,
+        lateFees: 0,
+      },
+      bills: [],
+      recentPayments: [],
+    };
+  }
+
+  let flatId = user.flatId;
+  let residentRecord = null;
+  if (Types.ObjectId.isValid(apartmentId)) {
+    residentRecord = await ResidentModel.findOne({
+      apartmentId: new Types.ObjectId(apartmentId),
+      userId: user.id,
+    }).lean();
+
+    if (residentRecord && !flatId) {
+      flatId = residentRecord.flatId?.toString();
+    }
+  }
+
+  const queryConditions: any[] = [];
+  if (flatId && Types.ObjectId.isValid(flatId)) {
+    queryConditions.push({ unitId: new Types.ObjectId(flatId) });
+  }
+  if (residentRecord?._id) {
+    queryConditions.push({ residentId: residentRecord._id });
+  }
+
+  if (queryConditions.length === 0) {
+    return {
+      summary: {
+        totalOutstanding: 0,
+        totalPaid: 0,
+        pendingCount: 0,
+        overdueCount: 0,
+        lateFees: 0,
+      },
+      bills: [],
+      recentPayments: [],
+    };
+  }
+
+  const aptObjectId = new Types.ObjectId(apartmentId);
+  const bills = await Billing.find({
+    apartmentId: aptObjectId,
+    $or: queryConditions,
+  })
+    .sort({ dueDate: -1, createdAt: -1 })
+    .lean();
+
+  const formattedBills = bills.map((bill) => {
+    const values = calculateBillValues(bill);
+    return {
+      _id: bill._id.toString(),
+      apartmentId: bill.apartmentId.toString(),
+      unitId: bill.unitId.toString(),
+      residentId: bill.residentId.toString(),
+      baseAmount: bill.baseAmount,
+      additionalCharges: bill.additionalCharges || [],
+      lateFeePerDay: bill.lateFeePerDay,
+      lateFeeAmount: values.lateFeeAmount,
+      lateFeeWaivedAmount: bill.lateFeeWaivedAmount || 0,
+      totalAmount: values.totalAmount,
+      paidAmount: bill.paidAmount,
+      balanceAmount: values.balanceAmount,
+      dueDate: bill.dueDate,
+      status: values.status,
+      createdAt: bill.createdAt,
+    };
+  });
+
+  let totalOutstanding = 0;
+  let totalPaid = 0;
+  let pendingCount = 0;
+  let overdueCount = 0;
+  let totalLateFees = 0;
+
+  for (const b of formattedBills) {
+    totalOutstanding += b.balanceAmount;
+    totalPaid += b.paidAmount;
+    totalLateFees += b.lateFeeAmount;
+    if (b.status === "OVERDUE") {
+      overdueCount++;
+    } else if (b.status === "PENDING" || b.status === "PARTIALLY_PAID") {
+      pendingCount++;
+    }
+  }
+
+  const paymentsRaw = await Payment.find({
+    apartmentId: aptObjectId,
+    $or: queryConditions,
+  })
+    .sort({ paidAt: -1 })
+    .limit(20)
+    .lean();
+
+  const recentPayments = paymentsRaw.map((p) => ({
+    _id: p._id.toString(),
+    billId: p.billId?.toString(),
+    amount: p.amount,
+    source: p.source,
+    description: p.description,
+    paidAt: p.paidAt,
+  }));
+
+  return {
+    summary: {
+      totalOutstanding: roundMoney(totalOutstanding),
+      totalPaid: roundMoney(totalPaid),
+      pendingCount,
+      overdueCount,
+      lateFees: roundMoney(totalLateFees),
+    },
+    bills: formattedBills,
+    recentPayments,
+  };
+};
+
+export const payResidentBillService = async (
+  billId: string,
+  user: {
+    id: string;
+    role: string;
+    name?: string;
+    apartmentId?: string | null;
+    flatId?: string | null;
+  },
+  payload: {
+    amount?: number;
+    paymentMethod?: string;
+    referenceNo?: string;
+    description?: string;
+  }
+) => {
+  const id = toObjectId(billId, "billId");
+  const bill = await Billing.findById(id);
+  if (!bill) {
+    throw new AppError("Bill not found", 404);
+  }
+
+  if (user.apartmentId && bill.apartmentId.toString() !== user.apartmentId) {
+    throw new AppError("You do not have access to pay this bill", 403);
+  }
+
+  const values = calculateBillValues(bill);
+  if (values.balanceAmount <= 0) {
+    throw new AppError("This bill is already fully settled", 400);
+  }
+
+  const payAmount =
+    payload.amount && payload.amount > 0
+      ? Math.min(payload.amount, values.balanceAmount)
+      : values.balanceAmount;
+
+  const actor: AuditActor = {
+    userId: user.id,
+  };
+
+  const result = await recordBillPaymentService(billId, payAmount, actor, {
+    paymentMethod: payload.paymentMethod || "UPI",
+    referenceNo:
+      payload.referenceNo || `PAY-${Date.now().toString().slice(-6)}`,
+    description: payload.description || "Resident online settlement",
+  });
+
+  return {
+    success: true,
+    message: `Payment of ₹${payAmount} recorded successfully!`,
+    bill: result,
+  };
+};
+

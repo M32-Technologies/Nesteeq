@@ -84,14 +84,18 @@ export function VisitorParkingActions({
     }
   )
   const slotSource = selectedVehicleType
-    ? typedSlotsQuery.data?.slots ?? []
+    ? typedSlotsQuery.data?.slots ?? availableSlots
     : availableSlots
-  const filteredAvailableSlots = slotSource.filter(
-    (slot) =>
-      slot.status === "AVAILABLE" &&
-      !slot.currentAssignment &&
-      matchesParkingVehicleType(slot.vehicleType, form.vehicleType)
-  )
+  const filteredAvailableSlots = form.vehicleType
+    ? slotSource.filter(
+        (slot) =>
+          slot.status === "AVAILABLE" &&
+          !slot.currentAssignment &&
+          matchesParkingVehicleType(slot.vehicleType, form.vehicleType)
+      )
+    : slotSource.filter(
+        (slot) => slot.status === "AVAILABLE" && !slot.currentAssignment
+      )
   const isLoadingSlots = selectedVehicleType
     ? typedSlotsQuery.isLoading
     : availableSlotsLoading
@@ -100,8 +104,9 @@ export function VisitorParkingActions({
     if (form.vehicleType) {
       return `Select ${getParkingVehicleTypeLabel(form.vehicleType)} slot`
     }
+    if (filteredAvailableSlots.length === 0) return "No available slots"
 
-    return "Select vehicle type first"
+    return "Select parking slot"
   })()
 
   const hasParking = Boolean(record.parkingSlotId)
@@ -251,18 +256,27 @@ export function VisitorParkingActions({
               <select
                 className={selectClassName}
                 value={form.slotId}
-                disabled={isLoadingSlots || !form.vehicleType}
-                onChange={(event) =>
+                disabled={isLoadingSlots}
+                onChange={(event) => {
+                  const selectedSlot = slotSource.find(
+                    (slot) => slot._id === event.target.value
+                  )
                   setForm({
                     ...form,
                     slotId: event.target.value,
+                    ...(selectedSlot?.vehicleType && !form.vehicleType
+                      ? { vehicleType: selectedSlot.vehicleType }
+                      : {}),
                   })
-                }
+                }}
               >
                 <option value="">{parkingSlotPlaceholder}</option>
                 {filteredAvailableSlots.map((slot) => (
                   <option key={slot._id} value={slot._id}>
                     {slot.slotNumber}
+                    {slot.vehicleType
+                      ? ` (${getParkingVehicleTypeLabel(slot.vehicleType)})`
+                      : ""}
                   </option>
                 ))}
               </select>

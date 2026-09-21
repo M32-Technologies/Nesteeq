@@ -1,5 +1,6 @@
 export {
   createBill,
+  getBillRecipients,
   getBills,
   recordBillPayment,
   updateBill,

@@ -46,11 +46,24 @@ export interface Bill {
   createdBy?: string;
   createdAt?: string;
   updatedAt?: string;
+  unitName?: string;
+  flatNumber?: string;
+  residentName?: string;
+}
+
+export interface BillRecipient {
+  unitId: string;
+  flatNumber: string;
+  unitName: string;
+  residentId: string | null;
+  residentName: string;
+  hasResident: boolean;
+  residentType: string | null;
 }
 
 export interface CreateBillPayload {
   apartmentId?: string;
-  residentId: string;
+  residentId?: string;
   unitId: string;
   baseAmount: number;
   additionalCharges?: AdditionalCharge[];
@@ -84,6 +97,9 @@ export interface Payment {
   recordedBy?: string;
   paidAt: string;
   createdAt?: string;
+  unitName?: string;
+  flatNumber?: string;
+  residentName?: string;
 }
 
 export interface FinanceSummary {
@@ -114,20 +130,33 @@ export interface Expense {
   apartmentId: string;
   title: string;
   description?: string;
+  invoiceRef?: string;
   category: ExpenseCategory;
   amount: number;
   vendorName?: string;
   expenseDate: string;
   status: ExpenseStatus;
+  rejectionReason?: string;
+  paymentMethod?: string;
+  paymentReference?: string;
+  paidAt?: string;
   createdBy?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface ExpenseSummary {
+  totalExpenses: number;
+  approvedExpenses: number;
+  pendingExpenses: number;
+  pendingCount: number;
 }
 
 export interface CreateExpensePayload {
   apartmentId?: string;
   title: string;
   description?: string;
+  invoiceRef?: string;
   category: ExpenseCategory;
   amount: number;
   vendorName?: string;
@@ -137,11 +166,16 @@ export interface CreateExpensePayload {
 export interface UpdateExpensePayload {
   title?: string;
   description?: string;
+  invoiceRef?: string;
   category?: ExpenseCategory;
   amount?: number;
   vendorName?: string;
   expenseDate?: string;
   status?: ExpenseStatus;
+  rejectionReason?: string;
+  paymentMethod?: string;
+  paymentReference?: string;
+  paidAt?: string;
 }
 
 export type WalletTransactionType = "CREDIT" | "DEBIT";
@@ -163,6 +197,10 @@ export interface Wallet {
   totalAdded: number;
   totalUsed: number;
   transactions: WalletTransaction[];
+  residentName?: string;
+  flatNumber?: string;
+  unitName?: string;
+  residentType?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -171,11 +209,17 @@ export interface AuditLog {
   _id: string;
   apartmentId: string;
   performedBy?: string;
+  performedByName?: string;
   action: string;
   entityType: string;
   entityId: string;
+  residentName?: string;
+  flatNumber?: string;
+  unitName?: string;
   oldValue?: Record<string, unknown>;
   newValue?: Record<string, unknown>;
+  oldValueFormatted?: Record<string, unknown>;
+  newValueFormatted?: Record<string, unknown>;
   description?: string;
   createdAt?: string;
 }
@@ -277,6 +321,9 @@ const toQuery = (params: object) => {
 export const getBills = (params: GetBillsParams = {}) =>
   request<Bill[]>(`/api/bills${toQuery(params)}`);
 
+export const getBillRecipients = (params: { apartmentId?: string } = {}) =>
+  request<BillRecipient[]>(`/api/bills/recipients${toQuery(params)}`);
+
 export const createBill = (payload: CreateBillPayload) =>
   request<Bill>("/api/bills", {
     method: "POST",
@@ -295,12 +342,17 @@ export const updateBill = (
 export const recordBillPayment = (
   billId: string,
   amount: number,
+  options?: {
+    paymentMethod?: string;
+    referenceNo?: string;
+    description?: string;
+  },
 ) =>
   request<Bill>(
     `/api/bills/${encodeURIComponent(billId)}/payment`,
     {
       method: "PATCH",
-      body: JSON.stringify({ amount }),
+      body: JSON.stringify({ amount, ...options }),
     },
   );
 
@@ -338,8 +390,15 @@ export const getExpenses = (
     apartmentId?: string;
     category?: ExpenseCategory;
     status?: ExpenseStatus;
+    search?: string;
+    startDate?: string;
+    endDate?: string;
   } = {},
 ) => request<Expense[]>(`/api/expenses${toQuery(params)}`);
+
+export const getExpenseSummary = (
+  params: { apartmentId?: string } = {},
+) => request<ExpenseSummary>(`/api/expenses/summary${toQuery(params)}`);
 
 export const createExpense = (payload: CreateExpensePayload) =>
   request<Expense>("/api/expenses", {
@@ -404,3 +463,172 @@ export const getAuditLogs = (
     entityId?: string;
   } = {},
 ) => request<AuditLog[]>(`/api/audit${toQuery(params)}`);
+
+export interface MaintenancePayout {
+  _id: string;
+  title: string;
+  description?: string;
+  category: string;
+  flatNumber: string;
+  amount: number;
+  technicianName: string;
+  reviewedByName: string;
+  remarks: string;
+  forwardedAt: string;
+  priority?: string;
+}
+
+export const getMaintenancePayouts = () =>
+  request<MaintenancePayout[]>("/api/treasurer/maintenance-payouts");
+
+export const processMaintenancePayout = (
+  jobId: string,
+  payload: { paymentMethod?: string; notes?: string } = {}
+) =>
+  request<Expense>(
+    `/api/treasurer/maintenance-payouts/${encodeURIComponent(jobId)}/process`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
+
+
+export interface TreasurerChartMonth {
+  month: number;
+  monthName: string;
+  collection: number;
+  expenses: number;
+  outstanding: number;
+  balance: number;
+}
+
+export interface TreasurerChartData {
+  year: number;
+  months: TreasurerChartMonth[];
+  totalCollection: number;
+  totalExpenses: number;
+  netCashflow: number;
+  marginRate: number;
+  hasData: boolean;
+}
+
+export interface TreasurerPendingDue {
+  _id: string;
+  unitId: string;
+  flatNumber: string;
+  residentId: string;
+  balanceAmount: number;
+  dueDate: string;
+  status: string;
+}
+
+export interface TreasurerRecentPayment {
+  _id: string;
+  residentId: string;
+  billId?: string;
+  unitId: string;
+  flatNumber: string;
+  amount: number;
+  source: PaymentSource;
+  description?: string;
+  paidAt: string;
+}
+
+export interface TreasurerDashboardResponse {
+  summary: FinanceSummary;
+  chart: TreasurerChartData;
+  pendingDues: TreasurerPendingDue[];
+  recentPayments: TreasurerRecentPayment[];
+}
+
+export const getTreasurerDashboard = () =>
+  request<TreasurerDashboardResponse>("/api/treasurer/dashboard");
+
+export const getTreasurerChart = (year?: number) =>
+  request<TreasurerChartData>(`/api/treasurer/chart${toQuery({ year })}`);
+
+export interface BillingSummary {
+  totalBilled: number;
+  totalCollected: number;
+  totalOutstanding: number;
+  totalLateFees: number;
+  totalOverdue: number;
+  totalBills: number;
+}
+
+export const getBillingSummary = () =>
+  request<BillingSummary>("/api/bills/summary");
+
+export interface WalletSummary {
+  totalBalance: number;
+  totalAdded: number;
+  totalUsed: number;
+  activeWallets: number;
+  zeroBalanceWallets: number;
+}
+
+export const getWalletSummary = () =>
+  request<WalletSummary>("/api/wallets/summary");
+
+export interface DefaulterReportRow {
+  billId: string;
+  residentId: string;
+  residentName: string;
+  residentEmail?: string;
+  residentPhone?: string;
+  flatNumber: string;
+  unitName?: string;
+  balanceAmount: number;
+  totalAmount: number;
+  dueDate: string;
+  overdueDays: number;
+  status: string;
+}
+
+export interface DefaultersReportResponse {
+  defaulters: DefaulterReportRow[];
+  totalOverdueAmount: number;
+  defaulterCount: number;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
+export const getDefaultersReport = (
+  params: {
+    days?: number;
+    search?: string;
+    page?: number;
+    limit?: number;
+  } = {}
+) =>
+  request<DefaultersReportResponse>(
+    `/api/treasurer/reports/defaulters${toQuery(params)}`
+  );
+
+export interface ExpenseCategoryBreakdown {
+  category: ExpenseCategory;
+  totalAmount: number;
+  count: number;
+  percentage: number;
+}
+
+export interface ExpenseBreakdownResponse {
+  totalApprovedAmount: number;
+  categories: ExpenseCategoryBreakdown[];
+}
+
+export const getExpenseBreakdownReport = (
+  params: {
+    startDate?: string;
+    endDate?: string;
+  } = {}
+) =>
+  request<ExpenseBreakdownResponse>(
+    `/api/treasurer/reports/expense-breakdown${toQuery(params)}`
+  );
+

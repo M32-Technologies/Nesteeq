@@ -8,6 +8,7 @@ import {
 import {
   Camera,
   CameraOff,
+  CheckCircle2,
   LogIn,
   QrCode,
   X,
@@ -210,15 +211,26 @@ export function VisitorScanPanel({
       <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
         <div>
           <label className="mb-2 block text-sm font-medium text-[#111111]">
-            Visitor Pass Token
+            {verifiedPass ? "Visitor Name" : "Visitor Pass Token"}
           </label>
-          <input
-            type="text"
-            className={inputClassName}
-            value={token}
-            onChange={(event) => onTokenChange(event.target.value)}
-            placeholder="Scan QR or enter token"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              className={inputClassName}
+              value={verifiedPass ? verifiedPass.visitorName : token}
+              onChange={(event) => onTokenChange(event.target.value)}
+              placeholder="Scan QR or enter token"
+            />
+            {verifiedPass && (
+              <button
+                type="button"
+                onClick={() => onTokenChange("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded bg-[#07584F]/10 px-2 py-0.5 text-xs font-semibold text-[#07584F] hover:bg-[#07584F]/20 cursor-pointer"
+              >
+                Clear
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex items-end">
           <div className="flex flex-wrap gap-2">
@@ -341,15 +353,15 @@ export function VisitorScanPanel({
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            className={`${primaryButtonClassName} mt-4`}
-            onClick={onCheckIn}
-            disabled={isCheckingIn}
-          >
-            <LogIn className="h-4 w-4" />
-            {isCheckingIn ? "Checking in..." : "Confirm Check-In"}
-          </button>
+          <div className="mt-4 flex items-center justify-between rounded-lg bg-emerald-50 border border-emerald-200 px-3.5 py-2.5">
+            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-800">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+              <span>Visitor Pass Verified & Gate Entry Granted</span>
+            </div>
+            <span className="rounded-full bg-emerald-600 text-white px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider">
+              Active Inside
+            </span>
+          </div>
         </div>
       ) : null}
     </div>

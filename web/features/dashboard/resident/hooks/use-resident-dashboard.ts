@@ -9,6 +9,7 @@ import {
   fetchResidentDashboardAnnouncements,
   fetchCurrentApartment,
   fetchCurrentResidentProfile,
+  fetchResidentDashboardFeed,
   type GuestPassItem,
   type CurrentApartment,
   type ResidentProfileItem,
@@ -119,6 +120,17 @@ export function useResidentDashboard() {
     staleTime: 30 * 1000,
   });
 
+  // 8. Backend Consolidated Dashboard Feed Query
+  const {
+    data: dashboardFeed,
+    isLoading: isFeedLoading,
+    refetch: refetchFeed,
+  } = useQuery({
+    queryKey: ["resident", "dashboard", "feed"],
+    queryFn: fetchResidentDashboardFeed,
+    staleTime: 30 * 1000,
+  });
+
   // Resolve clean human-readable flat unit without any raw IDs or dummy fallbacks
   const flatUnitName = useMemo(() => {
     if (residentProfile?.flat?.flatNumber) {
@@ -144,9 +156,11 @@ export function useResidentDashboard() {
   }, [residentProfile, user]);
 
   const complaintsList = complaintsData?.complaints || [];
-  const activeComplaintsCount = complaintsList.filter(
-    (c) => c.status !== "RESOLVED" && c.status !== "CLOSED" && c.status !== "REJECTED"
-  ).length;
+  const activeComplaintsCount =
+    dashboardFeed?.counts?.activeComplaints ??
+    complaintsList.filter(
+      (c) => c.status !== "RESOLVED" && c.status !== "CLOSED" && c.status !== "REJECTED"
+    ).length;
 
   const criticalAlert = useMemo(() => {
     return announcements.find(
@@ -154,12 +168,19 @@ export function useResidentDashboard() {
     );
   }, [announcements]);
 
-  const activeVisitorsCount = guestPasses.filter(
-    (p) => p.status === "ACTIVE"
-  ).length;
+  const activeVisitorsCount =
+    dashboardFeed?.counts?.activePasses ??
+    guestPasses.filter((p) => p.status === "ACTIVE").length;
 
-  // Build Unified Feed Items for Center Column
+  // Build Unified Feed Items for Center Column (from backend feed if available, or fallback)
   const unifiedFeedItems = useMemo<UnifiedFeedItem[]>(() => {
+    if (dashboardFeed?.feed && dashboardFeed.feed.length > 0) {
+      return dashboardFeed.feed.map((item) => ({
+        ...item,
+        rawDate: new Date(item.rawDate),
+      }));
+    }
+
     const items: UnifiedFeedItem[] = [];
 
     // Map Announcements
@@ -250,7 +271,7 @@ export function useResidentDashboard() {
 
     // Sort newest first
     return items.sort((a, b) => b.rawDate.getTime() - a.rawDate.getTime());
-  }, [announcements, complaintsList, guestPasses, apartmentName]);
+  }, [dashboardFeed, announcements, complaintsList, guestPasses, apartmentName]);
 
   // Refetch all queries
   const refetchAll = () => {
@@ -259,6 +280,7 @@ export function useResidentDashboard() {
     refetchVisitors();
     refetchComplaints();
     refetchAnnouncements();
+    refetchFeed();
   };
 
   return {

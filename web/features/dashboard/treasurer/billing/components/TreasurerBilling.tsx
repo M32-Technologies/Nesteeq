@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import {
   createBill,
   getBills,
+  getBillingSummary,
   recordBillPayment,
   updateBill,
   waiveLateFee,
@@ -86,10 +87,18 @@ export default function TreasurerBilling() {
     queryFn: () => getBills(),
   });
 
+  const billingSummaryQuery = useQuery({
+    queryKey: ["treasurer", "billing-summary"],
+    queryFn: () => getBillingSummary(),
+  });
+
   const invalidateTreasurerData = async () => {
     await Promise.all([
       queryClient.invalidateQueries({
         queryKey: ["treasurer", "bills"],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ["treasurer", "billing-summary"],
       }),
       queryClient.invalidateQueries({
         queryKey: ["treasurer", "finance-summary"],
@@ -276,27 +285,36 @@ export default function TreasurerBilling() {
   };
 
   const bills = billsQuery.data ?? [];
-  const billingStats = bills.reduce(
-    (stats, bill) => {
-      stats.collected += bill.paidAmount;
-      stats.outstanding += bill.balanceAmount;
-
-      if (bill.status === "OVERDUE") {
-        stats.overdue += bill.balanceAmount;
+  const serverSummary = billingSummaryQuery.data;
+  const billingStats = serverSummary
+    ? {
+        totalBills: serverSummary.totalBills,
+        collected: serverSummary.totalCollected,
+        outstanding: serverSummary.totalOutstanding,
+        overdue: serverSummary.totalOverdue,
       }
+    : bills.reduce(
+        (stats, bill) => {
+          stats.collected += bill.paidAmount;
+          stats.outstanding += bill.balanceAmount;
 
-      return stats;
-    },
-    {
-      collected: 0,
-      outstanding: 0,
-      overdue: 0,
-    },
-  );
+          if (bill.status === "OVERDUE") {
+            stats.overdue += bill.balanceAmount;
+          }
+
+          return stats;
+        },
+        {
+          totalBills: bills.length,
+          collected: 0,
+          outstanding: 0,
+          overdue: 0,
+        },
+      );
   const billingSummary = [
     {
       title: "Total Bills",
-      value: bills.length.toString(),
+      value: (serverSummary?.totalBills ?? bills.length).toString(),
       icon: FileText,
     },
     {
@@ -395,8 +413,8 @@ export default function TreasurerBilling() {
               <table className="w-full min-w-[1250px] text-left text-sm">
                 <thead className="border-b border-slate-200 text-slate-500">
                   <tr>
-                    <th className="pb-3 font-medium">Resident ID</th>
-                    <th className="pb-3 font-medium">Unit ID</th>
+                    <th className="pb-3 font-medium">Resident</th>
+                    <th className="pb-3 font-medium">Unit / Flat</th>
                     <th className="pb-3 font-medium">Base</th>
                     <th className="pb-3 font-medium">Due Date</th>
                     <th className="pb-3 font-medium">Late Fee</th>
@@ -414,10 +432,10 @@ export default function TreasurerBilling() {
                       className="border-b border-slate-100 last:border-0"
                     >
                       <td className="py-4 font-medium text-slate-900">
-                        {bill.residentId}
+                        {bill.residentName || "Resident"}
                       </td>
                       <td className="py-4 text-slate-600">
-                        {bill.unitId}
+                        {bill.unitName || (bill.flatNumber ? `Flat ${bill.flatNumber}` : "Unit")}
                       </td>
                       <td className="py-4 font-medium text-slate-900">
                         {formatCurrency(bill.baseAmount)}
@@ -501,7 +519,11 @@ export default function TreasurerBilling() {
                       : "Edit Bill"}
                 </h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Bill {selectedBill._id}
+                  {selectedBill.unitName ||
+                    (selectedBill.flatNumber
+                      ? `Flat ${selectedBill.flatNumber}`
+                      : "Unit")}{" "}
+                  • {selectedBill.residentName || "Resident"}
                 </p>
               </div>
               <button

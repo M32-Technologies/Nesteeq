@@ -25,6 +25,7 @@ const sameId = (id1: any, id2: any): boolean => {
 };
 
 import { Complaint, type ComplaintDocument } from "./complaint.model.js";
+import { Maintenance } from "../maintenance/maintenance.model.js";
 import {
   approvalAllowedStatuses,
   assertNotTerminal,
@@ -184,6 +185,9 @@ const createRemark = (message: string | undefined, user: AuthenticatedComplaintU
   };
 };
 
+const escapeComplaintRegex = (value: string) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const applySharedFilters = (
   filter: ComplaintFilter,
   query: GetComplaintsQuery
@@ -198,6 +202,15 @@ const applySharedFilters = (
 
   if (query.priority) {
     filter.priority = query.priority;
+  }
+
+  if (query.search?.trim()) {
+    const sRegex = new RegExp(escapeComplaintRegex(query.search.trim()), "i");
+    filter.$or = [
+      { title: sRegex },
+      { description: sRegex },
+      { ticketNumber: sRegex },
+    ];
   }
 };
 
@@ -293,13 +306,53 @@ export const getComplaints = async (
 
   const skip = (query.page - 1) * query.limit;
 
-  const [complaints, total] = await Promise.all([
+  const countFilter = { ...filter };
+  delete countFilter.status;
+
+  const [complaints, total, pendingCount, inProgressCount, resolvedCount] = await Promise.all([
     Complaint.find(filter).sort({ createdAt: -1 }).skip(skip).limit(query.limit).lean(),
     Complaint.countDocuments(filter),
+    Complaint.countDocuments({ ...countFilter, status: "PENDING" } as any),
+    Complaint.countDocuments({ ...countFilter, status: { $in: ["APPROVED", "ASSIGNED", "IN_PROGRESS"] } } as any),
+    Complaint.countDocuments({ ...countFilter, status: { $in: ["WORK_COMPLETED", "CLOSED"] } } as any),
   ]);
 
+  const complaintIds = complaints.map((c) => c._id);
+  const maintenanceJobs = await (Maintenance as any)
+    .find({
+      complaint: { $in: complaintIds },
+    })
+    .lean();
+
+  const maintenanceMap = new Map<string, any>(
+    maintenanceJobs.map((m: any) => [m.complaint.toString(), m])
+  );
+
+  const enrichedComplaints = complaints.map((c) => {
+    const m = maintenanceMap.get(c._id.toString());
+    return {
+      ...c,
+      maintenance: m
+        ? {
+            _id: m._id.toString(),
+            costReview: m.costReview,
+            finalCost: m.finalCost,
+            isSocietyCovered: m.isSocietyCovered,
+            assignedStaff: m.assignedStaff,
+            status: m.status,
+          }
+        : null,
+    };
+  });
+
   return {
-    complaints,
+    complaints: enrichedComplaints,
+    counts: {
+      total,
+      pendingCount,
+      inProgressCount,
+      resolvedCount,
+    },
     pagination: {
       page: query.page,
       limit: query.limit,

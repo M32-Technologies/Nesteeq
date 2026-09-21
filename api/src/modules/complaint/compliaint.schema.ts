@@ -130,6 +130,7 @@ export const getComplaintsQuerySchema = z
     status: z.enum(complaintStatuses).optional(),
     category: z.enum(complaintCategories).optional(),
     priority: z.enum(complaintPriorities).optional(),
+    search: z.string().trim().optional(),
     apartment: z.string().trim().min(1, "Apartment ID cannot be empty").optional(),
     flat: z.string().trim().min(1, "Flat ID cannot be empty").optional(),
     resident: authUserIdSchema.optional(),

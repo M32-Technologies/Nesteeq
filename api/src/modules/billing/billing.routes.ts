@@ -7,8 +7,11 @@ import {
 import {
   createBill,
   getBillById,
+  getBillRecipients,
   getBillingSummary,
   getBills,
+  getMyResidentBills,
+  payResidentBill,
   recordBillPayment,
   updateBill,
   waiveLateFee,
@@ -113,8 +116,14 @@ const requireBillApartmentAccess = catchAsync(
 
 router.use(protect);
 
+router.get("/my-bills", getMyResidentBills);
+router.post("/:id/pay", payResidentBill);
+
 router.get("/", requireRole("treasurer", "property_manager"), zodValidate(getBillsSchema), requireQueryApartmentAccess, getBills);
 
+router.get("/recipients", requireRole("treasurer", "property_manager"), requireQueryApartmentAccess, getBillRecipients);
+
+router.get("/summary", requireRole("treasurer", "property_manager"), requireQueryApartmentAccess, getBillingSummary);
 router.get("/summary/:apartmentId", requireRole("treasurer", "property_manager"), zodValidate(getBillingSummarySchema), requireParamApartmentAccess, getBillingSummary);
 
 router.get("/:id", requireRole("treasurer", "property_manager"), zodValidate(getBillByIdSchema), requireBillApartmentAccess, getBillById);
