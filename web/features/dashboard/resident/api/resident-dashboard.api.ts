@@ -195,3 +195,20 @@ export async function fetchResidentDashboardAnnouncements(): Promise<Announcemen
     return [];
   }
 }
+
+export interface CreateResidentComplaintPayload {
+  title: string;
+  description: string;
+  category: "PLUMBING" | "ELECTRICAL" | "CLEANING" | "SECURITY" | "LIFT" | "WATER" | "MAINTENANCE" | "OTHER";
+  priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+}
+
+export async function createResidentComplaint(payload: CreateResidentComplaintPayload) {
+  const res = await api.post<{
+    success: boolean;
+    message?: string;
+    data: any;
+  }>("/api/v1/complaints", payload);
+
+  return res.data;
+}

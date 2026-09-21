@@ -12,10 +12,12 @@ import {
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchResidentComplaints } from "../api/resident-dashboard.api";
+import { CreateComplaintModal } from "./create-complaint-modal";
 
 export function ResidentComplaintsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"ALL" | "IN_PROGRESS" | "RESOLVED">("ALL");
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const { data: complaintsData, isLoading } = useQuery({
     queryKey: ["resident", "complaints", activeTab],
@@ -58,12 +60,12 @@ export function ResidentComplaintsPage() {
 
         <button
           type="button"
-          onClick={() => alert("Log complaint form modal opened.")}
+          onClick={() => setIsCreateModalOpen(true)}
           className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#07584F] px-4 text-xs sm:text-sm font-medium text-white shadow-xs transition-colors hover:bg-[#064C44] cursor-pointer active:scale-95 self-start sm:self-auto"
         >
           <Plus className="size-4" />
           <LifeBuoy className="size-4" />
-          <span>Log New Complaint</span>
+          <span>Create Complaint</span>
         </button>
       </div>
 
@@ -116,7 +118,7 @@ export function ResidentComplaintsPage() {
           <div className="pt-2">
             <button
               type="button"
-              onClick={() => alert("Log complaint form modal opened.")}
+              onClick={() => setIsCreateModalOpen(true)}
               className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#07584F] px-4 text-xs sm:text-sm font-medium text-white shadow-xs hover:bg-[#064C44] transition cursor-pointer"
             >
               <Plus className="size-4" />
@@ -207,6 +209,12 @@ export function ResidentComplaintsPage() {
           })}
         </div>
       )}
+
+      {/* Modal Dialog */}
+      <CreateComplaintModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+      />
     </div>
   );
 }
