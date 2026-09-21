@@ -25,6 +25,7 @@ import {
   recordBillPaymentSchema,
   updateBillSchema,
   waiveLateFeeSchema,
+  payResidentBillSchema,
 } from "./billing.schema.js";
 
 import { zodValidate } from "../../middlewares/zodValidate.js";
@@ -117,7 +118,7 @@ const requireBillApartmentAccess = catchAsync(
 router.use(protect);
 
 router.get("/my-bills", getMyResidentBills);
-router.post("/:id/pay", payResidentBill);
+router.post("/:id/pay", zodValidate(payResidentBillSchema), payResidentBill);
 
 router.get("/", requireRole("treasurer", "property_manager"), zodValidate(getBillsSchema), requireQueryApartmentAccess, getBills);
 

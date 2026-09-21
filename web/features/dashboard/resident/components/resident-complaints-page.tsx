@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Wrench,
   Plus,
@@ -9,46 +9,141 @@ import {
   CheckCircle2,
   KeyRound,
   LifeBuoy,
-  X,
   CircleDollarSign,
   ShieldCheck,
   FileText,
-  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { fetchResidentComplaints } from "../api/resident-dashboard.api";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import {
+  confirmResidentComplaint,
+  fetchResidentComplaints,
+} from "../api/resident-dashboard.api";
 import { CreateComplaintModal } from "./create-complaint-modal";
 
+const isResolvedStatus = (status?: string) =>
+  Boolean(
+    status &&
+      ["WORK_COMPLETED", "APPROVED", "CLOSED", "RESOLVED"].includes(
+        status.toUpperCase()
+      )
+  );
+
+const isCancelledOrRejected = (status?: string) =>
+  Boolean(
+    status && ["REJECTED", "CANCELLED"].includes(status.toUpperCase())
+  );
+
+const getStatusBadge = (status: string) => {
+  const s = status ? status.toUpperCase() : "PENDING";
+  if (["CLOSED", "RESOLVED"].includes(s)) {
+    return {
+      label: "Closed",
+      className: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+    };
+  }
+  if (s === "APPROVED") {
+    return {
+      label: "Approved",
+      className: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+    };
+  }
+  if (s === "WORK_COMPLETED") {
+    return {
+      label: "Work Completed",
+      className: "bg-teal-50 text-teal-700 ring-teal-200",
+    };
+  }
+  if (s === "AWAITING_APPROVAL") {
+    return {
+      label: "Awaiting Approval",
+      className: "bg-purple-50 text-purple-700 ring-purple-200",
+    };
+  }
+  if (s === "IN_PROGRESS") {
+    return {
+      label: "In Progress",
+      className: "bg-blue-50 text-blue-700 ring-blue-200",
+    };
+  }
+  if (s === "ASSIGNED") {
+    return {
+      label: "Assigned",
+      className: "bg-indigo-50 text-indigo-700 ring-indigo-200",
+    };
+  }
+  if (s === "UNDER_REVIEW") {
+    return {
+      label: "Under Review",
+      className: "bg-sky-50 text-sky-700 ring-sky-200",
+    };
+  }
+  if (["REJECTED", "CANCELLED"].includes(s)) {
+    return {
+      label: s.replace(/_/g, " "),
+      className: "bg-rose-50 text-rose-700 ring-rose-200",
+    };
+  }
+  return {
+    label: "Pending",
+    className: "bg-amber-50 text-amber-700 ring-amber-200",
+  };
+};
+
 export function ResidentComplaintsPage() {
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"ALL" | "IN_PROGRESS" | "RESOLVED">("ALL");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
-  const { data: complaintsData, isLoading } = useQuery({
-    queryKey: ["resident", "complaints", activeTab, searchQuery],
-    queryFn: () =>
-      fetchResidentComplaints({
-        status: activeTab === "ALL" ? undefined : activeTab,
-        search: searchQuery.trim() || undefined,
-        limit: 50,
-      }),
+  const { data: complaintsData, isLoading, isFetching, refetch } = useQuery({
+    queryKey: ["resident", "complaints"],
+    queryFn: () => fetchResidentComplaints({ limit: 50 }),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   const complaintsList = complaintsData?.complaints || [];
 
-  const filtered = complaintsList.filter((c) => {
-    if (activeTab === "IN_PROGRESS" && (c.status === "RESOLVED" || c.status === "CLOSED")) return false;
-    if (activeTab === "RESOLVED" && c.status !== "RESOLVED" && c.status !== "CLOSED") return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return (
-        c.title.toLowerCase().includes(q) ||
-        c.description.toLowerCase().includes(q) ||
-        (c.ticketNumber && c.ticketNumber.toLowerCase().includes(q))
-      );
+  const filtered = useMemo(() => {
+    return complaintsList.filter((c) => {
+      if (activeTab === "IN_PROGRESS") {
+        if (isResolvedStatus(c.status) || isCancelledOrRejected(c.status)) return false;
+      } else if (activeTab === "RESOLVED") {
+        if (!isResolvedStatus(c.status)) return false;
+      }
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        return (
+          c.title?.toLowerCase().includes(q) ||
+          c.description?.toLowerCase().includes(q) ||
+          (c.ticketNumber && c.ticketNumber.toLowerCase().includes(q)) ||
+          c.category?.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [complaintsList, activeTab, searchQuery]);
+
+  const handleConfirmResolution = async (ticketId: string) => {
+    try {
+      setConfirmingId(ticketId);
+      await confirmResidentComplaint(ticketId, "Confirmed by Resident");
+      toast.success("Complaint resolution confirmed! Ticket closed.");
+      await queryClient.invalidateQueries({ queryKey: ["resident", "complaints"] });
+      await queryClient.invalidateQueries({ queryKey: ["resident", "dashboard", "complaints"] });
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        "Failed to confirm resolution";
+      toast.error(msg);
+    } finally {
+      setConfirmingId(null);
     }
-    return true;
-  });
+  };
 
   return (
     <div className="w-full space-y-6 pb-14">
@@ -87,21 +182,34 @@ export function ResidentComplaintsPage() {
           />
         </div>
 
-        <div className="flex items-center gap-1 rounded-lg border border-[#DDE3DF] bg-[#F7F8F5] p-1">
-          {(["ALL", "IN_PROGRESS", "RESOLVED"] as const).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors cursor-pointer ${
-                activeTab === tab
-                  ? "bg-white text-[#07584F] font-semibold shadow-2xs"
-                  : "text-[#637083] hover:text-[#111111]"
-              }`}
-            >
-              {tab === "ALL" ? "All Tickets" : tab === "IN_PROGRESS" ? "In Progress" : "Resolved"}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            title="Refresh tickets"
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#DDE3DF] bg-[#F7F8F5] px-3 text-xs font-medium text-[#637083] hover:text-[#111111] hover:bg-white transition-colors cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw className={`size-3.5 ${isFetching ? "animate-spin text-[#07584F]" : ""}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+
+          <div className="flex items-center gap-1 rounded-lg border border-[#DDE3DF] bg-[#F7F8F5] p-1">
+            {(["ALL", "IN_PROGRESS", "RESOLVED"] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                  activeTab === tab
+                    ? "bg-white text-[#07584F] font-semibold shadow-2xs"
+                    : "text-[#637083] hover:text-[#111111]"
+                }`}
+              >
+                {tab === "ALL" ? "All Tickets" : tab === "IN_PROGRESS" ? "In Progress" : "Resolved"}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -134,32 +242,28 @@ export function ResidentComplaintsPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((ticket, index) => {
-            const isResolved = ticket.status === "RESOLVED" || ticket.status === "CLOSED";
-            const isInProgress = ticket.status === "IN_PROGRESS";
+            const statusBadge = getStatusBadge(ticket.status);
+            const canConfirmResolution =
+              ticket.status === "WORK_COMPLETED" || ticket.status === "APPROVED";
             const completionOtp = (ticket as Record<string, any>).completionOtp;
             const maintenance = ticket.maintenance;
+            const ticketId = ticket._id || ticket.id || String(index);
 
             return (
               <div
-                key={ticket._id || ticket.id || index}
+                key={ticketId}
                 className="rounded-lg border border-[#DDE3DF] bg-white p-4.5 shadow-xs space-y-3 hover:border-slate-300 transition-colors"
               >
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono text-xs font-semibold text-[#7C8782]">
                         #{ticket.ticketNumber || (ticket._id ? ticket._id.slice(-6).toUpperCase() : "TKT")}
                       </span>
                       <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ring-1 ${
-                          isResolved
-                            ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                            : isInProgress
-                            ? "bg-blue-50 text-blue-700 ring-blue-200"
-                            : "bg-amber-50 text-amber-700 ring-amber-200"
-                        }`}
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ring-1 ${statusBadge.className}`}
                       >
-                        {ticket.status}
+                        {statusBadge.label}
                       </span>
                       {ticket.priority && (
                         <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-[#637083]">
@@ -190,14 +294,34 @@ export function ResidentComplaintsPage() {
                     <div>
                       <span className="text-[#7C8782]">Assigned Technician: </span>
                       <span className="font-semibold text-[#111111]">
-                        {ticket.assignedStaff.name} ({ticket.assignedStaff.role || "Staff"})
+                        {typeof ticket.assignedStaff === "object" ? ticket.assignedStaff.name : "Facility Staff"}{" "}
+                        ({typeof ticket.assignedStaff === "object" ? ticket.assignedStaff.role || "Staff" : "Staff"})
                       </span>
                     </div>
-                    {ticket.assignedStaff.phone && (
+                    {typeof ticket.assignedStaff === "object" && ticket.assignedStaff.phone && (
                       <span className="font-mono text-[#07584F] font-semibold">
                         {ticket.assignedStaff.phone}
                       </span>
                     )}
+                  </div>
+                )}
+
+                {/* Confirm Resolution Prompt */}
+                {canConfirmResolution && (
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-md bg-emerald-50/70 border border-emerald-200 p-2.5 text-xs text-emerald-900">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+                      <span>Work is completed on this ticket. Please confirm if the issue is resolved.</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleConfirmResolution(ticketId)}
+                      disabled={confirmingId === ticketId}
+                      className="inline-flex items-center gap-1.5 rounded-md bg-emerald-700 px-3 py-1 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-800 transition disabled:opacity-50 cursor-pointer self-start sm:self-auto shrink-0"
+                    >
+                      <CheckCircle2 className="size-3.5" />
+                      <span>{confirmingId === ticketId ? "Confirming..." : "Confirm Resolution"}</span>
+                    </button>
                   </div>
                 )}
 

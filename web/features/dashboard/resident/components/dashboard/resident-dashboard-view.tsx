@@ -170,7 +170,7 @@ export function ResidentDashboardView() {
         />
 
         <SummaryCard
-          label="Open Tickets"
+          label="Complaints"
           value={activeComplaintsCount}
           icon={<Wrench className="size-5" />}
           href="/resident/complaints"

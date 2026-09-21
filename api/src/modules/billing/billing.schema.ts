@@ -121,3 +121,16 @@ export const waiveLateFeeSchema = z.object({
       .positive("Waiver amount must be greater than 0"),
   }),
 });
+
+export const payResidentBillSchema = z.object({
+  params: z.object({
+    id: objectIdSchema,
+  }),
+  body: z.object({
+    amount: z.coerce.number().positive("Amount must be greater than 0").optional(),
+    paymentMethod: z.string().trim().max(50).optional(),
+    referenceNo: z.string().trim().max(100).optional(),
+    description: z.string().trim().max(255).optional(),
+  }),
+});
+

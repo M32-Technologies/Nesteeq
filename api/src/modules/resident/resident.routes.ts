@@ -37,14 +37,14 @@ router.post("/passes", protect, zodValidate(createResidentGuestPassSchema), crea
 router.get("/passes", protect, zodValidate(listResidentGuestPassesQuerySchema), getResidentGuestPassesHandler);
 router.patch("/passes/:passId/cancel", protect, zodValidate(residentGuestPassParamsSchema), cancelResidentGuestPassHandler);
 
-router.get("/", protect, zodValidate(residentListQuerySchema), getResidentHandler);
+router.get("/", protect, requireRole("property_manager"), zodValidate(residentListQuerySchema), getResidentHandler);
 
 router.get("/stats", protect, requireRole("property_manager"), getResidentStatsHandler);
 
 router.patch("/:id/status", protect, requireRole("property_manager"), updateResidentStatusHandler);
 
-router.patch("/:id", protect, updateResidentDetailsHandler);
+router.patch("/:id", protect, requireRole("property_manager"), updateResidentDetailsHandler);
 
-router.get("/:id", protect, getResidentDetailsHandler);
+router.get("/:id", protect, requireRole("property_manager"), getResidentDetailsHandler);
 
 export default router;

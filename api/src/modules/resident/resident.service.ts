@@ -573,7 +573,7 @@ export const registerVehicleService = async (
     const { apartmentId: aptId, resident, flatId } = await resolveResidentContext(user, apartmentId);
     const aptObjectId = new Types.ObjectId(aptId);
 
-    const normalizedNumber = data.vehicleNumber.trim().toUpperCase().replace(/\s+/g, " ");
+    const normalizedNumber = normalizeVehicleNumber(data.vehicleNumber);
 
     // Check if vehicle is already registered in this apartment
     const existingVehicle = await Vehicle.findOne({
@@ -584,6 +584,19 @@ export const registerVehicleService = async (
     if (existingVehicle) {
         throw new AppError(
             `Vehicle ${normalizedNumber} is already registered in this society`,
+            409
+        );
+    }
+
+    // Check if this vehicle is already allocated to any parking slot in this apartment
+    const slotWithVehicle = await ParkingSlotModel.findOne({
+        apartmentId: aptObjectId,
+        vehicleNumber: normalizedNumber,
+    });
+
+    if (slotWithVehicle) {
+        throw new AppError(
+            `Vehicle ${normalizedNumber} is already allocated to parking slot ${slotWithVehicle.slotNumber}`,
             409
         );
     }
@@ -683,7 +696,7 @@ export const deleteVehicleService = async (
     vehicleId: string,
     apartmentId?: string
 ) => {
-    const { apartmentId: aptId } = await resolveResidentContext(user, apartmentId);
+    const { apartmentId: aptId, resident, flatId } = await resolveResidentContext(user, apartmentId);
     const aptObjectId = new Types.ObjectId(aptId);
 
     if (!Types.ObjectId.isValid(vehicleId)) {
@@ -699,10 +712,19 @@ export const deleteVehicleService = async (
         throw new AppError("Vehicle not found", 404);
     }
 
-    // Clear vehicle number on associated slot if matches
+    const isOwner =
+        (vehicle.userId && vehicle.userId === user.id) ||
+        (resident?._id && vehicle.residentId && vehicle.residentId.toString() === resident._id.toString()) ||
+        (flatId && vehicle.flatId && vehicle.flatId.toString() === flatId.toString());
+
+    if (!isOwner) {
+        throw new AppError("You are not authorized to unregister this vehicle", 403);
+    }
+
+    // Clear vehicle number on associated slot
     if (vehicle.parkingSlotId) {
         await ParkingSlotModel.updateOne(
-            { _id: vehicle.parkingSlotId, vehicleNumber: vehicle.vehicleNumber },
+            { _id: vehicle.parkingSlotId },
             { $set: { vehicleNumber: null } }
         );
     }
@@ -718,7 +740,10 @@ export const createResidentGuestPassService = async (
     apartmentId?: string
 ) => {
     const { apartmentId: aptId, resident, flatId, flat } = await resolveResidentContext(user, apartmentId);
-    const targetFlatId = data.flatId && Types.ObjectId.isValid(data.flatId) ? data.flatId : flatId;
+    if (data.flatId && flatId && data.flatId !== flatId.toString()) {
+        throw new AppError("You are not authorized to create a guest pass for another flat", 403);
+    }
+    const targetFlatId = flatId || (data.flatId && Types.ObjectId.isValid(data.flatId) ? data.flatId : null);
     if (!targetFlatId) {
         throw new AppError("No valid flat found for this resident context", 400);
     }

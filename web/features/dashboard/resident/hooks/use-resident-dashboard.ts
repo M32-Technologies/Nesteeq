@@ -159,7 +159,13 @@ export function useResidentDashboard() {
   const activeComplaintsCount =
     dashboardFeed?.counts?.activeComplaints ??
     complaintsList.filter(
-      (c) => c.status !== "RESOLVED" && c.status !== "CLOSED" && c.status !== "REJECTED"
+      (c) =>
+        c.status !== "RESOLVED" &&
+        c.status !== "CLOSED" &&
+        c.status !== "APPROVED" &&
+        c.status !== "WORK_COMPLETED" &&
+        c.status !== "REJECTED" &&
+        c.status !== "CANCELLED"
     ).length;
 
   const criticalAlert = useMemo(() => {

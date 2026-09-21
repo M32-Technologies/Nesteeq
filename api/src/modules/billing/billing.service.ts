@@ -1015,6 +1015,27 @@ export const payResidentBillService = async (
     throw new AppError("You do not have access to pay this bill", 403);
   }
 
+  let flatId = user.flatId;
+  let residentRecord = null;
+  if (Types.ObjectId.isValid(user.apartmentId || "")) {
+    residentRecord = await ResidentModel.findOne({
+      apartmentId: new Types.ObjectId(user.apartmentId!),
+      userId: user.id,
+    }).lean();
+
+    if (residentRecord && !flatId) {
+      flatId = residentRecord.flatId?.toString();
+    }
+  }
+
+  const isOwner =
+    (flatId && bill.unitId.toString() === flatId) ||
+    (residentRecord && bill.residentId.toString() === residentRecord._id.toString());
+
+  if (!isOwner) {
+    throw new AppError("You do not have access to pay this bill", 403);
+  }
+
   const values = calculateBillValues(bill);
   if (values.balanceAmount <= 0) {
     throw new AppError("This bill is already fully settled", 400);

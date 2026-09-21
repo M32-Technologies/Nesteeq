@@ -29,7 +29,7 @@ export const registerVehicleSchema = z.object({
       .trim()
       .min(3, "Vehicle number must have at least 3 characters")
       .max(20, "Vehicle number cannot exceed 20 characters")
-      .transform((val) => val.toUpperCase().replace(/\s+/g, " ")),
+      .transform((val) => val.replace(/[\s-]/g, "").toUpperCase()),
     vehicleType: z.enum(["CAR", "BIKE", "EV", "BICYCLE", "OTHER"]).optional(),
     makeModel: z.string().trim().max(100).optional().nullable(),
     color: z.string().trim().max(50).optional().nullable(),
@@ -74,6 +74,7 @@ export const createResidentGuestPassSchema = z.object({
         .string()
         .min(5, "Visitor phone must contain at least 5 characters")
         .max(20, "Visitor phone cannot exceed 20 characters")
+        .regex(/^(\+?[0-9\s-]{5,20})$/, "Invalid visitor phone number format")
     ),
     purpose: optionalString(
       z.string().max(200, "Purpose cannot exceed 200 characters")

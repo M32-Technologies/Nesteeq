@@ -150,9 +150,17 @@ export function ResidentParkingPage() {
       toast.error("No available parking slot assigned. Please contact the property manager.");
       return;
     }
-    const cleanPlate = vehicleNumber.trim().toUpperCase().replace(/\s+/g, " ");
+    const cleanPlate = vehicleNumber.replace(/[\s-]/g, "").toUpperCase();
     if (!cleanPlate || cleanPlate.length < 3) {
       toast.error("Please enter a valid vehicle license plate number.");
+      return;
+    }
+
+    const isDuplicate = vehicles.some(
+      (v) => v.vehicleNumber.replace(/[\s-]/g, "").toUpperCase() === cleanPlate
+    );
+    if (isDuplicate) {
+      toast.error(`Vehicle ${cleanPlate} is already registered under your unit.`);
       return;
     }
 

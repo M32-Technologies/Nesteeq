@@ -209,12 +209,12 @@ export const createEmergencyAlertService = async ({
     const resident = await ResidentModel.findOne({
       userId,
       apartmentId,
-      status: "active",
+      status: { $in: ["active", "pending"] },
     })
 
     if (!resident) {
       throw new AppError(
-        "Active resident profile not found",
+        "Resident profile not found",
         404
       )
     }
@@ -225,7 +225,7 @@ export const createEmergencyAlertService = async ({
     const resident = await ResidentModel.findOne({
       userId,
       apartmentId,
-      status: "active",
+      status: { $in: ["active", "pending"] },
     })
 
     if (resident) {
@@ -234,7 +234,7 @@ export const createEmergencyAlertService = async ({
     } else {
       const anyResident = await ResidentModel.findOne({
         apartmentId,
-        status: "active",
+        status: { $in: ["active", "pending"] },
       })
       if (anyResident) {
         resolvedResidentId = anyResident._id.toString()

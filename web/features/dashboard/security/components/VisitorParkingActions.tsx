@@ -112,10 +112,17 @@ export function VisitorParkingActions({
   const hasParking = Boolean(record.parkingSlotId)
   const hasActiveParking =
     hasParking && record.parkingAssignmentStatus === "ACTIVE"
+  const hasVehicle = Boolean(
+    record.vehicleNumber &&
+      record.vehicleNumber.trim() &&
+      record.vehicleNumber.trim().toLowerCase() !== "no vehicle" &&
+      record.vehicleNumber.trim().toLowerCase() !== "none"
+  )
   const canAssign =
     record.status === "ACTIVE" &&
     Boolean(record.visitId) &&
     Boolean(record.flatId) &&
+    hasVehicle &&
     !hasActiveParking
   const canRelease =
     record.status === "ACTIVE" &&
@@ -134,6 +141,11 @@ export function VisitorParkingActions({
   }
 
   const handleAssign = async () => {
+    if (!hasVehicle) {
+      toast.error("Visitor has no vehicle to assign parking")
+      return
+    }
+
     if (!record.visitId || !record.flatId) {
       toast.error("Active visitor details are required")
       return

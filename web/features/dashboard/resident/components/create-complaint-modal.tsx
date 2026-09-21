@@ -143,7 +143,10 @@ export function CreateComplaintModal({
       }
 
       const locationPrefix = `[Location: ${values.location}]\n\n`;
-      const fullDescription = `${locationPrefix}${values.description.trim()}`;
+      let fullDescription = `${locationPrefix}${values.description.trim()}`;
+      if (selectedFile) {
+        fullDescription += `\n\n[Attached Photo Reference: ${selectedFile.name} (${(selectedFile.size / 1024).toFixed(1)} KB)]`;
+      }
 
       await createResidentComplaint({
         title: values.title.trim(),
@@ -416,7 +419,7 @@ export function CreateComplaintModal({
                       Click or drag and drop to upload photo
                     </p>
                     <p className="text-[11px] text-[#7C8782]">
-                      PNG, JPG or WEBP up to 5MB
+                      PNG, JPG or WEBP up to 5MB (Recorded as ticket photo reference)
                     </p>
                   </div>
                 </div>

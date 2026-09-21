@@ -221,9 +221,13 @@ export function ParkingSlots() {
 
       <ParkingForms
         assignForm={assignForm}
-        activeVisitors={
-          activeVisitorsQuery.data?.visitors ?? []
-        }
+        activeVisitors={(activeVisitorsQuery.data?.visitors ?? []).filter(
+          (visitor) =>
+            visitor.vehicleNumber &&
+            visitor.vehicleNumber.trim() &&
+            visitor.vehicleNumber.trim().toLowerCase() !== "no vehicle" &&
+            visitor.vehicleNumber.trim().toLowerCase() !== "none"
+        )}
         activeVisitorsLoading={activeVisitorsQuery.isLoading}
         availableSlots={availableSlots}
         availableSlotsLoading={availableSlotsQuery.isLoading}

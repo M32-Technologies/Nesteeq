@@ -39,13 +39,15 @@ export function ResidentComplaintsCard({
     id: c._id || String(idx),
     reqId: c.ticketNumber || `#REQ-${c._id.slice(-4).toUpperCase()}`,
     title: c.title,
-    status: c.status.replace("_", " "),
+    status: (c.status || "PENDING").replace(/_/g, " "),
     statusClass:
-      c.status === "IN_PROGRESS" || c.status === "ASSIGNED"
-        ? "bg-amber-100 text-amber-800"
-        : c.status === "RESOLVED"
+      ["RESOLVED", "CLOSED", "APPROVED", "WORK_COMPLETED"].includes((c.status || "").toUpperCase())
         ? "bg-emerald-100 text-emerald-800"
-        : "bg-blue-100 text-blue-800",
+        : ["IN_PROGRESS", "ASSIGNED", "UNDER_REVIEW", "AWAITING_APPROVAL"].includes((c.status || "").toUpperCase())
+        ? "bg-blue-100 text-blue-800"
+        : ["REJECTED", "CANCELLED"].includes((c.status || "").toUpperCase())
+        ? "bg-rose-100 text-rose-800"
+        : "bg-amber-100 text-amber-800",
     assignedText: "Assigned recently",
     assignedTo: c.assignedStaff?.name || "Facility Technician",
     assignedRole: c.assignedStaff?.role || null,

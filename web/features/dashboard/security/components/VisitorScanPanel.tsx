@@ -349,7 +349,12 @@ export function VisitorScanPanel({
                 Vehicle
               </p>
               <p className="mt-1 text-sm text-[#111111]">
-                {verifiedPass.vehicleNumber || "-"}
+                {verifiedPass.vehicleNumber &&
+                verifiedPass.vehicleNumber.trim() &&
+                verifiedPass.vehicleNumber.trim().toLowerCase() !== "no vehicle" &&
+                verifiedPass.vehicleNumber.trim().toLowerCase() !== "none"
+                  ? verifiedPass.vehicleNumber
+                  : "No vehicle"}
               </p>
             </div>
           </div>

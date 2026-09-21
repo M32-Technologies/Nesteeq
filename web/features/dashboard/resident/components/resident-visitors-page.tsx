@@ -84,6 +84,8 @@ export function ResidentVisitorsPage() {
   const [vehicleNumber, setVehicleNumber] = useState("");
   const [vehicleType, setVehicleType] = useState<"CAR" | "BIKE" | "EV" | "OTHER">("CAR");
   const [durationHours, setDurationHours] = useState(8);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 9;
 
   // Fetch Passes
   const {
@@ -156,6 +158,11 @@ export function ResidentVisitorsPage() {
     e.preventDefault();
     if (!visitorName.trim()) {
       toast.error("Visitor name is required");
+      return;
+    }
+
+    if (hasVehicle && !vehicleNumber.trim()) {
+      toast.error("Please enter the vehicle license plate number, or uncheck the vehicle option.");
       return;
     }
 
@@ -278,6 +285,12 @@ export function ResidentVisitorsPage() {
   const activePassesCount = passes.filter((p) => p.status === "ACTIVE").length;
   const usedPassesCount = passes.filter((p) => p.status === "USED").length;
 
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
+  const paginatedPasses = filtered.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
+
   return (
     <div className="w-full space-y-6 pb-14">
       {/* Header */}
@@ -367,7 +380,10 @@ export function ResidentVisitorsPage() {
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
             placeholder="Search visitors by name, vehicle, or pass code..."
             className="h-9 w-full rounded-lg border border-[#DDE3DF] bg-[#F7F8F5] pl-9 pr-4 text-xs sm:text-sm text-[#111111] placeholder:text-[#7C8782] outline-none transition-colors focus:border-[#07584F] focus:bg-white focus:ring-2 focus:ring-[#07584F]/15"
           />
@@ -378,7 +394,10 @@ export function ResidentVisitorsPage() {
             <button
               key={tab}
               type="button"
-              onClick={() => setActiveTab(tab)}
+              onClick={() => {
+                setActiveTab(tab);
+                setCurrentPage(1);
+              }}
               className={`rounded-md px-3 py-1 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
                 activeTab === tab
                   ? "bg-white text-[#07584F] font-semibold shadow-2xs"
@@ -430,7 +449,7 @@ export function ResidentVisitorsPage() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((pass) => {
+          {paginatedPasses.map((pass) => {
             const isActive = pass.status === "ACTIVE";
             const isUsed = pass.status === "USED";
             const isExpired = pass.status === "EXPIRED";
@@ -566,6 +585,38 @@ export function ResidentVisitorsPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[#EEF1F4] pt-4">
+          <p className="text-xs text-[#637083]">
+            Showing {(currentPage - 1) * PAGE_SIZE + 1} to{" "}
+            {Math.min(currentPage * PAGE_SIZE, filtered.length)} of{" "}
+            {filtered.length} passes
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              className="rounded-lg border border-[#DDE3DF] bg-white px-3 py-1.5 text-xs font-medium text-[#111111] hover:bg-[#F7F8F5] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            >
+              Previous
+            </button>
+            <span className="text-xs font-semibold text-[#111111]">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              className="rounded-lg border border-[#DDE3DF] bg-white px-3 py-1.5 text-xs font-medium text-[#111111] hover:bg-[#F7F8F5] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
 

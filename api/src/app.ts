@@ -73,6 +73,7 @@ app.use("/api/expenses", expenseRoutes);
 app.use("/api/wallets", walletRoutes);
 app.use("/api/audit", auditRoutes);
 app.use("/api/treasurer", treasurerRoutes);
+app.use("/api/residents", ResidentRoute);
 
 app.use("/api/v1/parking", parkingRoutes);
 app.use("/api/security/parking", parkingRoutes);

@@ -31,7 +31,19 @@ export interface ResidentComplaintsResponse {
     description: string;
     category: string;
     priority: "LOW" | "NORMAL" | "HIGH" | "URGENT";
-    status: "PENDING" | "UNDER_REVIEW" | "ASSIGNED" | "IN_PROGRESS" | "RESOLVED" | "CLOSED" | "REJECTED";
+    status:
+      | "PENDING"
+      | "UNDER_REVIEW"
+      | "ASSIGNED"
+      | "IN_PROGRESS"
+      | "WORK_COMPLETED"
+      | "AWAITING_APPROVAL"
+      | "APPROVED"
+      | "REJECTED"
+      | "CANCELLED"
+      | "CLOSED"
+      | "RESOLVED"
+      | string;
     assignedStaff?: {
       _id: string;
       name: string;
@@ -189,6 +201,18 @@ export async function fetchResidentComplaints(params?: {
   } catch {
     return { complaints: [], pagination: { total: 0, page: 1, limit: 5, pages: 1 } };
   }
+}
+
+export async function confirmResidentComplaint(complaintId: string, remarks?: string) {
+  const res = await api.patch<{
+    success: boolean;
+    message?: string;
+    data: unknown;
+  }>(`/api/v1/complaints/${complaintId}/confirm-resolution`, {
+    remarks: remarks || undefined,
+  });
+
+  return res.data?.data;
 }
 
 export interface ResidentDashboardFeedItem {
