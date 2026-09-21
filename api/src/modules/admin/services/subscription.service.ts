@@ -11,7 +11,6 @@ export const getAllSubscriptions = async (query: GetAllSubscriptionsQuery) => {
 
     const { page, limit, search, status, plan, sortBy, sortOrder } = query;
 
-    // Post-lookup match conditions (require $lookup result)
     const postLookupMatch: Record<string, unknown> = {};
 
     if (status) postLookupMatch.status = status;
@@ -41,7 +40,7 @@ export const getAllSubscriptions = async (query: GetAllSubscriptionsQuery) => {
                             city: 1,
                             state: 1,
                         },
-                    },
+                    },  
                 ],
                 as: "apartment",
             },

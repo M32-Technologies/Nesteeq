@@ -7,6 +7,7 @@ import { catchAsync } from "../utils/catchAsync.js";
 type ApartmentIdValue = | string | { toString: () => string } | null | undefined;
 
 export type UserRole =
+    | "admin"
     | "super_admin"
     | "property_manager"
     | "facility_manager"
@@ -44,7 +45,11 @@ export const requireRole = (...allowedRoles: UserRole[]) => {
         const userRole = normalizeRole(req.user.role);
         const normalizedAllowedRoles = allowedRoles.map(normalizeRole);
 
-        if (!normalizedAllowedRoles.includes(userRole)) {
+        const isAdminMatch =
+          (userRole === "admin" || userRole === "super_admin") &&
+          (normalizedAllowedRoles.includes("admin") || normalizedAllowedRoles.includes("super_admin"));
+
+        if (!normalizedAllowedRoles.includes(userRole) && !isAdminMatch) {
             return next(new AppError("You do not have permission to perform this action.", 403));
         }
 

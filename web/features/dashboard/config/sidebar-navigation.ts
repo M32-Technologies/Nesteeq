@@ -21,7 +21,6 @@ import {
 import type { LucideIcon } from "lucide-react"
 
 export type DashboardRole =
-  | "super_admin"
   | "property_manager"
   | "treasurer"
   | "facility_manager"
@@ -44,7 +43,6 @@ export type NavigationSection = {
 export const DEFAULT_DASHBOARD_ROLE: DashboardRole = "resident"
 
 export const dashboardRoleLabels: Record<DashboardRole, string> = {
-  super_admin: "Super Admin",
   property_manager: "Property Manager",
   treasurer: "Treasurer",
   facility_manager: "Facility Manager",
@@ -54,7 +52,6 @@ export const dashboardRoleLabels: Record<DashboardRole, string> = {
 }
 
 export const dashboardRoleRouteSegments: Record<DashboardRole, string> = {
-  super_admin: "super-admin",
   property_manager: "property-manager",
   treasurer: "treasurer",
   facility_manager: "facility-manager",
@@ -67,49 +64,6 @@ export const sidebarNavigation: Record<
   DashboardRole,
   NavigationSection[]
 > = {
-  super_admin: [
-    {
-      title: "Management",
-      items: [
-        {
-          title: "Dashboard",
-          href: "/dashboard",
-          icon: LayoutDashboard,
-        },
-        {
-          title: "Apartments",
-          href: "/dashboard/apartments",
-          icon: Building2,
-        },
-        {
-          title: "Users",
-          href: "/dashboard/users",
-          icon: Users,
-        },
-        {
-          title: "Staff",
-          href: "/dashboard/staff",
-          icon: UserRoundCog,
-        },
-      ],
-    },
-    {
-      title: "System",
-      items: [
-        {
-          title: "Reports",
-          href: "/dashboard/reports",
-          icon: BarChart3,
-        },
-        {
-          title: "Notifications",
-          href: "/dashboard/notifications",
-          icon: Bell,
-        },
-      ],
-    },
-  ],
-
   property_manager: [
     {
       title: "Management",
@@ -448,7 +402,6 @@ export function normalizeDashboardRole(role?: string | null): DashboardRole {
 
   const compactRole = normalizedRole?.replace(/_/g, "")
   const roleAliases: Record<string, DashboardRole> = {
-    superadmin: "super_admin",
     propertymanager: "property_manager",
     treasurer: "treasurer",
     facilitymanager: "facility_manager",
@@ -503,4 +456,12 @@ export function getDashboardNavigationItemByPath(
   }
 
   return null
+}
+
+export function getUserDashboardHref(role?: string | null): string {
+  if (role && role.trim().toLowerCase() === "admin") {
+    return "/admin/dashboard"
+  }
+
+  return `/${getDashboardRoleRouteSegment(normalizeDashboardRole(role))}`
 }
