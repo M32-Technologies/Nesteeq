@@ -344,13 +344,20 @@ export async function payResidentBill(
   return res.data;
 }
 
-export async function createResidentComplaint(payload: {
+export interface CreateResidentComplaintPayload {
   title: string;
   description: string;
-  category: string;
-  priority: "LOW" | "NORMAL" | "HIGH" | "URGENT";
-}) {
-  const res = await api.post("/api/v1/complaints", payload);
+  category: "PLUMBING" | "ELECTRICAL" | "CLEANING" | "SECURITY" | "LIFT" | "WATER" | "MAINTENANCE" | "OTHER";
+  priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+}
+
+export async function createResidentComplaint(payload: CreateResidentComplaintPayload) {
+  const res = await api.post<{
+    success: boolean;
+    message?: string;
+    data: any;
+  }>("/api/v1/complaints", payload);
+
   return res.data;
 }
 
@@ -502,5 +509,4 @@ export async function cancelResidentGuestPass(passId: string) {
     return fallbackRes.data;
   }
 }
-
 
