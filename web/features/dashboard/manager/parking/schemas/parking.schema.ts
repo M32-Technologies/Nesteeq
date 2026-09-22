@@ -12,11 +12,6 @@ export type EditSlotFormValues = z.infer<typeof editSlotSchema>
 export const assignResidentSchema = z.object({
   flatId: z.string().min(1, "Please select a flat"),
   residentId: z.string().optional(),
-  vehicleNumber: z
-    .string()
-    .trim()
-    .min(1, "Vehicle plate number is required")
-    .max(20, "Vehicle number cannot exceed 20 characters"),
 })
 
 export type AssignResidentFormValues = z.infer<typeof assignResidentSchema>

@@ -4,8 +4,19 @@ import { fromNodeHeaders } from "better-auth/node";
 import { AppError } from "../utils/AppError.js";
 import { catchAsync } from "../utils/catchAsync.js";
 
-type ApartmentIdValue =| string| { toString: () => string }| null | undefined;
+type ApartmentIdValue = | string | { toString: () => string } | null | undefined;
 
+export type UserRole =
+    | "admin"
+    | "super_admin"
+    | "property_manager"
+    | "facility_manager"
+    | "treasurer"
+    | "security_staff"
+    | "maintenance_technician"
+    | "resident"
+    | "owner"
+    | "tenant";
 const normalizeRole = (role: string) => role.trim().toLowerCase().replace(/[\s-]+/g, "_");
 
 const normalizeApartmentId = (apartmentId: ApartmentIdValue) => apartmentId?.toString().trim().toLowerCase();
@@ -25,7 +36,7 @@ export const protect = catchAsync(async (req: Request, res: Response, next: Next
     next();
 });
 
-export const requireRole = (...allowedRoles: string[]) => {
+export const requireRole = (...allowedRoles: UserRole[]) => {
     return (req: Request, res: Response, next: NextFunction) => {
         if (!req.user) {
             return next(new AppError("You are not logged in. Please sign in to continue.", 401));
@@ -34,7 +45,11 @@ export const requireRole = (...allowedRoles: string[]) => {
         const userRole = normalizeRole(req.user.role);
         const normalizedAllowedRoles = allowedRoles.map(normalizeRole);
 
-        if (!normalizedAllowedRoles.includes(userRole)) {
+        const isAdminMatch =
+          (userRole === "admin" || userRole === "super_admin") &&
+          (normalizedAllowedRoles.includes("admin") || normalizedAllowedRoles.includes("super_admin"));
+
+        if (!normalizedAllowedRoles.includes(userRole) && !isAdminMatch) {
             return next(new AppError("You do not have permission to perform this action.", 403));
         }
 
@@ -74,3 +89,5 @@ export const ensureApartmentAccess = (
 
     return authenticatedApartmentId;
 };
+
+

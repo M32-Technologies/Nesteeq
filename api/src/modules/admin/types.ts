@@ -1,0 +1,48 @@
+import { Types } from "mongoose";
+export interface AuthUserDoc {
+  _id?: string | Types.ObjectId;
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  role?: string | null;
+  image?: string | null;
+  emailVerified?: boolean | null;
+  createdAt?: Date | string;
+}
+
+export interface ApartmentStats {
+  total: number;
+  active: number;
+  pending_payment: number;
+  inactive: number;
+}
+
+export interface MonthlyRegistration {
+  period: string;
+  count: number;
+}
+
+export interface ApartmentAnalyticsData {
+  range: string;
+  interval: "month";
+  registrations: MonthlyRegistration[];
+}
+
+export interface SubscriptionStats {
+  total: number;
+  created: number;
+  authenticated: number;
+  active: number;
+  pending: number;
+  halted: number;
+  cancelled: number;
+  completed: number;
+  expired: number;
+}
+
+export interface SubscriptionAnalyticsData {
+  range: string;
+  interval: "month";
+  subscriptions: MonthlyRegistration[];
+}
+

@@ -52,6 +52,13 @@ function getBreadcrumb(role: DashboardRole, pathname: string) {
     }
   }
 
+  if (pathname === "/profile" || pathname.endsWith("/profile")) {
+    return {
+      parent: dashboardRoleLabels[role],
+      current: "My Profile",
+    }
+  }
+
   return {
     parent: dashboardRoleLabels[role],
     current: "Dashboard",
@@ -67,7 +74,7 @@ export default function DashboardNavbar({
   const pathname = usePathname()
   const breadcrumb = getBreadcrumb(role, pathname)
   const initials = getInitials(user.name)
-  const settingsHref = getDashboardItemHref(role, "/dashboard/settings")
+  const profileHref = "/profile"
 
   return (
     <header
@@ -193,8 +200,8 @@ export default function DashboardNavbar({
 
         {/* Profile button */}
         <Link
-          href={settingsHref}
-          aria-label="Profile settings"
+          href={profileHref}
+          aria-label="My Profile"
           className="
             flex
             h-10

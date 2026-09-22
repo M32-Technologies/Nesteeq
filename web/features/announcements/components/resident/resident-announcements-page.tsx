@@ -3,7 +3,6 @@
 import React from "react";
 import {
   FileDown,
-  RefreshCw,
   Search,
   Wrench,
   Flame,
@@ -40,8 +39,6 @@ export function ResidentAnnouncementsPage() {
     paginatedNotices,
     allNoticesCount,
     isLoading,
-    isRefetching,
-    refetch,
 
     selectedNotice,
     setSelectedNotice,
@@ -73,16 +70,6 @@ export function ResidentAnnouncementsPage() {
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2.5 shrink-0">
-          <button
-            type="button"
-            onClick={() => refetch()}
-            disabled={isRefetching}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-700 shadow-xs hover:bg-slate-50 disabled:opacity-50 transition"
-          >
-            <RefreshCw className={`size-4 text-slate-500 ${isRefetching ? "animate-spin" : ""}`} />
-            <span>Refresh</span>
-          </button>
-
           <button
             type="button"
             onClick={handleExportPDF}

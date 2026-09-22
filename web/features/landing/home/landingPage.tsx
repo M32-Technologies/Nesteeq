@@ -16,10 +16,7 @@ import { ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSession } from "@/lib/auth-client";
-import {
-  getDashboardRoleRouteSegment,
-  normalizeDashboardRole,
-} from "@/features/dashboard/config/sidebar-navigation";
+import { getUserDashboardHref } from "@/features/dashboard/config/sidebar-navigation";
 
 export default function HomePage() {
   const [isMounted, setIsMounted] = useState(false);
@@ -30,9 +27,7 @@ export default function HomePage() {
   }, []);
 
   const user = isMounted ? session?.user : null;
-  const dashboardHref = `/${getDashboardRoleRouteSegment(
-    normalizeDashboardRole(user?.role),
-  )}`;
+  const dashboardHref = getUserDashboardHref(user?.role);
 
   return (
     <>
