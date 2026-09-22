@@ -122,6 +122,16 @@ export const updateSubscriptionPlan = async (planId: string, data: UpdatePlanBod
         throw new AppError("Subscription plan not found", 404);
     }
 
+    if (data.planType && data.planType !== plan.planType) {
+        const existing = await SubscriptionPlan.findOne({
+            planType: data.planType,
+            _id: { $ne: planId },
+        }).lean();
+        if (existing) {
+            throw new AppError("Subscription plan already exists for this plan type", 409);
+        }
+    }
+
     if (data.razorpayPlanId) {
         await verifyRazorpayPlanId(data.razorpayPlanId);
     }

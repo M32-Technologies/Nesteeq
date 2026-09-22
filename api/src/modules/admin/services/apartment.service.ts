@@ -2,6 +2,7 @@ import { AppError } from "../../../utils/AppError.js";
 import { PipelineStage, Types } from "mongoose";
 import { GetAllApartmentsQuery, ApartmentAnalyticsQuery } from "../validation/apartment.validation.js";
 import { Apartment } from "../../apartment/apartment.model.js";
+import { Subscription } from "../../subscription/subscription.model.js";
 import { getAuthDB } from "../../../config/auth-db.js";
 import { AuthUserDoc, ApartmentStats, MonthlyRegistration, ApartmentAnalyticsData } from "../types.js";
 
@@ -120,9 +121,14 @@ export const getSingleApartment = async (apartmentId: string) => {
         );
     }
 
+    const currentSubscription = await Subscription.findOne({ apartment: apartment._id })
+        .sort({ createdAt: -1 })
+        .lean();
+
     return {
         ...apartment.toObject(),
         user: user ?? null,
+        currentSubscription: currentSubscription ?? null,
     };
 };
 

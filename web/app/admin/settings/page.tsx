@@ -18,17 +18,8 @@ export default function AdminSettingsPage() {
 
   return (
     <div className="w-full">
-      {/* Header */}
-      <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#0F172A]">
-            Portal Settings
-          </h1>
-          <p className="mt-1 text-sm text-[#64748B]">
-            Configure global administrative parameters, security controls, and system preferences.
-          </p>
-        </div>
-
+      {/* Header Actions */}
+      <div className="mb-6 flex justify-end">
         <button
           type="button"
           onClick={handleSave}

@@ -134,19 +134,9 @@ export default function PropertyManagersTable({
     <>
       <div className="rounded-xl border border-[#EEF1EF] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
         {/* Compact Table Header with Search & Filters */}
-        <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between border-b border-[#EEF1EF]">
-          <div className="flex items-center gap-2.5">
-            <h2 className="text-sm font-semibold text-[#0F172A]">
-              Property Managers
-            </h2>
-            <span className="rounded-md bg-[#EAF5EE] px-2 py-0.5 text-[11px] font-semibold text-[#14532D] tabular-nums">
-              {managers.length}
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Search Box — border on wrapper so rounded shape stays on focus */}
-            <div className="relative flex items-center w-full sm:w-56 rounded-lg border border-[#E2E8F0] bg-white transition-all focus-within:border-[#07584F] focus-within:ring-1 focus-within:ring-[#07584F]/10">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 px-5 py-3.5 border-b border-[#EEF1EF]">
+          {/* Search Box */}
+          <div className="relative flex-1 flex items-center rounded-lg border border-[#E2E8F0] bg-white transition-all focus-within:border-[#07584F] focus-within:ring-1 focus-within:ring-[#07584F]/10">
               <Search className="pointer-events-none absolute left-3 h-3.5 w-3.5 text-[#94A3B8]" />
               <input
                 type="text"
@@ -167,7 +157,8 @@ export default function PropertyManagersTable({
               )}
             </div>
 
-            {/* Status Filter */}
+          {/* Status Filter */}
+          <div className="flex items-center gap-2 self-start sm:self-auto">
             <div className="relative flex items-center rounded-lg border border-[#E2E8F0] bg-white transition-all hover:bg-slate-50 focus-within:border-[#07584F]">
               <Filter className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-[#64748B]" />
               <select

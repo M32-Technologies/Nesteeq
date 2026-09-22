@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { RefreshCw, AlertCircle } from "lucide-react"
+import { AlertCircle } from "lucide-react"
 import { authClient } from "@/lib/auth-client"
 import UserKpiCards from "@/features/admin/users/components/user-kpi-cards"
 import PropertyManagersTable from "@/features/admin/users/components/property-managers-table"
@@ -21,7 +21,6 @@ export default function AdminUsersPage() {
   const [isTableLoading, setIsTableLoading] = useState(true)
 
   const [error, setError] = useState<string | null>(null)
-  const [isRefreshing, setIsRefreshing] = useState(false)
 
   // 1. Fetch ALL users once for KPI stats (lightweight — we just need counts)
   const fetchStatsUsers = useCallback(async () => {
@@ -47,9 +46,8 @@ export default function AdminUsersPage() {
 
   // 2. Fetch paginated property managers for the table
   const fetchTablePage = useCallback(
-    async (page: number, showRefreshing = false) => {
-      if (showRefreshing) setIsRefreshing(true)
-      else setIsTableLoading(true)
+    async (page: number) => {
+      setIsTableLoading(true)
       setError(null)
 
       try {
@@ -82,7 +80,6 @@ export default function AdminUsersPage() {
         setError("Unable to fetch property managers from the server.")
       } finally {
         setIsTableLoading(false)
-        setIsRefreshing(false)
       }
     },
     []
@@ -127,43 +124,16 @@ export default function AdminUsersPage() {
 
   const handleRefresh = () => {
     fetchStatsUsers()
-    fetchTablePage(currentPage, true)
+    fetchTablePage(currentPage)
   }
 
   const handleUserUpdated = () => {
     fetchStatsUsers()
-    fetchTablePage(currentPage, false)
+    fetchTablePage(currentPage)
   }
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#0F172A]">
-            Users & Property Managers
-          </h1>
-          <p className="mt-1 text-sm text-[#64748B]">
-            Overview of platform users and property manager accounts.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={isRefreshing || isTableLoading}
-            className="inline-flex items-center gap-2 rounded-xl border border-[#E2E8F0] bg-white px-3.5 py-2 text-xs font-semibold text-[#334155] shadow-2xs hover:bg-slate-50 disabled:opacity-50 transition-colors"
-          >
-            <RefreshCw
-              className={`h-3.5 w-3.5 text-[#64748B] ${
-                isRefreshing ? "animate-spin text-[#07584F]" : ""
-              }`}
-            />
-            <span>{isRefreshing ? "Refreshing..." : "Refresh"}</span>
-          </button>
-        </div>
-      </div>
 
       {/* Error Alert if request fails */}
       {error && (

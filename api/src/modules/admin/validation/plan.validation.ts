@@ -39,6 +39,7 @@ export const createPlanSchema = z.object({
 const updatePlanBodySchema = z
     .object({
         planName: z.string().trim().min(1, "Plan name is required").optional(),
+        planType: z.string().trim().min(1, "Plan type is required").optional(),
         price: z.number().min(0, "Price must be >= 0").optional(),
         durationMonths: z.number().int().min(1, "Duration must be at least 1 month").optional(),
         features: featuresSchema,
