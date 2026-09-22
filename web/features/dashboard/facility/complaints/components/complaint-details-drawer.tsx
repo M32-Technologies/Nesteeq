@@ -134,7 +134,17 @@ export function ComplaintDetailsDrawer({
                   },
                   {
                     label: "Assigned technician",
-                    value: formatId(typeof complaint.assignedTo === "object" ? complaint.assignedTo?.name : complaint.assignedTo),
+                    value: (() => {
+                      const staff = typeof complaint.assignedStaff === "object" ? complaint.assignedStaff : null
+                      const to = typeof complaint.assignedTo === "object" ? complaint.assignedTo : null
+                      const techName =
+                        staff?.name ||
+                        staff?.fullName ||
+                        complaint.assignedTechnicianName ||
+                        to?.name ||
+                        to?.fullName
+                      return techName || "Not assigned"
+                    })(),
                   },
                   {
                     label: "Created",

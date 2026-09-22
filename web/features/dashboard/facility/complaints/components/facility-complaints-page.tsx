@@ -48,33 +48,35 @@ import {
   priorityWeight,
 } from "@/features/dashboard/facility/shared/components/facility-ui"
 
-const complaintManagerTransitions: Partial<
-  Record<ComplaintStatus, ComplaintStatus[]>
-> = {
-  PENDING: ["UNDER_REVIEW"],
-  UNDER_REVIEW: ["ASSIGNED"],
-  ASSIGNED: ["IN_PROGRESS"],
-  APPROVED: ["CLOSED"],
-  REJECTED: ["ASSIGNED", "IN_PROGRESS"],
-}
+export const standardComplaintLifecycleStatuses: ComplaintStatus[] = [
+  "PENDING",
+  "ASSIGNED",
+  "IN_PROGRESS",
+  "AWAITING_APPROVAL",
+  "RESOLVED",
+  "CLOSED",
+  "REJECTED",
+]
 
-const cancellableComplaintStatuses = new Set<ComplaintStatus>([
+export const cancellableComplaintStatuses = new Set<ComplaintStatus>([
   "PENDING",
   "UNDER_REVIEW",
   "ASSIGNED",
   "IN_PROGRESS",
   "WORK_COMPLETED",
   "AWAITING_APPROVAL",
+  "RESOLVED",
   "REJECTED",
 ])
 
-const approvalComplaintStatuses = new Set<ComplaintStatus>([
+export const approvalComplaintStatuses = new Set<ComplaintStatus>([
   "WORK_COMPLETED",
   "AWAITING_APPROVAL",
+  "RESOLVED",
 ])
 
-function getComplaintStatusOptions(status: ComplaintStatus) {
-  return complaintManagerTransitions[status] ?? []
+function getComplaintStatusOptions(status?: ComplaintStatus): ComplaintStatus[] {
+  return standardComplaintLifecycleStatuses
 }
 
 function getComplaintSearchValues(complaint: Complaint) {
@@ -86,7 +88,13 @@ function getComplaintSearchValues(complaint: Complaint) {
     complaint.category,
     complaint.priority,
     complaint.status,
-    typeof complaint.assignedTo === "object" ? complaint.assignedTo?.name : complaint.assignedTo,
+    typeof complaint.assignedStaff === "object"
+      ? complaint.assignedStaff?.name || complaint.assignedStaff?.fullName
+      : complaint.assignedStaff,
+    complaint.assignedTechnicianName,
+    typeof complaint.assignedTo === "object"
+      ? complaint.assignedTo?.name || complaint.assignedTo?.fullName
+      : complaint.assignedTo,
   ]
 }
 
@@ -183,6 +191,7 @@ export function FacilityComplaintsPage() {
       updateComplaintStatus(id, {
         status: nextStatus,
         notes,
+        remarks: notes,
       }),
     onSuccess: () => void handleSuccess("Status updated"),
     onError: (error) =>
@@ -251,18 +260,25 @@ export function FacilityComplaintsPage() {
     if (!selectedComplaint) return
 
     const formData = new FormData(event.currentTarget)
-    const assignedTo = readRequiredFormString(formData, "assignedStaff")
+    const assignedTo =
+      readRequiredFormString(formData, "assignedStaff") ||
+      readRequiredFormString(formData, "assignedTo")
 
     if (!assignedTo) {
-      toast.error("Technician user ID is required")
+      toast.error("Please select a technician")
       return
     }
+
+    const remarks = readFormString(formData, "remarks")
 
     assignMutation.mutate({
       id: selectedComplaint._id,
       payload: {
+        assignedStaff: assignedTo,
         assignedTo,
-        notes: readFormString(formData, "remarks"),
+        technicianId: assignedTo,
+        notes: remarks,
+        remarks,
       },
     })
   }

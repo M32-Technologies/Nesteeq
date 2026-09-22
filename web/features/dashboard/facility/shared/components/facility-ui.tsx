@@ -34,4 +34,5 @@ export {
   formatLabel,
   priorityWeight,
 } from "@/features/dashboard/facility/shared/components/facility-formatters"
+export { TechnicianSelect } from "@/features/dashboard/facility/shared/components/technician-select"
 

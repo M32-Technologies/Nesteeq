@@ -24,11 +24,16 @@ import type {
 } from "./technician.schema.js";
 
 const getAuthenticatedUser = (req: Request): AuthenticatedTechnicianUser => {
+  const reqUser = (req as any).user;
   return {
-    id: req.user?.id!,
-    role: req.user?.role!,
-    apartmentId: req.user?.apartmentId ?? null,
-    flatId: req.user?.flatId ?? null,
+    id: reqUser?.id ?? reqUser?._id?.toString() ?? "",
+    role: reqUser?.role ?? "",
+    apartmentId:
+      reqUser?.apartmentId ??
+      reqUser?.apartment?.toString?.() ??
+      reqUser?.apartment ??
+      null,
+    flatId: reqUser?.flatId ?? null,
   };
 };
 

@@ -7,14 +7,19 @@ import {
 } from "./facility.service.js";
 
 const getAuthenticatedUser = (req: Request): AuthenticatedFacilityUser => {
-  if (!req.user?.id || !req.user.role) {
+  const user = req.user as Record<string, unknown> | undefined;
+  const userId = req.user?.id ? String(req.user.id).trim() : (user?._id ? String(user._id).trim() : "");
+  const role = req.user?.role ? String(req.user.role).trim() : "";
+  const rawApartmentId = user?.apartmentId ?? user?.apartment ?? null;
+
+  if (!userId || !role) {
     throw new AppError("Authentication required", 401);
   }
 
   return {
-    id: req.user.id,
-    role: req.user.role,
-    apartmentId: req.user.apartmentId ?? null,
+    id: userId,
+    role: role,
+    apartmentId: rawApartmentId ? String(rawApartmentId).trim() : null,
   };
 };
 

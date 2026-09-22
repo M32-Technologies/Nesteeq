@@ -44,6 +44,10 @@ export const ensureCurrentUserExists = async (user: AuthenticatedFacilityUser): 
   if (!existingUser) {
     throw new AppError("Authenticated user not found", 404);
   }
+
+  if (!user.apartmentId && existingUser.apartmentId) {
+    user.apartmentId = existingUser.apartmentId;
+  }
 };
 
 export const assertCanViewFacilityDashboard = (user: AuthenticatedFacilityUser): void => {
@@ -68,7 +72,19 @@ export const scopedFilter = (
     throw new AppError("Management user must be linked to an apartment", 403);
   }
 
-  return { [apartmentField]: apartmentId };
+  const rawId = apartmentId.trim();
+  const values: unknown[] = [rawId];
+  if (ObjectId.isValid(rawId)) {
+    values.push(new ObjectId(rawId));
+  }
+
+  return {
+    $or: [
+      { [apartmentField]: { $in: values } },
+      { apartment: { $in: values } },
+      { apartmentId: { $in: values } },
+    ],
+  };
 };
 
 export const hasDashboardApartmentScope = (user: AuthenticatedFacilityUser): boolean => {

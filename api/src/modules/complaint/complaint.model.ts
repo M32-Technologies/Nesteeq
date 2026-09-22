@@ -18,6 +18,7 @@ export const complaintStatuses = [
   "UNDER_REVIEW",
   "ASSIGNED",
   "IN_PROGRESS",
+  "RESOLVED",
   "WORK_COMPLETED",
   "AWAITING_APPROVAL",
   "APPROVED",
@@ -153,19 +154,30 @@ const complaintSchema = new Schema(
       trim: true,
       index: true,
     },
+    residentId: {
+      type: Schema.Types.Mixed,
+      index: true,
+    },
     apartment: {
       type: Schema.Types.Mixed,
+      ref: "Apartment",
       required: true,
       index: true,
     },
     apartmentId: {
       type: Schema.Types.Mixed,
+      ref: "Apartment",
       index: true,
     },
     flat: {
       type: String,
       required: true,
       trim: true,
+      index: true,
+    },
+    flatId: {
+      type: Schema.Types.Mixed,
+      ref: "Flat",
       index: true,
     },
     title: {
@@ -205,6 +217,11 @@ const complaintSchema = new Schema(
     assignedStaff: {
       type: String,
       trim: true,
+      default: null,
+      index: true,
+    },
+    assignedTo: {
+      type: Schema.Types.Mixed,
       default: null,
       index: true,
     },

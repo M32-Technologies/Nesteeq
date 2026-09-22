@@ -33,7 +33,7 @@ import technicianRoutes from "./modules/technician/technician.routes.js";
 import facilityRoutes from "./modules/facility/facility.routes.js";
 import reportRoutes from "./modules/report/report.routes.js";
 import scheduleRoutes from "./modules/schedule/schedule.routes.js";
-import path from "node:path";
+
 const app = express();
 
 app.use(

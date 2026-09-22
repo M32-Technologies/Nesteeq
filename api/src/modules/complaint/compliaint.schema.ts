@@ -73,20 +73,30 @@ export const updateComplaintBodySchema = z
 
 export const assignComplaintBodySchema = z
   .object({
-    assignedStaff: authUserIdSchema,
-    estimatedCost: costSchema.optional(),
-    remarks: nonEmptyText("Remarks", 1000).optional(),
+    assignedStaff: z.string().trim().min(1, "Assigned staff is required").optional().nullable(),
+    assignedTo: z.string().trim().min(1, "Assigned staff is required").optional().nullable(),
+    technicianId: z.string().trim().min(1).optional().nullable(),
+    estimatedCost: costSchema.optional().nullable(),
+    remarks: z.string().trim().max(1000).optional().nullable().or(z.literal("")),
+    notes: z.string().trim().max(1000).optional().nullable().or(z.literal("")),
   })
-  .strict();
+  .passthrough()
+  .refine(
+    (data) => Boolean(data.assignedStaff || data.assignedTo || data.technicianId),
+    {
+      message: "Assigned staff is required",
+    }
+  );
 
 export const updateComplaintStatusBodySchema = z
   .object({
     status: z.enum(complaintStatuses, {
       error: "Complaint status is required",
     }),
-    remarks: nonEmptyText("Remarks", 1000).optional(),
+    remarks: z.string().trim().max(1000).optional().nullable().or(z.literal("")),
+    notes: z.string().trim().max(1000).optional().nullable().or(z.literal("")),
   })
-  .strict();
+  .passthrough();
 
 export const completeComplaintWorkBodySchema = z
   .object({
@@ -102,28 +112,33 @@ export const completeComplaintWorkBodySchema = z
 
 export const approveComplaintBodySchema = z
   .object({
-    remarks: nonEmptyText("Approval remarks", 1000).optional(),
+    remarks: z.string().trim().max(1000).optional().nullable(),
+    notes: z.string().trim().max(1000).optional().nullable(),
   })
-  .strict();
+  .passthrough();
 
 export const rejectComplaintBodySchema = z
   .object({
-    reason: nonEmptyText("Rejection reason", 1000),
-    remarks: nonEmptyText("Remarks", 1000).optional(),
+    reason: z.string().trim().max(1000).optional().nullable(),
+    remarks: z.string().trim().max(1000).optional().nullable(),
+    notes: z.string().trim().max(1000).optional().nullable(),
   })
-  .strict();
+  .passthrough();
 
 export const cancelComplaintBodySchema = z
   .object({
-    reason: nonEmptyText("Cancellation reason", 1000).optional(),
+    reason: z.string().trim().max(1000).optional().nullable(),
+    remarks: z.string().trim().max(1000).optional().nullable(),
+    notes: z.string().trim().max(1000).optional().nullable(),
   })
-  .strict();
+  .passthrough();
 
 export const confirmComplaintResolutionBodySchema = z
   .object({
-    remarks: nonEmptyText("Confirmation remarks", 1000).optional(),
+    remarks: z.string().trim().max(1000).optional().nullable(),
+    notes: z.string().trim().max(1000).optional().nullable(),
   })
-  .strict();
+  .passthrough();
 
 const preprocessEnumFilter = <T extends readonly string[]>(
   allowedValues: T,

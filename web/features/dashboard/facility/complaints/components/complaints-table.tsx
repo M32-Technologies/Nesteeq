@@ -61,8 +61,10 @@ export function ComplaintsTable({
                 <td className="px-4 py-4 text-[12px] text-[#66737F]">
                   {formatDate(complaint.createdAt)}
                 </td>
-                <td className="px-4 py-4">
-                  {formatId(typeof complaint.assignedTo === "object" ? complaint.assignedTo?.name : complaint.assignedTo)}
+                <td className="px-4 py-4 text-[13px] text-[#26313D]">
+                  {typeof complaint.assignedStaff === 'object' && complaint.assignedStaff?.name
+                    ? complaint.assignedStaff.name
+                    : complaint.assignedTechnicianName || (typeof complaint.assignedStaff === 'string' ? '-' : 'Not assigned')}
                 </td>
                 <td className="px-4 py-4">
                   <div className="flex justify-end">
@@ -110,6 +112,21 @@ export function ComplaintsTable({
             <div className="mt-3 grid gap-2 text-[12px] text-[#66737F]">
               <span>{formatLabel(complaint.category)}</span>
               <span>{formatDate(complaint.createdAt)}</span>
+              {(() => {
+                const staff = typeof complaint.assignedStaff === "object" ? complaint.assignedStaff : null
+                const to = typeof complaint.assignedTo === "object" ? complaint.assignedTo : null
+                const techName =
+                  staff?.name ||
+                  staff?.fullName ||
+                  complaint.assignedTechnicianName ||
+                  to?.name ||
+                  to?.fullName
+                return techName ? (
+                  <span>
+                    Technician: <strong className="font-medium text-[#111111]">{techName}</strong>
+                  </span>
+                ) : null
+              })()}
             </div>
           </article>
         ))}

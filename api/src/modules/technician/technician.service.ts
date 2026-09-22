@@ -6,7 +6,7 @@ import { isMaintenanceRole, isTechnicianCreatorRole } from "../../utils/role.js"
 
 
 
-import { Complaint } from "../complaint/complaint.model.js";
+import { Complaint, complaintCategories } from "../complaint/complaint.model.js";
 import {
   assignComplaint,
   completeComplaintWork,
@@ -19,6 +19,8 @@ import {
   updateMaintenanceProgress,
   updateMaintenanceStatus,
 } from "../maintenance/maintenance.service.js";
+import { Staff } from "../staff/staff.model.js";
+import { resolveFacilityManagerApartmentId } from "../facility/facility.service.js";
 import { Technician } from "./technician.model.js";
 import {
   assertCanAccessTechnician,
@@ -101,7 +103,156 @@ const ensureCurrentUserExists = async (
     throw new AppError("Authenticated user not found", 404);
   }
 
+  if (!user.apartmentId) {
+    const resolvedApt = await resolveFacilityManagerApartmentId(user as any);
+    if (resolvedApt) {
+      user.apartmentId = resolvedApt;
+    } else if (existingUser.apartmentId) {
+      user.apartmentId = existingUser.apartmentId;
+    }
+  }
+
   return existingUser;
+};
+
+export const normalizeSpecializations = (rawType?: string | null): string[] => {
+  if (!rawType) return ["MAINTENANCE"];
+  const t = rawType.trim().toUpperCase();
+  if (complaintCategories.includes(t as any)) return [t];
+  if (/electr/i.test(t)) return ["ELECTRICAL"];
+  if (/plumb/i.test(t)) return ["PLUMBING"];
+  if (/clean/i.test(t)) return ["CLEANING"];
+  if (/secur/i.test(t)) return ["SECURITY"];
+  if (/lift|elevator/i.test(t)) return ["LIFT"];
+  if (/water/i.test(t)) return ["WATER"];
+  return ["MAINTENANCE"];
+};
+
+export const formatTechnicianResponse = (tech: any, assignedTaskCount = 0) => {
+  const rawId = tech._id?.toString() || tech.id || "";
+  const name = tech.fullName || tech.name || "Technician";
+  const specs =
+    tech.specializations && tech.specializations.length > 0
+      ? tech.specializations
+      : tech.specialization && tech.specialization.length > 0
+        ? tech.specialization
+        : ["MAINTENANCE"];
+
+  return {
+    _id: rawId,
+    id: rawId,
+    userId: tech.userId || rawId,
+    name,
+    fullName: name,
+    email: tech.email || undefined,
+    phone: tech.phone || undefined,
+    role: "maintenance_technician",
+    status: tech.status || "ACTIVE",
+    specialization: specs,
+    specializations: specs,
+    assignedTaskCount,
+    shift: tech.shift ?? null,
+    notes: tech.notes ?? null,
+    joinedAt: tech.joinedAt ? new Date(tech.joinedAt).toISOString() : undefined,
+    createdAt: tech.createdAt ? new Date(tech.createdAt).toISOString() : new Date().toISOString(),
+    updatedAt: tech.updatedAt ? new Date(tech.updatedAt).toISOString() : new Date().toISOString(),
+  };
+};
+
+export const syncStaffTechnicians = async (apartmentId?: string | null): Promise<void> => {
+  if (!apartmentId) return;
+
+  const aptValues: unknown[] = [apartmentId];
+  if (Types.ObjectId.isValid(apartmentId)) {
+    aptValues.push(new Types.ObjectId(apartmentId));
+  }
+
+  const staffList = await Staff.find({
+    $or: [
+      { apartment: { $in: aptValues } },
+      { apartmentId: { $in: aptValues } },
+    ],
+    role: { $regex: /^(maintenance_technician|technician|maintenance_staff|staff)$/i },
+  } as any).lean();
+
+  for (const staff of staffList) {
+    if (!staff.userId) continue;
+
+    const authUser = await findAuthUserById(staff.userId);
+    const fullName = authUser?.name || "Technician";
+    const email = authUser?.email || null;
+    const phone = staff.phone || authUser?.phone || null;
+    const specializations = normalizeSpecializations(staff.maintenanceType);
+    const existing = await Technician.findOne({ userId: staff.userId });
+
+    const status =
+      staff.status === "inactive"
+        ? "INACTIVE"
+        : existing?.status || "ACTIVE";
+
+    await Technician.findOneAndUpdate(
+      { userId: staff.userId },
+      {
+        $setOnInsert: {
+          userId: staff.userId,
+          createdBy: staff.userId,
+          createdAt: staff.createdAt || new Date(),
+        },
+        $set: {
+          fullName,
+          email,
+          phone,
+          apartmentId: apartmentId.toString(),
+          specializations,
+          status,
+          updatedAt: staff.updatedAt || new Date(),
+        },
+      },
+      { upsert: true, new: true }
+    );
+  }
+
+  const authUsers = await getAuthDB()
+    .collection<AuthUserRecord>("user")
+    .find({
+      role: { $regex: /^(maintenance_technician|technician|maintenance_staff)$/i },
+      $or: [
+        { apartmentId: { $in: aptValues as any } },
+        { apartment: { $in: aptValues as any } },
+      ],
+    })
+    .toArray();
+
+  for (const u of authUsers) {
+    const userId = getAuthUserId(u, u._id?.toHexString() || "");
+    if (!userId) continue;
+
+    const existing = await Technician.findOne({ userId });
+    const fullName = u.name || "Technician";
+    const email = u.email || null;
+    const phone = u.phone || null;
+
+    await Technician.findOneAndUpdate(
+      { userId },
+      {
+        $setOnInsert: {
+          userId,
+          createdBy: userId,
+          createdAt: new Date(),
+        },
+        $set: {
+          fullName,
+          email,
+          phone,
+          apartmentId: apartmentId.toString(),
+          specializations: existing?.specializations?.length ? existing.specializations : ["MAINTENANCE"],
+          status: existing?.status || "ACTIVE",
+          updatedAt: new Date(),
+        },
+      },
+      { upsert: true, new: true }
+    );
+  }
 };
 
 const ensureTechnicianAuthUser = async (userId: string): Promise<AuthUserRecord> => {
@@ -133,7 +284,29 @@ const assertValidWorkId = (workId: string): void => {
 const getTechnicianOrThrow = async (technicianId: string) => {
   assertValidTechnicianId(technicianId);
 
-  const technician = await Technician.findById(technicianId);
+  let technician = await Technician.findById(technicianId);
+
+  if (!technician) {
+    const staff = await Staff.findOne({
+      $or: [
+        { _id: new Types.ObjectId(technicianId) },
+        { userId: technicianId },
+      ],
+    }).lean();
+
+    if (staff) {
+      await syncStaffTechnicians(staff.apartmentId?.toString());
+      technician = await Technician.findOne({ userId: staff.userId });
+    }
+  }
+
+  if (!technician) {
+    const authUser = await findAuthUserById(technicianId);
+    if (authUser?.apartmentId) {
+      await syncStaffTechnicians(authUser.apartmentId);
+      technician = await Technician.findOne({ userId: technicianId });
+    }
+  }
 
   if (!technician) {
     throw new AppError("Technician not found", 404);
@@ -253,6 +426,14 @@ export const getTechnicians = async (
 ) => {
   await ensureCurrentUserExists(user);
 
+  if (user.apartmentId) {
+    try {
+      await syncStaffTechnicians(user.apartmentId);
+    } catch {
+      // ignore
+    }
+  }
+
   const filter = buildRoleScopedFilter(query, user);
   const skip = (query.page - 1) * query.limit;
 
@@ -261,8 +442,45 @@ export const getTechnicians = async (
     Technician.countDocuments(filter),
   ]);
 
+  const userIds = technicians.map((t: any) => t.userId).filter(Boolean);
+  const countMap = new Map<string, number>();
+
+  if (userIds.length > 0) {
+    const [complaintCounts, maintenanceCounts] = await Promise.all([
+      Complaint.aggregate([
+        {
+          $match: {
+            assignedStaff: { $in: userIds },
+            status: { $in: activeComplaintStatuses },
+          },
+        },
+        { $group: { _id: "$assignedStaff", count: { $sum: 1 } } },
+      ]),
+      Maintenance.aggregate([
+        {
+          $match: {
+            assignedStaff: { $in: userIds },
+            status: { $in: activeMaintenanceStatuses },
+          },
+        },
+        { $group: { _id: "$assignedStaff", count: { $sum: 1 } } },
+      ]),
+    ]);
+
+    for (const item of complaintCounts) {
+      countMap.set(String(item._id), (countMap.get(String(item._id)) || 0) + item.count);
+    }
+    for (const item of maintenanceCounts) {
+      countMap.set(String(item._id), (countMap.get(String(item._id)) || 0) + item.count);
+    }
+  }
+
+  const formattedTechnicians = technicians.map((t: any) =>
+    formatTechnicianResponse(t, countMap.get(t.userId) || 0)
+  );
+
   return {
-    technicians,
+    technicians: formattedTechnicians,
     pagination: {
       page: query.page,
       limit: query.limit,
@@ -281,7 +499,21 @@ export const getTechnicianById = async (
   const technician = await getTechnicianOrThrow(technicianId);
   assertCanAccessTechnician(user, technician);
 
-  return technician;
+  const [activeComplaints, activeMaintenance] = await Promise.all([
+    Complaint.countDocuments({
+      assignedStaff: technician.userId,
+      status: { $in: activeComplaintStatuses },
+    }),
+    Maintenance.countDocuments({
+      assignedStaff: technician.userId,
+      status: { $in: activeMaintenanceStatuses },
+    }),
+  ]);
+
+  return formatTechnicianResponse(
+    technician.toObject ? technician.toObject() : technician,
+    activeComplaints + activeMaintenance
+  );
 };
 
 export const updateTechnician = async (
@@ -299,7 +531,8 @@ export const updateTechnician = async (
     updatedBy: user.id,
   };
 
-  if (data.fullName !== undefined) set.fullName = data.fullName;
+  const fullName = data.fullName ?? data.name;
+  if (fullName !== undefined) set.fullName = fullName;
   if (data.email !== undefined) set.email = data.email;
   if (data.phone !== undefined) set.phone = data.phone;
   if (data.apartmentId !== undefined) set.apartmentId = data.apartmentId;
@@ -309,16 +542,43 @@ export const updateTechnician = async (
   if (data.notes !== undefined) set.notes = data.notes;
 
   const updatedTechnician = await Technician.findByIdAndUpdate(
-    technicianId,
+    technician._id,
     { $set: set },
-    { new: true, runValidators: true }
+    { returnDocument: "after", runValidators: true }
   );
 
   if (!updatedTechnician) {
     throw new AppError("Technician not found", 404);
   }
 
-  return updatedTechnician;
+  if (technician.userId) {
+    const userUpdates: Record<string, unknown> = {};
+    if (fullName !== undefined) userUpdates.name = fullName;
+    if (data.email !== undefined) userUpdates.email = data.email;
+    if (data.phone !== undefined) userUpdates.phone = data.phone;
+
+    if (Object.keys(userUpdates).length > 0) {
+      await getAuthDB()
+        .collection("user")
+        .updateOne(
+          { $or: buildAuthUserIdFilters(technician.userId) },
+          { $set: userUpdates }
+        );
+    }
+
+    if (data.phone !== undefined) {
+      await Staff.updateMany(
+        { userId: technician.userId },
+        { $set: { phone: data.phone } }
+      );
+    }
+  }
+
+  const rawDoc = updatedTechnician && "toObject" in updatedTechnician
+    ? (updatedTechnician as any).toObject()
+    : updatedTechnician;
+
+  return formatTechnicianResponse(rawDoc);
 };
 
 export const updateTechnicianStatus = async (
@@ -349,16 +609,28 @@ export const updateTechnicianStatus = async (
   }
 
   const updatedTechnician = await Technician.findByIdAndUpdate(
-    technicianId,
+    technician._id,
     { $set: set },
-    { new: true, runValidators: true }
+    { returnDocument: "after", runValidators: true }
   );
 
   if (!updatedTechnician) {
     throw new AppError("Technician not found", 404);
   }
 
-  return updatedTechnician;
+  if (technician.userId) {
+    const staffStatus = data.status === "INACTIVE" ? "inactive" : "active";
+    await Staff.updateMany(
+      { userId: technician.userId },
+      { $set: { status: staffStatus } }
+    );
+  }
+
+  const rawDoc = updatedTechnician && "toObject" in updatedTechnician
+    ? (updatedTechnician as any).toObject()
+    : updatedTechnician;
+
+  return formatTechnicianResponse(rawDoc);
 };
 
 export const deactivateTechnician = async (
