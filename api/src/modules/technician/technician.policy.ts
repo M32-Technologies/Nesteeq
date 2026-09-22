@@ -6,11 +6,7 @@ import {
   normalizeRole,
 } from "../../utils/role.js";
 import { AppError } from "../../utils/AppError.js";
-
-
-
-
-
+import { Types } from "mongoose";
 import type { GetTechniciansQuery } from "./technician.schema.js";
 import type { AuthenticatedTechnicianUser } from "./technician.service.js";
 
@@ -26,10 +22,8 @@ const sameId = (id1: any, id2: any): boolean => {
 };
 
 const escapeRegex = (text: string): string => {
-    return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+  return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
 };
-
-
 
 type TechnicianFilter = Record<string, unknown>;
 
@@ -93,29 +87,60 @@ export const buildRoleScopedFilter = (
     if (query.apartmentId && query.apartmentId !== managerApartmentId) {
       throw new AppError("You do not have permission to view technicians for this apartment", 403);
     }
-
-    filter.apartmentId = managerApartmentId;
-  } else if (query.apartmentId) {
-    filter.apartmentId = query.apartmentId;
   }
 
-  if (query.status) {
-    filter.status = query.status;
+  const targetApartmentId = !globalManagementRoles.has(role)
+    ? managerApartmentId
+    : (normalizeOptionalString(query.apartmentId) ?? managerApartmentId);
+
+  const andClauses: Record<string, unknown>[] = [];
+
+  if (targetApartmentId) {
+    const aptValues: unknown[] = [targetApartmentId];
+    if (Types.ObjectId.isValid(targetApartmentId)) {
+      aptValues.push(new Types.ObjectId(targetApartmentId));
+    }
+
+    andClauses.push({
+      $or: [
+        { apartment: { $in: aptValues } },
+        { apartmentId: { $in: aptValues } },
+      ],
+    });
+  }
+
+  if (query.status && query.status.toLowerCase() !== "all") {
+    andClauses.push({
+      status: { $regex: new RegExp(`^${escapeRegex(query.status)}$`, "i") },
+    });
   }
 
   if (query.specialization) {
-    filter.specializations = query.specialization;
+    andClauses.push({
+      specializations: query.specialization,
+    });
   }
 
   if (query.search) {
-    const search = new RegExp(escapeRegex(query.search), "i");
-    filter.$or = [
-      { fullName: search },
-      { email: search },
-      { phone: search },
-      { employeeCode: search },
-      { userId: search },
-    ];
+    const search = new RegExp(escapeRegex(query.search.trim()), "i");
+    andClauses.push({
+      $or: [
+        { fullName: search },
+        { name: search },
+        { email: search },
+        { phone: search },
+        { employeeCode: search },
+        { userId: search },
+      ],
+    });
+  }
+
+  if (andClauses.length === 1) {
+    return andClauses[0];
+  }
+
+  if (andClauses.length > 1) {
+    return { $and: andClauses };
   }
 
   return filter;

@@ -12,18 +12,29 @@ import { AppError } from "../../utils/AppError.js";
 import type { AuthenticatedComplaintUser } from "./complaint.service.js";
 import type { ComplaintDocument } from "./complaint.model.js";
 
-const normalizeOptionalString = (value: string | null | undefined): string | undefined => {
-  if (!value) return undefined;
-  const trimmed = value.trim();
+const normalizeOptionalString = (value: unknown): string | undefined => {
+  if (value === null || value === undefined) return undefined;
+  let str: string;
+  if (typeof value === "string") {
+    str = value;
+  } else if (typeof value === "object" && value !== null && "_id" in value) {
+    str = String((value as any)._id);
+  } else if (typeof (value as any)?.toHexString === "function") {
+    str = (value as any).toHexString();
+  } else if (typeof (value as any)?.toString === "function") {
+    str = (value as any).toString();
+    if (str === "[object Object]") return undefined;
+  } else {
+    str = String(value);
+  }
+  const trimmed = str.trim();
   return trimmed === "" ? undefined : trimmed;
 };
 
 const sameId = (id1: any, id2: any): boolean => {
   if (!id1 || !id2) return false;
-  return id1.toString() === id2.toString();
+  return id1.toString().toLowerCase() === id2.toString().toLowerCase();
 };
-
-
 
 export const assertManagerCanManageComplaint = (
   user: AuthenticatedComplaintUser,
@@ -36,14 +47,15 @@ export const assertManagerCanManageComplaint = (
   }
 
   const managerApartmentId = normalizeOptionalString(user.apartmentId);
-  const complaintApartmentId = normalizeOptionalString(complaint.apartment);
+  const rawComplaintApartment = (complaint as any).apartment ?? (complaint as any).apartmentId;
+  const complaintApartmentId = normalizeOptionalString(rawComplaintApartment);
 
   if (!globalManagementRoles.has(role)) {
     if (!managerApartmentId) {
       throw new AppError("Management user must be linked to an apartment", 403);
     }
 
-    if (!complaintApartmentId || complaintApartmentId !== managerApartmentId) {
+    if (!complaintApartmentId || !sameId(complaintApartmentId, managerApartmentId)) {
       throw new AppError("You do not have permission to manage this complaint", 403);
     }
   }

@@ -6,16 +6,17 @@ import {
 } from "./complaint.model.js";
 
 const allowedStatusTransitions: Record<ComplaintStatus, readonly ComplaintStatus[]> = {
-  PENDING: ["UNDER_REVIEW", "CANCELLED"],
-  UNDER_REVIEW: ["ASSIGNED", "CANCELLED"],
-  ASSIGNED: ["IN_PROGRESS", "CANCELLED"],
-  IN_PROGRESS: ["WORK_COMPLETED", "AWAITING_APPROVAL", "CANCELLED"],
-  WORK_COMPLETED: ["AWAITING_APPROVAL", "APPROVED", "REJECTED", "CANCELLED"],
-  AWAITING_APPROVAL: ["APPROVED", "REJECTED", "CANCELLED"],
-  APPROVED: ["CLOSED"],
-  REJECTED: ["ASSIGNED", "IN_PROGRESS", "CANCELLED"],
-  CANCELLED: [],
-  CLOSED: [],
+  PENDING: ["UNDER_REVIEW", "ASSIGNED", "IN_PROGRESS", "CANCELLED", "REJECTED"],
+  UNDER_REVIEW: ["PENDING", "ASSIGNED", "IN_PROGRESS", "CANCELLED", "REJECTED"],
+  ASSIGNED: ["PENDING", "IN_PROGRESS", "AWAITING_APPROVAL", "RESOLVED", "WORK_COMPLETED", "REJECTED", "CANCELLED", "CLOSED"],
+  IN_PROGRESS: ["PENDING", "ASSIGNED", "WORK_COMPLETED", "RESOLVED", "AWAITING_APPROVAL", "CLOSED", "REJECTED", "CANCELLED"],
+  RESOLVED: ["PENDING", "ASSIGNED", "IN_PROGRESS", "AWAITING_APPROVAL", "CLOSED", "REJECTED"],
+  WORK_COMPLETED: ["AWAITING_APPROVAL", "APPROVED", "RESOLVED", "CLOSED", "REJECTED", "CANCELLED"],
+  AWAITING_APPROVAL: ["APPROVED", "RESOLVED", "CLOSED", "REJECTED", "IN_PROGRESS", "CANCELLED"],
+  APPROVED: ["CLOSED", "RESOLVED"],
+  REJECTED: ["PENDING", "ASSIGNED", "IN_PROGRESS", "CANCELLED"],
+  CANCELLED: ["PENDING", "ASSIGNED", "IN_PROGRESS"],
+  CLOSED: ["PENDING", "ASSIGNED", "IN_PROGRESS", "REJECTED"],
 } satisfies Record<ComplaintStatus, ComplaintStatus[]>;
 
 export const assignableStatuses = new Set<ComplaintStatus>([
@@ -35,12 +36,20 @@ export const completionAllowedStatuses = new Set<ComplaintStatus>([
 export const approvalAllowedStatuses = new Set<ComplaintStatus>([
   "WORK_COMPLETED",
   "AWAITING_APPROVAL",
+  "RESOLVED",
 ]);
 
 export const managerStatusUpdateTargets = new Set<ComplaintStatus>([
+  "PENDING",
   "UNDER_REVIEW",
   "ASSIGNED",
   "IN_PROGRESS",
+  "AWAITING_APPROVAL",
+  "RESOLVED",
+  "WORK_COMPLETED",
+  "APPROVED",
+  "REJECTED",
+  "CANCELLED",
   "CLOSED",
 ]);
 
@@ -71,13 +80,18 @@ export const assertNotTerminal = (complaint: ComplaintDocument): void => {
 
 export const assertValidTransition = (
   currentStatus: ComplaintStatus,
-  nextStatus: ComplaintStatus
+  nextStatus: ComplaintStatus,
+  isManager: boolean = false
 ): void => {
   if (currentStatus === nextStatus) {
     return;
   }
 
-  if (!allowedStatusTransitions[currentStatus].includes(nextStatus)) {
+  if (isManager) {
+    return;
+  }
+
+  if (!allowedStatusTransitions[currentStatus]?.includes(nextStatus)) {
     throw new AppError(`Invalid status transition from ${currentStatus} to ${nextStatus}`, 400);
   }
 };

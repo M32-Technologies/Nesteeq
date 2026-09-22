@@ -46,9 +46,16 @@ export type CreateSchedulePayload = {
   description?: string
   workType: ScheduleWorkType
   assignedTo?: string
+  assignedStaff?: string
+  technicianId?: string
+  technician?: string
   complaintId?: string
   maintenanceId?: string
+  complaint?: string
+  maintenance?: string
   scheduledDate: string
+  startTime?: string
+  endTime?: string
   estimatedDurationHours?: number
   notes?: string
 }

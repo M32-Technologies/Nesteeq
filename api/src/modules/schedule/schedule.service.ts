@@ -127,11 +127,22 @@ const getScheduleOrThrow = async (scheduleId: string) => {
 };
 
 const getTechnicianOrThrow = async (technicianId: string) => {
-  if (!Types.ObjectId.isValid(technicianId)) {
-    throw new AppError("Invalid technician ID", 400);
+  if (!technicianId) {
+    throw new AppError("Technician ID is required", 400);
   }
 
-  const technician = await Technician.findById(technicianId);
+  let technician = null;
+  if (Types.ObjectId.isValid(technicianId)) {
+    technician = await Technician.findById(technicianId);
+  }
+  if (!technician) {
+    technician = await Technician.findOne({
+      $or: [
+        { userId: technicianId },
+        ...(Types.ObjectId.isValid(technicianId) ? [{ _id: new Types.ObjectId(technicianId) }] : []),
+      ],
+    });
+  }
 
   if (!technician) {
     throw new AppError("Technician not found", 404);
@@ -151,8 +162,12 @@ export const ensureNoTechnicianConflict = async ({
   endAt: Date;
   excludeScheduleId?: string;
 }) => {
+  const techIdStr = technicianId.toString();
   const filter: ScheduleFilter = {
-    technician: new Types.ObjectId(technicianId),
+    $or: [
+      ...(Types.ObjectId.isValid(techIdStr) ? [{ technician: new Types.ObjectId(techIdStr) }] : []),
+      { technicianUserId: techIdStr },
+    ],
     status: { $in: activeScheduleStatuses },
     startAt: { $lt: endAt },
     endAt: { $gt: startAt },
@@ -425,41 +440,55 @@ export const createSchedule = async (
   await ensureCurrentUserExists(user);
   assertManagerCanManageApartment(user, user.apartmentId);
 
-  const technician = await getTechnicianOrThrow(data.technician);
+  const rawTechId =
+    data.technician ||
+    (data as any).technicianId ||
+    (data as any).assignedStaff ||
+    (data as any).assignedTo;
+
+  if (!rawTechId) {
+    throw new AppError("Technician is required", 400);
+  }
+
+  const technician = await getTechnicianOrThrow(rawTechId);
   assertManagerCanManageApartment(user, technician.apartmentId);
   assertTechnicianIsAssignable(technician);
 
-  const timeWindow = buildTimeWindow(data.scheduledDate, data.startTime, data.endTime);
+  const startTime = data.startTime || "09:00";
+  const endTime = data.endTime || "10:00";
+  const timeWindow = buildTimeWindow(data.scheduledDate, startTime, endTime);
+
   await ensureNoTechnicianConflict({
-    technicianId: data.technician,
+    technicianId: technician._id.toString(),
     startAt: timeWindow.startAt,
     endAt: timeWindow.endAt,
   });
 
-  const workId = data.workType === "complaint" ? data.complaint : data.maintenance;
+  const complaintId = data.complaint || (data as any).complaintId;
+  const maintenanceId = data.maintenance || (data as any).maintenanceId;
+  const workId = data.workType === "complaint" ? complaintId : maintenanceId;
 
-  if (!workId) {
-    throw new AppError("Schedule work reference is required", 400);
+  let work: WorkResolution | null = null;
+  if (workId) {
+    work = await resolveWork(data.workType, workId, technician, user);
   }
 
-  const work = await resolveWork(data.workType, workId, technician, user);
-
   const schedule = await Schedule.create({
-    title: data.title || work.title,
-    description: data.description ?? work.description,
+    title: data.title || work?.title || "Scheduled Work",
+    description: data.description ?? work?.description ?? null,
     technician: technician._id,
     technicianUserId: technician.userId,
-    workType: work.workType,
-    complaint: work.complaint,
-    maintenance: work.maintenance,
-    apartment: work.apartment,
-    flat: work.flat,
+    workType: work ? work.workType : data.workType,
+    complaint: work?.complaint ?? null,
+    maintenance: work?.maintenance ?? null,
+    apartment: work?.apartment ?? user.apartmentId ?? technician.apartmentId ?? null,
+    flat: work?.flat ?? null,
     scheduledDate: timeWindow.scheduledDate,
     startTime: timeWindow.startTime,
     endTime: timeWindow.endTime,
     startAt: timeWindow.startAt,
     endAt: timeWindow.endAt,
-    priority: data.priority ?? work.priority,
+    priority: data.priority ?? work?.priority ?? "MEDIUM",
     status: "SCHEDULED",
     notes: data.notes ?? null,
     statusHistory: [createHistoryEntry("SCHEDULED", user, data.notes)],
@@ -546,7 +575,12 @@ export const updateSchedule = async (
   assertScheduleEditable(schedule.status);
 
   const previousTechnicianId = getMongoId(schedule.technician);
-  const nextTechnicianId = data.technician ?? previousTechnicianId;
+  const nextTechnicianId =
+    data.technician ??
+    (data as any).technicianId ??
+    (data as any).assignedStaff ??
+    (data as any).assignedTo ??
+    previousTechnicianId;
   const technician = await getTechnicianOrThrow(nextTechnicianId);
   assertManagerCanManageApartment(user, technician.apartmentId);
   assertTechnicianIsAssignable(technician);
@@ -557,7 +591,7 @@ export const updateSchedule = async (
   const timeWindow = buildTimeWindow(nextDate, nextStartTime, nextEndTime);
 
   await ensureNoTechnicianConflict({
-    technicianId: nextTechnicianId,
+    technicianId: technician._id.toString(),
     startAt: timeWindow.startAt,
     endAt: timeWindow.endAt,
     excludeScheduleId: scheduleId,
