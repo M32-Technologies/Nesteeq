@@ -43,11 +43,16 @@ import type {
 } from "@/features/admin/apartments/types"
 
 export default function AdminDashboardPage() {
+  const [isMounted, setIsMounted] = useState(false)
   const [stats, setStats] = useState<ApartmentStats | null>(null)
   const [recentApartments, setRecentApartments] = useState<ApartmentItem[]>([])
   const [analytics, setAnalytics] = useState<ApartmentAnalyticsData | null>(null)
   const [range, setRange] = useState<"3m" | "6m" | "12m">("6m")
   const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   const loadDashboardData = useCallback(async () => {
     setIsLoading(true)
@@ -291,57 +296,61 @@ export default function AdminDashboardPage() {
             </div>
 
             {/* Spline Area Chart */}
-            <div className="mt-5 h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={chartData}
-                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient id="growthGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#07584F" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#07584F" stopOpacity={0.0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    vertical={false}
-                    stroke="#F1F5F9"
-                  />
-                  <XAxis
-                    dataKey="month"
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{ fontSize: 11, fill: "#94A3B8" }}
-                  />
-                  <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{ fontSize: 11, fill: "#94A3B8" }}
-                    allowDecimals={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#0F172A",
-                      borderRadius: "12px",
-                      color: "#FFFFFF",
-                      fontSize: "12px",
-                      border: "none",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                    }}
-                    labelStyle={{ color: "#94A3B8", fontWeight: 600 }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="registrations"
-                    name="Societies"
-                    stroke="#07584F"
-                    strokeWidth={2.5}
-                    fillOpacity={1}
-                    fill="url(#growthGradient)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+            <div className="mt-5 h-64 w-full min-w-0">
+              {isMounted ? (
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                  <AreaChart
+                    data={chartData}
+                    margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                  >
+                    <defs>
+                      <linearGradient id="growthGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#07584F" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#07584F" stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="#F1F5F9"
+                    />
+                    <XAxis
+                      dataKey="month"
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fontSize: 11, fill: "#94A3B8" }}
+                    />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fontSize: 11, fill: "#94A3B8" }}
+                      allowDecimals={false}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#0F172A",
+                        borderRadius: "12px",
+                        color: "#FFFFFF",
+                        fontSize: "12px",
+                        border: "none",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                      }}
+                      labelStyle={{ color: "#94A3B8", fontWeight: 600 }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="registrations"
+                      name="Societies"
+                      stroke="#07584F"
+                      strokeWidth={2.5}
+                      fillOpacity={1}
+                      fill="url(#growthGradient)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full w-full rounded-xl bg-slate-50/50 animate-pulse" />
+              )}
             </div>
 
             {/* Category Sub-Pills Footer */}

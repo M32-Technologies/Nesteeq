@@ -86,7 +86,6 @@ export const getManagerVisitorRecords = async (
 ) => {
   const initialPage = params.page ?? 1
   const pageLimit = Math.min(params.limit ?? (params.fetchAll ? 100 : 50), 100)
-
   const queryParams = {
     page: initialPage,
     limit: pageLimit,
