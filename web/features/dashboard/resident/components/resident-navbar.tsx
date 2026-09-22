@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
 import { useResidentDashboard } from "../hooks/use-resident-dashboard";
+import { ResidentSearch } from "./resident-search";
 
 interface ResidentNavbarProps {
   user: {
@@ -34,7 +35,7 @@ export function ResidentNavbar({ user }: ResidentNavbarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const { flatUnitName, residentRole, apartmentName } = useResidentDashboard();
 
   const handleSignOut = async () => {
@@ -75,7 +76,7 @@ export function ResidentNavbar({ user }: ResidentNavbarProps) {
       icon: Wrench,
     },
     {
-      label: "Maintenance Bills",
+      label: "Bills & Society Finance",
       href: "/resident/bills",
       icon: ReceiptText,
     },
@@ -127,16 +128,7 @@ export function ResidentNavbar({ user }: ResidentNavbarProps) {
 
           {/* Center: Search Bar */}
           <div className="hidden md:flex flex-1 max-w-md mx-4">
-            <div className="relative w-full">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[#7C8782]" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search passes, tickets, notices..."
-                className="h-10 w-full rounded-lg border border-[#DDE3DF] bg-[#F7F8F5] pl-9 pr-4 text-xs sm:text-sm text-[#111111] placeholder:text-[#7C8782] outline-none transition-colors focus:border-[#07584F] focus:bg-white focus:ring-2 focus:ring-[#07584F]/15"
-              />
-            </div>
+            <ResidentSearch />
           </div>
 
           {/* Right: Resident Flat Pill, SOS Alert Button, Bell & Profile */}
@@ -158,6 +150,16 @@ export function ResidentNavbar({ user }: ResidentNavbarProps) {
               <span className="hidden sm:inline">Emergency SOS</span>
               <span className="sm:hidden">SOS</span>
             </Link>
+
+            {/* Mobile Search Button */}
+            <button
+              type="button"
+              onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}
+              title="Search Resident Portal"
+              className="flex md:hidden size-9 items-center justify-center rounded-lg border border-[#DDE3DF] bg-white text-[#637083] hover:bg-[#F7F8F5] hover:text-[#111111] transition-colors cursor-pointer"
+            >
+              <Search className="size-4" />
+            </button>
 
             {/* Notifications Bell */}
             <Link
@@ -239,6 +241,16 @@ export function ResidentNavbar({ user }: ResidentNavbarProps) {
             </div>
           </div>
         </div>
+
+        {/* Mobile Expandable Search Bar */}
+        {isMobileSearchOpen && (
+          <div className="md:hidden pb-3 pt-1 border-t border-[#EEF1F4] animate-in fade-in duration-150">
+            <ResidentSearch
+              isMobileOpen={isMobileSearchOpen}
+              onMobileClose={() => setIsMobileSearchOpen(false)}
+            />
+          </div>
+        )}
       </div>
 
       {/* 2. SUB-NAVBAR ROW: PAGE TABS WITH ICONS - FULL WIDTH */}

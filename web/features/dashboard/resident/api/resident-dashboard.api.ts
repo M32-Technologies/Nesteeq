@@ -274,99 +274,20 @@ export async function fetchResidentDashboardAnnouncements(): Promise<Announcemen
   }
 }
 
-export interface AdditionalChargeItem {
-  title: string;
-  amount: number;
-  reason?: string;
-}
+export {
+  fetchResidentBills,
+  payResidentBill,
+} from "@/features/dashboard/treasurer/billing/services/billing.service";
 
-export interface ResidentBillItem {
-  _id: string;
-  apartmentId: string;
-  unitId: string;
-  residentId: string;
-  baseAmount: number;
-  additionalCharges: AdditionalChargeItem[];
-  lateFeePerDay: number;
-  lateFeeAmount: number;
-  lateFeeWaivedAmount: number;
-  totalAmount: number;
-  paidAmount: number;
-  balanceAmount: number;
-  dueDate: string;
-  status: "PENDING" | "PARTIALLY_PAID" | "PAID" | "OVERDUE";
-  createdAt: string;
-}
+export type {
+  AdditionalChargeItem,
+  ResidentBillItem,
+  ResidentBillsSummary,
+  ResidentPaymentItem,
+  ResidentBillsResponse,
+  PayResidentBillPayload,
+} from "@/features/dashboard/treasurer/billing/types/billing.types";
 
-export interface ResidentBillsSummary {
-  totalOutstanding: number;
-  totalPaid: number;
-  pendingCount: number;
-  overdueCount: number;
-  lateFees: number;
-}
-
-export interface ResidentPaymentItem {
-  _id: string;
-  billId?: string;
-  amount: number;
-  source: string;
-  description?: string;
-  paidAt: string;
-}
-
-export interface ResidentBillsResponse {
-  summary: ResidentBillsSummary;
-  bills: ResidentBillItem[];
-  recentPayments: ResidentPaymentItem[];
-}
-
-export async function fetchResidentBills(): Promise<ResidentBillsResponse> {
-  try {
-    const res = await api.get<{
-      success: boolean;
-      data: ResidentBillsResponse;
-    }>("/api/v1/bills/my-bills");
-    return (
-      res.data?.data || {
-        summary: {
-          totalOutstanding: 0,
-          totalPaid: 0,
-          pendingCount: 0,
-          overdueCount: 0,
-          lateFees: 0,
-        },
-        bills: [],
-        recentPayments: [],
-      }
-    );
-  } catch {
-    return {
-      summary: {
-        totalOutstanding: 0,
-        totalPaid: 0,
-        pendingCount: 0,
-        overdueCount: 0,
-        lateFees: 0,
-      },
-      bills: [],
-      recentPayments: [],
-    };
-  }
-}
-
-export async function payResidentBill(
-  billId: string,
-  payload: {
-    amount?: number;
-    paymentMethod?: string;
-    referenceNo?: string;
-    description?: string;
-  }
-) {
-  const res = await api.post(`/api/v1/bills/${encodeURIComponent(billId)}/pay`, payload);
-  return res.data;
-}
 
 export interface CreateResidentComplaintPayload {
   title: string;

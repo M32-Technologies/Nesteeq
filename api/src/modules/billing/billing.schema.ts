@@ -21,6 +21,16 @@ const additionalChargeSchema = z.object({
   reason: z.string().trim().optional(),
 });
 
+export const billTypeEnum = z.enum([
+  "MONTHLY_MAINTENANCE",
+  "WATER",
+  "COMMON_ELECTRICITY",
+  "LIFT_MAINTENANCE",
+  "SPECIAL_REPAIR",
+  "PARKING_MAINTENANCE",
+  "OTHER",
+]);
+
 export const createBillSchema = z.object({
   body: z.object({
     apartmentId: objectIdSchema,
@@ -28,6 +38,19 @@ export const createBillSchema = z.object({
     residentId: objectIdSchema.optional(),
 
     unitId: objectIdSchema,
+
+    title: z.string().trim().min(1).optional(),
+
+    billType: billTypeEnum.optional(),
+
+    billingPeriod: z
+      .string()
+      .trim()
+      .regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Billing period must be in YYYY-MM format")
+      .optional()
+      .nullable(),
+
+    description: z.string().trim().max(500).optional().nullable(),
 
     baseAmount: z
       .number()
@@ -46,6 +69,28 @@ export const createBillSchema = z.object({
   }),
 });
 
+export const createCommonBillSchema = z.object({
+  body: z.object({
+    apartmentId: objectIdSchema,
+    title: z.string().trim().min(2, "Bill title must be at least 2 characters"),
+    billType: billTypeEnum,
+    billingPeriod: z
+      .string()
+      .trim()
+      .regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Billing period must be in YYYY-MM format")
+      .optional()
+      .nullable(),
+    description: z.string().trim().max(500).optional().nullable(),
+    baseAmount: z.coerce.number().positive("Base amount must be greater than 0"),
+    additionalCharges: z.array(additionalChargeSchema).optional().default([]),
+    lateFeePerDay: z.coerce.number().nonnegative("Late fee cannot be negative").optional().default(0),
+    dueDate: z.coerce.date(),
+    targetType: z.enum(["ALL_FLATS", "BY_BLOCK", "CUSTOM_FLATS"]).default("ALL_FLATS"),
+    targetBlockIds: z.array(objectIdSchema).optional().default([]),
+    targetFlatIds: z.array(objectIdSchema).optional().default([]),
+  }),
+});
+
 export const getBillsSchema = z.object({
   query: z.object({
     apartmentId: objectIdSchema.optional(),
@@ -54,7 +99,19 @@ export const getBillsSchema = z.object({
 
     unitId: objectIdSchema.optional(),
 
+    commonBillId: objectIdSchema.optional(),
+
+    billType: billTypeEnum.optional(),
+
     status: billStatusSchema.optional(),
+  }),
+});
+
+export const getCommonBillsSchema = z.object({
+  query: z.object({
+    apartmentId: objectIdSchema.optional(),
+    billType: billTypeEnum.optional(),
+    status: z.enum(["ACTIVE", "CANCELLED"]).optional(),
   }),
 });
 

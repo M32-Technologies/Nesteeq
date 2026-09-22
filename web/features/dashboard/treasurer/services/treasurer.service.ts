@@ -33,6 +33,11 @@ export interface Bill {
   apartmentId: string;
   residentId: string;
   unitId: string;
+  commonBillId?: string | null;
+  title?: string | null;
+  billType?: string;
+  billingPeriod?: string | null;
+  description?: string | null;
   baseAmount: number;
   additionalCharges: AdditionalCharge[];
   lateFeePerDay: number;
@@ -49,6 +54,50 @@ export interface Bill {
   unitName?: string;
   flatNumber?: string;
   residentName?: string;
+}
+
+export interface CommonBillStats {
+  paidCount: number;
+  pendingCount: number;
+  overdueCount: number;
+  collectedAmount: number;
+  outstandingAmount: number;
+}
+
+export interface CommonBill {
+  _id: string;
+  apartmentId: string;
+  title: string;
+  billType: string;
+  billingPeriod?: string | null;
+  description?: string | null;
+  baseAmount: number;
+  additionalCharges: AdditionalCharge[];
+  lateFeePerDay: number;
+  dueDate: string;
+  targetType: "ALL_FLATS" | "BY_BLOCK" | "CUSTOM_FLATS";
+  targetBlockIds?: string[];
+  targetFlatIds?: string[];
+  totalFlatsCount: number;
+  totalAmount: number;
+  status: "ACTIVE" | "CANCELLED";
+  createdAt: string;
+  updatedAt?: string;
+  stats?: CommonBillStats;
+}
+
+export interface CreateCommonBillPayload {
+  title: string;
+  billType: string;
+  billingPeriod?: string | null;
+  description?: string | null;
+  baseAmount: number;
+  additionalCharges?: AdditionalCharge[];
+  lateFeePerDay?: number;
+  dueDate: string;
+  targetType: "ALL_FLATS" | "BY_BLOCK" | "CUSTOM_FLATS";
+  targetBlockIds?: string[];
+  targetFlatIds?: string[];
 }
 
 export interface BillRecipient {
@@ -82,6 +131,8 @@ export interface GetBillsParams {
   apartmentId?: string;
   residentId?: string;
   unitId?: string;
+  commonBillId?: string;
+  billType?: string;
   status?: BillStatus;
 }
 
@@ -329,6 +380,20 @@ export const createBill = (payload: CreateBillPayload) =>
     method: "POST",
     body: JSON.stringify(payload),
   });
+
+export const createCommonBill = (payload: CreateCommonBillPayload) =>
+  request<{
+    commonBill: CommonBill;
+    generatedCount: number;
+    totalAmount: number;
+    message: string;
+  }>("/api/bills/common", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const getCommonBills = (params: { billType?: string; status?: string } = {}) =>
+  request<CommonBill[]>(`/api/bills/common${toQuery(params)}`);
 
 export const updateBill = (
   billId: string,

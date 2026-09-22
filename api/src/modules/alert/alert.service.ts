@@ -206,15 +206,22 @@ export const createEmergencyAlertService = async ({
     normalizedRole === "owner" ||
     normalizedRole === "tenant"
   ) {
-    const resident = await ResidentModel.findOne({
+    let resident = await ResidentModel.findOne({
       userId,
       apartmentId,
       status: { $in: ["active", "pending"] },
     })
 
     if (!resident) {
+      resident = await ResidentModel.findOne({
+        userId,
+        apartmentId,
+      })
+    }
+
+    if (!resident) {
       throw new AppError(
-        "Resident profile not found",
+        "Resident profile not found in this apartment. Please contact the security gate directly.",
         404
       )
     }
@@ -222,11 +229,18 @@ export const createEmergencyAlertService = async ({
     resolvedResidentId = resident._id.toString()
     resolvedFlatId = resident.flatId.toString()
   } else if (!resolvedResidentId || !resolvedFlatId) {
-    const resident = await ResidentModel.findOne({
+    let resident = await ResidentModel.findOne({
       userId,
       apartmentId,
       status: { $in: ["active", "pending"] },
     })
+
+    if (!resident) {
+      resident = await ResidentModel.findOne({
+        userId,
+        apartmentId,
+      })
+    }
 
     if (resident) {
       resolvedResidentId = resident._id.toString()
@@ -259,6 +273,7 @@ export const createEmergencyAlertService = async ({
     apartmentId,
     residentId: resolvedResidentId,
     flatId: resolvedFlatId,
+    allowedStatuses: ["active", "pending"],
   })
 
   const alert = await EmergencyAlertModel.create({

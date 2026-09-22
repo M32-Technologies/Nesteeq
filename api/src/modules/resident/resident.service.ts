@@ -1,12 +1,8 @@
-import crypto from "crypto";
-import QRCode from "qrcode";
 import { AppError } from "../../utils/AppError.js";
-import { ResidentListQuery, RegisterVehicleInput, CreateResidentGuestPassInput } from "./resident.validation.js";
+import { ResidentListQuery, RegisterVehicleInput } from "./resident.validation.js";
 import { Resident } from "./resident.model.js";
-import { Vehicle } from "./vehicle.model.js";
 import { ParkingSlotModel } from "../parking/parking.model.js";
 import { GuestPassModel, GuestPassStatus } from "../visitors/visit.model.js";
-import { hashGuestPassToken } from "../visitors/visit.service.js";
 import { normalizeVehicleNumber } from "../parking/parking.service.js";
 import { Flat } from "../flat/flat.model.js";
 import { syncFlatOccupancy } from "../flat/flat.service.js";
@@ -404,7 +400,7 @@ export const updateResidentDetails = async (
     return getResidentDetails(resident._id.toString(), apartmentId);
 }
 
-const resolveResidentContext = async (user: any, apartmentId?: string) => {
+export const resolveResidentContext = async (user: any, apartmentId?: string) => {
     const aptId = apartmentId || user.apartmentId;
     if (!aptId) {
         throw new AppError("Apartment context is required", 400);
@@ -421,13 +417,17 @@ const resolveResidentContext = async (user: any, apartmentId?: string) => {
         }).lean();
     }
 
-    if (!resident && user.flatId && Types.ObjectId.isValid(user.flatId)) {
-        resident = await Resident.findOne({
-            flatId: new Types.ObjectId(user.flatId),
-        }).lean();
-    }
+    let flatId = resident?.flatId ? resident.flatId : null;
 
-    const flatId = resident?.flatId || (user.flatId && Types.ObjectId.isValid(user.flatId) ? new Types.ObjectId(user.flatId) : null);
+    if (!flatId && user.flatId && Types.ObjectId.isValid(user.flatId) && Types.ObjectId.isValid(aptId)) {
+        const matchingFlat = await Flat.findOne({
+            _id: new Types.ObjectId(user.flatId),
+            apartmentId: new Types.ObjectId(aptId),
+        }).select("_id").lean();
+        if (matchingFlat) {
+            flatId = matchingFlat._id;
+        }
+    }
 
     let flat: any = null;
     if (flatId) {
@@ -446,24 +446,7 @@ export const getMyVehiclesAndParkingService = async (user: any, apartmentId?: st
     const { apartmentId: aptId, resident, flatId, flat } = await resolveResidentContext(user, apartmentId);
     const aptObjectId = new Types.ObjectId(aptId);
 
-    // 1. Fetch registered vehicles
-    const vehicleConditions: any[] = [{ apartmentId: aptObjectId }];
-    if (flatId && Types.ObjectId.isValid(flatId)) {
-        vehicleConditions.push({ flatId: new Types.ObjectId(flatId) });
-    } else if (resident?._id) {
-        vehicleConditions.push({ residentId: resident._id });
-    } else {
-        vehicleConditions.push({ userId: user.id });
-    }
-
-    const vehicles = await Vehicle.find({
-        apartmentId: aptObjectId,
-        $or: vehicleConditions.slice(1).length ? vehicleConditions.slice(1) : [{ userId: user.id }],
-    })
-        .sort({ createdAt: -1 })
-        .lean();
-
-    // 2. Fetch assigned parking slots from ParkingSlotModel for this flat/resident
+    // 1. Fetch assigned parking slots from ParkingSlotModel for this flat/resident
     const slotConditions: any[] = [];
     if (flatId && Types.ObjectId.isValid(flatId)) {
         slotConditions.push({ flatId: new Types.ObjectId(flatId) });
@@ -480,9 +463,22 @@ export const getMyVehiclesAndParkingService = async (user: any, apartmentId?: st
         }).lean();
     }
 
-    const registeredSlotIds = new Set(
-        vehicles.filter((v: any) => v.parkingSlotId).map((v: any) => v.parkingSlotId.toString())
-    );
+    // 2. Derive vehicles directly from assigned slots that have a registered vehicleNumber
+    const vehicles = assignedSlots
+        .filter((s: any) => Boolean(s.vehicleNumber))
+        .map((s: any) => ({
+            _id: s._id.toString(),
+            vehicleNumber: s.vehicleNumber,
+            vehicleType: s.vehicleType,
+            makeModel: s.notes || "Assigned Vehicle",
+            color: "Standard",
+            rfidTag: `NST-${s._id.toString().slice(-6).toUpperCase()}`,
+            parkingSlotId: s._id.toString(),
+            status: s.status === "INACTIVE" ? "INACTIVE" : "ACTIVE",
+            evChargingRequired: s.vehicleType === "EV",
+            notes: s.notes || null,
+            createdAt: s.assignedAt || s.createdAt || new Date(),
+        }));
 
     // 3. Compute Guest Parking Quota (2 Slots / Month)
     const startOfMonth = new Date();
@@ -505,56 +501,39 @@ export const getMyVehiclesAndParkingService = async (user: any, apartmentId?: st
         ? `${(flat.blockId as any)?.blockname ? `${(flat.blockId as any).blockname} • ` : ""}Flat ${flat.flatNumber}`
         : "Assigned Unit";
 
+    const availableSlotsList = assignedSlots
+        .filter((s: any) => !s.vehicleNumber)
+        .map((s: any) => ({
+            _id: s._id.toString(),
+            slotNumber: s.slotNumber,
+            level: s.level,
+            zoneName: s.zoneName || null,
+            zoneCode: s.zoneCode || null,
+            prefix: s.prefix,
+            vehicleType: s.vehicleType,
+            status: s.status,
+            vehicleNumber: null,
+            isRegistered: false,
+        }));
+
     return {
-        vehicles: vehicles.map((v: any) => ({
-            _id: v._id.toString(),
-            vehicleNumber: v.vehicleNumber,
-            vehicleType: v.vehicleType,
-            makeModel: v.makeModel || "Not specified",
-            color: v.color || "Standard",
-            rfidTag: v.rfidTag || `NST-${v._id.toString().slice(-6).toUpperCase()}`,
-            parkingSlotId: v.parkingSlotId ? v.parkingSlotId.toString() : null,
-            status: v.status || "ACTIVE",
-            evChargingRequired: Boolean(v.evChargingRequired),
-            notes: v.notes || null,
-            createdAt: v.createdAt,
+        vehicles,
+        assignedSlots: assignedSlots.map((s: any) => ({
+            _id: s._id.toString(),
+            slotNumber: s.slotNumber,
+            level: s.level,
+            zoneName: s.zoneName || null,
+            zoneCode: s.zoneCode || null,
+            prefix: s.prefix,
+            vehicleType: s.vehicleType,
+            status: s.status,
+            vehicleNumber: s.vehicleNumber || null,
+            isRegistered: Boolean(s.vehicleNumber),
         })),
-        assignedSlots: assignedSlots.map((s: any) => {
-            const isRegistered = Boolean(s.vehicleNumber) || registeredSlotIds.has(s._id.toString());
-            return {
-                _id: s._id.toString(),
-                slotNumber: s.slotNumber,
-                level: s.level,
-                zoneName: s.zoneName || null,
-                zoneCode: s.zoneCode || null,
-                prefix: s.prefix,
-                vehicleType: s.vehicleType,
-                status: s.status,
-                vehicleNumber: s.vehicleNumber || null,
-                isRegistered,
-            };
-        }),
         totalSlotsAssigned: assignedSlots.length,
-        availableSlotsCount: assignedSlots.filter(
-            (s: any) => !s.vehicleNumber && !registeredSlotIds.has(s._id.toString())
-        ).length,
-        availableSlots: assignedSlots
-            .filter((s: any) => !s.vehicleNumber && !registeredSlotIds.has(s._id.toString()))
-            .map((s: any) => ({
-                _id: s._id.toString(),
-                slotNumber: s.slotNumber,
-                level: s.level,
-                zoneName: s.zoneName || null,
-                zoneCode: s.zoneCode || null,
-                prefix: s.prefix,
-                vehicleType: s.vehicleType,
-                status: s.status,
-                vehicleNumber: null,
-                isRegistered: false,
-            })),
-        isSlotLimitReached: assignedSlots.length > 0 && assignedSlots.filter(
-            (s: any) => !s.vehicleNumber && !registeredSlotIds.has(s._id.toString())
-        ).length === 0,
+        availableSlotsCount: availableSlotsList.length,
+        availableSlots: availableSlotsList,
+        isSlotLimitReached: assignedSlots.length > 0 && availableSlotsList.length === 0,
         flatUnitName,
         guestQuota: {
             monthlyTotal: monthlyQuota,
@@ -575,20 +554,7 @@ export const registerVehicleService = async (
 
     const normalizedNumber = normalizeVehicleNumber(data.vehicleNumber);
 
-    // Check if vehicle is already registered in this apartment
-    const existingVehicle = await Vehicle.findOne({
-        apartmentId: aptObjectId,
-        vehicleNumber: normalizedNumber,
-    });
-
-    if (existingVehicle) {
-        throw new AppError(
-            `Vehicle ${normalizedNumber} is already registered in this society`,
-            409
-        );
-    }
-
-    // Check if this vehicle is already allocated to any parking slot in this apartment
+    // 1. Check if this vehicle is already allocated to any parking slot in this apartment
     const slotWithVehicle = await ParkingSlotModel.findOne({
         apartmentId: aptObjectId,
         vehicleNumber: normalizedNumber,
@@ -601,7 +567,7 @@ export const registerVehicleService = async (
         );
     }
 
-    // Check assigned slots for this flat/resident
+    // 2. Check assigned slots for this flat/resident
     const slotConditions: any[] = [];
     if (flatId && Types.ObjectId.isValid(flatId)) {
         slotConditions.push({ flatId: new Types.ObjectId(flatId) });
@@ -610,12 +576,17 @@ export const registerVehicleService = async (
         slotConditions.push({ residentId: resident._id });
     }
 
-    const assignedSlots = slotConditions.length
-        ? await ParkingSlotModel.find({
-              apartmentId: aptObjectId,
-              $or: slotConditions,
-          })
-        : [];
+    if (slotConditions.length === 0) {
+        throw new AppError(
+            "No parking slot has been assigned to your unit by the property manager. Please contact management.",
+            403
+        );
+    }
+
+    const assignedSlots = await ParkingSlotModel.find({
+        apartmentId: aptObjectId,
+        $or: slotConditions,
+    });
 
     if (assignedSlots.length === 0) {
         throw new AppError(
@@ -624,35 +595,18 @@ export const registerVehicleService = async (
         );
     }
 
-    // Find all vehicles currently registered for this flat/resident to know which slots are occupied
-    const activeVehicles = await Vehicle.find({
-        apartmentId: aptObjectId,
-        $or: slotConditions.length ? slotConditions : [{ userId: user.id }],
-    }).lean();
-
-    const usedSlotIds = new Set(
-        activeVehicles
-            .filter((v: any) => v.parkingSlotId)
-            .map((v: any) => v.parkingSlotId.toString())
-    );
-    assignedSlots.forEach((s) => {
-        if (s.vehicleNumber) {
-            usedSlotIds.add(s._id.toString());
-        }
-    });
-
-    // Target slot selection
+    // 3. Target slot selection
     let targetSlot: any = null;
     if (data.slotId) {
         targetSlot = assignedSlots.find((s) => s._id.toString() === data.slotId);
         if (!targetSlot) {
             throw new AppError("The selected parking slot is not assigned to your unit.", 403);
         }
-        if (usedSlotIds.has(targetSlot._id.toString())) {
+        if (targetSlot.vehicleNumber) {
             throw new AppError("The selected parking slot already has a vehicle registered.", 400);
         }
     } else {
-        targetSlot = assignedSlots.find((s) => !usedSlotIds.has(s._id.toString()));
+        targetSlot = assignedSlots.find((s) => !s.vehicleNumber);
         if (!targetSlot) {
             throw new AppError(
                 `All assigned parking slots (${assignedSlots.length}) already have a vehicle registered. If you need another slot, please contact the property manager.`,
@@ -661,34 +615,31 @@ export const registerVehicleService = async (
         }
     }
 
-    // Assign vehicle type strictly from the property manager's parking slot
-    const assignedVehicleType = targetSlot.vehicleType || "CAR";
-
-    const rfidTag =
-        data.rfidTag?.trim() ||
-        `NST-RFID-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
-
-    // Update slot vehicleNumber
+    // Assign vehicle number and details directly to the property manager's parking slot
     targetSlot.vehicleNumber = normalizedNumber;
+    const noteDetails = [data.makeModel, data.color, data.notes].filter(Boolean).join(" | ");
+    if (noteDetails) {
+        targetSlot.notes = noteDetails;
+    }
+    if (resident?._id && !targetSlot.residentId) {
+        targetSlot.residentId = resident._id;
+    }
+    targetSlot.assignedAt = new Date();
     await targetSlot.save();
 
-    const newVehicle = await Vehicle.create({
-        apartmentId: aptObjectId,
-        residentId: resident?._id || (Types.ObjectId.isValid(user.id) ? new Types.ObjectId(user.id) : undefined),
-        flatId: flatId && Types.ObjectId.isValid(flatId) ? new Types.ObjectId(flatId) : undefined,
-        userId: user.id,
-        vehicleNumber: normalizedNumber,
-        vehicleType: assignedVehicleType,
-        makeModel: data.makeModel?.trim() || null,
-        color: data.color?.trim() || null,
-        rfidTag,
-        parkingSlotId: targetSlot._id,
-        evChargingRequired: Boolean(data.evChargingRequired),
-        notes: data.notes?.trim() || null,
+    return {
+        _id: targetSlot._id.toString(),
+        vehicleNumber: targetSlot.vehicleNumber,
+        vehicleType: targetSlot.vehicleType,
+        makeModel: data.makeModel?.trim() || "Assigned Vehicle",
+        color: data.color?.trim() || "Standard",
+        rfidTag: data.rfidTag?.trim() || `NST-${targetSlot._id.toString().slice(-6).toUpperCase()}`,
+        parkingSlotId: targetSlot._id.toString(),
         status: "ACTIVE",
-    });
-
-    return newVehicle;
+        evChargingRequired: targetSlot.vehicleType === "EV" || Boolean(data.evChargingRequired),
+        notes: targetSlot.notes || null,
+        createdAt: targetSlot.assignedAt,
+    };
 };
 
 export const deleteVehicleService = async (
@@ -703,272 +654,38 @@ export const deleteVehicleService = async (
         throw new AppError("Invalid vehicle ID", 400);
     }
 
-    const vehicle = await Vehicle.findOne({
+    // Vehicle ID maps directly to the ParkingSlotModel document _id
+    const slot = await ParkingSlotModel.findOne({
         _id: new Types.ObjectId(vehicleId),
         apartmentId: aptObjectId,
     });
 
-    if (!vehicle) {
+    if (!slot || !slot.vehicleNumber) {
         throw new AppError("Vehicle not found", 404);
     }
 
-    const isOwner =
-        (vehicle.userId && vehicle.userId === user.id) ||
-        (resident?._id && vehicle.residentId && vehicle.residentId.toString() === resident._id.toString()) ||
-        (flatId && vehicle.flatId && vehicle.flatId.toString() === flatId.toString());
+    const isAuthorized =
+        (flatId && slot.flatId && slot.flatId.toString() === flatId.toString()) ||
+        (resident?._id && slot.residentId && slot.residentId.toString() === resident._id.toString()) ||
+        user.role === "property_manager";
 
-    if (!isOwner) {
+    if (!isAuthorized) {
         throw new AppError("You are not authorized to unregister this vehicle", 403);
     }
 
-    // Clear vehicle number on associated slot
-    if (vehicle.parkingSlotId) {
-        await ParkingSlotModel.updateOne(
-            { _id: vehicle.parkingSlotId },
-            { $set: { vehicleNumber: null } }
-        );
-    }
+    const unregPlate = slot.vehicleNumber;
+    slot.vehicleNumber = null;
+    slot.notes = null;
+    await slot.save();
 
-    await Vehicle.deleteOne({ _id: vehicle._id });
-
-    return { success: true, message: `Vehicle ${vehicle.vehicleNumber} unregistered successfully` };
+    return { success: true, message: `Vehicle ${unregPlate} unregistered successfully` };
 };
 
-export const createResidentGuestPassService = async (
-    user: any,
-    data: CreateResidentGuestPassInput,
-    apartmentId?: string
-) => {
-    const { apartmentId: aptId, resident, flatId, flat } = await resolveResidentContext(user, apartmentId);
-    if (data.flatId && flatId && data.flatId !== flatId.toString()) {
-        throw new AppError("You are not authorized to create a guest pass for another flat", 403);
-    }
-    const targetFlatId = flatId || (data.flatId && Types.ObjectId.isValid(data.flatId) ? data.flatId : null);
-    if (!targetFlatId) {
-        throw new AppError("No valid flat found for this resident context", 400);
-    }
-
-    const now = new Date();
-    const validFrom = data.validFrom ? new Date(data.validFrom) : now;
-    let validUntil = data.validUntil ? new Date(data.validUntil) : null;
-
-    if (!validUntil) {
-        const hours = data.durationHours && data.durationHours > 0 ? data.durationHours : 8;
-        validUntil = new Date(validFrom.getTime() + hours * 60 * 60 * 1000);
-    }
-
-    if (validUntil <= validFrom) {
-        throw new AppError("Guest pass expiry must be later than start time", 400);
-    }
-    if (validUntil <= now) {
-        throw new AppError("Guest pass expiry must be in the future", 400);
-    }
-
-    const rawToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = hashGuestPassToken(rawToken);
-    const qrCodeDataUrl = await QRCode.toDataURL(rawToken, {
-        width: 280,
-        margin: 2,
-        errorCorrectionLevel: "M",
-    });
-
-    const pass = await GuestPassModel.create({
-        apartmentId: new Types.ObjectId(aptId),
-        createdByResidentId: resident?._id || new Types.ObjectId(user.id),
-        flatId: new Types.ObjectId(targetFlatId),
-        visitorName: data.visitorName.trim(),
-        visitorPhone: data.visitorPhone?.trim() || null,
-        purpose: data.purpose?.trim() || null,
-        vehicleNumber: data.vehicleNumber ? normalizeVehicleNumber(data.vehicleNumber) : null,
-        vehicleType: data.vehicleType ? data.vehicleType.toUpperCase() : null,
-        rawToken,
-        qrCodeDataUrl,
-        tokenHash,
-        validFrom,
-        validUntil,
-        status: GuestPassStatus.ACTIVE,
-    });
-
-    const flatNumber = flat?.flatNumber || null;
-    const passObj = pass.toObject();
-    delete (passObj as any).tokenHash;
-
-    return {
-        guestPass: {
-            ...passObj,
-            _id: pass._id.toString(),
-            id: pass._id.toString(),
-            token: rawToken,
-            qrCodeDataUrl,
-            flatNumber,
-        },
-        token: rawToken,
-        qrCodeDataUrl,
-    };
-};
-
-export const getResidentGuestPassesService = async (
-    user: any,
-    query: { status?: string; page?: number; limit?: number; search?: string },
-    apartmentId?: string
-) => {
-    const { apartmentId: aptId, resident, flatId, flat } = await resolveResidentContext(user, apartmentId);
-    const aptObjectId = new Types.ObjectId(aptId);
-
-    // Auto-expire old active passes
-    const now = new Date();
-    await GuestPassModel.updateMany(
-        {
-            apartmentId: aptObjectId,
-            status: GuestPassStatus.ACTIVE,
-            validUntil: { $lt: now },
-            $or: [
-                ...(flatId ? [{ flatId: new Types.ObjectId(flatId) }] : []),
-                ...(resident?._id ? [{ createdByResidentId: resident._id }] : []),
-            ],
-        },
-        { $set: { status: GuestPassStatus.EXPIRED } }
-    );
-
-    const conditions: Record<string, unknown>[] = [
-        { apartmentId: aptObjectId },
-    ];
-
-    const ownerFilter: Record<string, unknown>[] = [];
-    if (flatId && Types.ObjectId.isValid(flatId)) {
-        ownerFilter.push({ flatId: new Types.ObjectId(flatId) });
-    }
-    if (resident?._id) {
-        ownerFilter.push({ createdByResidentId: resident._id });
-    }
-    if (ownerFilter.length > 0) {
-        conditions.push({ $or: ownerFilter });
-    }
-
-    if (query.status && query.status !== "ALL") {
-        conditions.push({ status: query.status });
-    }
-
-    if (query.search?.trim()) {
-        const regex = new RegExp(escapeRegex(query.search.trim()), "i");
-        conditions.push({
-            $or: [
-                { visitorName: regex },
-                { purpose: regex },
-                { vehicleNumber: regex },
-                { visitorPhone: regex },
-            ],
-        });
-    }
-
-    const filter = conditions.length > 1 ? { $and: conditions } : conditions[0] || {};
-    const page = Math.max(1, Number(query.page) || 1);
-    const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
-    const skip = (page - 1) * limit;
-
-    const baseConditions = conditions.filter((c) => !("status" in c));
-    const baseFilter = baseConditions.length > 1 ? { $and: baseConditions } : baseConditions[0] || {};
-
-    const [passes, total, activePassesCount, usedPassesCount, expiredPassesCount] = await Promise.all([
-        GuestPassModel.find(filter)
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit)
-            .lean(),
-        GuestPassModel.countDocuments(filter),
-        GuestPassModel.countDocuments({ ...baseFilter, status: GuestPassStatus.ACTIVE }),
-        GuestPassModel.countDocuments({ ...baseFilter, status: GuestPassStatus.USED }),
-        GuestPassModel.countDocuments({ ...baseFilter, status: GuestPassStatus.EXPIRED }),
-    ]);
-
-    const flatNumber = flat?.flatNumber || null;
-
-    const items = passes.map((p: any) => ({
-        _id: p._id.toString(),
-        id: p._id.toString(),
-        apartmentId: p.apartmentId.toString(),
-        flatId: p.flatId.toString(),
-        flatNumber,
-        visitorName: p.visitorName,
-        visitorPhone: p.visitorPhone || null,
-        purpose: p.purpose || null,
-        vehicleNumber: p.vehicleNumber || null,
-        vehicleType: p.vehicleType || null,
-        status: p.status,
-        validFrom: p.validFrom,
-        validUntil: p.validUntil,
-        token: p.rawToken || null,
-        qrCodeDataUrl: p.qrCodeDataUrl || null,
-        usedAt: p.usedAt || null,
-        createdAt: p.createdAt,
-    }));
-
-    return {
-        guestPasses: items,
-        counts: {
-            total,
-            activePassesCount,
-            usedPassesCount,
-            expiredPassesCount,
-        },
-        pagination: {
-            page,
-            limit,
-            total,
-            totalPages: Math.ceil(total / limit),
-            hasNextPage: page * limit < total,
-            hasPreviousPage: page > 1,
-        },
-    };
-};
-
-export const cancelResidentGuestPassService = async (
-    user: any,
-    passId: string,
-    apartmentId?: string
-) => {
-    const { apartmentId: aptId, resident, flatId } = await resolveResidentContext(user, apartmentId);
-    const aptObjectId = new Types.ObjectId(aptId);
-
-    if (!Types.ObjectId.isValid(passId)) {
-        throw new AppError("Invalid pass ID", 400);
-    }
-
-    const pass = await GuestPassModel.findOne({
-        _id: new Types.ObjectId(passId),
-        apartmentId: aptObjectId,
-        $or: [
-            ...(flatId ? [{ flatId: new Types.ObjectId(flatId) }] : []),
-            ...(resident?._id ? [{ createdByResidentId: resident._id }] : []),
-        ],
-    });
-
-    if (!pass) {
-        throw new AppError("Visitor pass not found", 404);
-    }
-
-    if (pass.status === GuestPassStatus.CANCELLED) {
-        throw new AppError("Pass is already cancelled", 400);
-    }
-    if (pass.status === GuestPassStatus.USED) {
-        throw new AppError("Used passes cannot be cancelled", 400);
-    }
-    if (pass.status === GuestPassStatus.EXPIRED) {
-        throw new AppError("Expired passes cannot be cancelled", 400);
-    }
-
-    pass.status = GuestPassStatus.CANCELLED;
-    await pass.save();
-
-    return {
-        success: true,
-        message: "Visitor pass cancelled successfully",
-        guestPass: {
-            _id: pass._id.toString(),
-            status: pass.status,
-        },
-    };
-};
+export {
+    createResidentGuestPassService,
+    getResidentGuestPassesService,
+    cancelResidentGuestPassService,
+} from "../visitors/visit.service.js";
 
 export const getCurrentResidentProfileService = async (user: any, apartmentId?: string) => {
     const { apartmentId: aptId, resident, flat } = await resolveResidentContext(user, apartmentId);
@@ -1004,7 +721,7 @@ export const getCurrentResidentProfileService = async (user: any, apartmentId?: 
         email: authUser?.email || user.email || null,
         role: user.role || "resident",
         residentType: resident?.residentType || "resident",
-        phone: authUser?.phoneNumber || resident?.phone || null,
+        phone: authUser?.phone || authUser?.phoneNumber || resident?.phoneNumber || resident?.phone || null,
         status: resident?.status || "active",
         flat: flatInfo,
         joinedAt: resident?.createdAt || authUser?.createdAt || new Date().toISOString(),

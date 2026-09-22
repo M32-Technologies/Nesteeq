@@ -407,7 +407,7 @@ export const sidebarNavigation: Record<
       title: "Accounts",
       items: [
         {
-          title: "Maintenance Bills",
+          title: "Bills & Society Finance",
           href: "/dashboard/bills",
           icon: ReceiptText,
         },

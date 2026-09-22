@@ -1,15 +1,19 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import {
   useMutation,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 import {
+  ChevronLeft,
+  ChevronRight,
   CircleDollarSign,
   Clock3,
   FileText,
+  Layers,
+  Plus,
   TriangleAlert,
   X,
 } from "lucide-react";
@@ -17,6 +21,7 @@ import { toast } from "sonner";
 
 import {
   createBill,
+  createCommonBill,
   getBills,
   getBillingSummary,
   recordBillPayment,
@@ -24,12 +29,14 @@ import {
   waiveLateFee,
   type Bill,
   type CreateBillPayload,
+  type CreateCommonBillPayload,
 } from "../../services/treasurer.service";
 import {
   formatCurrency,
   formatDate,
 } from "../../utils/format";
 import CreateBillModal from "./CreateBillModal";
+import CreateCommonBillModal from "./CreateCommonBillModal";
 
 type BillAction = "payment" | "waiver" | "edit";
 
@@ -51,6 +58,53 @@ const statusClassNames: Record<Bill["status"], string> = {
     "rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700",
 };
 
+const BILL_TYPE_TAGS: Record<
+  string,
+  { label: string; className: string }
+> = {
+  MONTHLY_MAINTENANCE: {
+    label: "Monthly Maintenance",
+    className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  },
+  WATER: {
+    label: "Water Bill",
+    className: "bg-sky-50 text-sky-700 border-sky-200",
+  },
+  COMMON_ELECTRICITY: {
+    label: "Common Electricity",
+    className: "bg-amber-50 text-amber-700 border-amber-200",
+  },
+  LIFT_AMC: {
+    label: "Lift AMC",
+    className: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  },
+  SPECIAL_REPAIR: {
+    label: "Special Repair",
+    className: "bg-rose-50 text-rose-700 border-rose-200",
+  },
+  PARKING_MAINTENANCE: {
+    label: "Parking Maintenance",
+    className: "bg-purple-50 text-purple-700 border-purple-200",
+  },
+  OTHER: {
+    label: "Custom Bill",
+    className: "bg-slate-100 text-slate-700 border-slate-200",
+  },
+};
+
+const ITEMS_PER_PAGE = 8;
+
+const BILL_CATEGORY_FILTERS = [
+  { value: "ALL", label: "All Bills" },
+  { value: "MONTHLY_MAINTENANCE", label: "Maintenance" },
+  { value: "WATER", label: "Water" },
+  { value: "COMMON_ELECTRICITY", label: "Electricity" },
+  { value: "LIFT_AMC", label: "Lift AMC" },
+  { value: "SPECIAL_REPAIR", label: "Special Repair" },
+  { value: "PARKING_MAINTENANCE", label: "Parking" },
+  { value: "OTHER", label: "Other" },
+];
+
 const getSafeErrorMessage = (error: unknown) =>
   error instanceof Error
     ? error.message
@@ -68,8 +122,13 @@ const toDateInput = (date: string) => {
 
 export default function TreasurerBilling() {
   const queryClient = useQueryClient();
+  const [currentPage, setCurrentPage] = useState(1);
   const [isCreateBillOpen, setIsCreateBillOpen] =
     useState(false);
+  const [isCreateCommonBillOpen, setIsCreateCommonBillOpen] =
+    useState(false);
+  const [selectedCategoryFilter, setSelectedCategoryFilter] =
+    useState<string>("ALL");
   const [selectedBill, setSelectedBill] = useState<Bill | null>(
     null,
   );
@@ -83,8 +142,13 @@ export default function TreasurerBilling() {
   );
 
   const billsQuery = useQuery({
-    queryKey: ["treasurer", "bills"],
-    queryFn: () => getBills(),
+    queryKey: ["treasurer", "bills", selectedCategoryFilter],
+    queryFn: () =>
+      getBills(
+        selectedCategoryFilter !== "ALL"
+          ? { billType: selectedCategoryFilter }
+          : undefined,
+      ),
   });
 
   const billingSummaryQuery = useQuery({
@@ -123,6 +187,21 @@ export default function TreasurerBilling() {
     onSuccess: async () => {
       toast.success("Bill created.");
       setIsCreateBillOpen(false);
+      await invalidateTreasurerData();
+    },
+    onError: (error) => {
+      toast.error(getSafeErrorMessage(error));
+    },
+  });
+
+  const commonBillMutation = useMutation({
+    mutationFn: (payload: CreateCommonBillPayload) =>
+      createCommonBill(payload),
+    onSuccess: async (res) => {
+      toast.success(
+        `Generated ${res.commonBill.title} for ${res.generatedCount} flat(s).`,
+      );
+      setIsCreateCommonBillOpen(false);
       await invalidateTreasurerData();
     },
     onError: (error) => {
@@ -285,6 +364,11 @@ export default function TreasurerBilling() {
   };
 
   const bills = billsQuery.data ?? [];
+  const totalPages = Math.ceil(bills.length / ITEMS_PER_PAGE) || 1;
+  const paginatedBills = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return bills.slice(start, start + ITEMS_PER_PAGE);
+  }, [bills, currentPage]);
   const serverSummary = billingSummaryQuery.data;
   const billingStats = serverSummary
     ? {
@@ -381,19 +465,51 @@ export default function TreasurerBilling() {
           <div className="flex flex-col gap-4 border-b border-slate-200 p-6 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-slate-900">
-                Maintenance Bills
+                Maintenance & Common Bills
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                View resident bills and outstanding balances.
+                View individual resident bills, generate broadcast common bills, and track collection.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsCreateBillOpen(true)}
-              className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
-            >
-              Create Bill
-            </button>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsCreateBillOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-700 shadow-xs transition hover:bg-slate-50 hover:text-slate-900 cursor-pointer"
+              >
+                <Plus className="h-4 w-4 text-slate-500" />
+                <span>Single Flat Bill</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsCreateCommonBillOpen(true)}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#07584F] px-4 py-2.5 text-sm font-medium text-white shadow-xs transition hover:bg-[#064C44] cursor-pointer"
+              >
+                <Layers className="h-4 w-4" />
+                <span>Create Common Bill</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Category Filter Pills */}
+          <div className="border-b border-slate-100 bg-slate-50/60 px-6 py-2.5 flex items-center gap-1.5 overflow-x-auto">
+            {BILL_CATEGORY_FILTERS.map((cat) => (
+              <button
+                key={cat.value}
+                type="button"
+                onClick={() => {
+                  setSelectedCategoryFilter(cat.value);
+                  setCurrentPage(1);
+                }}
+                className={`rounded-lg px-3 py-1 text-xs font-medium transition cursor-pointer shrink-0 ${
+                  selectedCategoryFilter === cat.value
+                    ? "bg-slate-900 text-white shadow-xs"
+                    : "text-slate-600 hover:bg-slate-200/70"
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
           </div>
 
           <div className="overflow-x-auto p-6">
@@ -407,12 +523,14 @@ export default function TreasurerBilling() {
               </p>
             ) : bills.length === 0 ? (
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                No bills available.
+                No bills found for the selected category.
               </p>
             ) : (
-              <table className="w-full min-w-[1250px] text-left text-sm">
+              <>
+                <table className="w-full min-w-[1250px] text-left text-sm">
                 <thead className="border-b border-slate-200 text-slate-500">
                   <tr>
+                    <th className="pb-3 font-medium">Bill Details</th>
                     <th className="pb-3 font-medium">Resident</th>
                     <th className="pb-3 font-medium">Unit / Flat</th>
                     <th className="pb-3 font-medium">Base</th>
@@ -426,76 +544,145 @@ export default function TreasurerBilling() {
                   </tr>
                 </thead>
                 <tbody>
-                  {bills.map((bill) => (
-                    <tr
-                      key={bill._id}
-                      className="border-b border-slate-100 last:border-0"
-                    >
-                      <td className="py-4 font-medium text-slate-900">
-                        {bill.residentName || "Resident"}
-                      </td>
-                      <td className="py-4 text-slate-600">
-                        {bill.unitName || (bill.flatNumber ? `Flat ${bill.flatNumber}` : "Unit")}
-                      </td>
-                      <td className="py-4 font-medium text-slate-900">
-                        {formatCurrency(bill.baseAmount)}
-                      </td>
-                      <td className="py-4 text-slate-600">
-                        {formatDate(bill.dueDate)}
-                      </td>
-                      <td className="py-4 font-medium text-slate-900">
-                        {formatCurrency(bill.lateFeeAmount)}
-                      </td>
-                      <td className="py-4 font-semibold text-slate-900">
-                        {formatCurrency(bill.totalAmount)}
-                      </td>
-                      <td className="py-4 font-medium text-slate-900">
-                        {formatCurrency(bill.paidAmount)}
-                      </td>
-                      <td className="py-4 font-medium text-slate-900">
-                        {formatCurrency(bill.balanceAmount)}
-                      </td>
-                      <td className="py-4">
-                        <span className={statusClassNames[bill.status]}>
-                          {statusLabels[bill.status]}
-                        </span>
-                      </td>
-                      <td className="py-4">
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => openActionModal(bill, "edit")}
-                            disabled={bill.status === "PAID"}
-                            className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openActionModal(bill, "payment")}
-                            disabled={bill.balanceAmount <= 0}
-                            className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                          >
-                            Record
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openActionModal(bill, "waiver")}
-                            disabled={
-                              bill.lateFeeAmount - bill.lateFeeWaivedAmount <=
-                              0
-                            }
-                            className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
-                          >
-                            Waive
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {paginatedBills.map((bill) => {
+                    const tagCfg =
+                      BILL_TYPE_TAGS[bill.billType || "MONTHLY_MAINTENANCE"] ||
+                      BILL_TYPE_TAGS.OTHER;
+
+                    return (
+                      <tr
+                        key={bill._id}
+                        className="border-b border-slate-100 last:border-0"
+                      >
+                        <td className="py-4">
+                          <div className="font-semibold text-slate-900">
+                            {bill.title || tagCfg.label}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                            <span
+                              className={`inline-flex rounded border px-1.5 py-0.5 text-[10px] font-medium ${tagCfg.className}`}
+                            >
+                              {tagCfg.label}
+                            </span>
+                            {bill.billingPeriod && (
+                              <span className="inline-flex rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                                {bill.billingPeriod}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-4 font-medium text-slate-900">
+                          {bill.residentName || "Resident"}
+                        </td>
+                        <td className="py-4 text-slate-600">
+                          {bill.unitName || (bill.flatNumber ? `Flat ${bill.flatNumber}` : "Unit")}
+                        </td>
+                        <td className="py-4 font-medium text-slate-900">
+                          {formatCurrency(bill.baseAmount)}
+                        </td>
+                        <td className="py-4 text-slate-600">
+                          {formatDate(bill.dueDate)}
+                        </td>
+                        <td className="py-4 font-medium text-slate-900">
+                          {formatCurrency(bill.lateFeeAmount)}
+                        </td>
+                        <td className="py-4 font-semibold text-slate-900">
+                          {formatCurrency(bill.totalAmount)}
+                        </td>
+                        <td className="py-4 font-medium text-slate-900">
+                          {formatCurrency(bill.paidAmount)}
+                        </td>
+                        <td className="py-4 font-medium text-slate-900">
+                          {formatCurrency(bill.balanceAmount)}
+                        </td>
+                        <td className="py-4">
+                          <span className={statusClassNames[bill.status]}>
+                            {statusLabels[bill.status]}
+                          </span>
+                        </td>
+                        <td className="py-4">
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openActionModal(bill, "edit")}
+                              disabled={bill.status === "PAID"}
+                              className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openActionModal(bill, "payment")}
+                              disabled={bill.balanceAmount <= 0}
+                              className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                            >
+                              Record
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openActionModal(bill, "waiver")}
+                              disabled={
+                                bill.lateFeeAmount - bill.lateFeeWaivedAmount <=
+                                0
+                              }
+                              className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+                            >
+                              Waive
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
-            )}
+
+              {/* Standard Project Pagination */}
+              {bills.length > ITEMS_PER_PAGE ? (
+                <div className="flex items-center justify-between border-t border-slate-100 pt-4 text-xs text-slate-500">
+                  <p>
+                    Showing{" "}
+                    <span className="font-semibold text-slate-800">
+                      {(currentPage - 1) * ITEMS_PER_PAGE + 1}
+                    </span>{" "}
+                    to{" "}
+                    <span className="font-semibold text-slate-800">
+                      {Math.min(currentPage * ITEMS_PER_PAGE, bills.length)}
+                    </span>{" "}
+                    of{" "}
+                    <span className="font-semibold text-slate-800">
+                      {bills.length}
+                    </span>{" "}
+                    bills
+                  </p>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      className="rounded-md border border-slate-200 p-1.5 transition hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white cursor-pointer disabled:cursor-not-allowed"
+                      aria-label="Previous Page"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <span className="px-2 text-xs font-semibold text-slate-700">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      className="rounded-md border border-slate-200 p-1.5 transition hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white cursor-pointer disabled:cursor-not-allowed"
+                      aria-label="Next Page"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </>
+          )}
           </div>
         </div>
       </div>
@@ -504,6 +691,15 @@ export default function TreasurerBilling() {
         isOpen={isCreateBillOpen}
         onClose={() => setIsCreateBillOpen(false)}
         onCreate={handleCreateBill}
+      />
+
+      <CreateCommonBillModal
+        isOpen={isCreateCommonBillOpen}
+        onClose={() => setIsCreateCommonBillOpen(false)}
+        onCreate={async (payload) => {
+          await commonBillMutation.mutateAsync(payload);
+        }}
+        isSubmitting={commonBillMutation.isPending}
       />
 
       {selectedBill && action ? (

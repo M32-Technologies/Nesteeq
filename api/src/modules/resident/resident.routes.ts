@@ -28,14 +28,14 @@ import {
 const router = express.Router();
 
 router.get("/me", protect, getCurrentResidentProfileHandler);
-router.get("/dashboard/feed", protect, getResidentDashboardFeedHandler);
-router.get("/me/parking-info", protect, getMyVehiclesAndParkingHandler);
-router.post("/vehicles", protect, zodValidate(registerVehicleSchema), registerVehicleHandler);
-router.delete("/vehicles/:vehicleId", protect, zodValidate(vehicleIdParamsSchema), deleteVehicleHandler);
+router.get("/dashboard/feed", protect, requireRole("resident", "owner", "tenant", "property_manager"), getResidentDashboardFeedHandler);
+router.get("/me/parking-info", protect, requireRole("resident", "owner", "tenant", "property_manager"), getMyVehiclesAndParkingHandler);
+router.post("/vehicles", protect, requireRole("resident", "owner", "tenant", "property_manager"), zodValidate(registerVehicleSchema), registerVehicleHandler);
+router.delete("/vehicles/:vehicleId", protect, requireRole("resident", "owner", "tenant", "property_manager"), zodValidate(vehicleIdParamsSchema), deleteVehicleHandler);
 
-router.post("/passes", protect, zodValidate(createResidentGuestPassSchema), createResidentGuestPassHandler);
-router.get("/passes", protect, zodValidate(listResidentGuestPassesQuerySchema), getResidentGuestPassesHandler);
-router.patch("/passes/:passId/cancel", protect, zodValidate(residentGuestPassParamsSchema), cancelResidentGuestPassHandler);
+router.post("/passes", protect, requireRole("resident", "owner", "tenant", "property_manager"), zodValidate(createResidentGuestPassSchema), createResidentGuestPassHandler);
+router.get("/passes", protect, requireRole("resident", "owner", "tenant", "property_manager"), zodValidate(listResidentGuestPassesQuerySchema), getResidentGuestPassesHandler);
+router.patch("/passes/:passId/cancel", protect, requireRole("resident", "owner", "tenant", "property_manager"), zodValidate(residentGuestPassParamsSchema), cancelResidentGuestPassHandler);
 
 router.get("/", protect, requireRole("property_manager"), zodValidate(residentListQuerySchema), getResidentHandler);
 

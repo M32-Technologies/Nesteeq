@@ -85,7 +85,7 @@ export function ResidentDashboardView() {
       icon: Wrench,
     },
     {
-      title: "Maintenance Bills",
+      title: "Bills & Society Finance",
       description: "Review society dues and payment history",
       href: "/resident/bills",
       icon: ReceiptText,

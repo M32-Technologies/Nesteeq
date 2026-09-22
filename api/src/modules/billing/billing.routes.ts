@@ -6,10 +6,12 @@ import {
 
 import {
   createBill,
+  createCommonBill,
   getBillById,
   getBillRecipients,
   getBillingSummary,
   getBills,
+  getCommonBills,
   getMyResidentBills,
   payResidentBill,
   recordBillPayment,
@@ -19,9 +21,11 @@ import {
 
 import {
   createBillSchema,
+  createCommonBillSchema,
   getBillByIdSchema,
   getBillingSummarySchema,
   getBillsSchema,
+  getCommonBillsSchema,
   recordBillPaymentSchema,
   updateBillSchema,
   waiveLateFeeSchema,
@@ -130,6 +134,8 @@ router.get("/summary/:apartmentId", requireRole("treasurer", "property_manager")
 router.get("/:id", requireRole("treasurer", "property_manager"), zodValidate(getBillByIdSchema), requireBillApartmentAccess, getBillById);
 
 router.post("/", requireRole("treasurer"), requireBodyApartmentAccess, zodValidate(createBillSchema), createBill);
+router.post("/common", requireRole("treasurer"), requireBodyApartmentAccess, zodValidate(createCommonBillSchema), createCommonBill);
+router.get("/common", requireRole("treasurer", "property_manager"), zodValidate(getCommonBillsSchema), requireQueryApartmentAccess, getCommonBills);
 
 router.patch("/:id", requireRole("treasurer"), zodValidate(updateBillSchema), requireBillApartmentAccess, updateBill);
 

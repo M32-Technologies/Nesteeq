@@ -15,12 +15,19 @@ import {
   roundMoney,
 } from "./billing.calculation.js";
 import { Billing } from "./billing.model.js";
+import {
+  CommonBill,
+  CommonBillStatus,
+  CommonBillTargetType,
+  BillType,
+} from "./common-bill.model.js";
 import { AuditAction } from "../audit/audit.interface.js";
 import { createAuditLogService } from "../audit/audit.service.js";
 import { Flat } from "../flat/flat.model.js";
 import { ResidentModel } from "../resident/resident.model.js";
 import { Wallet } from "../wallet/wallet.model.js";
 import { WalletTransactionType } from "../wallet/wallet.interface.js";
+import { deductWalletFundsService } from "../wallet/wallet.service.js";
 import { PaymentSource } from "../payment/payment.interface.js";
 import { Payment } from "../payment/payment.model.js";
 import { createPaymentRecordService } from "../payment/payment.service.js";
@@ -36,10 +43,30 @@ interface CreateBillInput {
   apartmentId: string;
   residentId?: string;
   unitId: string;
+  title?: string;
+  billType?: BillType;
+  billingPeriod?: string | null;
+  description?: string | null;
   baseAmount: number;
   additionalCharges?: IAdditionalCharge[];
   lateFeePerDay?: number;
   dueDate: Date;
+  createdBy?: string;
+}
+
+export interface CreateCommonBillInput {
+  apartmentId: string;
+  title: string;
+  billType: BillType;
+  billingPeriod?: string | null;
+  description?: string | null;
+  baseAmount: number;
+  additionalCharges?: IAdditionalCharge[];
+  lateFeePerDay?: number;
+  dueDate: Date;
+  targetType: "ALL_FLATS" | "BY_BLOCK" | "CUSTOM_FLATS";
+  targetBlockIds?: string[];
+  targetFlatIds?: string[];
   createdBy?: string;
 }
 
@@ -68,6 +95,8 @@ interface BillFilters {
   apartmentId?: string;
   residentId?: string;
   unitId?: string;
+  commonBillId?: string;
+  billType?: string;
   status?: BillStatus;
 }
 
@@ -351,30 +380,32 @@ export const createBillService = async (
         dueDate: input.dueDate,
       });
 
-      const [bill] = await Billing.create(
-        [
-          {
-            apartmentId,
-            residentId,
-            unitId,
-            baseAmount: roundMoney(input.baseAmount),
-            additionalCharges,
-            lateFeePerDay: roundMoney(lateFeePerDay),
-            lateFeeAmount: values.lateFeeAmount,
-            lateFeeWaivedAmount: 0,
-            totalAmount: values.totalAmount,
-            paidAmount: 0,
-            balanceAmount: values.balanceAmount,
-            dueDate: input.dueDate,
-            status: values.status,
-            createdBy:
-              input.createdBy && Types.ObjectId.isValid(input.createdBy)
-                ? new Types.ObjectId(input.createdBy)
-                : undefined,
-          },
-        ],
-        { session }
-      );
+      const bill = new Billing({
+        apartmentId,
+        residentId,
+        unitId,
+        title: input.title?.trim() || undefined,
+        billType: input.billType || BillType.MONTHLY_MAINTENANCE,
+        billingPeriod: input.billingPeriod || undefined,
+        description: input.description?.trim() || undefined,
+        baseAmount: roundMoney(input.baseAmount),
+        additionalCharges,
+        lateFeePerDay: roundMoney(lateFeePerDay),
+        lateFeeAmount: values.lateFeeAmount,
+        lateFeeWaivedAmount: 0,
+        totalAmount: values.totalAmount,
+        paidAmount: 0,
+        balanceAmount: values.balanceAmount,
+        dueDate: input.dueDate,
+        status: values.status,
+        createdBy:
+          input.createdBy && Types.ObjectId.isValid(input.createdBy)
+            ? new Types.ObjectId(input.createdBy)
+            : undefined,
+      });
+
+      await bill.save({ session });
+      createdBill = bill;
 
       await createAuditLogService(
         {
@@ -425,6 +456,14 @@ export const getBillsService = async (
 
   if (filters.unitId) {
     query.unitId = toObjectId(filters.unitId, "unitId");
+  }
+
+  if (filters.commonBillId) {
+    query.commonBillId = toObjectId(filters.commonBillId, "commonBillId");
+  }
+
+  if (filters.billType) {
+    query.billType = filters.billType;
   }
 
   if (filters.status) {
@@ -1050,6 +1089,72 @@ export const payResidentBillService = async (
     userId: user.id,
   };
 
+  const isWalletPayment = payload.paymentMethod === "WALLET";
+
+  if (isWalletPayment) {
+    const resolvedResidentId =
+      residentRecord?._id?.toString() || bill.residentId?.toString();
+
+    if (!resolvedResidentId) {
+      throw new AppError("No resident profile found to access wallet", 400);
+    }
+
+    let wallet = await Wallet.findOne({
+      apartmentId: bill.apartmentId,
+      residentId: new Types.ObjectId(resolvedResidentId),
+    });
+
+    if (!wallet && bill.residentId) {
+      wallet = await Wallet.findOne({
+        apartmentId: bill.apartmentId,
+        residentId: bill.residentId,
+      });
+    }
+
+    if (!wallet) {
+      throw new AppError(
+        "No advance wallet found for this resident. Please deposit advance funds first.",
+        404
+      );
+    }
+
+    if (wallet.balance < payAmount) {
+      throw new AppError(
+        `Insufficient wallet balance (Available: ₹${wallet.balance}, Required: ₹${payAmount})`,
+        400
+      );
+    }
+
+    const effectiveResidentId = wallet.residentId.toString();
+
+    if (bill.residentId.toString() !== effectiveResidentId) {
+      bill.residentId = wallet.residentId;
+      await bill.save();
+    }
+
+    const debitedWallet = await deductWalletFundsService(
+      bill.apartmentId.toString(),
+      effectiveResidentId,
+      bill._id.toString(),
+      payAmount,
+      payload.description || "Bill settled via resident wallet",
+      actor
+    );
+
+    const updatedBill = await Billing.findById(bill._id);
+
+    const remainingBalance =
+      (debitedWallet as any)?.balance !== undefined
+        ? (debitedWallet as any).balance
+        : Math.max(0, wallet.balance - payAmount);
+
+    return {
+      success: true,
+      message: `Payment of ₹${payAmount} settled from Advance Wallet! Remaining balance: ₹${remainingBalance}`,
+      bill: updatedBill,
+    };
+  }
+
   const result = await recordBillPaymentService(billId, payAmount, actor, {
     paymentMethod: payload.paymentMethod || "UPI",
     referenceNo:
@@ -1063,4 +1168,248 @@ export const payResidentBillService = async (
     bill: result,
   };
 };
+
+export const createCommonBillService = async (
+  input: CreateCommonBillInput,
+  actor: AuditActor
+) => {
+  const aptId = toObjectId(input.apartmentId, "apartmentId");
+
+  // 1. Deduplication check: if billingPeriod is specified, prevent duplicate active common bill for same type & period
+  if (input.billingPeriod) {
+    const existing = await CommonBill.findOne({
+      apartmentId: aptId,
+      billType: input.billType,
+      billingPeriod: input.billingPeriod,
+      status: CommonBillStatus.ACTIVE,
+    });
+    if (existing) {
+      throw new AppError(
+        `A common bill for "${existing.title}" (${input.billingPeriod}) has already been generated for this apartment.`,
+        409
+      );
+    }
+  }
+
+  // 2. Resolve target flats
+  const flatQuery: Record<string, unknown> = {
+    apartmentId: aptId,
+    status: { $ne: "inactive" },
+  };
+
+  if (input.targetType === "BY_BLOCK" && input.targetBlockIds?.length) {
+    flatQuery.blockId = {
+      $in: input.targetBlockIds.map((id) => toObjectId(id, "targetBlockId")),
+    };
+  } else if (input.targetType === "CUSTOM_FLATS" && input.targetFlatIds?.length) {
+    flatQuery._id = {
+      $in: input.targetFlatIds.map((id) => toObjectId(id, "targetFlatId")),
+    };
+  }
+
+  const flats = await Flat.find(flatQuery).lean();
+  if (flats.length === 0) {
+    throw new AppError("No matching flats found for the selected target criteria", 400);
+  }
+
+  // 3. Map flats to active residents
+  const flatIds = flats.map((f) => f._id);
+  const residents = await ResidentModel.find({
+    apartmentId: aptId,
+    flatId: { $in: flatIds },
+    status: { $ne: "inactive" },
+  }).lean();
+
+  const residentByFlat = new Map(residents.map((r) => [r.flatId.toString(), r]));
+
+  // Also check if any flat has a direct residentId assigned
+  const validUnits: { flat: typeof flats[0]; residentId: Types.ObjectId }[] = [];
+  for (const flat of flats) {
+    const res = residentByFlat.get(flat._id.toString());
+    const resId = res?._id || (flat.residentId && Types.ObjectId.isValid(flat.residentId) ? flat.residentId : null);
+    if (resId) {
+      validUnits.push({
+        flat,
+        residentId: new Types.ObjectId(resId),
+      });
+    }
+  }
+
+  if (validUnits.length === 0) {
+    throw new AppError("None of the targeted flats have active residents assigned.", 400);
+  }
+
+  // 4. Calculate unit financial values
+  const additionalCharges = input.additionalCharges ?? [];
+  const lateFeePerDay = input.lateFeePerDay ?? 0;
+  const values = calculateBillValues({
+    baseAmount: input.baseAmount,
+    additionalCharges,
+    lateFeePerDay,
+    lateFeeWaivedAmount: 0,
+    paidAmount: 0,
+    dueDate: input.dueDate,
+  });
+
+  const totalAmount = roundMoney(values.totalAmount * validUnits.length);
+
+  const session = await mongoose.startSession();
+  let createdCommonBill: any = null;
+
+  try {
+    await session.withTransaction(async () => {
+      // 5. Create Parent CommonBill document
+      const common = new CommonBill({
+        apartmentId: aptId,
+        title: input.title.trim(),
+        billType: input.billType,
+        billingPeriod: input.billingPeriod || null,
+        description: input.description?.trim() || null,
+        baseAmount: roundMoney(input.baseAmount),
+        additionalCharges,
+        lateFeePerDay: roundMoney(lateFeePerDay),
+        dueDate: input.dueDate,
+        targetType: input.targetType,
+        targetBlockIds: (input.targetBlockIds || []).map((id) => toObjectId(id, "targetBlockId")),
+        targetFlatIds: (input.targetFlatIds || []).map((id) => toObjectId(id, "targetFlatId")),
+        totalFlatsCount: validUnits.length,
+        totalAmount,
+        status: CommonBillStatus.ACTIVE,
+        createdBy:
+          input.createdBy && Types.ObjectId.isValid(input.createdBy)
+            ? new Types.ObjectId(input.createdBy)
+            : null,
+      });
+
+      await common.save({ session });
+      createdCommonBill = common;
+
+      // 6. Create child Billing documents
+      const billsToCreate = validUnits.map(({ flat, residentId }) => ({
+        apartmentId: aptId,
+        residentId,
+        unitId: flat._id,
+        commonBillId: common._id,
+        title: input.title.trim(),
+        billType: input.billType,
+        billingPeriod: input.billingPeriod || undefined,
+        description: input.description?.trim() || undefined,
+        baseAmount: roundMoney(input.baseAmount),
+        additionalCharges,
+        lateFeePerDay: roundMoney(lateFeePerDay),
+        lateFeeAmount: values.lateFeeAmount,
+        lateFeeWaivedAmount: 0,
+        totalAmount: values.totalAmount,
+        paidAmount: 0,
+        balanceAmount: values.balanceAmount,
+        dueDate: input.dueDate,
+        status: values.status,
+        createdBy: common.createdBy,
+      }));
+
+      const childBills = await Billing.insertMany(billsToCreate, { session });
+
+      // 7. Auto-apply advance wallet credit where residents have positive balances
+      for (const billDoc of childBills) {
+        await applyWalletCreditToBill(billDoc, actor, session);
+      }
+
+      // 8. Audit logging
+      await createAuditLogService(
+        {
+          apartmentId: aptId.toString(),
+          performedBy: actor.userId,
+          action: AuditAction.BILL_CREATED,
+          entityType: "CommonBill",
+          entityId: common._id.toString(),
+          newValue: {
+            commonBillId: common._id.toString(),
+            title: common.title,
+            billType: common.billType,
+            billingPeriod: common.billingPeriod,
+            flatsCount: validUnits.length,
+            totalAmount,
+          },
+          description: `Common bill "${common.title}" (${common.billType}) broadcasted to ${validUnits.length} flats`,
+        },
+        session
+      );
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  return {
+    commonBill: createdCommonBill,
+    generatedCount: validUnits.length,
+    totalAmount,
+    message: `Common bill "${input.title}" generated successfully for ${validUnits.length} flats!`,
+  };
+};
+
+export const getCommonBillsService = async (
+  apartmentId: string,
+  filter?: { billType?: string; status?: string }
+) => {
+  const aptId = toObjectId(apartmentId, "apartmentId");
+  const query: Record<string, unknown> = { apartmentId: aptId };
+  if (filter?.billType) query.billType = filter.billType;
+  if (filter?.status) query.status = filter.status;
+
+  const commonBills = await CommonBill.find(query).sort({ createdAt: -1 }).lean();
+  if (commonBills.length === 0) {
+    return [];
+  }
+
+  const commonBillIds = commonBills.map((cb) => cb._id);
+  const childBills = await Billing.find(
+    { commonBillId: { $in: commonBillIds } },
+    "commonBillId status totalAmount paidAmount balanceAmount"
+  ).lean();
+
+  const statsMap = new Map<
+    string,
+    {
+      paidCount: number;
+      pendingCount: number;
+      overdueCount: number;
+      collectedAmount: number;
+      outstandingAmount: number;
+    }
+  >();
+
+  for (const b of childBills) {
+    if (!b.commonBillId) continue;
+    const cid = b.commonBillId.toString();
+    const current = statsMap.get(cid) || {
+      paidCount: 0,
+      pendingCount: 0,
+      overdueCount: 0,
+      collectedAmount: 0,
+      outstandingAmount: 0,
+    };
+    if (b.status === BillStatus.PAID) current.paidCount++;
+    else if (b.status === BillStatus.OVERDUE) current.overdueCount++;
+    else current.pendingCount++;
+
+    current.collectedAmount = roundMoney(current.collectedAmount + (b.paidAmount || 0));
+    current.outstandingAmount = roundMoney(current.outstandingAmount + (b.balanceAmount || 0));
+    statsMap.set(cid, current);
+  }
+
+  return commonBills.map((cb) => {
+    const stats = statsMap.get(cb._id.toString()) || {
+      paidCount: 0,
+      pendingCount: 0,
+      overdueCount: 0,
+      collectedAmount: 0,
+      outstandingAmount: 0,
+    };
+    return {
+      ...cb,
+      stats,
+    };
+  });
+};
+
 

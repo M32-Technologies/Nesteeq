@@ -2,10 +2,12 @@ import { Request, Response } from "express";
 
 import {
   createBillService,
+  createCommonBillService,
   getBillByIdService,
   getBillRecipientsService,
   getBillingSummaryService,
   getBillsService,
+  getCommonBillsService,
   getMyResidentBillsService,
   payResidentBillService,
   recordBillPaymentService,
@@ -37,18 +39,59 @@ export const createBill = catchAsync(
   }
 );
 
+export const createCommonBill = catchAsync(
+  async (req: Request, res: Response) => {
+    const apartmentId =
+      req.body.apartmentId || getAuthenticatedApartmentId(req);
+
+    const result = await createCommonBillService(
+      {
+        ...req.body,
+        apartmentId,
+        createdBy: req.user!.id,
+      },
+      getAuditActor(req)
+    );
+
+    res.status(201).json({
+      success: true,
+      message: result.message,
+      data: result,
+    });
+  }
+);
+
 export const getBills = catchAsync(
   async (req: Request, res: Response) => {
     const bills = await getBillsService({
       apartmentId: req.query.apartmentId as string | undefined,
       residentId: req.query.residentId as string | undefined,
       unitId: req.query.unitId as string | undefined,
+      commonBillId: req.query.commonBillId as string | undefined,
+      billType: req.query.billType as string | undefined,
       status: req.query.status as BillStatus | undefined,
     });
 
     res.status(200).json({
       success: true,
       data: bills,
+    });
+  }
+);
+
+export const getCommonBills = catchAsync(
+  async (req: Request, res: Response) => {
+    const apartmentId =
+      (req.query.apartmentId as string) || getAuthenticatedApartmentId(req);
+
+    const commonBills = await getCommonBillsService(apartmentId, {
+      billType: req.query.billType as string | undefined,
+      status: req.query.status as string | undefined,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: commonBills,
     });
   }
 );

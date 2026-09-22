@@ -29,6 +29,8 @@ import type {
   VisitorRecordsFacetResult,
   VisitorVisitListItem,
 } from "./visit.types.js"
+import type { CreateResidentGuestPassInput } from "./visit.validation.js"
+import { resolveResidentContext } from "../resident/resident.service.js"
 import { AppError } from "../../utils/AppError.js"
 import { escapeRegExp } from "../../utils/regex.js"
 
@@ -467,3 +469,257 @@ export const getVisitorHistoryService = async ({ apartmentId, page = 1, limit = 
   const result = await getVisitorVisitsPage({ apartmentId, page, limit })
   return { visits: result.data, pagination: result.pagination }
 }
+
+// --- Resident Guest Pass Services ---
+
+export const createResidentGuestPassService = async (
+  user: any,
+  data: CreateResidentGuestPassInput,
+  apartmentId?: string
+) => {
+  const { apartmentId: aptId, resident, flatId, flat } = await resolveResidentContext(user, apartmentId)
+  if (data.flatId && flatId && data.flatId !== flatId.toString()) {
+    throw new AppError("You are not authorized to create a guest pass for another flat", 403)
+  }
+  const targetFlatId = flatId || (data.flatId && Types.ObjectId.isValid(data.flatId) ? data.flatId : null)
+  if (!targetFlatId) {
+    throw new AppError("No valid flat found for this resident context", 400)
+  }
+
+  const now = new Date()
+  const validFrom = data.validFrom ? new Date(data.validFrom) : now
+  let validUntil = data.validUntil ? new Date(data.validUntil) : null
+
+  if (!validUntil) {
+    const hours = data.durationHours && data.durationHours > 0 ? data.durationHours : 8
+    validUntil = new Date(validFrom.getTime() + hours * 60 * 60 * 1000)
+  }
+
+  if (validUntil <= validFrom) {
+    throw new AppError("Guest pass expiry must be later than start time", 400)
+  }
+  if (validUntil <= now) {
+    throw new AppError("Guest pass expiry must be in the future", 400)
+  }
+
+  const rawToken = crypto.randomBytes(32).toString("hex")
+  const tokenHash = hashGuestPassToken(rawToken)
+  const qrCodeDataUrl = await QRCode.toDataURL(rawToken, {
+    width: 280,
+    margin: 2,
+    errorCorrectionLevel: "M",
+  })
+
+  const pass = await GuestPassModel.create({
+    apartmentId: new Types.ObjectId(aptId),
+    createdByResidentId: resident?._id || new Types.ObjectId(user.id),
+    flatId: new Types.ObjectId(targetFlatId),
+    visitorName: data.visitorName.trim(),
+    visitorPhone: data.visitorPhone?.trim() || null,
+    purpose: data.purpose?.trim() || null,
+    vehicleNumber: data.vehicleNumber ? normalizeVehicleNumber(data.vehicleNumber) : null,
+    vehicleType: data.vehicleType ? data.vehicleType.toUpperCase() : null,
+    rawToken,
+    qrCodeDataUrl,
+    tokenHash,
+    validFrom,
+    validUntil,
+    status: GuestPassStatus.ACTIVE,
+  })
+
+  const flatNumber = flat?.flatNumber || null
+  const passObj = pass.toObject()
+  delete (passObj as any).tokenHash
+
+  return {
+    guestPass: {
+      ...passObj,
+      _id: pass._id.toString(),
+      id: pass._id.toString(),
+      token: rawToken,
+      qrCodeDataUrl,
+      flatNumber,
+    },
+    token: rawToken,
+    qrCodeDataUrl,
+  }
+}
+
+export const getResidentGuestPassesService = async (
+  user: any,
+  query: { status?: string; page?: number; limit?: number; search?: string },
+  apartmentId?: string
+) => {
+  const { apartmentId: aptId, resident, flatId, flat } = await resolveResidentContext(user, apartmentId)
+  const aptObjectId = new Types.ObjectId(aptId)
+
+  const ownerFilter: Record<string, unknown>[] = []
+  if (flatId && Types.ObjectId.isValid(flatId)) {
+    ownerFilter.push({ flatId: new Types.ObjectId(flatId) });
+  }
+  if (resident?._id) {
+    ownerFilter.push({ createdByResidentId: resident._id });
+  }
+
+  // If user has neither an assigned flat nor a resident profile, return empty list immediately to prevent data leakage
+  if (ownerFilter.length === 0) {
+    return {
+      guestPasses: [],
+      counts: {
+        total: 0,
+        activePassesCount: 0,
+        usedPassesCount: 0,
+        expiredPassesCount: 0,
+      },
+      pagination: {
+        page: query.page || 1,
+        limit: query.limit || 20,
+        total: 0,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
+    };
+  }
+
+  // Auto-expire old active passes for this owner/flat
+  const now = new Date()
+  await GuestPassModel.updateMany(
+    {
+      apartmentId: aptObjectId,
+      status: GuestPassStatus.ACTIVE,
+      validUntil: { $lt: now },
+      $or: ownerFilter,
+    },
+    { $set: { status: GuestPassStatus.EXPIRED } }
+  )
+
+  const conditions: Record<string, unknown>[] = [
+    { apartmentId: aptObjectId },
+    { $or: ownerFilter },
+  ]
+
+  if (query.status && query.status !== "ALL") {
+    conditions.push({ status: query.status });
+  }
+
+  if (query.search?.trim()) {
+    const regex = new RegExp(escapeRegExp(query.search.trim()), "i");
+    conditions.push({
+      $or: [
+        { visitorName: regex },
+        { purpose: regex },
+        { vehicleNumber: regex },
+        { visitorPhone: regex },
+      ],
+    });
+  }
+
+  const filter = conditions.length > 1 ? { $and: conditions } : conditions[0] || {};
+  const page = Math.max(1, Number(query.page) || 1);
+  const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
+  const skip = (page - 1) * limit;
+
+  const baseConditions = conditions.filter((c) => !("status" in c));
+  const baseFilter = baseConditions.length > 1 ? { $and: baseConditions } : baseConditions[0] || {};
+
+  const [passes, total, activePassesCount, usedPassesCount, expiredPassesCount] = await Promise.all([
+    GuestPassModel.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    GuestPassModel.countDocuments(filter),
+    GuestPassModel.countDocuments({ ...baseFilter, status: GuestPassStatus.ACTIVE }),
+    GuestPassModel.countDocuments({ ...baseFilter, status: GuestPassStatus.USED }),
+    GuestPassModel.countDocuments({ ...baseFilter, status: GuestPassStatus.EXPIRED }),
+  ]);
+
+  const flatNumber = flat?.flatNumber || null;
+
+  const items = passes.map((p: any) => ({
+    _id: p._id.toString(),
+    id: p._id.toString(),
+    apartmentId: p.apartmentId.toString(),
+    flatId: p.flatId.toString(),
+    flatNumber,
+    visitorName: p.visitorName,
+    visitorPhone: p.visitorPhone || null,
+    purpose: p.purpose || null,
+    vehicleNumber: p.vehicleNumber || null,
+    vehicleType: p.vehicleType || null,
+    status: p.status,
+    validFrom: p.validFrom,
+    validUntil: p.validUntil,
+    token: p.rawToken || null,
+    qrCodeDataUrl: p.qrCodeDataUrl || null,
+    usedAt: p.usedAt || null,
+    createdAt: p.createdAt,
+  }));
+
+  return {
+    guestPasses: items,
+    counts: {
+      total,
+      activePassesCount,
+      usedPassesCount,
+      expiredPassesCount,
+    },
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      hasNextPage: page * limit < total,
+      hasPreviousPage: page > 1,
+    },
+  };
+}
+
+export const cancelResidentGuestPassService = async (
+  user: any,
+  passId: string,
+  apartmentId?: string
+) => {
+  const { apartmentId: aptId, resident, flatId } = await resolveResidentContext(user, apartmentId);
+  const aptObjectId = new Types.ObjectId(aptId);
+
+  if (!Types.ObjectId.isValid(passId)) {
+    throw new AppError("Invalid pass ID", 400);
+  }
+
+  const pass = await GuestPassModel.findOne({
+    _id: new Types.ObjectId(passId),
+    apartmentId: aptObjectId,
+    $or: [
+      ...(flatId ? [{ flatId: new Types.ObjectId(flatId) }] : []),
+      ...(resident?._id ? [{ createdByResidentId: resident._id }] : []),
+    ],
+  });
+
+  if (!pass) {
+    throw new AppError("Visitor pass not found", 404);
+  }
+
+  if (pass.status === GuestPassStatus.CANCELLED) {
+    throw new AppError("Pass is already cancelled", 400);
+  }
+  if (pass.status === GuestPassStatus.USED) {
+    throw new AppError("Used passes cannot be cancelled", 400);
+  }
+  if (pass.status === GuestPassStatus.EXPIRED) {
+    throw new AppError("Expired passes cannot be cancelled", 400);
+  }
+
+  pass.status = GuestPassStatus.CANCELLED;
+  await pass.save();
+
+  return {
+    success: true,
+    message: "Visitor pass cancelled successfully",
+    guestPass: {
+      _id: pass._id.toString(),
+      status: pass.status,
+    },
+  };
+};
