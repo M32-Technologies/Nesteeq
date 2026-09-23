@@ -22,7 +22,7 @@ import {
 const router = Router()
 
 router.use(protect)
-router.use(requireRole("maintenance_technician"))
+router.use(requireRole("maintenance_technician", "technician", "maintenance_staff"))
 
 router.get("/dashboard", getDashboardStatsController)
 router.get("/jobs", getAssignedJobsController)

@@ -1,6 +1,5 @@
 "use client"
 
-import { useState } from "react"
 import Link from "next/link"
 import {
   Activity,
@@ -13,6 +12,12 @@ import {
   Wrench,
 } from "lucide-react"
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLinkItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import type { AssignedJob } from "../services/jobs.service"
 
 type MaintenanceJobsTableProps = {
@@ -20,6 +25,8 @@ type MaintenanceJobsTableProps = {
   totalCount: number
   isLoading: boolean
   hasFilters: boolean
+  page?: number
+  pageSize?: number
 }
 
 const priorityStyles: Record<AssignedJob["priority"], string> = {
@@ -43,14 +50,56 @@ const statusStyles: Record<AssignedJob["status"], { badge: string; label: string
   },
 }
 
+const isHexObjectId = (val?: string | null): boolean => {
+  if (!val) return false
+  return /^[0-9a-fA-F]{24}$/.test(val.trim())
+}
+
+export const formatJobLocation = (job: AssignedJob) => {
+  const flatOrUnit =
+    (!isHexObjectId(job.flatNumber) && job.flatNumber) ||
+    (!isHexObjectId(job.unitNumber) && job.unitNumber) ||
+    (!isHexObjectId(job.flat) && job.flat) ||
+    ""
+
+  const block =
+    (!isHexObjectId(job.blockName) && job.blockName) ||
+    (!isHexObjectId(job.block) && job.block) ||
+    "Apartment"
+
+  if (flatOrUnit && flatOrUnit.toLowerCase() !== "unit") {
+    return {
+      main: flatOrUnit,
+      sub: block ? `(${block})` : "(Apartment)",
+    }
+  }
+
+  if (job.location && !isHexObjectId(job.location)) {
+    return { main: job.location, sub: block ? `(${block})` : null }
+  }
+
+  if (job.area && !isHexObjectId(job.area)) {
+    return { main: job.area, sub: block ? `(${block})` : null }
+  }
+
+  if (flatOrUnit) {
+    return {
+      main: flatOrUnit,
+      sub: block ? `(${block})` : "(Apartment)",
+    }
+  }
+
+  return { main: "Unit", sub: block ? `(${block})` : "(Apartment)" }
+}
+
 export default function MaintenanceJobsTable({
   jobs,
   totalCount,
   isLoading,
   hasFilters,
+  page,
+  pageSize,
 }: MaintenanceJobsTableProps) {
-  const [openActionJobId, setOpenActionJobId] = useState<string | null>(null)
-
   const formatDate = (dateString: string) => {
     try {
       return new Intl.DateTimeFormat("en-IN", {
@@ -68,20 +117,20 @@ export default function MaintenanceJobsTable({
       <div className="overflow-x-auto">
         <table className="w-full min-w-[950px] table-fixed border-collapse">
           <colgroup>
-            <col className="w-[12%]" />
-            <col className="w-[28%]" />
+            <col className="w-16" />
+            <col className="w-[30%]" />
+            <col className="w-[14%]" />
+            <col className="w-[16%]" />
+            <col className="w-[11%]" />
             <col className="w-[13%]" />
-            <col className="w-[15%]" />
-            <col className="w-[10%]" />
             <col className="w-[12%]" />
-            <col className="w-[12%]" />
-            <col className="w-[8%]" />
+            <col className="w-16" />
           </colgroup>
 
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50/80">
-              <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Job ID
+              <th className="w-16 px-3 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-slate-500">
+                SL NO
               </th>
               <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Issue / Title
@@ -111,8 +160,8 @@ export default function MaintenanceJobsTable({
             {isLoading ? (
               Array.from({ length: 4 }).map((_, index) => (
                 <tr key={index} className="animate-pulse">
-                  <td className="px-5 py-4">
-                    <div className="h-4 w-16 rounded bg-slate-100" />
+                  <td className="w-16 px-3 py-4 text-center">
+                    <div className="mx-auto h-4 w-6 rounded bg-slate-100" />
                   </td>
                   <td className="px-4 py-4">
                     <div className="h-4 w-48 rounded bg-slate-100" />
@@ -133,7 +182,7 @@ export default function MaintenanceJobsTable({
                     <div className="h-4 w-20 rounded bg-slate-100" />
                   </td>
                   <td className="px-5 py-4 text-right">
-                    <div className="ml-auto h-7 w-14 rounded bg-slate-100" />
+                    <div className="ml-auto h-7 w-8 rounded bg-slate-100" />
                   </td>
                 </tr>
               ))
@@ -154,7 +203,10 @@ export default function MaintenanceJobsTable({
                 </td>
               </tr>
             ) : (
-              jobs.map((job) => {
+              jobs.map((job, index) => {
+                const serialNumber =
+                  page && pageSize ? (page - 1) * pageSize + index + 1 : index + 1
+
                 const statusInfo = statusStyles[job.status] || {
                   badge: "bg-slate-100 text-slate-700 border-slate-200",
                   label: job.status,
@@ -165,10 +217,10 @@ export default function MaintenanceJobsTable({
                     key={job.jobId}
                     className="transition hover:bg-slate-50/70"
                   >
-                    {/* Job ID */}
-                    <td className="px-5 py-4 align-middle">
-                      <span className="inline-flex items-center gap-1.5 font-mono text-xs font-semibold text-[#0F5F45]">
-                        {job.jobId}
+                    {/* SL NO */}
+                    <td className="w-16 px-3 py-4 text-center align-middle">
+                      <span className="font-mono text-xs font-semibold text-slate-500">
+                        {serialNumber}
                       </span>
                     </td>
 
@@ -187,17 +239,24 @@ export default function MaintenanceJobsTable({
                       </div>
                     </td>
 
-                    {/* Location (Block + Flat) */}
+                    {/* Location */}
                     <td className="px-4 py-4 align-middle">
-                      <div className="flex items-center gap-1.5 text-sm text-slate-700">
-                        <MapPin size={14} className="shrink-0 text-slate-400" />
-                        <span className="font-semibold text-slate-900">
-                          {job.flat}
-                        </span>
-                        <span className="text-xs text-slate-400">
-                          ({job.block})
-                        </span>
-                      </div>
+                      {(() => {
+                        const loc = formatJobLocation(job)
+                        return (
+                          <div className="flex items-center gap-1.5 text-sm text-slate-700">
+                            <MapPin size={14} className="shrink-0 text-slate-400" />
+                            <span className="font-semibold text-slate-900">
+                              {loc.main}
+                            </span>
+                            {loc.sub ? (
+                              <span className="text-xs text-slate-400">
+                                {loc.sub}
+                              </span>
+                            ) : null}
+                          </div>
+                        )
+                      })()}
                     </td>
 
                     {/* Priority */}
@@ -235,39 +294,26 @@ export default function MaintenanceJobsTable({
 
                     {/* Action 3-Dot Dropdown Menu */}
                     <td className="px-5 py-4 text-right align-middle">
-                      <div className="relative inline-block text-left">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setOpenActionJobId((current) =>
-                              current === job.jobId ? null : job.jobId
-                            )
-                          }
-                          aria-expanded={openActionJobId === job.jobId}
-                          className="ml-auto flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 focus:outline-none"
-                          title="Actions"
-                        >
-                          <MoreVertical size={18} />
-                        </button>
-
-                        {openActionJobId === job.jobId && (
-                          <>
-                            <div
-                              className="fixed inset-0 z-10"
-                              onClick={() => setOpenActionJobId(null)}
-                            />
-                            <div className="absolute right-0 top-9 z-20 w-44 rounded-lg border border-slate-200 bg-white p-1 text-left shadow-lg">
-                              <Link
-                                href={`/maintenance-technician/jobs/${job.jobId}`}
-                                onClick={() => setOpenActionJobId(null)}
-                                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
-                              >
-                                <Eye size={15} className="text-slate-500" />
-                                View Details
-                              </Link>
-                            </div>
-                          </>
-                        )}
+                      <div className="inline-block text-left">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            className="ml-auto flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 focus:outline-none"
+                            title="Actions"
+                            aria-label="Actions"
+                          >
+                            <MoreVertical size={18} />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" side="bottom" sideOffset={4}>
+                            <DropdownMenuLinkItem
+                              render={
+                                <Link href={`/maintenance-technician/jobs/${job.jobId}`} />
+                              }
+                            >
+                              <Eye size={15} className="text-slate-500" />
+                              View Details
+                            </DropdownMenuLinkItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </td>
                   </tr>

@@ -14,7 +14,7 @@ import {
 } from "./maintenance-technician.service.js"
 
 const getAuthenticatedTechnicianId = (req: Request): string => {
-  const technicianId = req.user?.id
+  const technicianId = req.user?.id || (req.user as any)?._id?.toString()
   if (!technicianId) {
     throw new AppError("Authentication required", 401)
   }

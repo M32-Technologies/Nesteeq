@@ -23,6 +23,11 @@ export type AssignedJob = {
   priority: "High" | "Medium" | "Low"
   status: "ASSIGNED" | "IN_PROGRESS" | "COMPLETED"
   assignedDate: string
+  location?: string
+  area?: string
+  flatNumber?: string
+  unitNumber?: string
+  blockName?: string
 }
 
 export type JobDetails = {
