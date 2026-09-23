@@ -40,8 +40,6 @@ export interface ISecurityDelivery {
   status: DeliveryStatus
   receivedBy: string
   receivedAt: Date
-  notifiedBy?: string | null
-  notifiedAt?: Date | null
   collectedBy?: string | null
   collectedAt?: Date | null
   returnedBy?: string | null

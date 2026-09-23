@@ -16,10 +16,12 @@ export const zodValidate = (schema: ZodTypeAny): RequestHandler => {
     });
 
     if (!result.success) {
+      const errorMessage =
+        result.error.issues[0]?.message || "Validation failed";
       res.status(400).json({
         success: false,
         status: "fail",
-        message: "Validation failed",
+        message: errorMessage,
         details: result.error.issues.map((issue) => ({
           path: issue.path.join("."),
           message: issue.message,

@@ -1,6 +1,6 @@
 import { AppError } from "../../utils/AppError.js";
-import { ResidentListQuery, RegisterVehicleInput } from "./resident.validation.js";
-import { Resident } from "./resident.model.js";
+import { ResidentListQuery, RegisterVehicleInput, isValidVehicleNumber } from "./resident.validation.js";
+import { Resident, Vehicle } from "./resident.model.js";
 import { ParkingSlotModel } from "../parking/parking.model.js";
 import { GuestPassModel, GuestPassStatus } from "../visitors/visit.model.js";
 import { normalizeVehicleNumber } from "../parking/parking.service.js";
@@ -463,39 +463,42 @@ export const getMyVehiclesAndParkingService = async (user: any, apartmentId?: st
         }).lean();
     }
 
-    // 2. Derive vehicles directly from assigned slots that have a registered vehicleNumber
-    const vehicles = assignedSlots
-        .filter((s: any) => Boolean(s.vehicleNumber))
-        .map((s: any) => ({
-            _id: s._id.toString(),
-            vehicleNumber: s.vehicleNumber,
-            vehicleType: s.vehicleType,
-            makeModel: s.notes || "Assigned Vehicle",
-            color: "Standard",
-            rfidTag: `NST-${s._id.toString().slice(-6).toUpperCase()}`,
-            parkingSlotId: s._id.toString(),
-            status: s.status === "INACTIVE" ? "INACTIVE" : "ACTIVE",
-            evChargingRequired: s.vehicleType === "EV",
-            notes: s.notes || null,
-            createdAt: s.assignedAt || s.createdAt || new Date(),
-        }));
-
-    // 3. Compute Guest Parking Quota (2 Slots / Month)
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-
-    let monthlyPassesCount = 0;
-    if (flatId && Types.ObjectId.isValid(flatId)) {
-        monthlyPassesCount = await GuestPassModel.countDocuments({
+    // 2. Derive vehicles directly from assigned slots, enriched with Vehicle collection documents
+    const vehicleSlotIds = assignedSlots.filter((s: any) => Boolean(s.vehicleNumber)).map((s: any) => s._id);
+    const vehicleDocs = vehicleSlotIds.length
+        ? await Vehicle.find({
             apartmentId: aptObjectId,
-            flatId: new Types.ObjectId(flatId),
-            createdAt: { $gte: startOfMonth },
-        });
+            $or: [
+                { parkingSlotId: { $in: vehicleSlotIds } },
+                { vehicleNumber: { $in: assignedSlots.filter((s: any) => Boolean(s.vehicleNumber)).map((s: any) => s.vehicleNumber) } },
+            ],
+        }).lean()
+        : [];
+
+    const vehicleMap = new Map();
+    for (const v of vehicleDocs) {
+        if (v.parkingSlotId) vehicleMap.set(v.parkingSlotId.toString(), v);
+        if (v.vehicleNumber) vehicleMap.set(v.vehicleNumber, v);
     }
 
-    const monthlyQuota = 2;
-    const remainingQuota = Math.max(0, monthlyQuota - monthlyPassesCount);
+    const vehicles = assignedSlots
+        .filter((s: any) => Boolean(s.vehicleNumber))
+        .map((s: any) => {
+            const vDoc = vehicleMap.get(s._id.toString()) || vehicleMap.get(s.vehicleNumber);
+            return {
+                _id: vDoc?._id ? vDoc._id.toString() : s._id.toString(),
+                vehicleNumber: s.vehicleNumber,
+                vehicleType: vDoc?.vehicleType || s.vehicleType,
+                makeModel: vDoc?.makeModel || s.notes || "Assigned Vehicle",
+                color: vDoc?.color || "Standard",
+                rfidTag: vDoc?.rfidTag || `NST-${s._id.toString().slice(-6).toUpperCase()}`,
+                parkingSlotId: s._id.toString(),
+                status: s.status === "INACTIVE" ? "INACTIVE" : "ACTIVE",
+                evChargingRequired: vDoc?.evChargingRequired ?? (s.vehicleType === "EV"),
+                notes: vDoc?.notes || s.notes || null,
+                createdAt: vDoc?.createdAt || s.assignedAt || s.createdAt || new Date(),
+            };
+        });
 
     const flatUnitName = flat?.flatNumber
         ? `${(flat.blockId as any)?.blockname ? `${(flat.blockId as any).blockname} • ` : ""}Flat ${flat.flatNumber}`
@@ -535,11 +538,6 @@ export const getMyVehiclesAndParkingService = async (user: any, apartmentId?: st
         availableSlots: availableSlotsList,
         isSlotLimitReached: assignedSlots.length > 0 && availableSlotsList.length === 0,
         flatUnitName,
-        guestQuota: {
-            monthlyTotal: monthlyQuota,
-            usedThisMonth: monthlyPassesCount,
-            remaining: remainingQuota,
-        },
         rfidClearanceActive: true,
     };
 };
@@ -553,6 +551,10 @@ export const registerVehicleService = async (
     const aptObjectId = new Types.ObjectId(aptId);
 
     const normalizedNumber = normalizeVehicleNumber(data.vehicleNumber);
+
+    if (!isValidVehicleNumber(normalizedNumber)) {
+        throw new AppError("Please enter a valid vehicle number", 400);
+    }
 
     // 1. Check if this vehicle is already allocated to any parking slot in this apartment
     const slotWithVehicle = await ParkingSlotModel.findOne({
@@ -627,13 +629,37 @@ export const registerVehicleService = async (
     targetSlot.assignedAt = new Date();
     await targetSlot.save();
 
+    // Store in the Vehicle collection with full vehicle details
+    const vehicleDoc = await Vehicle.findOneAndUpdate(
+        {
+            apartmentId: aptObjectId,
+            vehicleNumber: normalizedNumber,
+        },
+        {
+            apartmentId: aptObjectId,
+            residentId: resident?._id || targetSlot.residentId || null,
+            flatId: flatId ? new Types.ObjectId(flatId) : targetSlot.flatId || null,
+            userId: user.id || resident?.userId || "",
+            vehicleNumber: normalizedNumber,
+            vehicleType: data.vehicleType || targetSlot.vehicleType || "CAR",
+            makeModel: data.makeModel?.trim() || null,
+            color: data.color?.trim() || null,
+            rfidTag: data.rfidTag?.trim() || `NST-${targetSlot._id.toString().slice(-6).toUpperCase()}`,
+            parkingSlotId: targetSlot._id,
+            evChargingRequired: data.vehicleType === "EV" || Boolean(data.evChargingRequired),
+            notes: data.notes?.trim() || null,
+            status: "ACTIVE",
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
     return {
-        _id: targetSlot._id.toString(),
+        _id: vehicleDoc._id.toString(),
         vehicleNumber: targetSlot.vehicleNumber,
         vehicleType: targetSlot.vehicleType,
-        makeModel: data.makeModel?.trim() || "Assigned Vehicle",
-        color: data.color?.trim() || "Standard",
-        rfidTag: data.rfidTag?.trim() || `NST-${targetSlot._id.toString().slice(-6).toUpperCase()}`,
+        makeModel: vehicleDoc.makeModel || data.makeModel?.trim() || "Assigned Vehicle",
+        color: vehicleDoc.color || data.color?.trim() || "Standard",
+        rfidTag: vehicleDoc.rfidTag || data.rfidTag?.trim() || `NST-${targetSlot._id.toString().slice(-6).toUpperCase()}`,
         parkingSlotId: targetSlot._id.toString(),
         status: "ACTIVE",
         evChargingRequired: targetSlot.vehicleType === "EV" || Boolean(data.evChargingRequired),
@@ -654,29 +680,69 @@ export const deleteVehicleService = async (
         throw new AppError("Invalid vehicle ID", 400);
     }
 
-    // Vehicle ID maps directly to the ParkingSlotModel document _id
-    const slot = await ParkingSlotModel.findOne({
+    // Support finding by either Vehicle collection _id or ParkingSlot _id
+    let slot: any = null;
+    let vehicleDoc: any = await Vehicle.findOne({
         _id: new Types.ObjectId(vehicleId),
         apartmentId: aptObjectId,
     });
 
-    if (!slot || !slot.vehicleNumber) {
+    if (vehicleDoc && vehicleDoc.parkingSlotId) {
+        slot = await ParkingSlotModel.findOne({
+            _id: vehicleDoc.parkingSlotId,
+            apartmentId: aptObjectId,
+        });
+    }
+
+    if (!slot) {
+        slot = await ParkingSlotModel.findOne({
+            _id: new Types.ObjectId(vehicleId),
+            apartmentId: aptObjectId,
+        });
+        if (slot && !vehicleDoc) {
+            vehicleDoc = await Vehicle.findOne({
+                apartmentId: aptObjectId,
+                $or: [
+                    { parkingSlotId: slot._id },
+                    ...(slot.vehicleNumber ? [{ vehicleNumber: slot.vehicleNumber }] : []),
+                ],
+            });
+        }
+    }
+
+    if (!slot && !vehicleDoc) {
+        throw new AppError("Vehicle not found", 404);
+    }
+
+    if (slot && !slot.vehicleNumber && !vehicleDoc) {
         throw new AppError("Vehicle not found", 404);
     }
 
     const isAuthorized =
-        (flatId && slot.flatId && slot.flatId.toString() === flatId.toString()) ||
-        (resident?._id && slot.residentId && slot.residentId.toString() === resident._id.toString()) ||
+        (flatId && (slot?.flatId?.toString() === flatId.toString() || vehicleDoc?.flatId?.toString() === flatId.toString())) ||
+        (resident?._id && (slot?.residentId?.toString() === resident._id.toString() || vehicleDoc?.residentId?.toString() === resident._id.toString())) ||
         user.role === "property_manager";
 
     if (!isAuthorized) {
         throw new AppError("You are not authorized to unregister this vehicle", 403);
     }
 
-    const unregPlate = slot.vehicleNumber;
-    slot.vehicleNumber = null;
-    slot.notes = null;
-    await slot.save();
+    const unregPlate = slot?.vehicleNumber || vehicleDoc?.vehicleNumber || "Vehicle";
+
+    if (slot) {
+        slot.vehicleNumber = null;
+        slot.notes = null;
+        await slot.save();
+    }
+
+    if (vehicleDoc) {
+        await Vehicle.deleteOne({ _id: vehicleDoc._id });
+    } else if (unregPlate) {
+        await Vehicle.deleteMany({
+            apartmentId: aptObjectId,
+            vehicleNumber: unregPlate,
+        });
+    }
 
     return { success: true, message: `Vehicle ${unregPlate} unregistered successfully` };
 };

@@ -482,10 +482,14 @@ export const releaseParkingSlotService = async ({
 
   if (visitId) {
     await VisitorVisitModel.updateOne(
-      { _id: visitId, apartmentId: aptObjectId, status: VisitorVisitStatus.ACTIVE },
-      { $set: { checkedOutAt: releasedAt, checkedOutBy: userId, status: VisitorVisitStatus.CHECKED_OUT } }
+      { _id: visitId, apartmentId: aptObjectId },
+      { $set: { parkingSlotId: null } }
     )
   }
+  await VisitorVisitModel.updateMany(
+    { apartmentId: aptObjectId, parkingSlotId: sObjectId },
+    { $set: { parkingSlotId: null } }
+  )
 
   return { slotId: toId(slot._id), releasedAt, releasedBy: userId }
 }

@@ -91,7 +91,10 @@ export function ResidentParkingPage() {
     },
     onError: (err: any) => {
       toast.error(
-        err?.response?.data?.message || err?.message || "Failed to register vehicle."
+        err?.response?.data?.details?.[0]?.message ||
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to register vehicle."
       );
     },
   });
