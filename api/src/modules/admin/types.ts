@@ -46,3 +46,22 @@ export interface SubscriptionAnalyticsData {
   subscriptions: MonthlyRegistration[];
 }
 
+export interface RevenueStats {
+  totalRevenue: number;
+  revenueThisMonth: number;
+  totalTransactions: number;
+  activeSubscribers: number;
+}
+
+export interface MonthlyRevenue {
+  period: string;
+  revenue: number;
+  count: number;
+}
+
+export interface RevenueAnalyticsData {
+  range: string;
+  interval: "month";
+  revenues: MonthlyRevenue[];
+}
+

@@ -100,9 +100,7 @@ export const verifySubscriptionPayment = async (
 };
 
 export const promoteCurrentUserToPropertyManager = async () => {
-  await api.post("/api/auth/update-user", {
-    role: "property_manager",
-  });
+  // Role promotion is handled automatically and securely on the backend in /subscriptions/verify
 };
 
 export const useCreateSubscription = () => {
