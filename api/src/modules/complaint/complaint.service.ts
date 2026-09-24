@@ -259,7 +259,7 @@ export const createComplaint = async (
   data: CreateComplaintInput,
   user: AuthenticatedComplaintUser
 ) => {
-  await ensureCurrentUserExists(user);
+ // await ensureCurrentUserExists(user);
 
   if (!isResidentRole(user.role)) {
     throw new AppError("Only residents can create complaints", 403);
