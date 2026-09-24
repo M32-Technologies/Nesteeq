@@ -5,10 +5,7 @@ import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "@/lib/auth-client";
-import {
-  getDashboardRoleRouteSegment,
-  normalizeDashboardRole,
-} from "@/features/dashboard/config/sidebar-navigation";
+import { getUserDashboardHref } from "@/features/dashboard/config/sidebar-navigation";
 
 export default function FinalCTA() {
   const [isMounted, setIsMounted] = useState(false);
@@ -19,9 +16,7 @@ export default function FinalCTA() {
   }, []);
 
   const user = isMounted ? session?.user : null;
-  const dashboardHref = `/${getDashboardRoleRouteSegment(
-    normalizeDashboardRole(user?.role),
-  )}`;
+  const dashboardHref = getUserDashboardHref(user?.role);
 
   return (
     <section className="bg-[var(--brand-dark)] px-5 py-24 sm:px-7 lg:px-10 lg:py-32">

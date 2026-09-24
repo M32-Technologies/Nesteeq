@@ -286,6 +286,7 @@ export const updateResidentStatus = async (
 const cleanResidentParams = (params: ResidentListParams) => ({
   search: params.search?.trim() || undefined,
   residentType: params.residentType,
+  flatId: params.flatId,
   blockId: params.blockId,
   status: params.status,
   page: params.page,
@@ -319,6 +320,10 @@ const cleanFlatParams = (params: FlatListParams) => ({
 const mapResident = (resident: ApiResident): ResidentUser => {
   const flat = getResidentFlat(resident)
   const block = getBlock(flat)
+  const flatId =
+    flat?._id ||
+    (typeof resident.flatId === "string" ? resident.flatId : undefined) ||
+    (typeof resident.flat === "string" ? resident.flat : undefined)
 
   return {
     id: resident.id || resident._id || resident.userId || "-",
@@ -328,7 +333,8 @@ const mapResident = (resident: ApiResident): ResidentUser => {
     type: resident.residentType || resident.type || "resident",
     blockId: block.id,
     block: block.name,
-    flat: flat?.flatNumber || "-",
+    flatId: flatId || undefined,
+    flat: flat?.flatNumber || (typeof resident.flat === "string" ? resident.flat : "-"),
     status: resident.status || "pending",
   }
 }

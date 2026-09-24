@@ -37,7 +37,11 @@ import type {
 export const toId = (val: ObjectIdLike | string | null | undefined) => val?.toString() ?? ""
 export const toMongoId = (val: string) => (Types.ObjectId.isValid(val) ? new Types.ObjectId(val) : val)
 export const normalizeText = (val?: string | null) => val?.trim() || null
-export const normalizeVehicleNumber = (val: string) => val.replace(/[\s-]/g, "").toUpperCase()
+export function normalizeVehicleNumber(val: string): string
+export function normalizeVehicleNumber(val?: string | null): string | null
+export function normalizeVehicleNumber(val?: string | null): string | null {
+  return val && val.trim() ? val.replace(/[\s-]/g, "").toUpperCase() : null
+}
 export const isDuplicateKeyError = (err: unknown): err is DuplicateKeyError =>
   typeof err === "object" && err !== null && "code" in err && (err as { code: number }).code === 11000
 

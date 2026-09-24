@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { authClient } from "@/lib/auth-client"
+import api from "@/lib/axios"
 import {
   dashboardRoleLabels,
   type DashboardRole,
@@ -86,37 +87,46 @@ export function ProfileSettingsPanel({
     .join("")
     .toUpperCase()
 
-  // Image Upload via Better-Auth
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Image Upload via Express upload endpoint + Better-Auth URL
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("Image file must be under 2MB")
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image file must be under 5MB")
       return
     }
 
-    const reader = new FileReader()
-    reader.onload = async () => {
-      const result = reader.result as string
-      setAvatarUrl(result)
-      try {
-        setIsSubmitting(true)
-        const { error } = await authClient.updateUser({
-          image: result,
-        })
-        if (error) {
-          throw new Error(error.message || "Failed to update profile photo")
-        }
-        toast.success("Profile photo updated successfully!")
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Failed to upload image"
-        toast.error(msg)
-      } finally {
-        setIsSubmitting(false)
+    try {
+      setIsSubmitting(true)
+
+      const formData = new FormData()
+      formData.append("avatar", file)
+
+      const uploadRes = await api.post("/api/v1/upload/avatar", formData)
+      const imageUrl = uploadRes.data?.url
+
+      if (!imageUrl) {
+        throw new Error("Failed to get uploaded image URL")
       }
+
+      setAvatarUrl(imageUrl)
+
+      const { error } = await authClient.updateUser({
+        image: imageUrl,
+      })
+
+      if (error) {
+        throw new Error(error.message || "Failed to update profile photo")
+      }
+
+      toast.success("Profile photo updated successfully!")
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to upload image"
+      toast.error(msg)
+    } finally {
+      setIsSubmitting(false)
     }
-    reader.readAsDataURL(file)
   }
 
   return (

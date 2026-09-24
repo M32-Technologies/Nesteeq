@@ -3,7 +3,7 @@ import { APIError, createAuthMiddleware } from "better-auth/api"
 import { mongodbAdapter } from "@better-auth/mongo-adapter"
 import { getAuthDB, getAuthMongoClient } from "../config/auth-db.js"
 import { env } from "../config/env.js"
-import { emailOTP } from "better-auth/plugins"
+import { admin, emailOTP } from "better-auth/plugins"
 import { emailService } from "../services/EmailService.js"
 
 export const auth = betterAuth({
@@ -17,7 +17,7 @@ export const auth = betterAuth({
     expiresIn: 60 * 60 * 24 * 7,
     updateAge: 60 * 60 * 24,
     cookieCache: {
-      enabled: false,
+      enabled: true,
       maxAge: 5 * 60,
     }
   },
@@ -79,8 +79,10 @@ export const auth = betterAuth({
         } else if (type == "email-verification") {
           await emailService.sendVerificationOtp(email, otp)
         }
-      },
+      },  
     }),
+    admin()
+    
   ],
   user: {
     additionalFields: {

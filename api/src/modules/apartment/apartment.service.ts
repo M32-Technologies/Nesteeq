@@ -1,7 +1,7 @@
 import { AppError } from "../../utils/AppError.js";
 import { getAuthDB } from "../../config/auth-db.js";
 import { Apartment } from "./apartment.model.js";
-import { CreateApartmentInput } from "./apartment.validation.js";
+import { CreateApartmentInput, UpdateApartmentInput } from "./apartment.validation.js";
 import { ObjectId } from "mongodb";
 
 const escapeRegex = (value: string) => {
@@ -118,4 +118,29 @@ export const getCurrentApartment = async (apartmentId?: string) => {
 
     return apartment;
 }
+
+export const updateCurrentApartment = async (
+    apartmentId: string | undefined,
+    data: UpdateApartmentInput
+) => {
+    if (!apartmentId) {
+        throw new AppError("Apartment context is required", 400);
+    }
+
+    if (!ObjectId.isValid(apartmentId)) {
+        throw new AppError("Apartment id must be a valid id", 400);
+    }
+
+    const apartment = await Apartment.findByIdAndUpdate(
+        apartmentId,
+        { $set: data },
+        { new: true, runValidators: true }
+    );
+
+    if (!apartment) {
+        throw new AppError("Apartment was not found", 404);
+    }
+
+    return apartment;
+};
 

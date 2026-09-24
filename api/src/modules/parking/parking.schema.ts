@@ -273,13 +273,11 @@ export const assignResidentParkingSchema =
       .object({
         flatId: objectIdSchema("Flat id"),
         residentId: objectIdSchema("Resident id").optional(),
-        vehicleNumber: z
-          .string()
-          .trim()
-          .max(20, "Vehicle number cannot exceed 20 characters")
-          .optional()
-          .nullable()
-          .or(z.literal("")),
+        vehicleNumber: optionalString(
+          z.string()
+            .trim()
+            .max(20, "Vehicle number cannot exceed 20 characters")
+        ),
       })
       .strict(),
   })

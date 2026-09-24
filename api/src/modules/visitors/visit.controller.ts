@@ -21,7 +21,9 @@ import {
 
 const getSecurityContext = (req: Request) => {
   const userId = req.user?.id
-  const apartmentId = req.user?.apartmentId
+  const apartmentId =
+    req.user?.apartmentId ||
+    (typeof req.query.apartmentId === "string" ? req.query.apartmentId : undefined)
 
   if (!userId) throw new AppError("Unauthorized", 401)
   if (!apartmentId) throw new AppError("Apartment context not found", 403)

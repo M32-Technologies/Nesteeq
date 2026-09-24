@@ -26,11 +26,13 @@ import type {
   ListVisitsInput,
   ManualVisitorEntryInput,
   ReleasedParkingAssignment,
+  VisitorRecordItem,
   VisitorRecordsFacetResult,
   VisitorVisitListItem,
 } from "./visit.types.js"
 import type { CreateResidentGuestPassInput } from "./visit.validation.js"
 import { resolveResidentContext } from "../resident/resident.service.js"
+import { getAuthDB } from "../../config/auth-db.js"
 import { AppError } from "../../utils/AppError.js"
 import { escapeRegExp } from "../../utils/regex.js"
 
@@ -340,9 +342,113 @@ export const getVisitorRecordsService = async ({
     ...baseStages, ...passStages, { $sort: { sortAt: -1 } },
     { $facet: { records: [{ $skip: skip }, { $limit: limit }, { $project: { sortAt: 0 } }], totalCount: [{ $count: "count" }] } },
   ])
+
+  const rawRecords = result?.records ?? []
+  let records: VisitorRecordItem[] = rawRecords
+
+  if (rawRecords.length > 0) {
+    const flatIds = [...new Set(rawRecords.map((r) => r.flatId).filter(Boolean))] as string[]
+    const passIds = [...new Set(rawRecords.map((r) => r.visitorPassId).filter(Boolean))] as string[]
+
+    const passResidentIdMap = new Map<string, string>()
+    if (passIds.length > 0) {
+      const validPassObjectIds = passIds.filter((id) => Types.ObjectId.isValid(id)).map((id) => new Types.ObjectId(id))
+      if (validPassObjectIds.length > 0) {
+        const guestPasses = await GuestPassModel.find({ _id: { $in: validPassObjectIds } })
+          .select("_id createdByResidentId")
+          .lean()
+        for (const gp of guestPasses) {
+          if (gp.createdByResidentId) {
+            passResidentIdMap.set(gp._id.toString(), gp.createdByResidentId.toString())
+          }
+        }
+      }
+    }
+
+    const flatObjectIds = flatIds.filter((id) => Types.ObjectId.isValid(id)).map((id) => new Types.ObjectId(id))
+    const passResidentObjectIds = [...new Set([...passResidentIdMap.values()])]
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id))
+
+    const [residentsByFlat, directResidents] = await Promise.all([
+      flatObjectIds.length > 0
+        ? ResidentModel.find({
+            apartmentId: aptObjectId,
+            flatId: { $in: flatObjectIds },
+            status: "active",
+          })
+            .select("_id userId flatId phoneNumber residentType")
+            .sort({ residentType: 1, joinedAt: -1 })
+            .lean()
+        : [],
+      passResidentObjectIds.length > 0
+        ? ResidentModel.find({
+            _id: { $in: passResidentObjectIds },
+          })
+            .select("_id userId flatId phoneNumber residentType")
+            .lean()
+        : [],
+    ])
+
+    const allResidents = [...residentsByFlat, ...directResidents]
+    const residentByIdMap = new Map<string, typeof allResidents[0]>()
+    const residentByFlatIdMap = new Map<string, typeof allResidents[0]>()
+
+    for (const res of allResidents) {
+      const rId = res._id.toString()
+      if (!residentByIdMap.has(rId)) {
+        residentByIdMap.set(rId, res)
+      }
+      const fId = res.flatId?.toString()
+      if (fId && !residentByFlatIdMap.has(fId)) {
+        residentByFlatIdMap.set(fId, res)
+      }
+    }
+
+    const userIds = [...new Set(allResidents.map((r) => r.userId).filter(Boolean))] as string[]
+    const users = userIds.length > 0
+      ? await getAuthDB()
+          .collection("user")
+          .find({
+            $or: [
+              { id: { $in: userIds } },
+              { _id: { $in: userIds.filter((id) => Types.ObjectId.isValid(id)).map((id) => new Types.ObjectId(id)) } },
+            ],
+          })
+          .project({ id: 1, _id: 1, name: 1, phone: 1 })
+          .toArray()
+      : []
+
+    const userMap = new Map<string, { name?: string | null; phone?: string | null }>()
+    for (const u of users) {
+      if (u.id) userMap.set(u.id, { name: u.name as string | null, phone: u.phone as string | null })
+      if (u._id) userMap.set(u._id.toString(), { name: u.name as string | null, phone: u.phone as string | null })
+    }
+
+    records = rawRecords.map((rec) => {
+      let residentDoc: typeof allResidents[0] | undefined
+      if (rec.visitorPassId && passResidentIdMap.has(rec.visitorPassId)) {
+        residentDoc = residentByIdMap.get(passResidentIdMap.get(rec.visitorPassId)!)
+      }
+      if (!residentDoc && rec.flatId) {
+        residentDoc = residentByFlatIdMap.get(rec.flatId)
+      }
+
+      const userInfo = residentDoc?.userId ? userMap.get(residentDoc.userId) : null
+      const residentName = userInfo?.name ?? null
+      const residentPhone = residentDoc?.phoneNumber ?? userInfo?.phone ?? null
+
+      return {
+        ...rec,
+        residentName,
+        residentPhone,
+      }
+    })
+  }
+
   const total = result?.totalCount[0]?.count ?? 0
   const totalPages = Math.ceil(total / limit)
-  return { records: result?.records ?? [], pagination: { page, limit, total, totalPages, hasNextPage: page < totalPages, hasPreviousPage: page > 1 } }
+  return { records, pagination: { page, limit, total, totalPages, hasNextPage: page < totalPages, hasPreviousPage: page > 1 } }
 }
 
 // --- Gate Check-in, Manual Entry, and Checkout ---

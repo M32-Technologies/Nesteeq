@@ -40,7 +40,7 @@ const getAuthUsersFilter = (userIds: string[]) => {
 };
 
 export const getResident = async (data: ResidentListQuery, apartmentId: string) => {
-    const { search, page, blockId, residentType, status, limit } = data;
+    const { search, page, blockId, flatId, residentType, status, limit } = data;
 
     if (!apartmentId) {
         throw new AppError("Apartment id is required", 400);
@@ -50,7 +50,9 @@ export const getResident = async (data: ResidentListQuery, apartmentId: string) 
 
     if (residentType) filter.residentType = residentType;
     if (status) filter.status = status;
-    if (blockId) {
+    if (flatId && Types.ObjectId.isValid(flatId)) {
+        filter.flatId = new Types.ObjectId(flatId);
+    } else if (blockId) {
         const flats = await Flat.find({ apartmentId, blockId }).select("_id").lean();
         filter.flatId = { $in: flats.map((flat) => flat._id) };
     }

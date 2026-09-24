@@ -6,19 +6,8 @@ import { AppError } from "../../utils/AppError.js";
 import { Apartment } from "../apartment/apartment.model.js";
 import { SubscriptionPlan } from "./subscription-plan.model.js";
 import { Subscription } from "./subscription.model.js";
-import { SubscriptionPlanInput } from "./subscription.schema.js";
 
-export const CreateSubscriptionPlan = async (data: SubscriptionPlanInput) => {
-  const existingPlan = await SubscriptionPlan.findOne({
-    planType: data.planType,
-  });
 
-  if (existingPlan) {
-    throw new AppError("Subscription plan already exists for this plan type", 409);
-  }
-
-  return SubscriptionPlan.create(data);
-};
 
 export const GetSubscriptionPlans = async () => {
   return SubscriptionPlan.find({ isActive: true })

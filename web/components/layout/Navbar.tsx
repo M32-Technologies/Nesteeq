@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, LogOut, Menu, UserCircle, X } from "lucide-react";
 import { signOut, useSession } from "@/lib/auth-client";
+import { getUserDashboardHref } from "@/features/dashboard/config/sidebar-navigation";
 
 const navItems = [
   { label: "Home", href: "/" },
@@ -116,12 +117,15 @@ export default function Navbar() {
             <div className="h-10 w-40 animate-pulse rounded-full bg-black/[0.06]" />
           ) : user ? (
             <>
-              <div className="flex h-10 items-center gap-2 rounded-full border border-black/[0.08] bg-white px-3 text-sm font-semibold text-[var(--ink)]">
+              <Link
+                href={getUserDashboardHref(user?.role)}
+                className="flex h-10 items-center gap-2 rounded-full border border-black/[0.08] bg-white px-3 text-sm font-semibold text-[var(--ink)] hover:border-[var(--brand)] hover:text-[var(--brand)] transition"
+              >
                 <span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--brand)] text-xs text-white">
                   {userInitial}
                 </span>
                 <span className="max-w-32 truncate">{userName}</span>
-              </div>
+              </Link>
 
               <button
                 type="button"
@@ -189,10 +193,14 @@ export default function Navbar() {
                 <div className="mt-4 h-11 animate-pulse rounded-full bg-black/[0.06]" />
               ) : user ? (
                 <div className="mt-4 space-y-3">
-                  <div className="flex h-11 items-center gap-2 rounded-full border border-black/[0.08] px-3 text-sm font-semibold text-[var(--ink)]">
+                  <Link
+                    href={getUserDashboardHref(user?.role)}
+                    onClick={() => setIsMenuOpen(false)}
+                    className="flex h-11 items-center gap-2 rounded-full border border-black/[0.08] px-3 text-sm font-semibold text-[var(--ink)] hover:border-[var(--brand)] hover:text-[var(--brand)] transition"
+                  >
                     <UserCircle className="h-5 w-5 text-[var(--brand)]" />
                     <span className="truncate">{userName}</span>
-                  </div>
+                  </Link>
 
                   <button
                     type="button"

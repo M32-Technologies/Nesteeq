@@ -44,7 +44,12 @@ async function getCurrentUserRole(request: NextRequest) {
 
   const session = (await response.json()) as AuthSessionResponse;
 
-  return normalizeDashboardRole(session?.user?.role);
+  return session?.user?.role ?? null;
+}
+
+function isAdmin(role?: string | null): boolean {
+  if (!role) return false;
+  return role.trim().toLowerCase() === "admin";
 }
 
 export async function proxy(request: NextRequest) {
@@ -56,8 +61,12 @@ export async function proxy(request: NextRequest) {
 
   if (isAuthRoute) {
     if (sessionCookie) {
-      const userRole = await getCurrentUserRole(request);
-      if (userRole) {
+      const rawRole = await getCurrentUserRole(request);
+      if (rawRole) {
+        if (isAdmin(rawRole)) {
+          return NextResponse.redirect(new URL("/admin/dashboard", request.url));
+        }
+        const userRole = normalizeDashboardRole(rawRole);
         const homeSegment = getDashboardRoleRouteSegment(userRole);
         return NextResponse.redirect(new URL(`/${homeSegment}`, request.url));
       }
@@ -72,7 +81,11 @@ export async function proxy(request: NextRequest) {
     if (!sessionCookie) {
       return NextResponse.redirect(new URL("/login?from=pricing", request.url));
     }
-    const userRole = await getCurrentUserRole(request);
+    const rawRole = await getCurrentUserRole(request);
+    if (isAdmin(rawRole)) {
+      return NextResponse.redirect(new URL("/admin/dashboard", request.url));
+    }
+    const userRole = normalizeDashboardRole(rawRole);
     if (userRole === "property_manager") {
       return NextResponse.redirect(new URL("/property-manager", request.url));
     }
@@ -92,11 +105,18 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const userRole = await getCurrentUserRole(request);
+  const rawRole = await getCurrentUserRole(request);
 
-  if (!userRole) {
+  if (!rawRole) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
+
+  // Admin users must only access the admin portal, not tenant/staff portals
+  if (isAdmin(rawRole)) {
+    return NextResponse.redirect(new URL("/admin/dashboard", request.url));
+  }
+
+  const userRole = normalizeDashboardRole(rawRole);
 
   if (userRole !== requiredRole) {
     const homeSegment = getDashboardRoleRouteSegment(userRole);
@@ -111,7 +131,6 @@ export const config = {
     "/login",
     "/register",
     "/onboarding",
-    "/super-admin/:path*",
     "/property-manager/:path*",
     "/treasurer/:path*",
     "/facility-manager/:path*",

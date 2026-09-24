@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import {
   RefreshCw,
+  FileDown,
   Search,
   Wrench,
   Flame,
@@ -55,6 +56,12 @@ export function ResidentAnnouncementsPage() {
   // Layout view toggle: Grid (default) vs. Stream/Feed
   const [viewMode, setViewMode] = useState<"grid" | "stream">("grid");
 
+  const handleExportPDF = () => {
+    if (typeof window !== "undefined") {
+      window.print();
+    }
+  };
+
   return (
     <div className="w-full space-y-6 pb-14">
       {/* ===================================================================== */}
@@ -91,6 +98,15 @@ export function ResidentAnnouncementsPage() {
               }`}
             />
             <span>Refresh</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExportPDF}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-700 shadow-xs hover:bg-slate-50 transition"
+          >
+            <FileDown className="size-4 text-slate-500" />
+            <span>Export PDF</span>
           </button>
         </div>
       </div>

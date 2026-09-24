@@ -154,6 +154,8 @@ export type VisitorRecordItem = {
   apartmentId: string
   flatId: string | null
   flatNumber: string | null
+  residentName?: string | null
+  residentPhone?: string | null
   visitorName: string
   visitorPhone?: string | null
   purpose?: string | null

@@ -12,6 +12,7 @@ import { toast } from "sonner"
 import { authClient } from "@/lib/auth-client"
 import {
   getDashboardRoleRouteSegment,
+  getUserDashboardHref,
   normalizeDashboardRole,
 } from "@/features/dashboard/config/sidebar-navigation"
 import {
@@ -114,12 +115,12 @@ function LoginForm() {
 
     toast.success("Welcome back to Nesteeq.")
 
-    const role = normalizeDashboardRole(acceptedRole ?? data?.user?.role)
+    const userRole = acceptedRole ?? data?.user?.role
 
     if (fromPricing) {
       router.push("/pricing")
     } else {
-      router.push(`/${getDashboardRoleRouteSegment(role)}`)
+      router.push(getUserDashboardHref(userRole))
     }
 
     router.refresh()

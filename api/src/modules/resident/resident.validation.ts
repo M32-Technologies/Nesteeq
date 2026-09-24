@@ -6,6 +6,7 @@ export const residentListQueryObjectSchema = z.object({
         .enum(["owner","resident"])
         .optional(),
 
+    flatId: z.string().trim().optional(),
     blockId: z.string().trim().optional(),
     status: z
         .enum(["active", "pending", "inactive"])
