@@ -108,12 +108,14 @@ export const auth = betterAuth({
         }
       },  
     }),
-    admin()
+    admin({
+      defaultRole: "resident",
+      adminRoles: ["admin"],
+    }),
     
   ],
   user: {
     additionalFields: {
-      role: { type: "string", required: true, defaultValue: "resident" },
       phone: { type: "string", required: false },
       apartmentId: { type: "string", required: false },
       flatId: { type: "string", required: false },

@@ -1,11 +1,22 @@
 import { getAllApartmentHandler, getApartmentStatsHandler, getApartmentAnalyticsHandler, getSingleApartmentHandler, updateStatusHandler } from "./controller/apartment.controller.js";
 import { getAllSubscriptionsHandler, getSubscriptionStatsHandler, getSubscriptionAnalyticsHandler, getSingleSubscriptionHandler } from "./controller/subscription.controller.js";
 import { getAllPlansHandler, getSinglePlanHandler, createPlanHandler, updatePlanHandler, updatePlanStatusHandler } from "./controller/plan.controller.js";
-import { getAllPaymentsHandler, getRevenueStatsHandler, getRevenueAnalyticsHandler } from "./controller/payment.controller.js";
+import {
+  getAllPaymentsHandler,
+  getRevenueStatsHandler,
+  getRevenueAnalyticsHandler,
+  getBillingBreakdownHandler,
+  getTopRevenueSocietiesHandler,
+  getSinglePaymentHandler,
+} from "./controller/payment.controller.js";
 import { getAllApartmentsQuerySchema, updateStatusSchema, apartmentAnalyticsQuerySchema } from "./validation/apartment.validation.js";
 import { getAllSubscriptionsQuerySchema, subscriptionAnalyticsQuerySchema } from "./validation/subscription.validation.js";
 import { getAllPlansQuerySchema, createPlanSchema, updatePlanSchema, updatePlanStatusSchema } from "./validation/plan.validation.js";
-import { getAllPaymentsQuerySchema, revenueAnalyticsQuerySchema } from "./validation/payment.validation.js";
+import {
+  getAllPaymentsQuerySchema,
+  revenueAnalyticsQuerySchema,
+  topSocietiesQuerySchema,
+} from "./validation/payment.validation.js";
 import express from "express"
 import { protect } from "../../middlewares/authMiddleware.js";
 import { requireRole } from "../../middlewares/authMiddleware.js";
@@ -49,4 +60,10 @@ router.get("/payments/stats", getRevenueStatsHandler);
 
 router.get("/payments/analytics", zodValidate(revenueAnalyticsQuerySchema), getRevenueAnalyticsHandler);
 
-export default router
+router.get("/payments/breakdown", getBillingBreakdownHandler);
+
+router.get("/payments/top-societies", zodValidate(topSocietiesQuerySchema), getTopRevenueSocietiesHandler);
+
+router.get("/payments/:id", getSinglePaymentHandler);
+
+export default router;

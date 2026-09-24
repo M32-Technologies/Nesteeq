@@ -10,8 +10,6 @@ import { SubscriptionPayment } from "../payment/subscription-payment.model.js";
 import { ObjectId } from "mongodb";
 import { getAuthDB } from "../../config/auth-db.js";
 
-
-
 export const GetSubscriptionPlans = async () => {
   return SubscriptionPlan.find({ isActive: true })
     .sort({ durationMonths: 1, price: 1 })
@@ -190,9 +188,7 @@ export const VerifySubscriptionPayment = async (
   subscription.remainingCount = Number(
     razorpaySubscription.remaining_count ?? 0,
   );
-
   subscription.razorpayCustomerId = razorpaySubscription.customer_id ?? null;
-
   subscription.currentStart = razorpaySubscription.current_start
     ? new Date(Number(razorpaySubscription.current_start) * 1000)
     : undefined;
@@ -219,50 +215,52 @@ export const VerifySubscriptionPayment = async (
 
   await subscription.save();
 
-  if (
+  const isPaymentValid =
+    Boolean(razorpay_payment_id) ||
     subscription.status === "active" ||
     subscription.status === "authenticated" ||
-    Number(subscription.paidCount ?? 0) > 0
-  ) {
+    Number(subscription.paidCount ?? 0) > 0;
+
+  if (isPaymentValid) {
+    if (subscription.status !== "active" && subscription.status !== "authenticated") {
+      subscription.status = "active";
+      await subscription.save();
+    }
+
     const apartment = await Apartment.findById(subscription.apartment);
     if (apartment) {
       apartment.status = "active";
       await apartment.save();
     }
 
-    const targetUserId = userId || subscription.subscribedBy || apartment?.managerId;
-    if (targetUserId) {
-      const authUserFilter = ObjectId.isValid(targetUserId)
-        ? { $or: [{ id: targetUserId }, { _id: new ObjectId(targetUserId) }] }
-        : { id: targetUserId };
+    const managerId = (userId || subscription.subscribedBy || apartment?.managerId)?.toString();
+    if (managerId) {
+      const userFilter = ObjectId.isValid(managerId)
+        ? { $or: [{ id: managerId }, { _id: new ObjectId(managerId) }] }
+        : { id: managerId };
 
-      const authUser = await getAuthDB()
+      await getAuthDB()
         .collection("user")
-        .findOne(authUserFilter, { projection: { role: 1 } });
-
-      if (authUser && authUser.role !== "admin") {
-        await getAuthDB()
-          .collection("user")
-          .updateOne(authUserFilter, {
+        .updateOne(
+          { ...userFilter, role: { $ne: "admin" } },
+          {
             $set: {
               role: "property_manager",
               apartmentId: subscription.apartment.toString(),
             },
-          });
-      }
+          },
+        );
     }
   }
-
-  // Record individual payment receipt for financial analytics & admin ledger (minus 18% GST)
   const GST_RATE = 0.18;
   const totalPaid = Number(subscription.planSnapshot?.price || 0);
   const netAmount = Math.round((totalPaid / (1 + GST_RATE)) * 100) / 100;
   const taxAmount = Math.round((totalPaid - netAmount) * 100) / 100;
-
+  
   await SubscriptionPayment.findOneAndUpdate(
     { razorpayPaymentId: razorpay_payment_id },
     {
-      apartment: subscription.apartment,
+      apartment: subscription.apartment,  
       subscription: subscription._id,
       plan: subscription.plan,
       planName: subscription.planSnapshot?.planName || "Subscription Plan",

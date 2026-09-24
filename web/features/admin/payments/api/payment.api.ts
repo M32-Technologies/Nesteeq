@@ -4,6 +4,9 @@ import type {
   RevenueAnalyticsData,
   PaymentListResponse,
   PaymentStatus,
+  BillingBreakdownData,
+  TopSocietyRevenueItem,
+  SubscriptionPaymentItem,
 } from "../types"
 
 /**
@@ -34,6 +37,34 @@ export async function fetchRevenueAnalytics(
 }
 
 /**
+ * Fetch subscription billing breakdown for donut chart & status.
+ * GET /api/v1/admin/payments/breakdown
+ */
+export async function fetchBillingBreakdown(): Promise<BillingBreakdownData> {
+  const { data } = await api.get<{
+    success: boolean
+    data: BillingBreakdownData
+  }>("/api/v1/admin/payments/breakdown")
+  return data.data
+}
+
+/**
+ * Fetch top societies by revenue for horizontal ranking bar chart.
+ * GET /api/v1/admin/payments/top-societies
+ */
+export async function fetchTopRevenueSocieties(
+  limit: number = 5
+): Promise<TopSocietyRevenueItem[]> {
+  const { data } = await api.get<{
+    success: boolean
+    data: TopSocietyRevenueItem[]
+  }>("/api/v1/admin/payments/top-societies", {
+    params: { limit },
+  })
+  return data.data
+}
+
+/**
  * Fetch a paginated, filterable, searchable list of payments.
  * GET /api/v1/admin/payments
  */
@@ -42,6 +73,9 @@ export async function fetchPayments(params: {
   limit?: number
   search?: string
   status?: PaymentStatus
+  type?: string
+  startDate?: string
+  endDate?: string
   sortBy?: "paidAt" | "amount" | "createdAt"
   sortOrder?: "asc" | "desc"
 }): Promise<PaymentListResponse> {
@@ -51,5 +85,19 @@ export async function fetchPayments(params: {
   }>("/api/v1/admin/payments", {
     params,
   })
+  return data.data
+}
+
+/**
+ * Fetch single payment record details.
+ * GET /api/v1/admin/payments/:id
+ */
+export async function fetchPaymentDetails(
+  id: string
+): Promise<SubscriptionPaymentItem> {
+  const { data } = await api.get<{
+    success: boolean
+    data: SubscriptionPaymentItem
+  }>(`/api/v1/admin/payments/${id}`)
   return data.data
 }

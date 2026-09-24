@@ -1,12 +1,15 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { CreditCard, Radio, AlertCircle } from "lucide-react"
+import { AlertCircle } from "lucide-react"
 import PaymentKpiCards from "./payment-kpi-cards"
+import RevenueOverviewChart from "./revenue-overview-chart"
+import RevenueDistributionChart from "./revenue-distribution-chart"
+import PaymentTransactionsTable from "./payment-transactions-table"
 import { fetchRevenueStats } from "../api/payment.api"
 import type { RevenueStats } from "../types"
 
-export default function PaymentsPage() {
+export function PaymentsPage() {
   const [stats, setStats] = useState<RevenueStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -48,27 +51,23 @@ export default function PaymentsPage() {
         </div>
       )}
 
-      {/* 1. Financial & Payment KPI Metrics (Live Connected) */}
+      {/* 1. Financial & Payment KPI Metric Cards */}
       <PaymentKpiCards stats={stats} isLoading={isLoading} />
 
-      {/* 2. Global Payments Ledger Area */}
-      <div className="rounded-3xl border border-slate-200/70 bg-white p-8 sm:p-12 text-center shadow-[0_1px_3px_rgba(0,0,0,0.02),0_4px_16px_rgba(0,0,0,0.02)]">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-[#07584F] shadow-2xs">
-          <CreditCard className="h-7 w-7" />
+      {/* 2. Revenue Graphs Section: Revenue Overview (Area Chart) & Revenue Distribution (Donut Chart) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div className="lg:col-span-7 xl:col-span-7">
+          <RevenueOverviewChart />
         </div>
-        <div className="mt-4 flex items-center justify-center gap-2">
-          <h2 className="text-lg font-bold text-[#0F172A]">
-            Global Payments Ledger
-          </h2>
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 border border-emerald-100">
-            <Radio className="h-2 w-2 text-emerald-600 animate-pulse" />
-            Live Sync
-          </span>
+        <div className="lg:col-span-5 xl:col-span-5">
+          <RevenueDistributionChart />
         </div>
-        <p className="mt-1.5 text-xs text-[#64748B] max-w-md mx-auto leading-relaxed">
-          Real-time transaction records, invoice receipts, and auto-debit renewals synchronized directly via Razorpay Subscriptions.
-        </p>
       </div>
+
+      {/* 3. Payment Transactions History Table with Date Range & Filters */}
+      <PaymentTransactionsTable />
     </div>
   )
 }
+
+export default PaymentsPage

@@ -23,7 +23,7 @@ export function formatINR(amount: number): string {
   }).format(amount)
 }
 
-export default function PaymentKpiCards({
+export function PaymentKpiCards({
   stats,
   isLoading = false,
 }: PaymentKpiCardsProps) {
@@ -150,3 +150,5 @@ export default function PaymentKpiCards({
     </div>
   )
 }
+
+export default PaymentKpiCards
