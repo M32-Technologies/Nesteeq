@@ -43,11 +43,23 @@ export function VisitorDetails({
     },
     {
       label: "Vehicle Number",
-      value: record.vehicleNumber ?? "-",
+      value:
+        record.vehicleNumber &&
+        record.vehicleNumber.trim() &&
+        record.vehicleNumber.trim().toLowerCase() !== "no vehicle" &&
+        record.vehicleNumber.trim().toLowerCase() !== "none"
+          ? record.vehicleNumber
+          : "No vehicle",
     },
     {
       label: "Vehicle Type",
-      value: getParkingVehicleTypeLabel(record.vehicleType),
+      value:
+        record.vehicleNumber &&
+        record.vehicleNumber.trim() &&
+        record.vehicleNumber.trim().toLowerCase() !== "no vehicle" &&
+        record.vehicleNumber.trim().toLowerCase() !== "none"
+          ? getParkingVehicleTypeLabel(record.vehicleType)
+          : "-",
     },
     {
       label: "Parking Slot",

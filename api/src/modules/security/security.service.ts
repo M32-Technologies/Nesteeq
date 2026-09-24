@@ -209,13 +209,20 @@ export const ensureResidentInApartment = async ({
   apartmentId,
   residentId,
   flatId,
+  allowedStatuses = ["active"],
 }: {
   apartmentId: string
   residentId: string
   flatId?: string
+  allowedStatuses?: string[]
 }) => {
   if (!Types.ObjectId.isValid(residentId)) throw new AppError("Invalid resident ID", 400)
-  const filter: Record<string, unknown> = { _id: residentId, apartmentId, status: "active", ...(flatId ? { flatId } : {}) }
+  const filter: Record<string, unknown> = {
+    _id: residentId,
+    apartmentId,
+    status: { $in: allowedStatuses },
+    ...(flatId ? { flatId } : {}),
+  }
   const res = await ResidentModel.findOne(filter).lean<LeanResident>()
   if (!res) throw new AppError("Resident not found in this apartment", 404)
   return res

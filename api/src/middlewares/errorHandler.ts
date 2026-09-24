@@ -41,7 +41,15 @@ const normalizeError = (error: unknown): AppError => {
     return new AppError("Invalid JSON body", 400);
   }
 
-  return new AppError("Something went wrong", 500);
+  const message =
+    !isProduction && error instanceof Error
+      ? error.message
+      : "Something went wrong";
+  return new AppError(
+    message,
+    500,
+    !isProduction && error instanceof Error ? { originalStack: error.stack } : undefined
+  );
 };
 
 export const notFoundHandler: RequestHandler = (req, _res, next) => {
@@ -58,7 +66,10 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
   const response: ErrorResponse = {
     success: false,
     status: appError.status,
-    message: appError.message,
+    message:
+      !isProduction && error instanceof Error && appError.message === "Something went wrong"
+        ? error.message
+        : appError.message,
   };
 
   if (appError.details !== undefined) {
@@ -66,7 +77,7 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
   }
 
   if (!isProduction) {
-    response.stack = appError.stack;
+    response.stack = (error instanceof Error && error.stack) ? error.stack : appError.stack;
   }
 
   res.status(appError.statusCode).json(response);

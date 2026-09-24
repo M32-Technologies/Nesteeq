@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation"
+import { ParkingSlots } from "@/features/dashboard/security/components/ParkingSlots"
 
 export default function SecurityParkingPage() {
-  redirect("/security/visitors")
+  return <ParkingSlots />
 }

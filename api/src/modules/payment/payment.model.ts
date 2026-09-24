@@ -38,6 +38,12 @@ const paymentSchema = new Schema<IPayment>(
       required: true,
       index: true,
     },
+    receiptNumber: {
+      type: String,
+      trim: true,
+      index: true,
+      sparse: true,
+    },
     description: {
       type: String,
       trim: true,

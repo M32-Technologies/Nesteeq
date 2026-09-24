@@ -197,8 +197,6 @@ const enrichDeliveries = async (
       status: delivery.status,
       receivedBy: delivery.receivedBy,
       receivedAt: delivery.receivedAt,
-      notifiedBy: delivery.notifiedBy ?? null,
-      notifiedAt: delivery.notifiedAt ?? null,
       collectedBy: delivery.collectedBy ?? null,
       collectedAt: delivery.collectedAt ?? null,
       returnedBy: delivery.returnedBy ?? null,
@@ -444,8 +442,6 @@ export const updateDeliveryStatusService = async ({
 
   if (status === DeliveryStatus.NOTIFIED) {
     delivery.status = DeliveryStatus.NOTIFIED
-    delivery.notifiedBy = userId
-    delivery.notifiedAt = now
   }
 
   if (status === DeliveryStatus.COLLECTED) {

@@ -18,6 +18,7 @@ interface CreateExpenseInput {
   apartmentId: string;
   title: string;
   description?: string;
+  invoiceRef?: string;
   category: ExpenseCategory;
   amount: number;
   vendorName?: string;
@@ -28,17 +29,25 @@ interface CreateExpenseInput {
 interface UpdateExpenseInput {
   title?: string;
   description?: string;
+  invoiceRef?: string;
   category?: ExpenseCategory;
   amount?: number;
   vendorName?: string;
   expenseDate?: Date;
   status?: ExpenseStatus;
+  rejectionReason?: string;
+  paymentMethod?: string;
+  paymentReference?: string;
+  paidAt?: Date;
 }
 
 interface ExpenseFilters {
   apartmentId?: string;
   category?: ExpenseCategory;
   status?: ExpenseStatus;
+  search?: string;
+  startDate?: Date;
+  endDate?: Date;
 }
 
 const validateObjectId = (id: string) => {
@@ -85,20 +94,30 @@ const assertExpenseStatusTransition = (
 const getExpenseAuditValue = (expense: {
   title: string;
   description?: string;
+  invoiceRef?: string;
   category: ExpenseCategory;
   amount: number;
   vendorName?: string;
   expenseDate: Date;
   status: ExpenseStatus;
+  rejectionReason?: string;
+  paymentMethod?: string;
+  paymentReference?: string;
+  paidAt?: Date;
   createdBy?: Types.ObjectId;
 }) => ({
   title: expense.title,
   description: expense.description,
+  invoiceRef: expense.invoiceRef,
   category: expense.category,
   amount: expense.amount,
   vendorName: expense.vendorName,
   expenseDate: expense.expenseDate,
   status: expense.status,
+  rejectionReason: expense.rejectionReason,
+  paymentMethod: expense.paymentMethod,
+  paymentReference: expense.paymentReference,
+  paidAt: expense.paidAt,
   createdBy: expense.createdBy?.toString(),
 });
 
@@ -155,6 +174,9 @@ export const createExpenseService = async (
   return createdExpense;
 };
 
+const escapeRegex = (str: string) =>
+  str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 export const getExpensesService = async (
   filters: ExpenseFilters
 ) => {
@@ -171,6 +193,28 @@ export const getExpensesService = async (
 
   if (filters.status) {
     query.status = filters.status;
+  }
+
+  if (filters.search) {
+    const safeSearch = escapeRegex(filters.search.trim());
+    const searchRegex = new RegExp(safeSearch, "i");
+    query.$or = [
+      { title: searchRegex },
+      { vendorName: searchRegex },
+      { invoiceRef: searchRegex },
+      { description: searchRegex },
+    ];
+  }
+
+  if (filters.startDate || filters.endDate) {
+    const dateQuery: Record<string, unknown> = {};
+    if (filters.startDate) {
+      dateQuery.$gte = filters.startDate;
+    }
+    if (filters.endDate) {
+      dateQuery.$lte = filters.endDate;
+    }
+    query.expenseDate = dateQuery;
   }
 
   return Expense.find(query).sort({
@@ -218,9 +262,17 @@ export const updateExpenseService = async (
         input.status
       );
 
+      const updateData: UpdateExpenseInput = { ...input };
+      if (
+        updateData.status === ExpenseStatus.PAID &&
+        !updateData.paidAt
+      ) {
+        updateData.paidAt = new Date();
+      }
+
       const expense = await Expense.findByIdAndUpdate(
         expenseId,
-        input,
+        updateData,
         {
           returnDocument: "after",
           runValidators: true,
@@ -236,6 +288,29 @@ export const updateExpenseService = async (
         existingExpense.status !== ExpenseStatus.APPROVED &&
         expense.status === ExpenseStatus.APPROVED;
 
+      const wasRejected =
+        existingExpense.status !== ExpenseStatus.REJECTED &&
+        expense.status === ExpenseStatus.REJECTED;
+
+      const wasPaid =
+        existingExpense.status !== ExpenseStatus.PAID &&
+        expense.status === ExpenseStatus.PAID;
+
+      let description = `Expense ${expense._id.toString()} updated`;
+      if (wasApproved) {
+        description = `Expense ${expense._id.toString()} approved`;
+      } else if (wasRejected) {
+        description = `Expense ${expense._id.toString()} rejected${
+          expense.rejectionReason ? `: ${expense.rejectionReason}` : ""
+        }`;
+      } else if (wasPaid) {
+        description = `Expense ${expense._id.toString()} marked as paid${
+          expense.paymentMethod ? ` via ${expense.paymentMethod}` : ""
+        }${
+          expense.paymentReference ? ` (Ref: ${expense.paymentReference})` : ""
+        }`;
+      }
+
       await createAuditLogService(
         {
           apartmentId: expense.apartmentId.toString(),
@@ -245,9 +320,7 @@ export const updateExpenseService = async (
           entityId: expense._id.toString(),
           oldValue: getExpenseAuditValue(existingExpense),
           newValue: getExpenseAuditValue(expense),
-          description: wasApproved
-            ? `Expense ${expense._id.toString()} approved`
-            : `Expense ${expense._id.toString()} updated`,
+          description,
         },
         session
       );
@@ -263,4 +336,60 @@ export const updateExpenseService = async (
   }
 
   return updatedExpense;
+};
+
+export const getExpenseSummaryService = async (
+  apartmentId: string
+) => {
+  validateObjectId(apartmentId);
+  const id = new Types.ObjectId(apartmentId);
+
+  const [result] = await Expense.aggregate([
+    { $match: { apartmentId: id } },
+    {
+      $group: {
+        _id: null,
+        totalExpenses: { $sum: "$amount" },
+        approvedExpenses: {
+          $sum: {
+            $cond: [
+              {
+                $in: [
+                  "$status",
+                  [ExpenseStatus.APPROVED, ExpenseStatus.PAID],
+                ],
+              },
+              "$amount",
+              0,
+            ],
+          },
+        },
+        pendingExpenses: {
+          $sum: {
+            $cond: [
+              { $eq: ["$status", ExpenseStatus.PENDING] },
+              "$amount",
+              0,
+            ],
+          },
+        },
+        pendingCount: {
+          $sum: {
+            $cond: [
+              { $eq: ["$status", ExpenseStatus.PENDING] },
+              1,
+              0,
+            ],
+          },
+        },
+      },
+    },
+  ]);
+
+  return {
+    totalExpenses: result?.totalExpenses ?? 0,
+    approvedExpenses: result?.approvedExpenses ?? 0,
+    pendingExpenses: result?.pendingExpenses ?? 0,
+    pendingCount: result?.pendingCount ?? 0,
+  };
 };
