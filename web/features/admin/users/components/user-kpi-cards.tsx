@@ -48,7 +48,7 @@ export default function UserKpiCards({ stats, isLoading = false }: UserKpiCardsP
           </div>
           <p className="mt-1 text-xs text-[#059669] font-medium flex items-center gap-1 truncate">
             <span>↗</span>
-            <span>Excluding system administrators</span>
+            <span>{stats.residents.toLocaleString()} residents · {stats.propertyManagers.toLocaleString()} managers</span>
           </p>
         </div>
       </div>

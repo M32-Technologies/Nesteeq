@@ -36,8 +36,9 @@ export interface SubscriptionStats {
   pending: number;
   halted: number;
   cancelled: number;
-  completed: number;
+  completed: number;  
   expired: number;
+  expiringSoon: number;
 }
 
 export interface SubscriptionAnalyticsData {

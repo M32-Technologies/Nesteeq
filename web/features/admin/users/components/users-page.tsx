@@ -4,102 +4,86 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 import { AlertCircle } from "lucide-react"
 import { authClient } from "@/lib/auth-client"
 import UserKpiCards from "@/features/admin/users/components/user-kpi-cards"
-import PropertyManagersTable from "@/features/admin/users/components/property-managers-table"
-import type { BetterAuthUser, UserKpiStats } from "@/features/admin/users/types"
+import PropertyManagersTable, {
+  isAdminUser,
+} from "@/features/admin/users/components/property-managers-table"
+import type { BetterAuthUser, UserKpiStats, UserRoleFilter } from "@/features/admin/users/types"
 
-const PAGE_SIZE = 10
+export function isManagerUser(user: { role?: string | null }): boolean {
+  if (!user.role) return false
+  const r = user.role.trim().toLowerCase().replace(/[\s-]+/g, "_")
+  return (
+    r === "property_manager" ||
+    r === "propertymanager" ||
+    r === "property-manager" ||
+    r === "manager"
+  )
+}
+
+export function isResidentUser(user: { role?: string | null }): boolean {
+  if (isAdminUser(user)) return false
+  if (isManagerUser(user)) return false
+  if (!user.role) return true
+  const r = user.role.trim().toLowerCase().replace(/[\s-]+/g, "_")
+  return (
+    r === "resident" ||
+    r === "owner" ||
+    r === "tenant" ||
+    (!r && !isAdminUser(user))
+  )
+}
 
 export default function UsersPage() {
-  // KPI stats state — fetched once from all users
+  // All non-admin platform users
   const [allUsers, setAllUsers] = useState<BetterAuthUser[]>([])
-  const [isStatsLoading, setIsStatsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Table state — paginated property managers
-  const [tableUsers, setTableUsers] = useState<BetterAuthUser[]>([])
-  const [totalTableUsers, setTotalTableUsers] = useState(0)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [isTableLoading, setIsTableLoading] = useState(true)
+  // Role filter state — "all" | "property_manager" | "resident"
+  const [roleFilter, setRoleFilter] = useState<UserRoleFilter>("all")
 
   const [error, setError] = useState<string | null>(null)
 
-  // 1. Fetch ALL users once for KPI stats (lightweight — we just need counts)
-  const fetchStatsUsers = useCallback(async () => {
-    setIsStatsLoading(true)
+  // 1. Fetch ALL users and strictly filter out any admin or super_admin account
+  const fetchUsers = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
     try {
       const res = await authClient.admin.listUsers({
-        query: { limit: 500 },
+        query: {
+          limit: 1000,
+          sortBy: "createdAt",
+          sortDirection: "desc",
+        },
       })
 
       if (res.error) {
-        setError(res.error.message || "Failed to load user stats.")
+        setError(res.error.message || "Failed to load user directory.")
         return
       }
 
       const rawUsers = (res.data?.users || []) as BetterAuthUser[]
-      setAllUsers(rawUsers)
+      // Strictly exclude any admin or super_admin user
+      const nonAdminUsers = rawUsers.filter((u) => !isAdminUser(u))
+      setAllUsers(nonAdminUsers)
     } catch {
       setError("Unable to connect to the authentication server.")
     } finally {
-      setIsStatsLoading(false)
+      setIsLoading(false)
     }
   }, [])
 
-  // 2. Fetch paginated property managers for the table
-  const fetchTablePage = useCallback(
-    async (page: number) => {
-      setIsTableLoading(true)
-      setError(null)
-
-      try {
-        const offset = (page - 1) * PAGE_SIZE
-
-        const res = await authClient.admin.listUsers({
-          query: {
-            limit: PAGE_SIZE,
-            offset,
-            filterField: "role",
-            filterValue: "property_manager",
-            filterOperator: "eq",
-            sortBy: "createdAt",
-            sortDirection: "desc",
-          },
-        })
-
-        if (res.error) {
-          setError(res.error.message || "Failed to load property managers.")
-          return
-        }
-
-        const rawUsers = (res.data?.users || []) as BetterAuthUser[]
-        const total = (res.data as Record<string, unknown>)?.total as number | undefined
-
-        setTableUsers(rawUsers)
-        setTotalTableUsers(total ?? rawUsers.length)
-        setCurrentPage(page)
-      } catch {
-        setError("Unable to fetch property managers from the server.")
-      } finally {
-        setIsTableLoading(false)
-      }
-    },
-    []
-  )
-
   // Initial load
   useEffect(() => {
-    fetchStatsUsers()
-    fetchTablePage(1)
-  }, [fetchStatsUsers, fetchTablePage])
+    fetchUsers()
+  }, [fetchUsers])
 
-  // Compute KPI metrics (Excluding Admin role)
+  // Compute KPI metrics — Admins are 100% excluded from all counts
   const stats: UserKpiStats = useMemo(() => {
-    const nonAdminUsers = allUsers.filter(
-      (u) => u.role !== "admin" && u.role !== "super_admin"
-    )
+    const nonAdminUsers = allUsers.filter((u) => !isAdminUser(u))
 
-    const propertyManagers = allUsers.filter(
-      (u) => u.role === "property_manager" || u.role === "propertymanager"
-    )
+    const propertyManagers = nonAdminUsers.filter((u) => isManagerUser(u))
+
+    const residents = nonAdminUsers.filter((u) => isResidentUser(u))
 
     const verifiedManagers = propertyManagers.filter(
       (u) => u.emailVerified && !u.banned
@@ -114,22 +98,35 @@ export default function UsersPage() {
     return {
       totalUsers: nonAdminUsers.length,
       propertyManagers: propertyManagers.length,
+      residents: residents.length,
       verifiedManagers: verifiedManagers.length,
       inactiveUsers: inactiveUsers.length,
       totalBanned: totalBanned.length,
     }
   }, [allUsers])
 
-  const totalPages = Math.max(1, Math.ceil(totalTableUsers / PAGE_SIZE))
+  // Filter users based on selected option button (All Users / Managers / Residents)
+  const currentRoleUsers = useMemo(() => {
+    const nonAdminUsers = allUsers.filter((u) => !isAdminUser(u))
+    if (roleFilter === "property_manager") {
+      return nonAdminUsers.filter((u) => isManagerUser(u))
+    }
+    if (roleFilter === "resident") {
+      return nonAdminUsers.filter((u) => isResidentUser(u))
+    }
+    return nonAdminUsers
+  }, [allUsers, roleFilter])
+
+  const handleRoleFilterChange = (newRole: UserRoleFilter) => {
+    setRoleFilter(newRole)
+  }
 
   const handleRefresh = () => {
-    fetchStatsUsers()
-    fetchTablePage(currentPage)
+    fetchUsers()
   }
 
   const handleUserUpdated = () => {
-    fetchStatsUsers()
-    fetchTablePage(currentPage)
+    fetchUsers()
   }
 
   return (
@@ -145,26 +142,24 @@ export default function UsersPage() {
           <button
             type="button"
             onClick={handleRefresh}
-            className="rounded-lg bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 transition-colors"
+            className="rounded-lg bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 transition-colors cursor-pointer"
           >
             Try Again
           </button>
         </div>
       )}
 
-      {/* 1. KPI Metric Cards Section */}
-      <UserKpiCards stats={stats} isLoading={isStatsLoading} />
+      {/* 1. KPI Metric Cards Section (Admins excluded) */}
+      <UserKpiCards stats={stats} isLoading={isLoading} />
 
-      {/* 2. Property Managers Table Section (Paginated) */}
+      {/* 2. Users Table Section (No admins, option button filterable) */}
       <PropertyManagersTable
-        managers={tableUsers}
-        isLoading={isTableLoading}
+        users={currentRoleUsers}
+        isLoading={isLoading}
         onUserUpdated={handleUserUpdated}
-        currentPage={currentPage}
-        totalPages={totalPages}
-        totalItems={totalTableUsers}
-        pageSize={PAGE_SIZE}
-        onPageChange={(page) => fetchTablePage(page)}
+        roleFilter={roleFilter}
+        onRoleFilterChange={handleRoleFilterChange}
+        stats={stats}
       />
     </div>
   )

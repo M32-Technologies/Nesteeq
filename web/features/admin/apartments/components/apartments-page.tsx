@@ -27,12 +27,15 @@ export default function ApartmentsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZE)
   const [isListLoading, setIsListLoading] = useState(true)
 
-  // Search & Filters
+  // Search, Filters & Sorting
   const [searchTerm, setSearchTerm] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<ApartmentFilterStatus>("all")
+  const [sortBy, setSortBy] = useState<"name" | "createdAt" | "updatedAt" | "city">("createdAt")
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
 
   const [error, setError] = useState<string | null>(null)
 
@@ -66,11 +69,11 @@ export default function ApartmentsPage() {
       try {
         const res = await fetchApartments({
           page,
-          limit: PAGE_SIZE,
+          limit: pageSize,
           search: debouncedSearch.trim() || undefined,
           status: statusFilter !== "all" ? statusFilter : undefined,
-          sortBy: "createdAt",
-          sortOrder: "desc",
+          sortBy,
+          sortOrder,
         })
 
         setApartments(res.apartments || [])
@@ -83,7 +86,7 @@ export default function ApartmentsPage() {
         setIsListLoading(false)
       }
     },
-    [debouncedSearch, statusFilter]
+    [debouncedSearch, statusFilter, sortBy, sortOrder, pageSize]
   )
 
   // Load stats on mount
@@ -91,7 +94,7 @@ export default function ApartmentsPage() {
     loadStats()
   }, [loadStats])
 
-  // Reload list when debounced search or status filter changes (reset to page 1)
+  // Reload list when debounced search, status filter, sort, or page size changes (reset to page 1)
   useEffect(() => {
     setCurrentPage(1)
     loadApartments(1)
@@ -105,6 +108,19 @@ export default function ApartmentsPage() {
     }
   }
 
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize)
+    setCurrentPage(1)
+  }
+
+  const handleSortChange = (
+    newSortBy: "name" | "createdAt" | "updatedAt" | "city",
+    newSortOrder: "asc" | "desc"
+  ) => {
+    setSortBy(newSortBy)
+    setSortOrder(newSortOrder)
+  }
+
   // Handle reload on update / try again
   const handleRefresh = async () => {
     setError(null)
@@ -114,6 +130,8 @@ export default function ApartmentsPage() {
   const handleClearFilters = () => {
     setSearchTerm("")
     setStatusFilter("all")
+    setSortBy("createdAt")
+    setSortOrder("desc")
   }
 
   return (
@@ -146,12 +164,16 @@ export default function ApartmentsPage() {
         currentPage={currentPage}
         totalPages={totalPages}
         totalItems={totalItems}
-        pageSize={PAGE_SIZE}
+        pageSize={pageSize}
         onPageChange={handlePageChange}
+        onPageSizeChange={handlePageSizeChange}
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
+        sortBy={sortBy}
+        sortOrder={sortOrder}
+        onSortChange={handleSortChange}
         onClearFilters={handleClearFilters}
         onApartmentUpdated={handleRefresh}
       />

@@ -83,3 +83,10 @@ export const getSinglePaymentHandler = catchAsync(
     });
   }
 );
+
+
+export const getReportHandler = catchAsync (
+  async(req : Request , res : Response) => {
+    
+  }
+)

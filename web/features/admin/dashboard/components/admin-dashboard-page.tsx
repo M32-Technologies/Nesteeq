@@ -5,15 +5,18 @@ import Link from "next/link"
 import {
   Building2,
   CreditCard,
-  Users,
-  BarChart3,
-  Plus,
-  ShieldCheck,
+  Layers,
+  AlertCircle,
+  CheckCircle2,
   TrendingUp,
   Clock,
-  CheckCircle2,
   ChevronRight,
-  Radio,
+  ArrowUpRight,
+  Plus,
+  Users,
+  RefreshCw,
+  FileText,
+  ShieldCheck,
 } from "lucide-react"
 import {
   AreaChart,
@@ -24,6 +27,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts"
+import { format, isValid } from "date-fns"
 
 import {
   fetchApartmentStats,
@@ -36,29 +40,92 @@ import type {
   ApartmentAnalyticsData,
 } from "@/features/admin/apartments/types"
 
+import { fetchSubscriptionStats } from "@/features/admin/subscriptions/api/subscription.api"
+import type { SubscriptionStats } from "@/features/admin/subscriptions/types"
+
+import {
+  fetchRevenueStats,
+  fetchPayments,
+} from "@/features/admin/payments/api/payment.api"
+import type {
+  RevenueStats,
+  SubscriptionPaymentItem,
+} from "@/features/admin/payments/types"
+
+function formatINR(amount?: number): string {
+  if (typeof amount !== "number" || isNaN(amount)) return "₹0"
+  try {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(amount)
+  } catch {
+    return `₹${amount.toLocaleString("en-IN")}`
+  }
+}
+
+function formatDate(dateString?: string): string {
+  if (!dateString) return "—"
+  try {
+    const d = new Date(dateString)
+    if (!isValid(d)) return "—"
+    return format(d, "dd MMM yyyy")
+  } catch {
+    return "—"
+  }
+}
+
+function getInitials(name: string): string {
+  if (!name) return "AP"
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[1][0]).toUpperCase()
+}
+
 export default function AdminDashboardPage() {
-  const [stats, setStats] = useState<ApartmentStats | null>(null)
+  const [aptStats, setAptStats] = useState<ApartmentStats | null>(null)
+  const [subStats, setSubStats] = useState<SubscriptionStats | null>(null)
+  const [revStats, setRevStats] = useState<RevenueStats | null>(null)
   const [recentApartments, setRecentApartments] = useState<ApartmentItem[]>([])
+  const [recentPayments, setRecentPayments] = useState<SubscriptionPaymentItem[]>([])
   const [analytics, setAnalytics] = useState<ApartmentAnalyticsData | null>(null)
   const [range, setRange] = useState<"3m" | "6m" | "12m">("6m")
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const loadDashboardData = useCallback(async () => {
     setIsLoading(true)
+    setError(null)
     try {
-      const [statsRes, apartmentsRes, analyticsRes] = await Promise.allSettled([
+      const [
+        aptRes,
+        subRes,
+        revRes,
+        analyticsRes,
+        recentAptsRes,
+        recentPaymentsRes,
+      ] = await Promise.allSettled([
         fetchApartmentStats(),
-        fetchApartments({ limit: 5, sortBy: "createdAt", sortOrder: "desc" }),
+        fetchSubscriptionStats(),
+        fetchRevenueStats(),
         fetchApartmentAnalytics(range),
+        fetchApartments({ limit: 5, sortBy: "createdAt", sortOrder: "desc" }),
+        fetchPayments({ limit: 5, sortBy: "paidAt", sortOrder: "desc" }),
       ])
 
-      if (statsRes.status === "fulfilled") setStats(statsRes.value)
-      if (apartmentsRes.status === "fulfilled")
-        setRecentApartments(apartmentsRes.value.apartments || [])
-      if (analyticsRes.status === "fulfilled")
-        setAnalytics(analyticsRes.value)
+      if (aptRes.status === "fulfilled") setAptStats(aptRes.value)
+      if (subRes.status === "fulfilled") setSubStats(subRes.value)
+      if (revRes.status === "fulfilled") setRevStats(revRes.value)
+      if (analyticsRes.status === "fulfilled") setAnalytics(analyticsRes.value)
+      if (recentAptsRes.status === "fulfilled") {
+        setRecentApartments(recentAptsRes.value.apartments || [])
+      }
+      if (recentPaymentsRes.status === "fulfilled") {
+        setRecentPayments(recentPaymentsRes.value.payments || [])
+      }
     } catch {
-      // Graceful fallback
+      setError("Unable to sync dashboard telemetry from backend services.")
     } finally {
       setIsLoading(false)
     }
@@ -68,224 +135,256 @@ export default function AdminDashboardPage() {
     loadDashboardData()
   }, [loadDashboardData])
 
-  const totalSocieties = stats?.total ?? 0
-  const activeSocieties = stats?.active ?? 0
-  const pendingSocieties = stats?.pending_payment ?? 0
-  const inactiveSocieties = stats?.inactive ?? 0
+  // Real backend metric calculations
+  const totalSocieties = aptStats?.total ?? 0
+  const activeSocieties = aptStats?.active ?? 0
+  const pendingSocieties = aptStats?.pending_payment ?? 0
 
-  const activePercent =
+  const activeSubscriptions = subStats?.active ?? 0
+  const totalSubscriptions = subStats?.total ?? 0
+  const pendingSubscriptions = subStats?.pending ?? 0
+  const expiringSoonSubscriptions = subStats?.expiringSoon ?? 0
+
+  const totalRevenue = revStats?.totalRevenue ?? 0
+  const monthRevenue = revStats?.revenueThisMonth ?? 0
+
+  // Action items count (expiring subscriptions + pending onboarding)
+  const actionItemsCount = expiringSoonSubscriptions + pendingSocieties
+
+  // Active operational rate
+  const activeCoveragePercent =
     totalSocieties > 0 ? Math.round((activeSocieties / totalSocieties) * 100) : 0
 
-  // Chart data from analytics API or fallback month structure with real counts
+  // Real registration analytics data from API
   const chartData =
     analytics?.registrations && analytics.registrations.length > 0
       ? analytics.registrations.map((r) => ({
-          month: r.period.length === 7 ? r.period.slice(5) : r.period,
+          period: r.period,
           registrations: r.count,
         }))
-      : [
-          { month: "Jan", registrations: 0 },
-          { month: "Feb", registrations: 0 },
-          { month: "Mar", registrations: 0 },
-          { month: "Apr", registrations: 0 },
-          { month: "May", registrations: 0 },
-          { month: "Jun", registrations: 0 },
-        ]
+      : []
+
+  const totalRegistrationsInRange = chartData.reduce(
+    (acc, curr) => acc + curr.registrations,
+    0
+  )
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      {/* Top 2-Column Responsive Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* ========================================================= */}
-        {/* LEFT COLUMN (Main Stats & Large Cards - 8 cols)          */}
-        {/* ========================================================= */}
-        <div className="lg:col-span-8 space-y-6">
-          {/* Card 1: Top Financial / Society Overview Card */}
-          <div className="rounded-3xl border border-slate-200/70 bg-white p-6 sm:p-7 shadow-[0_1px_3px_rgba(0,0,0,0.02),0_4px_16px_rgba(0,0,0,0.02)]">
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
-              {/* Left Sub-Section: Main Number & Action Pills */}
-              <div className="md:col-span-7 flex flex-col justify-between space-y-5">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">
-                      Total Managed Societies
-                    </span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-100">
-                      <Radio className="h-2 w-2 text-emerald-600 animate-pulse" />
-                      Live Platform
-                    </span>
-                  </div>
+    <div className="w-full space-y-6">
+      {/* Error Alert */}
+      {error && (
+        <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50/90 p-4 text-xs text-red-800 animate-in fade-in">
+          <AlertCircle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-semibold">Dashboard Sync Error</p>
+            <p className="mt-0.5">{error}</p>
+          </div>
+          <button
+            type="button"
+            onClick={loadDashboardData}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 transition cursor-pointer"
+          >
+            <RefreshCw className="h-3 w-3" />
+            <span>Try Again</span>
+          </button>
+        </div>
+      )}
 
-                  <div className="mt-2.5 flex items-baseline gap-3">
-                    <span className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#0F172A]">
-                      {isLoading ? (
-                        <span className="inline-block h-9 w-20 bg-slate-100 rounded-lg animate-pulse" />
-                      ) : (
-                        totalSocieties
-                      )}
-                    </span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                      <TrendingUp className="h-3 w-3" />
-                      <span>Active Tiers</span>
-                    </span>
-                  </div>
+      {/* ========================================================= */}
+      {/* 1. EXECUTIVE KPI METRICS (4 Core Platform Pillars)        */}
+      {/* ========================================================= */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Metric 1: Total Societies */}
+        <Link
+          href="/admin/apartments"
+          className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:border-emerald-300 hover:shadow-xs transition-all"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-[#64748B]">
+              Managed Communities
+            </span>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#EAF5EE] text-[#07584F] group-hover:scale-105 transition-transform">
+              <Building2 className="h-4.5 w-4.5" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <p className="text-2xl sm:text-3xl font-bold tracking-tight text-[#0F172A] tabular-nums">
+              {isLoading ? (
+                <span className="inline-block h-8 w-16 bg-slate-100 rounded-lg animate-pulse" />
+              ) : (
+                totalSocieties
+              )}
+            </p>
+            <p className="mt-1 text-xs text-[#64748B] flex items-center gap-1.5 truncate">
+              <span className="font-semibold text-[#07584F]">
+                {activeSocieties} active
+              </span>
+              <span>·</span>
+              <span>{pendingSocieties} onboarding</span>
+            </p>
+          </div>
+        </Link>
 
-                  <Link
-                    href="/admin/apartments"
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-[#07584F] hover:underline mt-1.5"
-                  >
-                    <span>View all societies</span>
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  </Link>
-                </div>
+        {/* Metric 2: Active Subscriptions */}
+        <Link
+          href="/admin/subscriptions"
+          className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:border-emerald-300 hover:shadow-xs transition-all"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-[#64748B]">
+              Active Subscriptions
+            </span>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#EAF5EE] text-[#07584F] group-hover:scale-105 transition-transform">
+              <Layers className="h-4.5 w-4.5" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <p className="text-2xl sm:text-3xl font-bold tracking-tight text-[#0F172A] tabular-nums">
+              {isLoading ? (
+                <span className="inline-block h-8 w-16 bg-slate-100 rounded-lg animate-pulse" />
+              ) : (
+                activeSubscriptions
+              )}
+            </p>
+            <p className="mt-1 text-xs text-[#64748B] truncate">
+              <span className="font-semibold text-slate-700">
+                {totalSubscriptions} total
+              </span>{" "}
+              registered plans
+            </p>
+          </div>
+        </Link>
 
-                {/* Quick Action Pills (Matching Bank.LY reference action buttons) */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-100">
-                  <Link
-                    href="/admin/apartments"
-                    className="flex flex-col items-center justify-center p-2.5 rounded-2xl border border-slate-150 bg-slate-50/60 hover:bg-slate-100 hover:border-slate-200 transition-all text-center group"
-                  >
-                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-[#07584F] shadow-2xs group-hover:scale-105 transition-transform">
-                      <Plus className="h-4 w-4" />
-                    </div>
-                    <span className="mt-1.5 text-[11px] font-semibold text-[#0F172A]">
-                      Society
-                    </span>
-                  </Link>
+        {/* Metric 3: Platform Revenue */}
+        <Link
+          href="/admin/payments"
+          className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:border-emerald-300 hover:shadow-xs transition-all"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-[#64748B]">
+              Total Platform Revenue
+            </span>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#EAF5EE] text-[#07584F] group-hover:scale-105 transition-transform">
+              <CreditCard className="h-4.5 w-4.5" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <p className="text-2xl sm:text-3xl font-bold tracking-tight text-[#0F172A] tabular-nums truncate">
+              {isLoading ? (
+                <span className="inline-block h-8 w-24 bg-slate-100 rounded-lg animate-pulse" />
+              ) : (
+                formatINR(totalRevenue)
+              )}
+            </p>
+            <p className="mt-1 text-xs text-[#64748B] truncate">
+              <span className="font-semibold text-[#07584F]">
+                {formatINR(monthRevenue)}
+              </span>{" "}
+              captured this month
+            </p>
+          </div>
+        </Link>
 
-                  <Link
-                    href="/admin/plans"
-                    className="flex flex-col items-center justify-center p-2.5 rounded-2xl border border-slate-150 bg-slate-50/60 hover:bg-slate-100 hover:border-slate-200 transition-all text-center group"
-                  >
-                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-[#07584F] shadow-2xs group-hover:scale-105 transition-transform">
-                      <CreditCard className="h-4 w-4" />
-                    </div>
-                    <span className="mt-1.5 text-[11px] font-semibold text-[#0F172A]">
-                      Plans
-                    </span>
-                  </Link>
+        {/* Metric 4: Action Radar */}
+        <Link
+          href="/admin/subscriptions"
+          className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:border-amber-300 hover:shadow-xs transition-all"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-[#64748B]">
+              Attention Required
+            </span>
+            <div
+              className={`flex h-9 w-9 items-center justify-center rounded-xl transition-transform group-hover:scale-105 ${
+                actionItemsCount > 0
+                  ? "bg-amber-50 text-amber-700"
+                  : "bg-[#EAF5EE] text-[#07584F]"
+              }`}
+            >
+              {actionItemsCount > 0 ? (
+                <AlertCircle className="h-4.5 w-4.5" />
+              ) : (
+                <CheckCircle2 className="h-4.5 w-4.5" />
+              )}
+            </div>
+          </div>
+          <div className="mt-3">
+            <p className="text-2xl sm:text-3xl font-bold tracking-tight text-[#0F172A] tabular-nums">
+              {isLoading ? (
+                <span className="inline-block h-8 w-12 bg-slate-100 rounded-lg animate-pulse" />
+              ) : (
+                actionItemsCount
+              )}
+            </p>
+            <p className="mt-1 text-xs text-[#64748B] truncate">
+              {actionItemsCount > 0 ? (
+                <>
+                  <span className="font-semibold text-amber-700">
+                    {expiringSoonSubscriptions} expiring soon
+                  </span>
+                  <span> · </span>
+                  <span>{pendingSocieties} pending</span>
+                </>
+              ) : (
+                <span className="font-semibold text-[#07584F]">
+                  All systems operational
+                </span>
+              )}
+            </p>
+          </div>
+        </Link>
+      </div>
 
-                  <Link
-                    href="/admin/users"
-                    className="flex flex-col items-center justify-center p-2.5 rounded-2xl border border-slate-150 bg-slate-50/60 hover:bg-slate-100 hover:border-slate-200 transition-all text-center group"
-                  >
-                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-[#07584F] shadow-2xs group-hover:scale-105 transition-transform">
-                      <Users className="h-4 w-4" />
-                    </div>
-                    <span className="mt-1.5 text-[11px] font-semibold text-[#0F172A]">
-                      Users
-                    </span>
-                  </Link>
+      {/* ========================================================= */}
+      {/* 2. PLATFORM ADOPTION & OPERATIONAL TELEMETRY              */}
+      {/* ========================================================= */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* Growth Trajectory (Area Chart - 8 cols) */}
+        <div className="lg:col-span-8 rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-slate-100">
+            <div>
+              <h2 className="text-base font-bold text-[#0F172A] tracking-tight">
+                Platform Growth Trajectory
+              </h2>
+              <p className="text-xs text-[#64748B] mt-0.5">
+                New apartment communities registered over time
+              </p>
+            </div>
 
-                  <Link
-                    href="/admin/reports"
-                    className="flex flex-col items-center justify-center p-2.5 rounded-2xl border border-slate-150 bg-slate-50/60 hover:bg-slate-100 hover:border-slate-200 transition-all text-center group"
-                  >
-                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-[#07584F] shadow-2xs group-hover:scale-105 transition-transform">
-                      <BarChart3 className="h-4 w-4" />
-                    </div>
-                    <span className="mt-1.5 text-[11px] font-semibold text-[#0F172A]">
-                      Reports
-                    </span>
-                  </Link>
-                </div>
-              </div>
-
-              {/* Right Sub-Section: Sub-KPI Highlights */}
-              <div className="md:col-span-5 flex flex-col justify-between border-t md:border-t-0 md:border-l border-slate-100 md:pl-6 pt-5 md:pt-0 space-y-4">
-                {/* Active Societies sub-card */}
-                <div className="rounded-2xl border border-slate-100 bg-[#F8FAFC] p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-[#64748B]">
-                      Active Societies
-                    </span>
-                    <Link
-                      href="/admin/apartments?status=active"
-                      className="text-[11px] font-semibold text-[#07584F] hover:underline"
-                    >
-                      View
-                    </Link>
-                  </div>
-                  <div className="mt-2 text-2xl font-bold text-[#0F172A]">
-                    {isLoading ? (
-                      <span className="inline-block h-7 w-16 bg-slate-200 rounded animate-pulse" />
-                    ) : (
-                      activeSocieties
-                    )}
-                  </div>
-                  <p className="mt-0.5 text-[11px] text-emerald-700 font-medium flex items-center gap-1">
-                    <CheckCircle2 className="h-3 w-3" />
-                    <span>Verified &amp; Operational</span>
-                  </p>
-                </div>
-
-                {/* Pending Onboarding sub-card */}
-                <div className="rounded-2xl border border-slate-100 bg-[#F8FAFC] p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-[#64748B]">
-                      Pending Onboarding
-                    </span>
-                    <Link
-                      href="/admin/apartments?status=pending_payment"
-                      className="text-[11px] font-semibold text-[#07584F] hover:underline"
-                    >
-                      Review
-                    </Link>
-                  </div>
-                  <div className="mt-2 text-2xl font-bold text-[#0F172A]">
-                    {isLoading ? (
-                      <span className="inline-block h-7 w-16 bg-slate-200 rounded animate-pulse" />
-                    ) : (
-                      pendingSocieties
-                    )}
-                  </div>
-                  <p className="mt-0.5 text-[11px] text-amber-700 font-medium flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    <span>Awaiting payment or setup</span>
-                  </p>
-                </div>
-              </div>
+            {/* Range Toggle */}
+            <div className="flex items-center rounded-xl bg-slate-100 p-1 self-start sm:self-auto">
+              {(["3m", "6m", "12m"] as const).map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRange(r)}
+                  className={`rounded-lg px-3 py-1 text-xs font-semibold uppercase transition-all cursor-pointer ${
+                    range === r
+                      ? "bg-white text-[#0F172A] shadow-xs"
+                      : "text-[#64748B] hover:text-[#0F172A]"
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Card 2: Platform Growth & Activity Overview Chart (Matching "Spending overview") */}
-          <div className="rounded-3xl border border-slate-200/70 bg-white p-6 sm:p-7 shadow-[0_1px_3px_rgba(0,0,0,0.02),0_4px_16px_rgba(0,0,0,0.02)]">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-slate-100">
-              <div>
-                <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">
-                  Platform Growth &amp; Registrations
-                </span>
-                <div className="mt-1 flex items-baseline gap-2">
-                  <span className="text-2xl sm:text-3xl font-bold tracking-tight text-[#0F172A]">
-                    {totalSocieties} Societies
-                  </span>
-                  <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
-                    Growth Trends
-                  </span>
-                </div>
+          {/* Chart Rendering */}
+          <div className="mt-4 h-64 w-full">
+            {isLoading ? (
+              <div className="h-full w-full rounded-xl bg-slate-50 flex items-center justify-center animate-pulse">
+                <span className="text-xs text-slate-400">Loading trend data...</span>
               </div>
-
-              {/* Range Selector Pill */}
-              <div className="flex items-center rounded-xl bg-slate-100 p-1 self-start sm:self-auto">
-                {(["3m", "6m", "12m"] as const).map((r) => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => setRange(r)}
-                    className={`rounded-lg px-3 py-1 text-xs font-semibold uppercase transition-all cursor-pointer ${
-                      range === r
-                        ? "bg-white text-[#0F172A] shadow-xs"
-                        : "text-[#64748B] hover:text-[#0F172A]"
-                    }`}
-                  >
-                    {r}
-                  </button>
-                ))}
+            ) : chartData.length === 0 ? (
+              <div className="h-full w-full flex flex-col items-center justify-center text-center">
+                <Building2 className="h-8 w-8 text-slate-300 mb-2" />
+                <p className="text-xs font-semibold text-slate-700">No registration history</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  New societies registered will chart here automatically.
+                </p>
               </div>
-            </div>
-
-            {/* Spline Area Chart */}
-            <div className="mt-5 h-64 w-full">
+            ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
                   data={chartData}
@@ -303,7 +402,7 @@ export default function AdminDashboardPage() {
                     stroke="#F1F5F9"
                   />
                   <XAxis
-                    dataKey="month"
+                    dataKey="period"
                     tickLine={false}
                     axisLine={false}
                     tick={{ fontSize: 11, fill: "#94A3B8" }}
@@ -336,288 +435,323 @@ export default function AdminDashboardPage() {
                   />
                 </AreaChart>
               </ResponsiveContainer>
-            </div>
-
-            {/* Category Sub-Pills Footer */}
-            <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2 text-xs">
-              <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-[#07584F]" />
-                <span className="font-semibold text-[#0F172A]">Societies Registered</span>
-                <span className="text-[#64748B] font-mono text-[11px]">
-                  ({chartData.reduce((a, b) => a + b.registrations, 0)} total in range)
-                </span>
-              </div>
-
-              <div className="flex items-center gap-4 text-[#64748B]">
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                  <span>Verified Onboarding</span>
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-blue-500" />
-                  <span>Razorpay Linked</span>
-                </span>
-              </div>
-            </div>
+            )}
           </div>
 
-          {/* Card 3: System Insights (Matching "Insights" in reference) */}
-          <div className="rounded-3xl border border-slate-200/70 bg-white p-6 sm:p-7 shadow-[0_1px_3px_rgba(0,0,0,0.02),0_4px_16px_rgba(0,0,0,0.02)]">
-            <h3 className="text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-4">
-              Platform Governance &amp; Insights
-            </h3>
-
-            <div className="space-y-3">
-              <div className="flex items-start justify-between p-3 rounded-2xl bg-[#F8FAFC] border border-slate-100">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-[#07584F] shrink-0">
-                    <ShieldCheck className="h-4.5 w-4.5" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-[#0F172A]">
-                      Apartment Verification Status
-                    </h4>
-                    <p className="text-[11px] text-[#64748B]">
-                      {activeSocieties} of {totalSocieties} societies actively managed with verified credentials.
-                    </p>
-                  </div>
-                </div>
-                <Link
-                  href="/admin/apartments"
-                  className="text-xs font-semibold text-[#07584F] hover:underline whitespace-nowrap ml-2"
-                >
-                  View More
-                </Link>
-              </div>
-
-              <div className="flex items-start justify-between p-3 rounded-2xl bg-[#F8FAFC] border border-slate-100">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 shrink-0">
-                    <CreditCard className="h-4.5 w-4.5" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-[#0F172A]">
-                      Subscription Gateway Integration
-                    </h4>
-                    <p className="text-[11px] text-[#64748B]">
-                      Razorpay merchant webhooks active for automatic society invoice renewal.
-                    </p>
-                  </div>
-                </div>
-                <Link
-                  href="/admin/plans"
-                  className="text-xs font-semibold text-[#07584F] hover:underline whitespace-nowrap ml-2"
-                >
-                  View More
-                </Link>
-              </div>
-            </div>
+          {/* Chart Footer Indicator */}
+          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-[#64748B]">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-[#07584F]" />
+              <span>
+                <strong className="text-[#0F172A] font-semibold">
+                  {totalRegistrationsInRange}
+                </strong>{" "}
+                societies onboarded in selected range
+              </span>
+            </span>
+            <Link
+              href="/admin/apartments"
+              className="text-xs font-semibold text-[#07584F] hover:underline inline-flex items-center gap-1"
+            >
+              <span>Explore communities</span>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </Link>
           </div>
         </div>
 
-        {/* ========================================================= */}
-        {/* RIGHT COLUMN (Summary Arc, Recent List, Coverage - 4 cols) */}
-        {/* ========================================================= */}
-        <div className="lg:col-span-4 space-y-6">
-          {/* Card 1: Societies Summary Arc Gauge (Matching "Accounts summary" in reference) */}
-          <div className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02),0_4px_16px_rgba(0,0,0,0.02)]">
-            <h3 className="text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-4">
-              Societies Summary
-            </h3>
+        {/* Operational Health & Quick Actions (Right 4 cols) */}
+        <div className="lg:col-span-4 space-y-4">
+          {/* Health & Coverage Card */}
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] space-y-4">
+            <div>
+              <h3 className="text-sm font-bold text-[#0F172A]">
+                Operational Coverage
+              </h3>
+              <p className="text-xs text-[#64748B] mt-0.5">
+                Active society verification rate
+              </p>
+            </div>
 
-            {/* Semi-Circle SVG Gauge */}
-            <div className="relative flex flex-col items-center justify-center pt-2">
-              <svg className="w-52 h-28 overflow-visible" viewBox="0 0 200 110">
-                {/* Background arc */}
-                <path
-                  d="M 20 100 A 80 80 0 0 1 180 100"
-                  fill="none"
-                  stroke="#F1F5F9"
-                  strokeWidth="20"
-                  strokeLinecap="round"
-                />
-                {/* Inactive segment */}
-                <path
-                  d="M 20 100 A 80 80 0 0 1 180 100"
-                  fill="none"
-                  stroke="#94A3B8"
-                  strokeWidth="20"
-                  strokeDasharray="251.2"
-                  strokeDashoffset={
-                    totalSocieties > 0
-                      ? 251.2 * (1 - (inactiveSocieties + pendingSocieties + activeSocieties) / (totalSocieties || 1))
-                      : 251.2
-                  }
-                  strokeLinecap="round"
-                />
-                {/* Pending segment */}
-                <path
-                  d="M 20 100 A 80 80 0 0 1 180 100"
-                  fill="none"
-                  stroke="#F59E0B"
-                  strokeWidth="20"
-                  strokeDasharray="251.2"
-                  strokeDashoffset={
-                    totalSocieties > 0
-                      ? 251.2 * (1 - (pendingSocieties + activeSocieties) / (totalSocieties || 1))
-                      : 251.2
-                  }
-                  strokeLinecap="round"
-                />
-                {/* Active segment */}
-                <path
-                  d="M 20 100 A 80 80 0 0 1 180 100"
-                  fill="none"
-                  stroke="#07584F"
-                  strokeWidth="20"
-                  strokeDasharray="251.2"
-                  strokeDashoffset={
-                    totalSocieties > 0
-                      ? 251.2 * (1 - activeSocieties / (totalSocieties || 1))
-                      : 251.2
-                  }
-                  strokeLinecap="round"
-                />
-              </svg>
-
-              {/* Center stat inside the arc */}
-              <div className="absolute top-16 text-center">
-                <span className="text-3xl font-extrabold text-[#0F172A]">
-                  {totalSocieties}
+            <div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-xl font-bold text-[#0F172A] tabular-nums">
+                  {activeSocieties} / {totalSocieties}
                 </span>
-                <p className="text-[11px] text-[#64748B] font-medium">
-                  Total Societies
-                </p>
+                <span className="text-xs font-bold text-[#07584F]">
+                  {activeCoveragePercent}% active
+                </span>
+              </div>
+              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-[#07584F] to-[#10B981] transition-all duration-500"
+                  style={{ width: `${activeCoveragePercent}%` }}
+                />
               </div>
             </div>
 
-            {/* Summary Legend (Matching reference legend exactly) */}
-            <div className="mt-6 space-y-2.5 pt-4 border-t border-slate-100 text-xs">
+            <div className="pt-3 border-t border-slate-100 space-y-2 text-xs">
               <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-[#64748B]">
-                  <span className="h-2.5 w-2.5 rounded-sm bg-[#07584F]" />
-                  <span>Active Societies</span>
+                <span className="text-[#64748B] flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  <span>Active Subscriptions</span>
                 </span>
-                <span className="font-bold text-[#0F172A]">{activeSocieties}</span>
+                <span className="font-bold text-[#0F172A]">{activeSubscriptions}</span>
               </div>
-
               <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-[#64748B]">
-                  <span className="h-2.5 w-2.5 rounded-sm bg-[#F59E0B]" />
-                  <span>Pending Payment</span>
+                <span className="text-[#64748B] flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-amber-500" />
+                  <span>Pending Invoices</span>
                 </span>
-                <span className="font-bold text-[#0F172A]">{pendingSocieties}</span>
+                <span className="font-bold text-[#0F172A]">{pendingSubscriptions}</span>
               </div>
-
               <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-[#64748B]">
-                  <span className="h-2.5 w-2.5 rounded-sm bg-[#94A3B8]" />
-                  <span>Inactive / Hidden</span>
+                <span className="text-[#64748B] flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-rose-500" />
+                  <span>Expiring Within 30d</span>
                 </span>
-                <span className="font-bold text-[#0F172A]">{inactiveSocieties}</span>
+                <span className="font-bold text-rose-700">
+                  {expiringSoonSubscriptions}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Card 2: Recent Societies List (Matching "Recent Transactions" in reference) */}
-          <div className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02),0_4px_16px_rgba(0,0,0,0.02)]">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">
-                Recent Societies
-              </h3>
+          {/* Quick Operations Strip */}
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] space-y-3">
+            <h3 className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">
+              Quick Operations
+            </h3>
+
+            <div className="grid grid-cols-2 gap-2">
               <Link
                 href="/admin/apartments"
-                className="text-xs font-semibold text-[#07584F] hover:underline"
+                className="flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-100 bg-slate-50/70 hover:bg-[#EAF5EE] hover:border-emerald-200 transition group"
               >
-                View More
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-[#07584F] shadow-2xs group-hover:scale-105 transition-transform">
+                  <Building2 className="h-3.5 w-3.5" />
+                </div>
+                <span className="text-xs font-semibold text-slate-800">Societies</span>
+              </Link>
+
+              <Link
+                href="/admin/plans"
+                className="flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-100 bg-slate-50/70 hover:bg-[#EAF5EE] hover:border-emerald-200 transition group"
+              >
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-[#07584F] shadow-2xs group-hover:scale-105 transition-transform">
+                  <Layers className="h-3.5 w-3.5" />
+                </div>
+                <span className="text-xs font-semibold text-slate-800">Plans</span>
+              </Link>
+
+              <Link
+                href="/admin/subscriptions"
+                className="flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-100 bg-slate-50/70 hover:bg-[#EAF5EE] hover:border-emerald-200 transition group"
+              >
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-[#07584F] shadow-2xs group-hover:scale-105 transition-transform">
+                  <CreditCard className="h-3.5 w-3.5" />
+                </div>
+                <span className="text-xs font-semibold text-slate-800">Billing</span>
+              </Link>
+
+              <Link
+                href="/admin/users"
+                className="flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-100 bg-slate-50/70 hover:bg-[#EAF5EE] hover:border-emerald-200 transition group"
+              >
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-[#07584F] shadow-2xs group-hover:scale-105 transition-transform">
+                  <Users className="h-3.5 w-3.5" />
+                </div>
+                <span className="text-xs font-semibold text-slate-800">Users</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================= */}
+      {/* 3. RECENT ACTIVITY DUAL STREAMS (Real Data)                */}
+      {/* ========================================================= */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Left: Recent Onboarded Societies */}
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
+              <div>
+                <h3 className="text-sm font-bold text-[#0F172A]">
+                  Recent Societies
+                </h3>
+                <p className="text-xs text-[#64748B]">
+                  Latest apartment communities added to Nesteeq
+                </p>
+              </div>
+              <Link
+                href="/admin/apartments"
+                className="text-xs font-semibold text-[#07584F] hover:underline inline-flex items-center gap-1"
+              >
+                <span>View all</span>
+                <ChevronRight className="h-3.5 w-3.5" />
               </Link>
             </div>
 
-            <div className="space-y-3">
+            {/* List */}
+            <div className="mt-3 divide-y divide-slate-100">
               {isLoading ? (
-                [...Array(4)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-3 p-2 rounded-2xl animate-pulse"
-                  >
-                    <div className="h-10 w-10 bg-slate-100 rounded-xl shrink-0" />
-                    <div className="flex-1 space-y-1.5">
-                      <div className="h-3.5 w-28 bg-slate-100 rounded" />
-                      <div className="h-2.5 w-20 bg-slate-50 rounded" />
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="py-3 flex items-center gap-3 animate-pulse">
+                    <div className="h-9 w-9 rounded-xl bg-slate-100 shrink-0" />
+                    <div className="flex-1 space-y-1">
+                      <div className="h-3.5 w-32 bg-slate-100 rounded" />
+                      <div className="h-2.5 w-24 bg-slate-100 rounded" />
                     </div>
                   </div>
                 ))
               ) : recentApartments.length === 0 ? (
-                <div className="text-center py-6 text-xs text-[#94A3B8]">
-                  <Building2 className="h-8 w-8 mx-auto text-slate-300 mb-2" />
-                  <p className="font-medium text-[#0F172A]">No societies registered yet</p>
-                  <p className="mt-1">Add your first society to see live activity.</p>
+                <div className="py-8 text-center text-xs text-slate-400">
+                  <Building2 className="h-7 w-7 text-slate-300 mx-auto mb-1.5" />
+                  <p className="font-semibold text-slate-700">No societies registered</p>
+                  <p className="mt-0.5">Societies added to the system will appear here.</p>
                 </div>
               ) : (
-                recentApartments.map((apt) => (
-                  <div
-                    key={apt._id}
-                    className="flex items-center justify-between p-2.5 rounded-2xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100"
-                  >
-                    <div className="flex items-center gap-3 overflow-hidden mr-2">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#EAF5EE] to-[#D5EBE0] text-[#07584F] font-bold text-sm shrink-0 shadow-2xs">
-                        {apt.name?.charAt(0).toUpperCase() || "S"}
+                recentApartments.map((apt) => {
+                  const initials = getInitials(apt.name)
+                  const isActive = apt.status === "active"
+                  return (
+                    <div
+                      key={apt._id}
+                      className="py-3 flex items-center justify-between gap-3 group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#EAF5EE] border border-emerald-200/80 text-xs font-bold text-[#07584F] shrink-0 shadow-2xs">
+                          {initials}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-[#0F172A] truncate group-hover:text-[#07584F] transition-colors">
+                            {apt.name}
+                          </p>
+                          <p className="text-[11px] text-[#64748B] truncate">
+                            {apt.city || "Urban Region"}
+                            {apt.totalUnits ? ` · ${apt.totalUnits} units` : ""}
+                          </p>
+                        </div>
                       </div>
-                      <div className="truncate">
-                        <h4 className="text-xs font-bold text-[#0F172A] truncate">
-                          {apt.name}
-                        </h4>
-                        <p className="text-[11px] text-[#64748B] truncate">
-                          {apt.city || "Urban Region"} • {apt.totalUnits || 0} units
-                        </p>
+
+                      <div className="text-right shrink-0 flex items-center gap-2">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold border ${
+                            isActive
+                              ? "bg-[#EAF5EE] text-[#07584F] border-emerald-200/80"
+                              : "bg-[#FFFBEB] text-[#B45309] border-amber-200/80"
+                          }`}
+                        >
+                          {isActive ? "Active" : "Pending"}
+                        </span>
                       </div>
                     </div>
-
-                    <span
-                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${
-                        apt.status === "active"
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          : "bg-amber-50 text-amber-800 border border-amber-200"
-                      }`}
-                    >
-                      {apt.status === "active" ? "Active" : "Pending"}
-                    </span>
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
           </div>
 
-          {/* Card 3: Active Coverage Widget (Matching "Monthly Budget" in reference) */}
-          <div className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02),0_4px_16px_rgba(0,0,0,0.02)]">
-            <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">
-              Active Platform Coverage
-            </span>
+          <div className="pt-3 border-t border-slate-100 text-right">
+            <Link
+              href="/admin/apartments"
+              className="text-xs font-semibold text-[#07584F] hover:underline"
+            >
+              Manage all societies ({totalSocieties}) →
+            </Link>
+          </div>
+        </div>
 
-            <div className="mt-2.5 flex items-baseline justify-between">
-              <div className="text-2xl font-bold tracking-tight text-[#0F172A]">
-                {activeSocieties}{" "}
-                <span className="text-sm font-normal text-[#64748B]">
-                  / {totalSocieties} societies
-                </span>
+        {/* Right: Recent Transactions */}
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
+              <div>
+                <h3 className="text-sm font-bold text-[#0F172A]">
+                  Recent Transactions
+                </h3>
+                <p className="text-xs text-[#64748B]">
+                  Live subscription payment activity
+                </p>
               </div>
-              <span className="text-xs font-bold text-[#07584F]">
-                {activePercent}% active
-              </span>
+              <Link
+                href="/admin/payments"
+                className="text-xs font-semibold text-[#07584F] hover:underline inline-flex items-center gap-1"
+              >
+                <span>View all</span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Link>
             </div>
 
-            {/* Progress Bar */}
-            <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-[#07584F] to-[#0A7B6E] transition-all duration-500"
-                style={{ width: `${activePercent}%` }}
-              />
-            </div>
+            {/* List */}
+            <div className="mt-3 divide-y divide-slate-100">
+              {isLoading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="py-3 flex items-center gap-3 animate-pulse">
+                    <div className="h-9 w-9 rounded-xl bg-slate-100 shrink-0" />
+                    <div className="flex-1 space-y-1">
+                      <div className="h-3.5 w-32 bg-slate-100 rounded" />
+                      <div className="h-2.5 w-24 bg-slate-100 rounded" />
+                    </div>
+                  </div>
+                ))
+              ) : recentPayments.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400">
+                  <CreditCard className="h-7 w-7 text-slate-300 mx-auto mb-1.5" />
+                  <p className="font-semibold text-slate-700">No payment records</p>
+                  <p className="mt-0.5">Subscription payments will stream here in real-time.</p>
+                </div>
+              ) : (
+                recentPayments.map((payment) => {
+                  const aptName = payment.apartment?.name || "Apartment"
+                  const isCaptured = payment.status === "captured"
+                  return (
+                    <div
+                      key={payment._id}
+                      className="py-3 flex items-center justify-between gap-3 group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 border border-slate-200/80 text-xs font-bold text-slate-700 shrink-0 shadow-2xs group-hover:bg-[#EAF5EE] group-hover:text-[#07584F] transition-colors">
+                          <CreditCard className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-[#0F172A] truncate group-hover:text-[#07584F] transition-colors">
+                            {aptName}
+                          </p>
+                          <p className="text-[11px] text-[#64748B] truncate">
+                            {payment.planName} · {formatDate(payment.paidAt || payment.createdAt)}
+                          </p>
+                        </div>
+                      </div>
 
-            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-[#64748B]">
-              <span>Pending Activations:</span>
-              <span className="font-bold text-[#0F172A]">{pendingSocieties}</span>
+                      <div className="text-right shrink-0">
+                        <p className="text-xs font-bold text-[#0F172A] tabular-nums">
+                          {formatINR(payment.totalAmount || payment.amount)}
+                        </p>
+                        <span
+                          className={`inline-flex items-center rounded-full px-1.5 py-0.2 text-[10px] font-semibold border ${
+                            isCaptured
+                              ? "bg-[#EAF5EE] text-[#07584F] border-emerald-200/80"
+                              : "bg-[#FEF2F2] text-[#DC2626] border-red-200/80"
+                          }`}
+                        >
+                          {isCaptured ? "Captured" : payment.status}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
             </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 text-right">
+            <Link
+              href="/admin/payments"
+              className="text-xs font-semibold text-[#07584F] hover:underline"
+            >
+              All payment records →
+            </Link>
           </div>
         </div>
       </div>
