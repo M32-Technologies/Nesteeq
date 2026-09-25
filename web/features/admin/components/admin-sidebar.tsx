@@ -6,11 +6,7 @@ import {
   Settings,
   LogOut,
   X,
-  HelpCircle,
-  Sparkles,
-  PanelLeftClose,
   ShieldCheck,
-  Radio,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -55,156 +51,160 @@ export default function AdminSidebar({
         />
       )}
 
-      {/* Main Sidebar (Matching reference Bank.LY sidebar) */}
+      {/* Main Sidebar: auto-collapsing on desktop with smooth hover expansion */}
       <aside
         aria-label="Admin navigation sidebar"
         className={cn(
-          "fixed top-0 bottom-0 left-0 z-50 flex h-screen w-[260px] flex-col justify-between bg-white border-r border-[#E5E8EC] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-          isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          "peer/sidebar group/sidebar fixed top-0 bottom-0 left-0 z-50 flex h-screen w-[260px] flex-col justify-between overflow-hidden bg-white border-r border-[#E5E8EC] transition-[transform,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+          isMobileOpen ? "translate-x-0" : "-translate-x-full",
+          "lg:w-[76px] lg:translate-x-0 lg:hover:w-[260px]"
         )}
       >
         {/* Top Header & Brand */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="flex h-[72px] items-center justify-between px-6 border-b border-slate-100/80">
-            <Link
-              href="/admin/dashboard"
-              onClick={onMobileClose}
-              className="flex items-center gap-2.5 group select-none"
-            >
-              {/* Brand Geometric Logo Icon */}
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#07584F] to-[#0A7B6E] text-white shadow-xs">
+        <div className="flex h-[72px] shrink-0 items-center border-b border-slate-100/90 overflow-hidden">
+          <Link
+            href="/admin/dashboard"
+            onClick={onMobileClose}
+            className="flex items-center group select-none h-full"
+          >
+            {/* Brand Logo Icon (Fixed 76px width to remain perfectly centered when collapsed) */}
+            <div className="flex w-[76px] shrink-0 items-center justify-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#07584F] to-[#0A7B6E] text-white shadow-xs ring-1 ring-emerald-900/10">
                 <ShieldCheck className="h-5 w-5" />
               </div>
-
-              <div className="flex flex-col">
-                <span className="text-[19px] font-extrabold tracking-tight text-[#0F172A] leading-tight">
-                  Nesteeq
-                </span>
-                <span className="text-[10px] font-semibold text-[#07584F] tracking-wider uppercase">
-                  Admin OS
-                </span>
-              </div>
-            </Link>
-
-            {/* Collapse / Close Indicator */}
-            <div className="flex items-center">
-              <button
-                type="button"
-                onClick={onMobileClose}
-                aria-label="Close navigation"
-                className="hidden lg:flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
-                title="Sidebar layout"
-              >
-                <PanelLeftClose className="h-4 w-4" />
-              </button>
-
-              <button
-                type="button"
-                onClick={onMobileClose}
-                aria-label="Close mobile navigation"
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 lg:hidden"
-              >
-                <X className="h-5 w-5" />
-              </button>
             </div>
-          </div>
 
-          {/* Navigation Items List */}
-          <nav className="mt-4 px-3.5 space-y-1.5">
-            {adminSidebarItems.map((item) => {
-              const Icon = item.icon
-              const isActive =
-                item.href === "/admin/dashboard"
-                  ? pathname === "/admin/dashboard"
-                  : pathname.startsWith(item.href)
+            {/* Brand Typography (Fades and slides smoothly on hover) */}
+            <div className="flex flex-col min-w-0 transition-all duration-200 translate-x-0 opacity-100 lg:-translate-x-1 lg:opacity-0 lg:group-hover/sidebar:translate-x-0 lg:group-hover/sidebar:opacity-100">
+              <span className="text-[18px] font-extrabold tracking-tight text-[#0F172A] leading-tight whitespace-nowrap">
+                Nesteeq
+              </span>
+              <span className="text-[10px] font-semibold text-[#07584F] tracking-wider uppercase whitespace-nowrap">
+                Admin OS
+              </span>
+            </div>
+          </Link>
 
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={onMobileClose}
-                  className={cn(
-                    "flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-[13.5px] transition-all",
-                    isActive
-                      ? "bg-white text-[#0F172A] font-bold shadow-xs border border-slate-200/90 ring-1 ring-slate-900/5"
-                      : "text-[#64748B] font-medium hover:bg-slate-50 hover:text-[#0F172A]"
-                  )}
-                >
-                  <Icon
-                    className={cn(
-                      "h-[18px] w-[18px] shrink-0 transition-colors",
-                      isActive ? "text-[#07584F]" : "text-[#94A3B8]"
-                    )}
-                  />
-                  <span className="truncate">{item.title}</span>
-                </Link>
-              )
-            })}
-          </nav>
+          {/* Close button on mobile only */}
+          <button
+            type="button"
+            onClick={onMobileClose}
+            aria-label="Close mobile navigation"
+            className="ml-auto mr-4 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 lg:hidden cursor-pointer"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
-        {/* Bottom Section: Settings, Help, Logout & Status Card */}
-        <div className="p-3.5 border-t border-slate-100/90 space-y-3">
-          <nav className="space-y-1">
-            {/* Settings */}
-            <Link
-              href="/admin/settings"
-              onClick={onMobileClose}
-              className={cn(
-                "flex items-center gap-3 px-3.5 py-2 rounded-xl text-[13px] transition-colors",
-                isSettingsActive
-                  ? "bg-slate-100 text-[#0F172A] font-semibold"
-                  : "text-[#64748B] hover:bg-slate-50 hover:text-[#0F172A] font-medium"
-              )}
-            >
-              <Settings className="h-4 w-4 shrink-0 text-[#94A3B8]" />
-              <span className="truncate">Settings</span>
-            </Link>
+        {/* Navigation Items List */}
+        <nav className="mt-3 flex-1 overflow-x-hidden overflow-y-auto px-2.5 space-y-1 [&::-webkit-scrollbar]:hidden">
+          {adminSidebarItems.map((item) => {
+            const Icon = item.icon
+            const isActive =
+              item.href === "/admin/dashboard"
+                ? pathname === "/admin/dashboard"
+                : pathname.startsWith(item.href)
 
-            {/* Help & Support */}
-            <a
-              href="mailto:support@nesteeq.com"
-              className="flex items-center gap-3 px-3.5 py-2 rounded-xl text-[13px] font-medium text-[#64748B] hover:bg-slate-50 hover:text-[#0F172A] transition-colors"
-            >
-              <HelpCircle className="h-4 w-4 shrink-0 text-[#94A3B8]" />
-              <span className="truncate">Help &amp; Support</span>
-            </a>
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onMobileClose}
+                title={item.title}
+                className={cn(
+                  "relative flex h-[46px] w-full items-center overflow-hidden rounded-xl transition-all duration-150 group/item",
+                  isActive
+                    ? "bg-slate-50 text-[#0F172A] font-semibold shadow-2xs border border-slate-200/90 ring-1 ring-slate-900/5"
+                    : "text-[#64748B] font-medium hover:bg-slate-50/80 hover:text-[#0F172A]"
+                )}
+              >
+                {/* Active indicator bar */}
+                {isActive && (
+                  <span
+                    className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[#07584F]"
+                    aria-hidden="true"
+                  />
+                )}
 
-            {/* Log Out */}
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="flex w-full items-center gap-3 px-3.5 py-2 rounded-xl text-[13px] font-medium text-[#64748B] hover:bg-red-50/80 hover:text-red-600 transition-colors cursor-pointer"
-            >
-              <LogOut className="h-4 w-4 shrink-0 text-[#94A3B8] group-hover:text-red-600" />
-              <span className="truncate">Log out</span>
-            </button>
-          </nav>
+                {/* Icon (56px width, perfectly centered when sidebar is 76px wide) */}
+                <div className="flex w-[56px] shrink-0 items-center justify-center">
+                  <Icon
+                    className={cn(
+                      "h-[19px] w-[19px] shrink-0 transition-colors",
+                      isActive
+                        ? "text-[#07584F]"
+                        : "text-[#94A3B8] group-hover/item:text-[#07584F]"
+                    )}
+                  />
+                </div>
 
-          {/* Bottom Card (Matching "Get more with Bank.LY" in the reference) */}
-          <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-b from-[#F8FAFC] to-[#F1F5F9] p-3.5 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-[#0F172A] flex items-center gap-1.5">
-                <Sparkles className="h-3.5 w-3.5 text-[#07584F]" />
-                Nesteeq Core
-              </span>
-              <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-100/70 px-1.5 py-0.5 rounded-full">
-                <Radio className="h-2.5 w-2.5 text-emerald-600 animate-pulse" />
-                Live
-              </span>
+                {/* Label (Smoothly revealed on hover) */}
+                <div className="flex min-w-0 flex-1 items-center transition-opacity duration-200 opacity-100 lg:opacity-0 lg:group-hover/sidebar:opacity-100">
+                  <span className="truncate whitespace-nowrap text-[13.5px]">
+                    {item.title}
+                  </span>
+                </div>
+              </Link>
+            )
+          })}
+        </nav>
+
+        {/* Bottom Section: Settings & Log Out (Manage Plans & Help & Support removed) */}
+        <div className="shrink-0 p-2.5 border-t border-slate-100/90 space-y-1">
+          {/* Settings */}
+          <Link
+            href="/admin/settings"
+            onClick={onMobileClose}
+            title="Settings"
+            className={cn(
+              "relative flex h-[44px] w-full items-center overflow-hidden rounded-xl transition-all duration-150 group/item",
+              isSettingsActive
+                ? "bg-slate-50 text-[#0F172A] font-semibold shadow-2xs border border-slate-200/90 ring-1 ring-slate-900/5"
+                : "text-[#64748B] font-medium hover:bg-slate-50/80 hover:text-[#0F172A]"
+            )}
+          >
+            {isSettingsActive && (
+              <span
+                className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[#07584F]"
+                aria-hidden="true"
+              />
+            )}
+
+            <div className="flex w-[56px] shrink-0 items-center justify-center">
+              <Settings
+                className={cn(
+                  "h-[18px] w-[18px] shrink-0 transition-colors",
+                  isSettingsActive
+                    ? "text-[#07584F]"
+                    : "text-[#94A3B8] group-hover/item:text-[#07584F]"
+                )}
+              />
             </div>
 
-            <p className="mt-1.5 text-[11px] text-[#64748B] leading-relaxed">
-              Real-time platform monitors &amp; society governance active.
-            </p>
+            <div className="flex min-w-0 flex-1 items-center transition-opacity duration-200 opacity-100 lg:opacity-0 lg:group-hover/sidebar:opacity-100">
+              <span className="truncate whitespace-nowrap text-[13px]">
+                Settings
+              </span>
+            </div>
+          </Link>
 
-            <Link
-              href="/admin/plans"
-              className="mt-3 block w-full text-center rounded-xl bg-gradient-to-r from-[#07584F] to-[#0A7B6E] py-1.5 text-xs font-semibold text-white shadow-xs hover:opacity-95 transition-opacity"
-            >
-              Manage Plans
-            </Link>
-          </div>
+          {/* Log Out */}
+          <button
+            type="button"
+            onClick={handleSignOut}
+            title="Log out"
+            className="relative flex h-[44px] w-full items-center overflow-hidden rounded-xl text-[#64748B] font-medium hover:bg-red-50/80 hover:text-red-600 transition-colors cursor-pointer group/logout"
+          >
+            <div className="flex w-[56px] shrink-0 items-center justify-center">
+              <LogOut className="h-[18px] w-[18px] shrink-0 text-[#94A3B8] group-hover/logout:text-red-600 transition-colors" />
+            </div>
+
+            <div className="flex min-w-0 flex-1 items-center transition-opacity duration-200 opacity-100 lg:opacity-0 lg:group-hover/sidebar:opacity-100">
+              <span className="truncate whitespace-nowrap text-[13px]">
+                Log out
+              </span>
+            </div>
+          </button>
         </div>
       </aside>
     </>

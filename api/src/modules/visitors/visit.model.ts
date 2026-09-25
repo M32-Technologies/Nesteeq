@@ -59,6 +59,20 @@ const guestPassSchema = new Schema(
       default: null,
       maxlength: 20,
     },
+    vehicleType: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: null,
+    },
+    rawToken: {
+      type: String,
+      default: null,
+    },
+    qrCodeDataUrl: {
+      type: String,
+      default: null,
+    },
     tokenHash: {
       type: String,
       required: true,

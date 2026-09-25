@@ -33,8 +33,9 @@ import technicianRoutes from "./modules/technician/technician.routes.js";
 import facilityRoutes from "./modules/facility/facility.routes.js";
 import reportRoutes from "./modules/report/report.routes.js";
 import scheduleRoutes from "./modules/schedule/schedule.routes.js";
+import treasurerRoutes from "./modules/treasurer/treasurer.routes.js";
 import uploadRoutes from "./modules/upload/upload.routes.js";
-import adminRoutes from "./modules/admin/admin.routes.js"
+import adminRoutes from "./modules/admin/admin.routes.js";
 const app = express();
 
 app.use(
@@ -69,6 +70,7 @@ app.use("/api/v1/finance", financeRoutes);
 app.use("/api/v1/expenses", expenseRoutes);
 app.use("/api/v1/wallets", walletRoutes);
 app.use("/api/v1/audit", auditRoutes);
+app.use("/api/v1/treasurer", treasurerRoutes);
 
 app.use("/api/bills", billingRoutes);
 app.use("/api/payments", paymentRoutes);
@@ -76,10 +78,13 @@ app.use("/api/finance", financeRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/wallets", walletRoutes);
 app.use("/api/audit", auditRoutes);
+app.use("/api/treasurer", treasurerRoutes);
+app.use("/api/residents", ResidentRoute);
 
 app.use("/api/v1/parking", parkingRoutes);
 app.use("/api/security/parking", parkingRoutes);
 
+app.use("/api/v1/visitors", visitorsRoutes);
 app.use("/api/visitors", visitorsRoutes);
 app.use("/api/deliveries", deliveryRoutes);
 app.use("/api/security/deliveries", deliveryRoutes);

@@ -166,6 +166,9 @@ export function AssignResidentDrawer({
         input: {
           flatId: values.flatId,
           residentId: values.residentId ? values.residentId : undefined,
+          vehicleNumber: values.vehicleNumber?.trim()
+            ? values.vehicleNumber.trim().toUpperCase()
+            : undefined,
         },
       },
       {
@@ -487,6 +490,39 @@ export function AssignResidentDrawer({
                       </div>
                     </div>
                   </div>
+                )}
+              </div>
+
+              {/* Field 3: Vehicle Number */}
+              <div>
+                <label
+                  htmlFor="assign-vehicle-input"
+                  className="mb-1.5 flex items-center justify-between text-xs font-semibold text-slate-700"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Car size={14} className="text-slate-400" />
+                    Vehicle Plate Number
+                  </span>
+                  <span className="text-[11px] font-normal text-slate-400">
+                    Optional
+                  </span>
+                </label>
+
+                <input
+                  id="assign-vehicle-input"
+                  {...form.register("vehicleNumber")}
+                  placeholder="e.g. MH 12 AB 1234 (Leave blank if resident will register)"
+                  autoComplete="off"
+                  className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 font-mono text-xs font-semibold uppercase text-slate-900 placeholder:font-sans placeholder:font-normal placeholder:normal-case placeholder:text-slate-400 outline-none transition hover:border-slate-400 focus:border-slate-300 focus:outline-none focus-visible:outline-none focus:ring-0"
+                />
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Leave empty to allocate the slot so the resident can register their own vehicle.
+                </p>
+
+                {form.formState.errors.vehicleNumber && (
+                  <p className="mt-1 text-xs font-medium text-red-600">
+                    {form.formState.errors.vehicleNumber.message}
+                  </p>
                 )}
               </div>
             </div>

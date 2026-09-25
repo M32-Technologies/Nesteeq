@@ -28,6 +28,26 @@ export const formatDate = (date: string | undefined) => {
   }).format(parsedDate);
 };
 
+export const formatDateTime = (date: string | undefined) => {
+  if (!date) {
+    return "Not recorded";
+  }
+
+  const parsedDate = new Date(date);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return date;
+  }
+
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).format(parsedDate);
+};
+
 export const monthLabels = [
   "Jan",
   "Feb",

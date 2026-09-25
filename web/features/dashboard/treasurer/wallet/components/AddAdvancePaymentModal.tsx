@@ -1,7 +1,10 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { X } from "lucide-react";
+
+import { getBillRecipients } from "../../services/treasurer.service";
 
 export interface NewAdvancePaymentData {
   residentId: string;
@@ -15,8 +18,6 @@ interface AddAdvancePaymentModalProps {
   onAdd: (payment: NewAdvancePaymentData) => void | Promise<void>;
   isSubmitting?: boolean;
 }
-
-const objectIdPattern = /^[0-9a-fA-F]{24}$/;
 
 const getSafeErrorMessage = (error: unknown) =>
   error instanceof Error
@@ -34,9 +35,20 @@ export default function AddAdvancePaymentModal({
   const [description, setDescription] = useState("Advance payment");
   const [error, setError] = useState("");
 
+  const recipientsQuery = useQuery({
+    queryKey: ["treasurer", "bill-recipients"],
+    queryFn: () => getBillRecipients(),
+    enabled: isOpen,
+  });
+
   if (!isOpen) {
     return null;
   }
+
+  const recipients = recipientsQuery.data ?? [];
+  const activeResidents = recipients.filter(
+    (r) => r.hasResident && Boolean(r.residentId)
+  );
 
   const resetForm = () => {
     setResidentId("");
@@ -55,14 +67,13 @@ export default function AddAdvancePaymentModal({
   ) => {
     event.preventDefault();
 
-    const trimmedResidentId = residentId.trim();
-    const parsedAmount = Number(amount);
-    const trimmedDescription = description.trim();
-
-    if (!objectIdPattern.test(trimmedResidentId)) {
-      setError("Resident ID must be a valid MongoDB ObjectId.");
+    if (!residentId) {
+      setError("Please select a resident.");
       return;
     }
+
+    const parsedAmount = Number(amount);
+    const trimmedDescription = description.trim();
 
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
       setError("Amount must be greater than 0.");
@@ -78,7 +89,7 @@ export default function AddAdvancePaymentModal({
 
     try {
       await onAdd({
-        residentId: trimmedResidentId,
+        residentId,
         amount: parsedAmount,
         description: trimmedDescription,
       });
@@ -121,24 +132,36 @@ export default function AddAdvancePaymentModal({
             ) : null}
 
             <label className="text-sm font-medium text-slate-700">
-              Resident ID
-              <input
-                type="text"
-                value={residentId}
-                onChange={(event) => setResidentId(event.target.value)}
-                pattern="[0-9a-fA-F]{24}"
-                required
-                className="mt-2 w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
-              />
+              Resident / Flat
+              {recipientsQuery.isLoading ? (
+                <div className="mt-2 text-xs text-slate-500">
+                  Loading residents...
+                </div>
+              ) : (
+                <select
+                  value={residentId}
+                  onChange={(event) => setResidentId(event.target.value)}
+                  required
+                  className="mt-2 w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                >
+                  <option value="">Select Resident / Flat</option>
+                  {activeResidents.map((r) => (
+                    <option key={r.residentId} value={r.residentId!}>
+                      {r.flatNumber ? `Flat ${r.flatNumber}` : r.unitName} — {r.residentName} ({r.residentType || "resident"})
+                    </option>
+                  ))}
+                </select>
+              )}
             </label>
 
             <label className="text-sm font-medium text-slate-700">
-              Amount
+              Amount (₹)
               <input
                 type="number"
                 min="0.01"
                 step="0.01"
                 value={amount}
+                placeholder="e.g. 5000"
                 onChange={(event) => setAmount(event.target.value)}
                 required
                 className="mt-2 w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"

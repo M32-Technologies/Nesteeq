@@ -85,6 +85,7 @@ export const VerifySubscriptionPaymentHandler = catchAsync(
       razorpay_payment_id,
       razorpay_subscription_id,
       razorpay_signature,
+      req.user?.id
     );
 
     res.status(200).json({

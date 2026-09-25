@@ -92,10 +92,20 @@ export function VisitorRecordsTable({
                   {formatDateTime(record.checkedOutAt)}
                 </td>
                 <td className={tdClassName}>
-                  {record.vehicleNumber || "-"}
+                  {record.vehicleNumber &&
+                  record.vehicleNumber.trim() &&
+                  record.vehicleNumber.trim().toLowerCase() !== "no vehicle" &&
+                  record.vehicleNumber.trim().toLowerCase() !== "none"
+                    ? record.vehicleNumber
+                    : "No vehicle"}
                 </td>
                 <td className={tdClassName}>
-                  {getParkingVehicleTypeLabel(record.vehicleType)}
+                  {record.vehicleNumber &&
+                  record.vehicleNumber.trim() &&
+                  record.vehicleNumber.trim().toLowerCase() !== "no vehicle" &&
+                  record.vehicleNumber.trim().toLowerCase() !== "none"
+                    ? getParkingVehicleTypeLabel(record.vehicleType)
+                    : "-"}
                 </td>
                 <td className={tdClassName}>
                   {record.parkingSlotNumber ? (

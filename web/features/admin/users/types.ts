@@ -17,9 +17,12 @@ export type BetterAuthUser = {
 export type UserKpiStats = {
   totalUsers: number // Excluding admin and super_admin
   propertyManagers: number
+  residents: number
   inactiveUsers: number // !emailVerified or banned
   verifiedManagers: number
   totalBanned: number
 }
+
+export type UserRoleFilter = "all" | "property_manager" | "resident"
 
 export type ManagerFilterStatus = "all" | "active" | "inactive" | "banned"

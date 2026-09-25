@@ -25,6 +25,8 @@ const sameId = (id1: any, id2: any): boolean => {
 };
 
 import { Complaint, type ComplaintDocument } from "./complaint.model.js";
+import { ResidentModel } from "../resident/resident.model.js";
+import { Maintenance } from "../maintenance/maintenance.model.js";
 import {
   approvalAllowedStatuses,
   assertNotTerminal,
@@ -184,12 +186,19 @@ const createRemark = (message: string | undefined, user: AuthenticatedComplaintU
   };
 };
 
+const escapeComplaintRegex = (value: string) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const applySharedFilters = (
   filter: ComplaintFilter,
   query: GetComplaintsQuery
 ): void => {
-  if (query.status) {
-    filter.status = query.status;
+  if (query.status && query.status !== "all") {
+    if (query.status === "RESOLVED") {
+      filter.status = { $in: ["WORK_COMPLETED", "APPROVED", "CLOSED"] };
+    } else {
+      filter.status = query.status;
+    }
   }
 
   if (query.category) {
@@ -198,6 +207,15 @@ const applySharedFilters = (
 
   if (query.priority) {
     filter.priority = query.priority;
+  }
+
+  if (query.search?.trim()) {
+    const sRegex = new RegExp(escapeComplaintRegex(query.search.trim()), "i");
+    filter.$or = [
+      { title: sRegex },
+      { description: sRegex },
+      { ticketNumber: sRegex },
+    ];
   }
 };
 
@@ -241,14 +259,28 @@ export const createComplaint = async (
   data: CreateComplaintInput,
   user: AuthenticatedComplaintUser
 ) => {
-  await ensureCurrentUserExists(user);
+ // await ensureCurrentUserExists(user);
 
   if (!isResidentRole(user.role)) {
     throw new AppError("Only residents can create complaints", 403);
   }
 
   const apartment = normalizeOptionalString(user.apartmentId);
-  const flat = normalizeOptionalString(user.flatId);
+  let flat = normalizeOptionalString(user.flatId);
+
+  if (!flat && apartment && Types.ObjectId.isValid(apartment)) {
+    const residentDoc = await ResidentModel.findOne({
+      apartmentId: new Types.ObjectId(apartment),
+      $or: [
+        { userId: user.id },
+        ...(Types.ObjectId.isValid(user.id) ? [{ _id: new Types.ObjectId(user.id) }] : []),
+      ],
+    }).lean();
+
+    if (residentDoc?.flatId) {
+      flat = residentDoc.flatId.toString();
+    }
+  }
 
   if (!apartment || !flat) {
     throw new AppError("Resident must be linked to an apartment and flat before creating a complaint", 400);
@@ -293,13 +325,117 @@ export const getComplaints = async (
 
   const skip = (query.page - 1) * query.limit;
 
-  const [complaints, total] = await Promise.all([
+  const countFilter = { ...filter };
+  delete countFilter.status;
+
+  const [complaints, total, pendingCount, inProgressCount, resolvedCount] = await Promise.all([
     Complaint.find(filter).sort({ createdAt: -1 }).skip(skip).limit(query.limit).lean(),
     Complaint.countDocuments(filter),
+    Complaint.countDocuments({ ...countFilter, status: "PENDING" } as any),
+    Complaint.countDocuments({ ...countFilter, status: { $in: ["UNDER_REVIEW", "ASSIGNED", "IN_PROGRESS", "AWAITING_APPROVAL"] } } as any),
+    Complaint.countDocuments({ ...countFilter, status: { $in: ["WORK_COMPLETED", "APPROVED", "CLOSED"] } } as any),
   ]);
 
+  const complaintIds = complaints.map((c) => c._id);
+  const staffIds = Array.from(new Set(complaints.map((c) => c.assignedStaff).filter(Boolean))) as string[];
+  const residentIds = Array.from(new Set(complaints.map((c) => c.resident).filter(Boolean))) as string[];
+  const allUserIds = Array.from(new Set([...staffIds, ...residentIds]));
+
+  const userObjectIds: ObjectId[] = [];
+  const userStringIds: string[] = [];
+  for (const id of allUserIds) {
+    userStringIds.push(id);
+    if (ObjectId.isValid(id)) {
+      userObjectIds.push(new ObjectId(id));
+    }
+  }
+
+  const [maintenanceJobs, authUsers] = await Promise.all([
+    (Maintenance as any).find({ complaint: { $in: complaintIds } }).lean(),
+    allUserIds.length > 0
+      ? getAuthDB()
+          .collection("user")
+          .find({
+            $or: [
+              { id: { $in: userStringIds } },
+              { _id: { $in: userObjectIds } },
+            ],
+          })
+          .project({ _id: 1, id: 1, name: 1, email: 1, role: 1, phone: 1 })
+          .toArray()
+      : Promise.resolve([]),
+  ]);
+
+  const userMap = new Map<string, any>();
+  for (const u of authUsers) {
+    if (u.id) userMap.set(u.id, u);
+    if (u._id) userMap.set(u._id.toString(), u);
+  }
+
+  const maintenanceMap = new Map<string, any>(
+    maintenanceJobs.map((m: any) => [m.complaint.toString(), m])
+  );
+
+  const enrichedComplaints = complaints.map((c) => {
+    const m = maintenanceMap.get(c._id.toString());
+    const staffUser = c.assignedStaff ? userMap.get(c.assignedStaff) : null;
+    const residentUser = c.resident ? userMap.get(c.resident) : null;
+
+    const assignedStaffData = staffUser
+      ? {
+          _id: staffUser.id || staffUser._id?.toString() || c.assignedStaff,
+          name: staffUser.name || "Technician",
+          role: staffUser.role || "Staff",
+          phone: staffUser.phone || null,
+        }
+      : c.assignedStaff
+      ? {
+          _id: c.assignedStaff,
+          name: "Assigned Staff",
+          role: "Staff",
+          phone: null,
+        }
+      : null;
+
+    const residentData = residentUser
+      ? {
+          _id: residentUser.id || residentUser._id?.toString() || c.resident,
+          name: residentUser.name || "Resident",
+          email: residentUser.email || null,
+          phone: residentUser.phone || null,
+        }
+      : {
+          _id: c.resident,
+          name: "Resident",
+        };
+
+    return {
+      ...c,
+      assignedStaff: assignedStaffData,
+      assignedTo: assignedStaffData,
+      resident: c.resident,
+      residentId: residentData,
+      maintenance: m
+        ? {
+            _id: m._id.toString(),
+            costReview: m.costReview,
+            finalCost: m.finalCost,
+            isSocietyCovered: m.isSocietyCovered,
+            assignedStaff: m.assignedStaff,
+            status: m.status,
+          }
+        : null,
+    };
+  });
+
   return {
-    complaints,
+    complaints: enrichedComplaints,
+    counts: {
+      total,
+      pendingCount,
+      inProgressCount,
+      resolvedCount,
+    },
     pagination: {
       page: query.page,
       limit: query.limit,
@@ -318,7 +454,43 @@ export const getComplaintById = async (
   const complaint = await getComplaintOrThrow(complaintId);
   assertCanAccessComplaint(user, complaint);
 
-  return complaint;
+  const staffUser = complaint.assignedStaff ? await findAuthUserById(complaint.assignedStaff) : null;
+  const residentUser = complaint.resident ? await findAuthUserById(complaint.resident) : null;
+
+  const assignedStaffData = staffUser
+    ? {
+        _id: (staffUser as any).id || (staffUser as any)._id?.toString() || complaint.assignedStaff,
+        name: (staffUser as any).name || "Technician",
+        role: (staffUser as any).role || "Staff",
+        phone: (staffUser as any).phone || null,
+      }
+    : complaint.assignedStaff
+    ? {
+        _id: complaint.assignedStaff,
+        name: "Assigned Staff",
+        role: "Staff",
+        phone: null,
+      }
+    : null;
+
+  const residentData = residentUser
+    ? {
+        _id: (residentUser as any).id || (residentUser as any)._id?.toString() || complaint.resident,
+        name: (residentUser as any).name || "Resident",
+        email: (residentUser as any).email || null,
+        phone: (residentUser as any).phone || null,
+      }
+    : {
+        _id: complaint.resident,
+        name: "Resident",
+      };
+
+  return {
+    ...complaint.toObject(),
+    assignedStaff: assignedStaffData,
+    assignedTo: assignedStaffData,
+    residentId: residentData,
+  };
 };
 
 export const updateComplaint = async (
@@ -463,13 +635,6 @@ export const updateComplaintStatus = async (
     if (nextStatus === "ASSIGNED" && !complaint.assignedStaff) {
       throw new AppError("Assign staff before moving complaint to ASSIGNED", 400);
     }
-
-    if (
-      nextStatus === "CLOSED" &&
-      complaint.residentConfirmation?.status !== "CONFIRMED"
-    ) {
-      throw new AppError("Resident confirmation is required before closing this complaint", 400);
-    }
   } else {
     throw new AppError("You do not have permission to update complaint status", 403);
   }
@@ -481,6 +646,22 @@ export const updateComplaintStatus = async (
   if (nextStatus === "CLOSED") {
     set.closedBy = user.id;
     set.closedAt = new Date();
+    if (complaint.residentConfirmation?.status !== "CONFIRMED") {
+      set["residentConfirmation.status"] = "CONFIRMED";
+      set["residentConfirmation.confirmedAt"] = new Date();
+      set["residentConfirmation.confirmedBy"] = user.id;
+      set["residentConfirmation.remarks"] = "Closed by Facility Manager";
+    }
+  } else if (nextStatus === "APPROVED") {
+    if (!complaint.approvalDetails?.status) {
+      set["approvalDetails.status"] = "APPROVED";
+      set["approvalDetails.reviewedBy"] = user.id;
+      set["approvalDetails.reviewedAt"] = new Date();
+    }
+    if (!complaint.residentConfirmation?.status) {
+      set["residentConfirmation.status"] = "PENDING";
+      set["residentConfirmation.requestedAt"] = new Date();
+    }
   }
 
   return updateComplaintDocument(complaintId, set, createRemark(data.remarks, user));
@@ -660,8 +841,8 @@ export const confirmComplaintResolution = async (
     return complaint;
   }
 
-  if (currentStatus !== "APPROVED") {
-    throw new AppError("Only approved complaints can be confirmed", 400);
+  if (!["APPROVED", "WORK_COMPLETED"].includes(currentStatus)) {
+    throw new AppError("Only approved or completed complaints can be confirmed", 400);
   }
 
   const now = new Date();

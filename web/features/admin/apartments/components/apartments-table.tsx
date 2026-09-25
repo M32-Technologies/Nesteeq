@@ -16,6 +16,7 @@ import {
   XCircle,
   CreditCard,
   Layers,
+  ArrowUpDown,
 } from "lucide-react"
 import type {
   ApartmentItem,
@@ -32,11 +33,19 @@ type ApartmentsTableProps = {
   totalItems: number
   pageSize: number
   onPageChange: (page: number) => void
+  onPageSizeChange?: (pageSize: number) => void
   // Filters & Search
   searchTerm: string
   onSearchChange: (query: string) => void
   statusFilter: ApartmentFilterStatus
   onStatusFilterChange: (status: ApartmentFilterStatus) => void
+  // Sorting
+  sortBy?: "name" | "createdAt" | "updatedAt" | "city"
+  sortOrder?: "asc" | "desc"
+  onSortChange?: (
+    sortBy: "name" | "createdAt" | "updatedAt" | "city",
+    sortOrder: "asc" | "desc"
+  ) => void
   onClearFilters: () => void
   onApartmentUpdated?: () => void
 }
@@ -49,17 +58,26 @@ export default function ApartmentsTable({
   totalItems,
   pageSize,
   onPageChange,
+  onPageSizeChange,
   searchTerm,
   onSearchChange,
   statusFilter,
   onStatusFilterChange,
+  sortBy = "createdAt",
+  sortOrder = "desc",
+  onSortChange,
   onClearFilters,
   onApartmentUpdated,
 }: ApartmentsTableProps) {
   const [selectedApartmentId, setSelectedApartmentId] = useState<string | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
 
-  const hasActiveFilters = Boolean(searchTerm.trim() || statusFilter !== "all")
+  const hasActiveFilters = Boolean(
+    searchTerm.trim() ||
+      statusFilter !== "all" ||
+      sortBy !== "createdAt" ||
+      sortOrder !== "desc"
+  )
 
   const handleOpenDetails = (id: string) => {
     setSelectedApartmentId(id)
@@ -151,12 +169,40 @@ export default function ApartmentsTable({
               <ChevronDown className="pointer-events-none absolute right-2 h-3.5 w-3.5 text-[#94A3B8]" />
             </div>
 
+            {/* Sort Filter */}
+            <div className="relative flex items-center rounded-lg border border-[#E2E8F0] bg-white transition-all hover:bg-slate-50 focus-within:border-[#07584F]">
+              <ArrowUpDown className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-[#64748B]" />
+              <select
+                value={`${sortBy}_${sortOrder}`}
+                aria-label="Sort apartments"
+                onChange={(e) => {
+                  if (onSortChange) {
+                    const [newSortBy, newSortOrder] = e.target.value.split("_") as [
+                      "name" | "createdAt" | "updatedAt" | "city",
+                      "asc" | "desc"
+                    ]
+                    onSortChange(newSortBy, newSortOrder)
+                  }
+                }}
+                className="h-8 rounded-lg border-0 bg-transparent pl-7 pr-7 text-xs font-medium text-[#334155] outline-none focus:outline-none focus:ring-0 appearance-none cursor-pointer"
+              >
+                <option value="createdAt_desc">Newest First</option>
+                <option value="createdAt_asc">Oldest First</option>
+                <option value="name_asc">Name (A – Z)</option>
+                <option value="name_desc">Name (Z – A)</option>
+                <option value="city_asc">City (A – Z)</option>
+                <option value="city_desc">City (Z – A)</option>
+                <option value="updatedAt_desc">Recently Updated</option>
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2 h-3.5 w-3.5 text-[#94A3B8]" />
+            </div>
+
             {/* Clear Filters button */}
             {hasActiveFilters && (
               <button
                 type="button"
                 onClick={onClearFilters}
-                className="inline-flex h-8 items-center gap-1 rounded-lg border border-dashed border-[#CBD5E1] bg-white px-2.5 text-xs font-medium text-[#64748B] hover:border-slate-400 hover:text-[#0F172A] transition-colors"
+                className="inline-flex h-8 items-center gap-1 rounded-lg border border-dashed border-[#CBD5E1] bg-white px-2.5 text-xs font-medium text-[#64748B] hover:border-slate-400 hover:text-[#0F172A] transition-colors cursor-pointer"
               >
                 <X className="h-3.5 w-3.5" />
                 <span>Reset</span>
@@ -327,7 +373,8 @@ export default function ApartmentsTable({
         {/* Pagination Footer */}
         {!isLoading && totalItems > 0 && (
           <div className="flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between border-t border-[#EEF1EF]">
-            <p className="text-xs text-[#64748B]">
+            <div className="flex items-center gap-3">
+              <p className="text-xs text-[#64748B]">
               Showing{" "}
               <span className="font-semibold text-[#334155]">
                 {Math.min((currentPage - 1) * pageSize + 1, totalItems)}
@@ -342,6 +389,19 @@ export default function ApartmentsTable({
               </span>
               {" "}apartments
             </p>
+
+            {onPageSizeChange && (
+              <select
+                value={pageSize}
+                onChange={(e) => onPageSizeChange(Number(e.target.value))}
+                className="h-7 rounded-lg border border-[#E2E8F0] bg-white px-2 text-xs font-medium text-[#334155] cursor-pointer focus:outline-none hover:bg-slate-50 transition-colors"
+              >
+                <option value={10}>10 / page</option>
+                <option value={25}>25 / page</option>
+                <option value={50}>50 / page</option>
+              </select>
+            )}
+          </div>
 
             <div className="flex items-center gap-1.5">
               <button

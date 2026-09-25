@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import api from "@/lib/axios";
+import { authClient } from "@/lib/auth-client";
 import {
   CreateSubscriptionResponse,
   CreateSubscriptionResult,
@@ -56,6 +57,16 @@ export const useCurrentSubscription = (enabled: boolean = true) => {
 };
 
 export const refreshAuthSessionFromDatabase = async () => {
+  try {
+    await authClient.getSession({
+      query: {
+        disableCookieCache: true,
+      },
+    });
+  } catch (error) {
+    console.error("Failed to refresh client session:", error);
+  }
+
   await api.get("/api/auth/get-session", {
     params: {
       disableCookieCache: true,
@@ -100,9 +111,7 @@ export const verifySubscriptionPayment = async (
 };
 
 export const promoteCurrentUserToPropertyManager = async () => {
-  await api.post("/api/auth/update-user", {
-    role: "property_manager",
-  });
+  // Role promotion is handled automatically and securely on the backend in /subscriptions/verify
 };
 
 export const useCreateSubscription = () => {
