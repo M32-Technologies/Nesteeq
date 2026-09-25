@@ -14,6 +14,9 @@ import { ResidentModel } from "../resident/resident.model.js";
 import { PaymentSource } from "../payment/payment.interface.js";
 import { createPaymentRecordService } from "../payment/payment.service.js";
 
+import { Flat } from "../flat/flat.model.js";
+import { getAuthDB } from "../../config/auth-db.js";
+
 import { AppError } from "../../utils/AppError.js";
 
 interface AuditActor {
@@ -32,6 +35,20 @@ const toObjectId = (id: string, field: string) => {
   }
 
   return new Types.ObjectId(id);
+};
+
+const getAuthUsersFilter = (userIds: string[]) => {
+  const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
+  const objectIds = uniqueIds
+    .filter((userId) => Types.ObjectId.isValid(userId))
+    .map((userId) => new Types.ObjectId(userId));
+
+  return {
+    $or: [
+      { id: { $in: uniqueIds } },
+      ...(objectIds.length ? [{ _id: { $in: objectIds } }] : []),
+    ],
+  };
 };
 
 const validateResidentOwnership = async (
@@ -92,10 +109,140 @@ export const createWalletService = async (
   });
 };
 
-export const getWalletsService = async (apartmentId: string) => {
+export const getWalletSummaryService = async (apartmentId: string) => {
   validateObjectId(apartmentId);
+  const aptId = new Types.ObjectId(apartmentId);
 
-  return Wallet.find({ apartmentId }).sort({ updatedAt: -1 });
+  const [agg] = await Wallet.aggregate([
+    {
+      $match: { apartmentId: aptId },
+    },
+    {
+      $group: {
+        _id: null,
+        totalBalance: { $sum: "$balance" },
+        totalAdded: { $sum: "$totalAdded" },
+        totalUsed: { $sum: "$totalUsed" },
+        activeWallets: {
+          $sum: {
+            $cond: [{ $gt: ["$balance", 0] }, 1, 0],
+          },
+        },
+        zeroBalanceWallets: {
+          $sum: {
+            $cond: [{ $lte: ["$balance", 0] }, 1, 0],
+          },
+        },
+        totalWallets: { $sum: 1 },
+      },
+    },
+  ]);
+
+  return {
+    totalBalance: agg?.totalBalance || 0,
+    totalAdded: agg?.totalAdded || 0,
+    totalUsed: agg?.totalUsed || 0,
+    activeWallets: agg?.activeWallets || 0,
+    zeroBalanceWallets: agg?.zeroBalanceWallets || 0,
+    totalWallets: agg?.totalWallets || 0,
+  };
+};
+
+export const getWalletsService = async (
+  apartmentId: string,
+  query?: { search?: string; status?: string; page?: number; limit?: number }
+) => {
+  validateObjectId(apartmentId);
+  const aptId = new Types.ObjectId(apartmentId);
+
+  const filter: Record<string, any> = { apartmentId: aptId };
+  if (query?.status === "ACTIVE") {
+    filter.balance = { $gt: 0 };
+  } else if (query?.status === "ZERO") {
+    filter.balance = { $lte: 0 };
+  }
+
+  const wallets = await Wallet.find(filter)
+    .sort({ updatedAt: -1 })
+    .lean();
+
+  if (wallets.length === 0) {
+    return [];
+  }
+
+  const residentIds = wallets.map((w) => w.residentId);
+
+  const residents = await ResidentModel.find(
+    { _id: { $in: residentIds } },
+    "_id userId flatId residentType"
+  ).lean();
+
+  const flatIds = residents
+    .map((r) => r.flatId)
+    .filter((id): id is Types.ObjectId => Boolean(id));
+
+  const flats = await Flat.find(
+    { _id: { $in: flatIds } },
+    "_id flatNumber"
+  ).lean();
+
+  const flatMap = new Map(
+    flats.map((f) => [f._id.toString(), f.flatNumber])
+  );
+
+  const userIds = residents
+    .map((r) => r.userId)
+    .filter((id): id is string => Boolean(id));
+
+  let userMap = new Map<string, string>();
+  if (userIds.length > 0) {
+    const authUsers = await getAuthDB()
+      .collection("user")
+      .find(getAuthUsersFilter(userIds))
+      .toArray();
+    userMap = new Map(
+      authUsers.map((u) => [u.id || u._id.toString(), u.name || "Resident"])
+    );
+  }
+
+  const residentInfoMap = new Map(
+    residents.map((r) => {
+      const flatNum = r.flatId ? flatMap.get(r.flatId.toString()) : "";
+      const name = r.userId ? userMap.get(r.userId) || "Resident" : "Resident";
+      return [
+        r._id.toString(),
+        {
+          residentName: name,
+          flatNumber: flatNum || "",
+          unitName: flatNum ? `Flat ${flatNum}` : "",
+          residentType: r.residentType,
+        },
+      ];
+    })
+  );
+
+  let mappedWallets = wallets.map((w) => {
+    const info = residentInfoMap.get(w.residentId.toString());
+    return {
+      ...w,
+      residentName: info?.residentName || "Resident",
+      flatNumber: info?.flatNumber || "",
+      unitName: info?.unitName || "",
+      residentType: info?.residentType || "",
+    };
+  });
+
+  if (query?.search?.trim()) {
+    const term = query.search.trim().toLowerCase();
+    mappedWallets = mappedWallets.filter(
+      (w) =>
+        (w.residentName || "").toLowerCase().includes(term) ||
+        (w.flatNumber || "").toLowerCase().includes(term) ||
+        (w.unitName || "").toLowerCase().includes(term)
+    );
+  }
+
+  return mappedWallets;
 };
 
 export const getWalletService = async (
@@ -108,13 +255,55 @@ export const getWalletService = async (
   const wallet = await Wallet.findOne({
     apartmentId,
     residentId,
-  });
+  }).lean();
 
   if (!wallet) {
     throw new AppError("Wallet not found", 404);
   }
 
-  return wallet;
+  const resident = await ResidentModel.findById(
+    residentId,
+    "_id userId flatId residentType"
+  ).lean();
+
+  let residentName = "Resident";
+  let flatNumber = "";
+  let unitName = "";
+  let residentType = "";
+
+  if (resident) {
+    residentType = resident.residentType;
+    if (resident.flatId) {
+      const flat = await Flat.findById(resident.flatId, "flatNumber").lean();
+      if (flat) {
+        flatNumber = flat.flatNumber;
+        unitName = `Flat ${flat.flatNumber}`;
+      }
+    }
+    if (resident.userId) {
+      const authUser = await getAuthDB()
+        .collection("user")
+        .findOne({
+          $or: [
+            { id: resident.userId },
+            ...(Types.ObjectId.isValid(resident.userId)
+              ? [{ _id: new Types.ObjectId(resident.userId) }]
+              : []),
+          ],
+        });
+      if (authUser?.name) {
+        residentName = authUser.name;
+      }
+    }
+  }
+
+  return {
+    ...wallet,
+    residentName,
+    flatNumber,
+    unitName,
+    residentType,
+  };
 };
 
 export const addWalletFundsService = async (
@@ -252,17 +441,16 @@ export const deductWalletFundsService = async (
         session
       );
 
-      const [wallet, bill] = await Promise.all([
-        Wallet.findOne({
-          apartmentId: apartmentObjectId,
-          residentId: residentObjectId,
-        }).session(session),
-        Billing.findOne({
-          _id: billObjectId,
-          apartmentId: apartmentObjectId,
-          residentId: residentObjectId,
-        }).session(session),
-      ]);
+      const wallet = await Wallet.findOne({
+        apartmentId: apartmentObjectId,
+        residentId: residentObjectId,
+      }).session(session);
+
+      const bill = await Billing.findOne({
+        _id: billObjectId,
+        apartmentId: apartmentObjectId,
+        residentId: residentObjectId,
+      }).session(session);
 
       if (!wallet) {
         throw new AppError("Wallet not found", 404);

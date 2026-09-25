@@ -10,6 +10,8 @@ export interface ApiVisitorRecord {
   apartmentId: string
   flatId?: string | null
   flatNumber?: string | null
+  residentName?: string | null
+  residentPhone?: string | null
   visitorName: string
   visitorPhone?: string | null
   purpose?: string | null
@@ -67,6 +69,8 @@ export function mapApiRecordToVisitorRecord(apiRec: ApiVisitorRecord): VisitorRe
     visitorPhone: apiRec.visitorPhone ?? undefined,
     unitId: apiRec.flatId ?? "",
     flatNumber: apiRec.flatNumber ?? "—",
+    residentName: apiRec.residentName ?? undefined,
+    residentPhone: apiRec.residentPhone ?? undefined,
     purpose: apiRec.purpose || "Personal Visit",
     vehicleNumber: apiRec.vehicleNumber ?? undefined,
     vehicleType: apiRec.vehicleType ?? undefined,

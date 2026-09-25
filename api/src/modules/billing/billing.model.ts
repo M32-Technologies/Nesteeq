@@ -2,6 +2,7 @@ import mongoose, { Schema } from "mongoose";
 
 import {
   BillStatus,
+  BillType,
   IBilling,
 } from "./billing.interface.js";
 
@@ -47,6 +48,39 @@ const billingSchema = new Schema<IBilling>(
       type: Schema.Types.ObjectId,
       required: true,
       index: true,
+    },
+
+    commonBillId: {
+      type: Schema.Types.ObjectId,
+      ref: "CommonBill",
+      default: null,
+      index: true,
+    },
+
+    title: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+
+    billType: {
+      type: String,
+      enum: Object.values(BillType),
+      default: BillType.MONTHLY_MAINTENANCE,
+      index: true,
+    },
+
+    billingPeriod: {
+      type: String,
+      trim: true,
+      default: null,
+      index: true,
+    },
+
+    description: {
+      type: String,
+      trim: true,
+      default: null,
     },
 
     baseAmount: {

@@ -153,14 +153,32 @@ export const listParkingSlotsService = async ({
     usageType: ParkingUsageType.VISITOR,
   }
 
-  if (status === "AVAILABLE") filter.status = ParkingSlotStatus.AVAILABLE
-  else if (status === "OCCUPIED") filter.status = { $in: [ParkingSlotStatus.OCCUPIED, ParkingSlotStatus.ASSIGNED] }
-  else if (status === "UNAVAILABLE") filter.status = ParkingSlotStatus.INACTIVE
+  if (status === "AVAILABLE") {
+    filter.status = ParkingSlotStatus.AVAILABLE
+    filter.vehicleNumber = { $in: [null, ""] }
+    filter.visitorVisitId = null
+  } else if (status === "OCCUPIED") {
+    filter.status = { $in: [ParkingSlotStatus.OCCUPIED, ParkingSlotStatus.ASSIGNED] }
+  } else if (status === "UNAVAILABLE") {
+    filter.status = ParkingSlotStatus.INACTIVE
+  }
 
-  if (vehicleType) filter.vehicleType = vehicleType
+  if (vehicleType) {
+    if (vehicleType === "OTHER") {
+      filter.$or = [{ vehicleType: "OTHER" }, { vehicleType: null }, { vehicleType: { $exists: false } }]
+    } else {
+      filter.vehicleType = vehicleType
+    }
+  }
   if (search) {
     const reg = new RegExp(escapeRegExp(search.trim()), "i")
-    filter.$or = [{ slotNumber: reg }, { vehicleNumber: reg }, { visitorName: reg }]
+    const searchCondition = [{ slotNumber: reg }, { vehicleNumber: reg }, { visitorName: reg }]
+    if (filter.$or) {
+      filter.$and = [{ $or: filter.$or }, { $or: searchCondition }]
+      delete filter.$or
+    } else {
+      filter.$or = searchCondition
+    }
   }
 
   const skip = (page - 1) * limit
@@ -468,10 +486,14 @@ export const releaseParkingSlotService = async ({
 
   if (visitId) {
     await VisitorVisitModel.updateOne(
-      { _id: visitId, apartmentId: aptObjectId, status: VisitorVisitStatus.ACTIVE },
-      { $set: { checkedOutAt: releasedAt, checkedOutBy: userId, status: VisitorVisitStatus.CHECKED_OUT } }
+      { _id: visitId, apartmentId: aptObjectId },
+      { $set: { parkingSlotId: null } }
     )
   }
+  await VisitorVisitModel.updateMany(
+    { apartmentId: aptObjectId, parkingSlotId: sObjectId },
+    { $set: { parkingSlotId: null } }
+  )
 
   return { slotId: toId(slot._id), releasedAt, releasedBy: userId }
 }
@@ -646,7 +668,7 @@ export const assignResidentParking = async (
         status: ParkingSlotStatus.ASSIGNED,
         flatId: new Types.ObjectId(data.flatId),
         residentId: data.residentId ? new Types.ObjectId(data.residentId) : null,
-        vehicleNumber: normalizeVehicleNumber(data.vehicleNumber),
+        vehicleNumber: data.vehicleNumber ? normalizeVehicleNumber(data.vehicleNumber) : null,
         assignedAt: new Date(),
       },
     },

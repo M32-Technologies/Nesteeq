@@ -3,6 +3,7 @@ import { Request, Response } from "express";
 import {
   createExpenseService,
   getExpenseByIdService,
+  getExpenseSummaryService,
   getExpensesService,
   updateExpenseService,
 } from "./expense.service.js";
@@ -39,11 +40,31 @@ export const getExpenses = catchAsync(
       apartmentId: req.query.apartmentId as string,
       category: req.query.category as ExpenseCategory,
       status: req.query.status as ExpenseStatus,
+      search: req.query.search as string,
+      startDate: req.query.startDate
+        ? new Date(req.query.startDate as string)
+        : undefined,
+      endDate: req.query.endDate
+        ? new Date(req.query.endDate as string)
+        : undefined,
     });
 
     res.status(200).json({
       success: true,
       data: expenses,
+    });
+  }
+);
+
+export const getExpenseSummary = catchAsync(
+  async (req: Request, res: Response) => {
+    const summary = await getExpenseSummaryService(
+      req.query.apartmentId as string
+    );
+
+    res.status(200).json({
+      success: true,
+      data: summary,
     });
   }
 );

@@ -1,9 +1,14 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { X } from "lucide-react";
 
-import type { CreateBillPayload } from "../types/billing.types";
+import { getBillRecipients } from "../services/billing.service";
+import type {
+  BillRecipient,
+  CreateBillPayload,
+} from "../types/billing.types";
 
 export type NewBillData = CreateBillPayload;
 
@@ -12,8 +17,6 @@ interface CreateBillModalProps {
   onClose: () => void;
   onCreate: (bill: CreateBillPayload) => void | Promise<void>;
 }
-
-const objectIdPattern = /^[0-9a-fA-F]{24}$/;
 
 const getSafeErrorMessage = (error: unknown) => {
   if (error instanceof Error) {
@@ -29,6 +32,7 @@ export default function CreateBillModal({
   onCreate,
 }: CreateBillModalProps) {
   const [residentId, setResidentId] = useState("");
+  const [residentName, setResidentName] = useState("");
   const [unitId, setUnitId] = useState("");
   const [baseAmount, setBaseAmount] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -42,12 +46,22 @@ export default function CreateBillModal({
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const recipientsQuery = useQuery<BillRecipient[]>({
+    queryKey: ["bill-recipients"],
+    queryFn: () => getBillRecipients(),
+    enabled: isOpen,
+  });
+
+  const recipients = recipientsQuery.data ?? [];
+  const selectedRecipient = recipients.find((r) => r.unitId === unitId);
+
   if (!isOpen) {
     return null;
   }
 
   const resetForm = () => {
     setResidentId("");
+    setResidentName("");
     setUnitId("");
     setBaseAmount("");
     setDueDate("");
@@ -69,7 +83,6 @@ export default function CreateBillModal({
   ) => {
     event.preventDefault();
 
-    const trimmedResidentId = residentId.trim();
     const trimmedUnitId = unitId.trim();
     const trimmedChargeTitle = additionalChargeTitle.trim();
     const trimmedChargeReason = additionalChargeReason.trim();
@@ -79,18 +92,18 @@ export default function CreateBillModal({
       additionalChargeAmount || "0",
     );
 
-    if (!trimmedResidentId || !trimmedUnitId || !dueDate) {
-      setError("Resident ID, Unit ID and Due Date are required.");
+    if (!trimmedUnitId) {
+      setError("Please select a Unit / Flat.");
       return;
     }
 
-    if (!objectIdPattern.test(trimmedResidentId)) {
-      setError("Resident ID must be a valid MongoDB ObjectId.");
+    if (!residentId && (!selectedRecipient || !selectedRecipient.hasResident)) {
+      setError("The selected unit has no active resident assigned.");
       return;
     }
 
-    if (!objectIdPattern.test(trimmedUnitId)) {
-      setError("Unit ID must be a valid MongoDB ObjectId.");
+    if (!dueDate) {
+      setError("Due Date is required.");
       return;
     }
 
@@ -120,8 +133,8 @@ export default function CreateBillModal({
     }
 
     const payload: CreateBillPayload = {
-      residentId: trimmedResidentId,
       unitId: trimmedUnitId,
+      ...(residentId ? { residentId } : {}),
       baseAmount: parsedBaseAmount,
       dueDate,
       lateFeePerDay: parsedLateFeePerDay,
@@ -190,44 +203,84 @@ export default function CreateBillModal({
 
             <div>
               <label
-                htmlFor="residentId"
+                htmlFor="unitId"
                 className="mb-2 block text-sm font-medium text-slate-700"
               >
-                Resident ID
+                Unit / Flat
               </label>
 
-              <input
-                id="residentId"
-                type="text"
-                value={residentId}
-                onChange={(event) =>
-                  setResidentId(event.target.value)
-                }
-                placeholder="24-character resident ObjectId"
-                pattern="[0-9a-fA-F]{24}"
+              <select
+                id="unitId"
+                value={unitId}
+                onChange={(event) => {
+                  const selectedUnitId = event.target.value;
+                  setUnitId(selectedUnitId);
+                  const found = recipients.find(
+                    (r) => r.unitId === selectedUnitId
+                  );
+                  if (found) {
+                    setResidentId(found.residentId || "");
+                    setResidentName(found.residentName);
+                  } else {
+                    setResidentId("");
+                    setResidentName("");
+                  }
+                }}
                 required
-                className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400"
-              />
+                disabled={recipientsQuery.isLoading}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 disabled:bg-slate-100"
+              >
+                <option value="">
+                  {recipientsQuery.isLoading
+                    ? "Loading units..."
+                    : "Select Unit / Flat"}
+                </option>
+                {recipients.map((recipient) => (
+                  <option
+                    key={recipient.unitId}
+                    value={recipient.unitId}
+                    disabled={!recipient.hasResident}
+                  >
+                    {recipient.unitName}{" "}
+                    {recipient.hasResident
+                      ? `— ${recipient.residentName} (${recipient.residentType || "Resident"})`
+                      : "(Vacant - No Resident)"}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
               <label
-                htmlFor="unitId"
+                htmlFor="residentName"
                 className="mb-2 block text-sm font-medium text-slate-700"
               >
-                Unit ID
+                Resident Name
               </label>
 
-              <input
-                id="unitId"
-                type="text"
-                value={unitId}
-                onChange={(event) => setUnitId(event.target.value)}
-                placeholder="24-character unit ObjectId"
-                pattern="[0-9a-fA-F]{24}"
-                required
-                className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400"
-              />
+              <div className="relative">
+                <input
+                  id="residentName"
+                  type="text"
+                  value={residentName}
+                  readOnly
+                  placeholder={
+                    unitId
+                      ? "No resident assigned"
+                      : "Select a unit to view resident"
+                  }
+                  className={`w-full rounded-lg border px-3.5 py-2.5 text-sm outline-none transition ${
+                    selectedRecipient && !selectedRecipient.hasResident
+                      ? "border-amber-200 bg-amber-50 text-amber-800 placeholder:text-amber-600"
+                      : "border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400"
+                  }`}
+                />
+                {selectedRecipient?.residentType ? (
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded bg-slate-200 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-slate-700">
+                    {selectedRecipient.residentType}
+                  </span>
+                ) : null}
+              </div>
             </div>
 
             <div>

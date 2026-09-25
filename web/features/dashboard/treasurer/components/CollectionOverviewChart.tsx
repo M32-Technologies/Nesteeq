@@ -78,7 +78,7 @@ export default function CollectionOverviewChart() {
     monthlyRows.length === 1
       ? padding.left + drawableWidth / 2
       : padding.left +
-        (index / (monthlyRows.length - 1)) * drawableWidth;
+      (index / (monthlyRows.length - 1)) * drawableWidth;
 
   const getY = (value: number) =>
     padding.top +

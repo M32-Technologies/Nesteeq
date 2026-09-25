@@ -12,6 +12,7 @@ export interface IPayment {
   unitId: Types.ObjectId;
   amount: number;
   source: PaymentSource;
+  receiptNumber?: string;
   description?: string;
   recordedBy?: string;
   paidAt: Date;

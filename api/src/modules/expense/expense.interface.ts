@@ -23,6 +23,7 @@ export interface IExpense {
 
   title: string;
   description?: string;
+  invoiceRef?: string;
 
   category: ExpenseCategory;
 
@@ -33,6 +34,11 @@ export interface IExpense {
   expenseDate: Date;
 
   status: ExpenseStatus;
+
+  rejectionReason?: string;
+  paymentMethod?: string;
+  paymentReference?: string;
+  paidAt?: Date;
 
   createdBy?: Types.ObjectId;
 
