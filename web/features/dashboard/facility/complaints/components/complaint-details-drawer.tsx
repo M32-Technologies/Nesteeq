@@ -21,6 +21,15 @@ import {
 import { ComplaintActions } from "@/features/dashboard/facility/complaints/components/complaint-actions"
 import { ComplaintMaintenanceSection } from "@/features/dashboard/facility/complaints/components/complaint-maintenance-section"
 
+function getMediaUrl(url: string) {
+  if (!url) return ""
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("blob:")) {
+    return url
+  }
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:6001"
+  return `${baseUrl.replace(/\/$/, "")}/${url.replace(/^\//, "")}`
+}
+
 export function ComplaintDetailsDrawer({
   open,
   complaint,
@@ -112,6 +121,48 @@ export function ComplaintDetailsDrawer({
               {complaint.description}
             </p>
           </section>
+
+          {(() => {
+            const complaintImages = [
+              ...(Array.isArray(complaint.images) ? complaint.images : []),
+              ...(Array.isArray(complaint.attachments) ? complaint.attachments : []),
+            ].filter(Boolean)
+
+            if (complaintImages.length === 0) return null
+
+            return (
+              <section className="border-b border-[#E8EDF2] py-5">
+                <h3 className="text-[15px] font-semibold text-[#111111] mb-3">
+                  Attached Photos ({complaintImages.length})
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {complaintImages.map((img, idx) => {
+                    const resolved = getMediaUrl(img)
+                    return (
+                      <a
+                        key={idx}
+                        href={resolved}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group relative block aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-50 transition-all hover:ring-2 hover:ring-primary/50"
+                      >
+                        <img
+                          src={resolved}
+                          alt={`Complaint photo ${idx + 1}`}
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center">
+                          <span className="opacity-0 group-hover:opacity-100 text-[11px] font-medium text-white bg-black/70 px-2 py-1 rounded shadow-sm transition-opacity">
+                            View full
+                          </span>
+                        </div>
+                      </a>
+                    )
+                  })}
+                </div>
+              </section>
+            )
+          })()}
 
           <section className="border-b border-[#E8EDF2] py-5">
             <h3 className="text-[15px] font-semibold text-[#111111]">

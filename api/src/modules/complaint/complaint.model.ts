@@ -214,6 +214,14 @@ const complaintSchema = new Schema(
       default: "PENDING",
       index: true,
     },
+    images: {
+      type: [String],
+      default: [],
+    },
+    attachments: {
+      type: [String],
+      default: [],
+    },
     assignedStaff: {
       type: String,
       trim: true,

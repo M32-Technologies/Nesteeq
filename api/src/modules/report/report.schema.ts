@@ -12,7 +12,10 @@ const objectIdSchema = (entity: string) =>
     .trim()
     .regex(/^[a-fA-F0-9]{24}$/, `Invalid ${entity} ID`);
 
-const optionalDateSchema = z.coerce.date().optional();
+const optionalDateSchema = z.preprocess(
+  (arg) => (typeof arg === "string" && arg.trim() === "" ? undefined : arg),
+  z.coerce.date().optional()
+);
 
 export const reportQuerySchema = z
   .object({

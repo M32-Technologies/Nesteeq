@@ -17,19 +17,22 @@ import {
   type TechnicianStatus,
 } from "../technician/technician.model.js";
 import {
+  addOrToFilter,
   applyApartmentScope,
   assertCanViewReports,
   ensureCurrentUserExists,
   type ReportFilter,
 } from "./report.policy.js";
 import type { ReportQuery } from "./report.schema.js";
+import { Staff } from "../staff/staff.model.js";
+import { resolveFacilityManagerApartmentId } from "../facility/facility.service.js";
+import { syncStaffTechnicians } from "../technician/technician.service.js";
 
 const normalizeOptionalString = (value: string | null | undefined): string | undefined => {
   if (!value) return undefined;
   const trimmed = value.trim();
   return trimmed === "" ? undefined : trimmed;
 };
-
 
 export type AuthenticatedReportUser = {
   id: string;
@@ -181,9 +184,10 @@ const buildTechnicianFilter = (
   if (query.technicianStatus) filter.status = query.technicianStatus;
   if (query.category) filter.specializations = query.category;
   if (query.technician) {
-    filter.$or = Types.ObjectId.isValid(query.technician)
+    const techClauses = Types.ObjectId.isValid(query.technician)
       ? [{ _id: query.technician }, { userId: query.technician }]
       : [{ userId: query.technician }];
+    addOrToFilter(filter, techClauses);
   }
 
   return filter;
@@ -394,11 +398,32 @@ const mergeWorkload = (
   return workload;
 };
 
+const ensureUserAndApartment = async (user: AuthenticatedReportUser) => {
+  await ensureCurrentUserExists(user);
+  if (!user.apartmentId) {
+    try {
+      const resolvedApt = await resolveFacilityManagerApartmentId(user as any);
+      if (resolvedApt) {
+        user.apartmentId = resolvedApt;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  if (user.apartmentId) {
+    try {
+      await syncStaffTechnicians(user.apartmentId);
+    } catch {
+      // ignore
+    }
+  }
+};
+
 export const getComplaintReport = async (
   query: ReportQuery,
   user: AuthenticatedReportUser
 ) => {
-  await ensureCurrentUserExists(user);
+  await ensureUserAndApartment(user);
   assertCanViewReports(user);
 
   const filter = await buildComplaintFilter(query, user);
@@ -437,7 +462,7 @@ export const getMaintenanceReport = async (
   query: ReportQuery,
   user: AuthenticatedReportUser
 ) => {
-  await ensureCurrentUserExists(user);
+  await ensureUserAndApartment(user);
   assertCanViewReports(user);
 
   const filter = await buildMaintenanceFilter(query, user);
@@ -476,7 +501,7 @@ export const getTechnicianReport = async (
   query: ReportQuery,
   user: AuthenticatedReportUser
 ) => {
-  await ensureCurrentUserExists(user);
+  await ensureUserAndApartment(user);
   assertCanViewReports(user);
 
   const technicianFilter = buildTechnicianFilter(query, user);
@@ -538,7 +563,7 @@ export const getCostReport = async (
   query: ReportQuery,
   user: AuthenticatedReportUser
 ) => {
-  await ensureCurrentUserExists(user);
+  await ensureUserAndApartment(user);
   assertCanViewReports(user);
 
   const complaintFilter = await buildComplaintFilter(query, user);
@@ -571,7 +596,7 @@ export const getPendingWorkReport = async (
   query: ReportQuery,
   user: AuthenticatedReportUser
 ) => {
-  await ensureCurrentUserExists(user);
+  await ensureUserAndApartment(user);
   assertCanViewReports(user);
 
   const complaintFilter = await buildComplaintFilter(query, user);
@@ -653,6 +678,243 @@ export const getReportsOverview = async (
   query: ReportQuery,
   user: AuthenticatedReportUser
 ) => {
+  await ensureUserAndApartment(user);
+
+  const complaintFilter = await buildComplaintFilter(query, user);
+  const maintenanceFilter = await buildMaintenanceFilter(query, user);
+  const technicianFilter = buildTechnicianFilter(query, user);
+
+  // 1. Complaints Summary
+  const [
+    totalComplaints,
+    resolvedComplaints,
+    pendingComplaints,
+  ] = await Promise.all([
+    Complaint.countDocuments(complaintFilter),
+    Complaint.countDocuments({
+      ...complaintFilter,
+      status: { $in: ["RESOLVED", "CLOSED", "APPROVED", "WORK_COMPLETED"] },
+    } as any),
+    Complaint.countDocuments({
+      ...complaintFilter,
+      status: { $in: ["PENDING", "UNDER_REVIEW", "ASSIGNED"] },
+    } as any),
+  ]);
+
+  // 2. Maintenance Summary
+  const [
+    totalMaintenance,
+    completedMaintenance,
+    inProgressMaintenance,
+  ] = await Promise.all([
+    Maintenance.countDocuments(maintenanceFilter),
+    Maintenance.countDocuments({
+      ...maintenanceFilter,
+      status: { $in: ["COMPLETED", "WORK_COMPLETED", "APPROVED", "CLOSED"] },
+    } as any),
+    Maintenance.countDocuments({
+      ...maintenanceFilter,
+      status: { $in: ["IN_PROGRESS", "ON_HOLD", "ASSIGNED", "AWAITING_APPROVAL"] },
+    } as any),
+  ]);
+
+  // 3. Maintenance Cost: Sum up cost or totalCost from completed maintenance / resolved complaint expenses
+  const [maintenanceCostAgg, complaintCostAgg] = await Promise.all([
+    Maintenance.aggregate<{ total: number }>([
+      { $match: maintenanceFilter },
+      {
+        $group: {
+          _id: null,
+          total: {
+            $sum: {
+              $ifNull: [
+                "$finalCost",
+                {
+                  $ifNull: [
+                    "$cost",
+                    {
+                      $ifNull: [
+                        "$totalCost",
+                        {
+                          $ifNull: [
+                            "$costReview.submittedAmount",
+                            {
+                              $cond: [
+                                { $in: ["$status", ["APPROVED", "CLOSED", "COMPLETED", "WORK_COMPLETED"]] },
+                                { $ifNull: ["$estimatedCost", 0] },
+                                0,
+                              ],
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      },
+    ]),
+    Complaint.aggregate<{ total: number }>([
+      {
+        $match: {
+          ...complaintFilter,
+          status: { $in: ["RESOLVED", "CLOSED", "APPROVED", "WORK_COMPLETED"] },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: {
+            $sum: {
+              $ifNull: ["$finalCost", 0],
+            },
+          },
+        },
+      },
+    ]),
+  ]);
+
+  const totalCost = (maintenanceCostAgg[0]?.total || 0) + (complaintCostAgg[0]?.total || 0);
+
+  // 4. Technician Performance Table
+  // Fetch active maintenance technicians (Technician and Staff collection)
+  const [techList, staffTechs] = await Promise.all([
+    Technician.find({
+      ...technicianFilter,
+      status: { $ne: "INACTIVE" },
+    }).lean(),
+    user.apartmentId
+      ? Staff.find({
+          apartmentId: Types.ObjectId.isValid(user.apartmentId)
+            ? new Types.ObjectId(user.apartmentId)
+            : user.apartmentId,
+          role: { $regex: /^(maintenance_technician|technician|maintenance_staff)$/i },
+          status: "active",
+        }).lean()
+      : [],
+  ]);
+
+  const technicianMap = new Map<
+    string,
+    {
+      technicianId: string;
+      name: string;
+      userId: string;
+      candidateIds: unknown[];
+    }
+  >();
+
+  for (const t of techList) {
+    const userId = t.userId || t._id.toString();
+    const candidateIds: unknown[] = [userId, t._id.toString()];
+    if (Types.ObjectId.isValid(userId)) candidateIds.push(new Types.ObjectId(userId));
+    if (Types.ObjectId.isValid(t._id)) candidateIds.push(t._id);
+
+    technicianMap.set(userId, {
+      technicianId: userId,
+      name: t.fullName || t.email || "Technician",
+      userId,
+      candidateIds,
+    });
+  }
+
+  for (const s of staffTechs) {
+    if (!s.userId || technicianMap.has(s.userId)) continue;
+    const candidateIds: unknown[] = [s.userId, s._id.toString()];
+    if (Types.ObjectId.isValid(s.userId)) candidateIds.push(new Types.ObjectId(s.userId));
+    if (Types.ObjectId.isValid(s._id)) candidateIds.push(s._id);
+
+    technicianMap.set(s.userId, {
+      technicianId: s.userId,
+      name: s.phone || "Technician",
+      userId: s.userId,
+      candidateIds,
+    });
+  }
+
+  if (technicianMap.size === 0) {
+    const allTechs = await Technician.find({ status: { $ne: "INACTIVE" } }).limit(20).lean();
+    for (const t of allTechs) {
+      const userId = t.userId || t._id.toString();
+      const candidateIds: unknown[] = [userId, t._id.toString()];
+      if (Types.ObjectId.isValid(userId)) candidateIds.push(new Types.ObjectId(userId));
+      if (Types.ObjectId.isValid(t._id)) candidateIds.push(t._id);
+
+      technicianMap.set(userId, {
+        technicianId: userId,
+        name: t.fullName || t.email || "Technician",
+        userId,
+        candidateIds,
+      });
+    }
+  }
+
+  const completedJobStatuses = ["RESOLVED", "CLOSED", "COMPLETED", "WORK_COMPLETED", "APPROVED"];
+  const activeJobStatuses = ["ASSIGNED", "IN_PROGRESS", "PENDING", "ON_HOLD", "UNDER_REVIEW"];
+
+  const dateRange = getDateRange(query);
+  const aptScopeCondition = user.apartmentId
+    ? {
+        $or: [
+          { apartment: { $in: [user.apartmentId, ...(Types.ObjectId.isValid(user.apartmentId) ? [new Types.ObjectId(user.apartmentId)] : [])] } },
+          { apartmentId: { $in: [user.apartmentId, ...(Types.ObjectId.isValid(user.apartmentId) ? [new Types.ObjectId(user.apartmentId)] : [])] } },
+        ],
+      }
+    : null;
+
+  const technicianPerformance = await Promise.all(
+    Array.from(technicianMap.values()).map(async (tech) => {
+      const staffClause = {
+        $or: [
+          { assignedStaff: { $in: tech.candidateIds } },
+          { assignedTo: { $in: tech.candidateIds } },
+          { assignedTechnicianId: { $in: tech.candidateIds } },
+        ],
+      };
+
+      const jobFilter: Record<string, unknown> = {
+        $and: [staffClause],
+      };
+
+      if (aptScopeCondition) {
+        (jobFilter.$and as Record<string, unknown>[]).push(aptScopeCondition);
+      }
+      if (dateRange) {
+        (jobFilter.$and as Record<string, unknown>[]).push({ createdAt: dateRange });
+      }
+
+      const [completedComplaints, completedMaint, activeComplaints, activeMaint] =
+        await Promise.all([
+          Complaint.countDocuments({
+            ...jobFilter,
+            status: { $in: completedJobStatuses },
+          } as any),
+          Maintenance.countDocuments({
+            ...jobFilter,
+            status: { $in: completedJobStatuses },
+          } as any),
+          Complaint.countDocuments({
+            ...jobFilter,
+            status: { $in: activeJobStatuses },
+          } as any),
+          Maintenance.countDocuments({
+            ...jobFilter,
+            status: { $in: activeJobStatuses },
+          } as any),
+        ]);
+
+      return {
+        technicianId: tech.technicianId,
+        name: tech.name,
+        completedJobs: completedComplaints + completedMaint,
+        activeJobs: activeComplaints + activeMaint,
+      };
+    })
+  );
+
   const [complaints, maintenance, technicians, costs, pendingWork] = await Promise.all([
     getComplaintReport(query, user),
     getMaintenanceReport(query, user),
@@ -662,6 +924,19 @@ export const getReportsOverview = async (
   ]);
 
   return {
+    complaintsSummary: {
+      total: totalComplaints,
+      resolved: resolvedComplaints,
+      pending: pendingComplaints,
+      averageResolutionTimeHours: 0,
+    },
+    maintenanceSummary: {
+      total: totalMaintenance,
+      completed: completedMaintenance,
+      inProgress: inProgressMaintenance,
+      totalCost,
+    },
+    technicianPerformance,
     filters: {
       startDate: query.startDate ?? null,
       endDate: query.endDate ?? null,

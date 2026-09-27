@@ -44,6 +44,8 @@ export const createComplaintBodySchema = z
     priority: z.enum(complaintPriorities, {
       error: "Complaint priority is required",
     }),
+    images: z.array(z.string().trim()).optional().default([]),
+    attachments: z.array(z.string().trim()).optional().default([]),
   })
   .strict();
 
@@ -64,6 +66,8 @@ export const updateComplaintBodySchema = z
     category: z.enum(complaintCategories).optional(),
     priority: z.enum(complaintPriorities).optional(),
     estimatedCost: costSchema.optional(),
+    images: z.array(z.string().trim()).optional(),
+    attachments: z.array(z.string().trim()).optional(),
     remarks: nonEmptyText("Remarks", 1000).optional(),
   })
   .strict()

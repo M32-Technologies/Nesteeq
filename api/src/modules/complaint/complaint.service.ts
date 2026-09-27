@@ -935,6 +935,11 @@ export const createComplaint = async (
     ? new Types.ObjectId(flat)
     : undefined;
 
+  const rawImages = (data as any).images || (data as any).attachments || [];
+  const images = Array.isArray(rawImages) ? rawImages : rawImages ? [rawImages] : [];
+  const rawAttachments = (data as any).attachments || images;
+  const attachments = Array.isArray(rawAttachments) ? rawAttachments : rawAttachments ? [rawAttachments] : [];
+
   const complaint = await Complaint.create({
     resident: user.id,
     residentId: user.id,
@@ -947,11 +952,12 @@ export const createComplaint = async (
     category: data.category,
     priority: data.priority,
     status: "PENDING",
+    images,
+    attachments,
   });
 
-  return complaint;
   const [enriched] = await enrichComplaints([complaint]);
-  return enriched;
+  return enriched || complaint;
 };
 
 export const getComplaints = async (
@@ -1070,6 +1076,14 @@ export const updateComplaint = async (
     }
 
     set.estimatedCost = data.estimatedCost;
+  }
+
+  if ((data as any).images !== undefined) {
+    set.images = (data as any).images;
+  }
+
+  if ((data as any).attachments !== undefined) {
+    set.attachments = (data as any).attachments;
   }
 
   return updateComplaintDocument(complaintId, set, createRemark(data.remarks, user));

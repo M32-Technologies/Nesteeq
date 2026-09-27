@@ -53,6 +53,7 @@ export type Complaint = {
   assignedTechnicianName?: string
   maintenanceId?: string
   attachments?: string[]
+  images?: string[]
   rejectionReason?: string
   activityNotes?: ActivityNote[]
   completionDetails?: CompletionDetails
