@@ -220,6 +220,7 @@ export interface ExpenseSummary {
   approvedExpenses: number;
   pendingExpenses: number;
   pendingCount: number;
+  totalCount?: number;
 }
 
 export interface CreateExpensePayload {
@@ -590,7 +591,7 @@ export const getMaintenancePayouts = () =>
 
 export const processMaintenancePayout = (
   jobId: string,
-  payload: { paymentMethod?: string; notes?: string } = {}
+  payload: { paymentMethod?: string; paymentReference?: string; notes?: string } = {}
 ) =>
   request<Expense>(
     `/api/treasurer/maintenance-payouts/${encodeURIComponent(jobId)}/process`,

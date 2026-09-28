@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { X } from "lucide-react";
 
 import type {
@@ -52,10 +52,6 @@ export default function AddExpenseModal({
   const [expenseDate, setExpenseDate] = useState("");
   const [error, setError] = useState("");
 
-  if (!isOpen) {
-    return null;
-  }
-
   const resetForm = () => {
     setTitle("");
     setDescription("");
@@ -71,6 +67,21 @@ export default function AddExpenseModal({
     resetForm();
     onClose();
   };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        handleClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
+
+  if (!isOpen) {
+    return null;
+  }
 
   const handleSubmit = async (
     event: FormEvent<HTMLFormElement>,
