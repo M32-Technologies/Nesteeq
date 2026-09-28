@@ -169,7 +169,7 @@ const syncTechnicianWorkloadStatus = async (userId: string) => {
   return Technician.findByIdAndUpdate(
     technician._id,
     { $set: { status: nextStatus } },
-    { new: true, runValidators: true }
+    { returnDocument: "after", runValidators: true }
   );
 };
 
@@ -311,7 +311,7 @@ export const updateTechnician = async (
   const updatedTechnician = await Technician.findByIdAndUpdate(
     technicianId,
     { $set: set },
-    { new: true, runValidators: true }
+    { returnDocument: "after", runValidators: true }
   );
 
   if (!updatedTechnician) {
@@ -351,7 +351,7 @@ export const updateTechnicianStatus = async (
   const updatedTechnician = await Technician.findByIdAndUpdate(
     technicianId,
     { $set: set },
-    { new: true, runValidators: true }
+    { returnDocument: "after", runValidators: true }
   );
 
   if (!updatedTechnician) {

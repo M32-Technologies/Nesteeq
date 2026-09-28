@@ -269,7 +269,7 @@ export const startJob = async (jobId: string, technicianId?: string) => {
         },
       },
     },
-    { new: true }
+    { returnDocument: "after" }
   )
 
   if (!job) {
@@ -320,7 +320,7 @@ export const addProgressUpdate = async (
         updatedBy: technicianId || "Technician",
       },
     },
-    { new: true }
+    { returnDocument: "after" }
   )
 
   if (!job) {
@@ -360,7 +360,7 @@ export const uploadEvidence = async (
         updatedBy: technicianId || "Technician",
       },
     },
-    { new: true }
+    { returnDocument: "after" }
   )
 
   if (!job) {
@@ -409,7 +409,7 @@ export const submitCost = async (
         },
       },
     },
-    { new: true }
+    { returnDocument: "after" }
   )
 
   if (!job) {
@@ -471,7 +471,7 @@ export const completeJob = async (
         },
       },
     },
-    { new: true }
+    { returnDocument: "after" }
   )
 
   if (!job) {

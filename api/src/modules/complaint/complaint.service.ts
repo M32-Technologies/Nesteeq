@@ -160,7 +160,7 @@ const updateComplaintDocument = async (
   }
 
   const updatedComplaint = await Complaint.findByIdAndUpdate(complaintId, update, {
-    new: true,
+    returnDocument: "after",
     runValidators: true,
   });
 

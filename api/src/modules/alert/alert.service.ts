@@ -439,7 +439,7 @@ export const updateEmergencyAlertStatusService = async ({
         $set: statusUpdate,
       },
       {
-        new: true,
+        returnDocument: "after",
         runValidators: true,
       }
     )

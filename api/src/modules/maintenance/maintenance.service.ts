@@ -189,7 +189,7 @@ const updateMaintenanceDocument = async (
   }
 
   const updatedMaintenance = await Maintenance.findByIdAndUpdate(maintenanceId, update, {
-    new: true,
+    returnDocument: "after",
     runValidators: true,
   });
 

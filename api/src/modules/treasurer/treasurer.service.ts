@@ -289,7 +289,7 @@ export const updateTreasurerSettingsService = async (
   const settings = await TreasurerSetting.findOneAndUpdate(
     { apartmentId: id },
     { $set: updateData },
-    { new: true, upsert: true }
+    { returnDocument: "after", upsert: true }
   );
   return settings;
 };
@@ -399,7 +399,7 @@ export const processMaintenancePayoutService = async (
         "costReview.forwardedToRole": "SETTLED",
       },
     },
-    { new: false }
+    { returnDocument: "before" }
   );
 
   if (!job) {

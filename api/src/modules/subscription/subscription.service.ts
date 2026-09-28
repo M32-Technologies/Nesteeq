@@ -274,7 +274,7 @@ export const VerifySubscriptionPayment = async (
       billingCycle: Math.max(1, Number(subscription.paidCount ?? 1)),
       paidAt: new Date(),
     },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   );
 
   return {

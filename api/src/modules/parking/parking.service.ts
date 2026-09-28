@@ -259,7 +259,7 @@ export const updateParkingSlotStatusService = async ({
         flatId: null,
       },
     },
-    { new: true }
+    { returnDocument: "after" }
   ).lean<IParkingSlot | null>()
 
   if (!slot) throw new AppError("Parking slot not found", 404)
