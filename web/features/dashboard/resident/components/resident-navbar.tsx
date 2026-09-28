@@ -60,42 +60,42 @@ export function ResidentNavbar({ user }: ResidentNavbarProps) {
     icon: React.ComponentType<{ className?: string }>;
     badge?: string;
   }> = [
-    {
-      label: "Dashboard",
-      href: "/resident",
-      icon: LayoutDashboard,
-    },
-    {
-      label: "Visitors & Passes",
-      href: "/resident/visitors",
-      icon: QrCode,
-    },
-    {
-      label: "Complaints & Service",
-      href: "/resident/complaints",
-      icon: Wrench,
-    },
-    {
-      label: "Bills & Society Finance",
-      href: "/resident/bills",
-      icon: ReceiptText,
-    },
-    {
-      label: "My Parking",
-      href: "/resident/parking",
-      icon: Car,
-    },
-    {
-      label: "Announcements",
-      href: "/resident/announcements",
-      icon: Bell,
-    },
-    {
-      label: "Emergency SOS",
-      href: "/resident/alerts",
-      icon: ShieldAlert,
-    },
-  ];
+      {
+        label: "Dashboard",
+        href: "/resident",
+        icon: LayoutDashboard,
+      },
+      {
+        label: "Visitors & Passes",
+        href: "/resident/visitors",
+        icon: QrCode,
+      },
+      {
+        label: "Complaints & Service",
+        href: "/resident/complaints",
+        icon: Wrench,
+      },
+      {
+        label: "Bills & Society Finance",
+        href: "/resident/bills",
+        icon: ReceiptText,
+      },
+      {
+        label: "My Parking",
+        href: "/resident/parking",
+        icon: Car,
+      },
+      {
+        label: "Announcements",
+        href: "/resident/announcements",
+        icon: Bell,
+      },
+      {
+        label: "Emergency SOS",
+        href: "/resident/alerts",
+        icon: ShieldAlert,
+      },
+    ];
 
   const isTabActive = (href: string) => {
     if (href === "/resident") {
@@ -264,21 +264,19 @@ export function ResidentNavbar({ user }: ResidentNavbarProps) {
                 <Link
                   key={tab.href}
                   href={tab.href}
-                  className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs sm:text-sm font-medium tracking-tight whitespace-nowrap transition-colors cursor-pointer ${
-                    active
+                  className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs sm:text-sm font-medium tracking-tight whitespace-nowrap transition-colors cursor-pointer ${active
                       ? "bg-[#07584F] text-white shadow-xs font-semibold"
                       : "text-[#637083] hover:bg-slate-100/80 hover:text-[#111111]"
-                  }`}
+                    }`}
                 >
                   <Icon className="size-4 shrink-0" />
                   <span>{tab.label}</span>
                   {tab.badge && (
                     <span
-                      className={`ml-1 rounded px-1.5 py-0.2 text-[10px] font-bold uppercase tracking-wider ${
-                        active
+                      className={`ml-1 rounded px-1.5 py-0.2 text-[10px] font-bold uppercase tracking-wider ${active
                           ? "bg-white/20 text-white"
                           : "bg-emerald-100 text-emerald-800"
-                      }`}
+                        }`}
                     >
                       {tab.badge}
                     </span>

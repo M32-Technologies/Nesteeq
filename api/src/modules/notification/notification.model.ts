@@ -1,26 +1,12 @@
-import mongoose, { Schema, model, type InferSchemaType } from "mongoose";
+import { Schema, model, type HydratedDocument } from "mongoose";
 
-export const notificationTypes = [
-  "NEW_COMPLAINT",
-  "TASK_ASSIGNED",
-  "MAINTENANCE_STATUS_UPDATED",
-  "WORK_COMPLETED",
-  "COST_SUBMITTED",
-  "COST_APPROVED",
-  "COST_REJECTED",
-  "RESIDENT_CONFIRMATION_REQUESTED",
-  "RESIDENT_CONFIRMATION_RECEIVED",
-  "SCHEDULE_CREATED",
-  "SCHEDULE_UPDATED",
-  "SCHEDULE_CANCELLED",
-] as const;
+import {
+  notificationTypes,
+  notificationSeverities,
+  type INotification,
+} from "./notification.types.js";
 
-export const notificationSeverities = ["INFO", "SUCCESS", "WARNING", "ERROR"] as const;
-
-export type NotificationType = (typeof notificationTypes)[number];
-export type NotificationSeverity = (typeof notificationSeverities)[number];
-
-const notificationSchema = new Schema(
+const notificationSchema = new Schema<INotification>(
   {
     apartment: {
       type: String,
@@ -43,13 +29,13 @@ const notificationSchema = new Schema(
     },
     type: {
       type: String,
-      enum: [...notificationTypes],
+      enum: notificationTypes,
       required: true,
       index: true,
     },
     severity: {
       type: String,
-      enum: [...notificationSeverities],
+      enum: notificationSeverities,
       required: true,
       default: "INFO",
     },
@@ -93,7 +79,6 @@ const notificationSchema = new Schema(
 notificationSchema.index({ recipientUserId: 1, readAt: 1, createdAt: -1 });
 notificationSchema.index({ recipientRole: 1, apartment: 1, readAt: 1, createdAt: -1 });
 
-export type NotificationDocument = InferSchemaType<typeof notificationSchema>;
+export type NotificationDocument = HydratedDocument<INotification>;
 
-export const Notification =
-  mongoose.models.Notification || model("Notification", notificationSchema);
+export const Notification = model<INotification>("Notification", notificationSchema);

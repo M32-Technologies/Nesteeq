@@ -54,7 +54,7 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
 app.use("/api/v1/upload", uploadRoutes);
 app.use("/api/upload", uploadRoutes);
 
-app.use("/api/v1/admin" , adminRoutes)
+app.use("/api/v1/admin", adminRoutes)
 
 app.use("/api/v1", SubscriptionsRoute);
 app.use("/api/v1/apartment", ApartmentRoute);

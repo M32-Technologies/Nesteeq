@@ -555,7 +555,7 @@ export const getBillsService = async (
       : `Unit ${bill.unitId.toString().slice(-4).toUpperCase()}`;
     const residentName = bill.residentId
       ? residentNameMap.get(bill.residentId.toString()) ||
-        `Resident #${bill.residentId.toString().slice(-4).toUpperCase()}`
+      `Resident #${bill.residentId.toString().slice(-4).toUpperCase()}`
       : "Vacant (No Resident)";
 
     return {
@@ -846,7 +846,7 @@ export const waiveLateFeeService = async (
         Math.max(
           0,
           currentValues.lateFeeAmount -
-            bill.lateFeeWaivedAmount
+          bill.lateFeeWaivedAmount
         )
       );
 
