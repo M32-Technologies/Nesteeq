@@ -49,6 +49,7 @@ type ApiBlock = {
   _id?: string
   blockname?: string
   name?: string
+  status?: "active" | "inactive"
 }
 
 type BlocksApiData = {
@@ -201,8 +202,12 @@ export const downloadResidentInviteTemplate = async () => {
   return response.data
 }
 
-export const getBlocks = async (): Promise<BlockOption[]> => {
-  const response = await api.get<ApiResponse<BlocksApiData>>("/api/v1/blocks")
+export const getBlocks = async (
+  params?: { status?: "active" | "inactive"; search?: string }
+): Promise<BlockOption[]> => {
+  const response = await api.get<ApiResponse<BlocksApiData>>("/api/v1/blocks", {
+    params,
+  })
 
   if (!response.data.success) {
     throw new Error(response.data.message || "Failed to fetch blocks")
@@ -211,6 +216,7 @@ export const getBlocks = async (): Promise<BlockOption[]> => {
   return response.data.data.blocks.map((block) => ({
     id: block.id ?? block._id ?? "",
     name: block.blockname ?? block.name ?? block.id ?? block._id ?? "-",
+    status: block.status,
   }))
 }
 
@@ -219,7 +225,7 @@ export const getFlats = async (
 ): Promise<FlatOption[]> => {
   const flatParams =
     typeof params === "string"
-      ? { blockId: params, limit: 500 }
+      ? { blockId: params === "all" ? undefined : params, limit: 500 }
       : cleanFlatParams(params)
 
   const response = await api.get<ApiResponse<FlatsApiData>>("/api/v1/flats", {

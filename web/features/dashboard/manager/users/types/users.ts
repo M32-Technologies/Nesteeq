@@ -107,6 +107,7 @@ export type CreateResidentInviteInput = {
 export type BlockOption = {
   id: string
   name: string
+  status?: "active" | "inactive"
 }
 
 export type FlatOption = {

@@ -755,7 +755,7 @@ export const updateParkingSlotStatus = async (
 
 export const getParkingStats = async (apartmentId: string) => {
   const aptObjectId = parkingObjectId(apartmentId, "apartment id")
-  const [stats, levels, zoneNames, zoneCodes] = await Promise.all([
+  const [stats, levels, zoneNames] = await Promise.all([
     ParkingSlotModel.aggregate([
       { $match: { apartmentId: aptObjectId } },
       {

@@ -21,6 +21,7 @@ import {
 } from "../api/users.api"
 import type {
   CreateResidentInviteInput,
+  FlatListParams,
   InvitationListParams,
   ResidentListParams,
   ResidentStatus,
@@ -43,8 +44,10 @@ export const invitationQueryKeys = {
 }
 
 export const residenceOptionQueryKeys = {
-  blocks: ["blocks"] as const,
-  flats: (blockId?: string) => ["flats", blockId ?? "all"] as const,
+  blocks: (params?: { status?: "active" | "inactive"; search?: string }) =>
+    ["blocks", params ?? "all"] as const,
+  flats: (blockId?: string, params?: Record<string, unknown>) =>
+    ["flats", blockId ?? "all", params ?? {}] as const,
 }
 
 export const useResidentsQuery = (params: ResidentListParams = {}) => {
@@ -71,19 +74,43 @@ export const useInvitationsQuery = (params: InvitationListParams = {}) => {
   })
 }
 
-export const useBlocksQuery = () => {
+export const useBlocksQuery = (params?: {
+  status?: "active" | "inactive"
+  search?: string
+}) => {
   return useQuery({
-    queryKey: residenceOptionQueryKeys.blocks,
-    queryFn: getBlocks,
+    queryKey: residenceOptionQueryKeys.blocks(params),
+    queryFn: () => getBlocks(params),
     staleTime: 5 * 60 * 1000,
   })
 }
 
-export const useFlatsQuery = (blockId?: string) => {
+export const useFlatsQuery = (params?: FlatListParams | string) => {
+  const isString = typeof params === "string"
+  const blockId = isString
+    ? params === "all"
+      ? undefined
+      : params
+    : params?.blockId
+  const queryParams = isString
+    ? { blockId: params === "all" ? undefined : params, limit: 500 }
+    : params
+
+  const isEnabled = isString
+    ? Boolean(params)
+    : Boolean(
+        queryParams?.blockId ||
+          queryParams?.occupancyStatus ||
+          queryParams?.status
+      )
+
   return useQuery({
-    queryKey: residenceOptionQueryKeys.flats(blockId),
-    queryFn: () => getFlats(blockId),
-    enabled: Boolean(blockId),
+    queryKey: residenceOptionQueryKeys.flats(
+      blockId,
+      typeof queryParams === "object" ? queryParams : undefined
+    ),
+    queryFn: () => getFlats(queryParams),
+    enabled: isEnabled,
     staleTime: 5 * 60 * 1000,
   })
 }
