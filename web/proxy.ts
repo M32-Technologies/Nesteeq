@@ -17,7 +17,6 @@ function getAuthBaseUrl() {
 }
 
 async function getCurrentUserRole(request: NextRequest) {
-  
   const baseUrl = getAuthBaseUrl();
   const cookieHeader = request.headers.get("cookie");
 
@@ -28,7 +27,7 @@ async function getCurrentUserRole(request: NextRequest) {
   let response: Response;
 
   try {
-    response = await fetch(`${baseUrl}/api/auth/get-session`, {
+    response = await fetch(`${baseUrl}/api/auth/get-session?disableCookieCache=true`, {
       headers: {
         cookie: cookieHeader,
       },
@@ -52,12 +51,17 @@ function isAdmin(role?: string | null): boolean {
   return role.trim().toLowerCase() === "admin";
 }
 
-export async function proxy(request: NextRequest) {
+export default  async function proxy(request: NextRequest) {
+
   const pathname = request.nextUrl.pathname;
+
   const sessionCookie = getSessionCookie(request);
 
-  // 1. Auth routes (/login, /register): Redirect authenticated users to their dashboard
-  const isAuthRoute = pathname === "/login" || pathname === "/register";
+  // 1. Auth routes (/login, /register, /admin/login): Redirect authenticated users to their dashboard
+  const isAuthRoute = 
+    pathname === "/login" || 
+    pathname === "/register" || 
+    pathname === "/admin/login";
 
   if (isAuthRoute) {
     if (sessionCookie) {
@@ -74,9 +78,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. Onboarding route (/onboarding):
-  // - Unauthenticated users are redirected to login
-  // - Users who already completed onboarding (property-manager) are redirected to their dashboard
+  // 2. Onboarding route (/onboarding)
   if (pathname === "/onboarding") {
     if (!sessionCookie) {
       return NextResponse.redirect(new URL("/login?from=pricing", request.url));
@@ -91,29 +93,45 @@ export async function proxy(request: NextRequest) {
     }
     return NextResponse.next();
   }
-
+  
   // 3. Protected routes: Require session cookie
   if (!sessionCookie) {
+    if (pathname.startsWith("/admin")) {
+      return NextResponse.redirect(new URL("/admin/login", request.url));
+    }
     return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  const pathSegment = pathname.split("/")[1]; 
-
-  const requiredRole = getDashboardRoleFromRouteSegment(pathSegment);
-
-  if (!requiredRole) {
-    return NextResponse.next();
   }
 
   const rawRole = await getCurrentUserRole(request);
 
   if (!rawRole) {
+    if (pathname.startsWith("/admin")) {
+      return NextResponse.redirect(new URL("/admin/login", request.url));
+    }
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // Admin users must only access the admin portal, not tenant/staff portals
+  // 4. Admin Routing Logic
   if (isAdmin(rawRole)) {
-    return NextResponse.redirect(new URL("/admin/dashboard", request.url));
+    if (!pathname.startsWith("/admin")) {
+      return NextResponse.redirect(new URL("/admin/dashboard", request.url));
+    }
+    return NextResponse.next();
+  }
+
+  // 5. Block Normal Users from Admin Routes
+  if (pathname.startsWith("/admin")) {
+    const userRole = normalizeDashboardRole(rawRole);
+    const homeSegment = getDashboardRoleRouteSegment(userRole);
+    return NextResponse.redirect(new URL(`/${homeSegment}`, request.url));
+  }
+
+  // 6. Normal User Portal Confinement
+  const pathSegment = pathname.split("/")[1]; 
+  const requiredRole = getDashboardRoleFromRouteSegment(pathSegment);
+
+  if (!requiredRole) {
+    return NextResponse.next();
   }
 
   const userRole = normalizeDashboardRole(rawRole);
@@ -130,6 +148,8 @@ export const config = {
   matcher: [
     "/login",
     "/register",
+    "/admin/login",
+    "/admin/:path*", 
     "/onboarding",
     "/property-manager/:path*",
     "/treasurer/:path*",

@@ -68,7 +68,7 @@ export default function DashboardShell({
           onOpenSidebar={() => setIsSidebarOpen(true)}
         />
 
-        <div className="mt-5 px-4 sm:px-6">{children}</div>
+        <div className="px-4 sm:px-6 pt-5 pb-8">{children}</div>
       </main>
     </div>
   )

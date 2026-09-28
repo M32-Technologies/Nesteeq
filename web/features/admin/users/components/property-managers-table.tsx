@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import {
   Search,
   Building2,
@@ -14,28 +14,48 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Users,
+  Home,
+  Shield,
+  Wrench,
 } from "lucide-react"
-import type { BetterAuthUser, ManagerFilterStatus } from "../types"
+import type { BetterAuthUser, ManagerFilterStatus, UserRoleFilter, UserKpiStats } from "../types"
 import ManagerDetailsModal from "./manager-details-modal"
 
-type PropertyManagersTableProps = {
-  managers: BetterAuthUser[]
+export function isAdminUser(user: { role?: string | null }): boolean {
+  if (!user.role) return false
+  const r = user.role.trim().toLowerCase().replace(/[\s-]+/g, "_")
+  return (
+    r === "admin" ||
+    r === "super_admin" ||
+    r === "superadmin" ||
+    r === "administrator"
+  )
+}
+
+export type PropertyManagersTableProps = {
+  managers?: BetterAuthUser[]
+  users?: BetterAuthUser[]
   isLoading?: boolean
   onUserUpdated: () => void
-  // Pagination
-  currentPage: number
-  totalPages: number
-  totalItems: number
-  pageSize: number
-  onPageChange: (page: number) => void
+  // Role Filter
+  roleFilter?: UserRoleFilter
+  onRoleFilterChange?: (role: UserRoleFilter) => void
+  stats?: UserKpiStats | null
+  // Optional controlled pagination
+  currentPage?: number
+  totalPages?: number
+  totalItems?: number
+  pageSize?: number
+  onPageChange?: (page: number) => void
 }
 
 /**
- * Bulletproof Manager Avatar:
+ * Bulletproof User Avatar:
  * Prevents Next.js / native img alt text from overflowing inside the circle.
  * Falls back gracefully to a crisp 1-letter initial on a soothing gradient.
  */
-function ManagerAvatar({
+function UserAvatar({
   name,
   email,
   image,
@@ -49,7 +69,7 @@ function ManagerAvatar({
     ? name.trim().charAt(0).toUpperCase()
     : email?.trim()
     ? email.trim().charAt(0).toUpperCase()
-    : "M"
+    : "U"
 
   const isValidUrl = Boolean(
     image &&
@@ -78,71 +98,237 @@ function ManagerAvatar({
   )
 }
 
+/**
+ * Visual Role Badge: Displays non-admin roles (Admin is never shown)
+ */
+function UserRoleBadge({ role }: { role?: string | null }) {
+  const normalized = (role ?? "resident").trim().toLowerCase().replace(/[\s-]+/g, "_")
+
+  if (normalized === "property_manager" || normalized === "propertymanager") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-md bg-[#EAF5EE] px-2.5 py-1 text-[11px] font-semibold text-[#07584F] border border-emerald-200/60 whitespace-nowrap">
+        <Building2 className="h-3 w-3 text-[#07584F]" />
+        Property Manager
+      </span>
+    )
+  }
+
+  if (normalized === "facility_manager") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 border border-amber-200/60 whitespace-nowrap">
+        <Wrench className="h-3 w-3 text-amber-600" />
+        Facility Manager
+      </span>
+    )
+  }
+
+  if (normalized === "security_staff") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 border border-slate-200 whitespace-nowrap">
+        <Shield className="h-3 w-3 text-slate-600" />
+        Security Staff
+      </span>
+    )
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-md bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-700 border border-sky-200/60 whitespace-nowrap">
+      <Home className="h-3 w-3 text-sky-600" />
+      Resident
+    </span>
+  )
+}
+
 export default function PropertyManagersTable({
   managers,
+  users,
   isLoading = false,
   onUserUpdated,
-  currentPage,
-  totalPages,
-  totalItems,
-  pageSize,
-  onPageChange,
+  roleFilter = "all",
+  onRoleFilterChange,
+  stats,
+  currentPage: controlledCurrentPage,
+  totalPages: controlledTotalPages,
+  totalItems: controlledTotalItems,
+  pageSize: propPageSize = 10,
+  onPageChange: controlledOnPageChange,
 }: PropertyManagersTableProps) {
+  const [internalPage, setInternalPage] = useState(1)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<ManagerFilterStatus>("all")
-  const [selectedManager, setSelectedManager] = useState<BetterAuthUser | null>(null)
+  const [selectedUser, setSelectedUser] = useState<BetterAuthUser | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
 
-  // Filter managers exclusively by search and status
-  const filteredManagers = useMemo(() => {
-    return managers.filter((manager) => {
-      const name = (manager.name || "").toLowerCase()
-      const email = (manager.email || "").toLowerCase()
-      const phone = (manager.phone || "").toLowerCase()
+  const currentPage = controlledCurrentPage ?? internalPage
+  const handlePageChange = controlledOnPageChange ?? setInternalPage
+
+  // Reset page when filter or search changes
+  useEffect(() => {
+    setInternalPage(1)
+  }, [roleFilter, searchTerm, statusFilter])
+
+  // 1. Strictly filter out all admin and super_admin users
+  const nonAdminUsers = useMemo(() => {
+    const raw = users ?? managers ?? []
+    return raw.filter((user) => !isAdminUser(user))
+  }, [users, managers])
+
+  // 2. Filter users by search query and account status
+  const filteredUsers = useMemo(() => {
+    return nonAdminUsers.filter((user) => {
+      const name = (user.name || "").toLowerCase()
+      const email = (user.email || "").toLowerCase()
+      const phone = (user.phone || "").toLowerCase()
+      const role = (user.role || "").toLowerCase()
+      const apt = (user.apartmentId || "").toLowerCase()
+      const flat = (user.flatId || "").toLowerCase()
       const query = searchTerm.toLowerCase().trim()
 
       const matchesSearch =
-        !query || name.includes(query) || email.includes(query) || phone.includes(query)
+        !query ||
+        name.includes(query) ||
+        email.includes(query) ||
+        phone.includes(query) ||
+        role.includes(query) ||
+        apt.includes(query) ||
+        flat.includes(query)
 
       if (!matchesSearch) return false
 
       if (statusFilter === "active") {
-        return manager.emailVerified && !manager.banned
+        return user.emailVerified && !user.banned
       }
       if (statusFilter === "inactive") {
-        return !manager.emailVerified && !manager.banned
+        return !user.emailVerified && !user.banned
       }
       if (statusFilter === "banned") {
-        return Boolean(manager.banned)
+        return Boolean(user.banned)
       }
 
       return true
     })
-  }, [managers, searchTerm, statusFilter])
+  }, [nonAdminUsers, searchTerm, statusFilter])
 
-  const handleOpenDetails = (manager: BetterAuthUser) => {
-    setSelectedManager(manager)
+  const totalItems = controlledTotalItems ?? filteredUsers.length
+  const totalPages =
+    controlledTotalPages ?? Math.max(1, Math.ceil(totalItems / propPageSize))
+
+  const displayedUsers = useMemo(() => {
+    if (controlledCurrentPage !== undefined && controlledTotalItems !== undefined) {
+      return filteredUsers
+    }
+    const start = (currentPage - 1) * propPageSize
+    return filteredUsers.slice(start, start + propPageSize)
+  }, [
+    filteredUsers,
+    currentPage,
+    propPageSize,
+    controlledCurrentPage,
+    controlledTotalItems,
+  ])
+
+  const handleOpenDetails = (user: BetterAuthUser) => {
+    setSelectedUser(user)
     setIsDetailsOpen(true)
   }
 
   const handleCloseDetails = () => {
     setIsDetailsOpen(false)
-    setSelectedManager(null)
+    setSelectedUser(null)
   }
 
   return (
     <>
       <div className="rounded-xl border border-[#EEF1EF] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-        {/* Compact Table Header with Search & Filters */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 px-5 py-3.5 border-b border-[#EEF1EF]">
-          {/* Search Box */}
-          <div className="relative flex-1 flex items-center rounded-lg border border-[#E2E8F0] bg-white transition-all focus-within:border-[#07584F] focus-within:ring-1 focus-within:ring-[#07584F]/10">
+        {/* Table Header with Role Option Buttons, Search & Status Filters */}
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 px-5 py-3.5 border-b border-[#EEF1EF]">
+          {/* 1. Role Segmented Buttons (All Users / Managers / Residents) */}
+          {onRoleFilterChange && (
+            <div className="inline-flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200/60 shadow-2xs self-start lg:self-auto">
+              <button
+                type="button"
+                onClick={() => onRoleFilterChange("all")}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                  roleFilter === "all"
+                    ? "bg-white text-[#0F172A] shadow-xs"
+                    : "text-[#64748B] hover:text-[#0F172A]"
+                }`}
+              >
+                <Users className="h-3.5 w-3.5" />
+                <span>All Users</span>
+                {stats?.totalUsers !== undefined && (
+                  <span
+                    className={`ml-1 rounded-full px-1.5 py-0.2 text-[10.5px] font-bold tabular-nums ${
+                      roleFilter === "all"
+                        ? "bg-emerald-50 text-[#07584F]"
+                        : "bg-slate-200/70 text-slate-600"
+                    }`}
+                  >
+                    {stats.totalUsers}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onRoleFilterChange("property_manager")}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                  roleFilter === "property_manager"
+                    ? "bg-white text-[#0F172A] shadow-xs"
+                    : "text-[#64748B] hover:text-[#0F172A]"
+                }`}
+              >
+                <Building2 className="h-3.5 w-3.5" />
+                <span>Managers</span>
+                {stats?.propertyManagers !== undefined && (
+                  <span
+                    className={`ml-1 rounded-full px-1.5 py-0.2 text-[10.5px] font-bold tabular-nums ${
+                      roleFilter === "property_manager"
+                        ? "bg-emerald-50 text-[#07584F]"
+                        : "bg-slate-200/70 text-slate-600"
+                    }`}
+                  >
+                    {stats.propertyManagers}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onRoleFilterChange("resident")}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                  roleFilter === "resident"
+                    ? "bg-white text-[#0F172A] shadow-xs"
+                    : "text-[#64748B] hover:text-[#0F172A]"
+                }`}
+              >
+                <Home className="h-3.5 w-3.5" />
+                <span>Residents</span>
+                {stats?.residents !== undefined && (
+                  <span
+                    className={`ml-1 rounded-full px-1.5 py-0.2 text-[10.5px] font-bold tabular-nums ${
+                      roleFilter === "resident"
+                        ? "bg-emerald-50 text-[#07584F]"
+                        : "bg-slate-200/70 text-slate-600"
+                    }`}
+                  >
+                    {stats.residents}
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* 2. Search & Status Filter */}
+          <div className="flex flex-1 flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2.5">
+            {/* Search Box */}
+            <div className="relative flex-1 sm:max-w-xs flex items-center rounded-lg border border-[#E2E8F0] bg-white transition-all focus-within:border-[#07584F] focus-within:ring-1 focus-within:ring-[#07584F]/10">
               <Search className="pointer-events-none absolute left-3 h-3.5 w-3.5 text-[#94A3B8]" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search by name, email..."
+                placeholder="Search by name, email, role..."
                 className="h-8 w-full rounded-lg border-0 bg-transparent pl-8.5 pr-7 text-xs text-[#0F172A] placeholder:text-[#94A3B8] outline-none focus:outline-none focus:ring-0"
               />
               {searchTerm && (
@@ -150,20 +336,19 @@ export default function PropertyManagersTable({
                   type="button"
                   onClick={() => setSearchTerm("")}
                   aria-label="Clear search"
-                  className="absolute right-2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-2 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
               )}
             </div>
 
-          {/* Status Filter */}
-          <div className="flex items-center gap-2 self-start sm:self-auto">
+            {/* Status Filter */}
             <div className="relative flex items-center rounded-lg border border-[#E2E8F0] bg-white transition-all hover:bg-slate-50 focus-within:border-[#07584F]">
               <Filter className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-[#64748B]" />
               <select
                 value={statusFilter}
-                aria-label="Filter managers by status"
+                aria-label="Filter users by status"
                 onChange={(e) => setStatusFilter(e.target.value as ManagerFilterStatus)}
                 className="h-8 rounded-lg border-0 bg-transparent pl-7 pr-7 text-xs font-medium text-[#334155] outline-none focus:outline-none focus:ring-0 appearance-none cursor-pointer"
               >
@@ -182,7 +367,8 @@ export default function PropertyManagersTable({
           <table className="w-full text-left text-xs">
             <thead className="bg-[#F8FAF8] text-[#64748B] font-semibold border-b border-[#EEF1EF]">
               <tr>
-                <th className="py-3.5 pl-6 pr-4">Property Manager</th>
+                <th className="py-3.5 pl-6 pr-4">User</th>
+                <th className="py-3.5 px-4">Role</th>
                 <th className="py-3.5 px-4">Contact Number</th>
                 <th className="py-3.5 px-4">Assigned Property</th>
                 <th className="py-3.5 px-4">Account Status</th>
@@ -206,6 +392,9 @@ export default function PropertyManagersTable({
                       </div>
                     </td>
                     <td className="py-4 px-4">
+                      <div className="h-6 w-24 rounded-md bg-slate-200" />
+                    </td>
+                    <td className="py-4 px-4">
                       <div className="h-3.5 w-24 rounded bg-slate-200" />
                     </td>
                     <td className="py-4 px-4">
@@ -222,30 +411,40 @@ export default function PropertyManagersTable({
                     </td>
                   </tr>
                 ))
-              ) : filteredManagers.length === 0 ? (
+              ) : displayedUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-14 text-center text-[#64748B]">
+                  <td colSpan={7} className="py-14 text-center text-[#64748B]">
                     <div className="flex flex-col items-center justify-center">
                       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
-                        <Building2 className="h-6 w-6 stroke-[1.5]" />
+                        {roleFilter === "property_manager" ? (
+                          <Building2 className="h-6 w-6 stroke-[1.5]" />
+                        ) : (
+                          <Users className="h-6 w-6 stroke-[1.5]" />
+                        )}
                       </div>
                       <p className="mt-3 text-sm font-semibold text-[#0F172A]">
                         {searchTerm || statusFilter !== "all"
-                          ? "No property managers match your filters"
-                          : "No property managers registered yet"}
+                          ? "No users match your filters"
+                          : roleFilter === "property_manager"
+                          ? "No property managers registered yet"
+                          : roleFilter === "resident"
+                          ? "No residents registered yet"
+                          : "No users registered yet"}
                       </p>
                       <p className="mt-1 text-xs text-[#94A3B8] max-w-sm">
                         {searchTerm || statusFilter !== "all"
                           ? "Try clearing the search input or changing the status filter dropdown."
-                          : "Property managers will automatically appear here once they complete onboarding."}
+                          : roleFilter === "property_manager"
+                          ? "Property managers will automatically appear here once onboarded."
+                          : "Registered users will automatically appear in this directory."}
                       </p>
                     </div>
                   </td>
                 </tr>
               ) : (
-                filteredManagers.map((manager) => {
-                  const formattedDate = manager.createdAt
-                    ? new Date(manager.createdAt).toLocaleDateString("en-US", {
+                displayedUsers.map((user) => {
+                  const formattedDate = user.createdAt
+                    ? new Date(user.createdAt).toLocaleDateString("en-US", {
                         year: "numeric",
                         month: "short",
                         day: "numeric",
@@ -254,35 +453,40 @@ export default function PropertyManagersTable({
 
                   return (
                     <tr
-                      key={manager.id}
+                      key={user.id}
                       className="hover:bg-[#F8FAF8]/80 transition-colors group"
                     >
-                      {/* Property Manager Profile */}
+                      {/* User Profile */}
                       <td className="py-3.5 pl-6 pr-4">
                         <div className="flex items-center gap-3">
-                          <ManagerAvatar
-                            name={manager.name}
-                            email={manager.email}
-                            image={manager.image}
+                          <UserAvatar
+                            name={user.name}
+                            email={user.email}
+                            image={user.image}
                           />
 
                           <div className="min-w-0">
                             <p className="font-semibold text-sm text-[#0F172A] truncate group-hover:text-[#07584F] transition-colors">
-                              {manager.name || "Unnamed Manager"}
+                              {user.name || "Unnamed User"}
                             </p>
                             <p className="truncate text-xs text-[#64748B]">
-                              {manager.email}
+                              {user.email}
                             </p>
                           </div>
                         </div>
                       </td>
 
+                      {/* Role */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <UserRoleBadge role={user.role} />
+                      </td>
+
                       {/* Contact Number */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        {manager.phone ? (
+                        {user.phone ? (
                           <div className="flex items-center gap-1.5 font-medium text-[#334155]">
                             <Phone className="h-3 w-3 text-[#94A3B8]" />
-                            <span>{manager.phone}</span>
+                            <span>{user.phone}</span>
                           </div>
                         ) : (
                           <span className="text-slate-400 italic">No phone</span>
@@ -291,13 +495,20 @@ export default function PropertyManagersTable({
 
                       {/* Assigned Property */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        {manager.apartmentId ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-lg border border-[#EEF1EF] bg-[#F8FAF8] px-2.5 py-1 text-xs font-medium text-[#334155]">
-                            <Building2 className="h-3 w-3 text-[#07584F]" />
-                            <span className="font-mono text-[11px] truncate max-w-[120px]">
-                              {manager.apartmentId}
+                        {user.apartmentId ? (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="inline-flex items-center gap-1.5 rounded-lg border border-[#EEF1EF] bg-[#F8FAF8] px-2.5 py-1 text-xs font-medium text-[#334155] w-fit">
+                              <Building2 className="h-3 w-3 text-[#07584F]" />
+                              <span className="font-mono text-[11px] truncate max-w-[120px]">
+                                {user.apartmentId}
+                              </span>
                             </span>
-                          </span>
+                            {user.flatId && (
+                              <span className="text-[10.5px] text-[#64748B] pl-1 font-mono">
+                                Flat: {user.flatId}
+                              </span>
+                            )}
+                          </div>
                         ) : (
                           <span className="inline-flex items-center rounded-md bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-500">
                             Unassigned
@@ -307,12 +518,12 @@ export default function PropertyManagersTable({
 
                       {/* Account Status */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        {manager.banned ? (
+                        {user.banned ? (
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-medium text-red-700 border border-red-200">
                             <XCircle className="h-3 w-3 text-red-500" />
                             Suspended
                           </span>
-                        ) : manager.emailVerified ? (
+                        ) : user.emailVerified ? (
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EAF5EE] px-2.5 py-1 text-[11px] font-medium text-[#14532D] border border-emerald-200/60">
                             <CheckCircle2 className="h-3 w-3 text-[#14532D]" />
                             Active
@@ -334,8 +545,8 @@ export default function PropertyManagersTable({
                       <td className="py-3.5 pl-4 pr-6 text-right whitespace-nowrap">
                         <button
                           type="button"
-                          onClick={() => handleOpenDetails(manager)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-[#E2E8F0] bg-white px-3 py-1.5 text-xs font-semibold text-[#334155] shadow-2xs hover:bg-slate-50 hover:text-[#07584F] hover:border-[#07584F]/30 transition-colors"
+                          onClick={() => handleOpenDetails(user)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-[#E2E8F0] bg-white px-3 py-1.5 text-xs font-semibold text-[#334155] shadow-2xs hover:bg-slate-50 hover:text-[#07584F] hover:border-[#07584F]/30 transition-colors cursor-pointer"
                         >
                           <Eye className="h-3.5 w-3.5 text-[#64748B]" />
                           <span>Details</span>
@@ -355,25 +566,30 @@ export default function PropertyManagersTable({
             <p className="text-xs text-[#64748B]">
               Showing{" "}
               <span className="font-semibold text-[#334155]">
-                {Math.min((currentPage - 1) * pageSize + 1, totalItems)}
+                {Math.min((currentPage - 1) * propPageSize + 1, totalItems)}
               </span>
-              –
+              {" "}–{" "}
               <span className="font-semibold text-[#334155]">
-                {Math.min(currentPage * pageSize, totalItems)}
+                {Math.min(currentPage * propPageSize, totalItems)}
               </span>
               {" "}of{" "}
               <span className="font-semibold text-[#334155]">
                 {totalItems}
               </span>
-              {" "}managers
+              {" "}
+              {roleFilter === "property_manager"
+                ? "managers"
+                : roleFilter === "resident"
+                ? "residents"
+                : "users"}
             </p>
 
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={() => onPageChange(currentPage - 1)}
+                onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage <= 1}
-                className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#E2E8F0] bg-white px-2.5 text-xs font-medium text-[#334155] transition-colors hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none"
+                className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#E2E8F0] bg-white px-2.5 text-xs font-medium text-[#334155] transition-colors hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Previous</span>
@@ -385,9 +601,9 @@ export default function PropertyManagersTable({
 
               <button
                 type="button"
-                onClick={() => onPageChange(currentPage + 1)}
+                onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage >= totalPages}
-                className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#E2E8F0] bg-white px-2.5 text-xs font-medium text-[#334155] transition-colors hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none"
+                className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#E2E8F0] bg-white px-2.5 text-xs font-medium text-[#334155] transition-colors hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
               >
                 <span className="hidden sm:inline">Next</span>
                 <ChevronRight className="h-3.5 w-3.5" />
@@ -399,7 +615,7 @@ export default function PropertyManagersTable({
 
       {/* Details Modal */}
       <ManagerDetailsModal
-        user={selectedManager}
+        user={selectedUser}
         isOpen={isDetailsOpen}
         onClose={handleCloseDetails}
         onUserUpdated={onUserUpdated}

@@ -32,6 +32,14 @@ export const getAllSubscriptionsQueryObjectSchema = z.object({
         .string()
         .trim()
         .optional(),
+    startDate: z
+        .string()
+        .trim()
+        .optional(),
+    endDate: z
+        .string()
+        .trim()
+        .optional(),
     sortBy: z
         .enum(["createdAt", "updatedAt", "currentStart", "currentEnd", "status"])
         .default("createdAt"),

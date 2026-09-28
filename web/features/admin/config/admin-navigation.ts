@@ -53,9 +53,4 @@ export const adminSidebarItems: AdminSidebarItem[] = [
     href: "/admin/payments",
     icon: Wallet,
   },
-  {
-    title: "Reports",
-    href: "/admin/reports",
-    icon: BarChart3,
-  },
 ]

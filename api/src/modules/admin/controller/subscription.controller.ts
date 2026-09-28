@@ -4,6 +4,7 @@ import {
     getAllSubscriptions,
     getSubscriptionStats,
     getSubscriptionAnalytics,
+    getSubscriptionPlanDistribution,
     getSingleSubscription,
 } from "../services/subscription.service.js";
 import { GetAllSubscriptionsQuery, SubscriptionAnalyticsQuery } from "../validation/subscription.validation.js";
@@ -35,6 +36,17 @@ export const getSubscriptionAnalyticsHandler = catchAsync(
     async (req: Request, res: Response) => {
         const query = req.query as unknown as SubscriptionAnalyticsQuery;
         const result = await getSubscriptionAnalytics(query);
+
+        res.status(200).json({
+            success: true,
+            data: result,
+        });
+    }
+);
+
+export const getSubscriptionPlanDistributionHandler = catchAsync(
+    async (req: Request, res: Response) => {
+        const result = await getSubscriptionPlanDistribution();
 
         res.status(200).json({
             success: true,

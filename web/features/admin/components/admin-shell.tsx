@@ -15,8 +15,8 @@ export default function AdminShell({ children }: { children: ReactNode }) {
         onMobileClose={() => setIsMobileOpen(false)}
       />
 
-      {/* Main Layout Area: Starts directly at the right edge of the 260px sidebar */}
-      <div className="flex-1 min-w-0 flex flex-col lg:pl-[260px] bg-[#F1F3F6]">
+      {/* Main Layout Area: Smoothly transitions padding when sidebar expands on hover */}
+      <div className="flex-1 min-w-0 flex flex-col transition-[padding-left] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:pl-[76px] lg:peer-hover/sidebar:pl-[260px] bg-[#F1F3F6]">
         {/* Top Navbar */}
         <AdminNavbar onMenuClick={() => setIsMobileOpen(true)} />
 

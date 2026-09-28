@@ -17,12 +17,31 @@ export const auth = betterAuth({
     expiresIn: 60 * 60 * 24 * 7,
     updateAge: 60 * 60 * 24,
     cookieCache: {
-      enabled: true,
-      maxAge: 5 * 60,
+      enabled: false,
     }
   },
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path === "/email-otp/send-verification-otp") {
+        const email = typeof ctx.body?.email === "string"
+          ? ctx.body.email.toLowerCase()
+          : null
+        const type = ctx.body?.type
+
+        if (email && type === "sign-in") {
+          const existingUser = await ctx.context.internalAdapter.findUserByEmail(email)
+          const role = (existingUser?.user as { role?: string } | undefined)?.role
+          if (role && role.trim().toLowerCase() === "admin") {
+            throw new APIError("FORBIDDEN", {
+              code: "ADMIN_LOGIN_RESTRICTED",
+              message: "Administrator accounts cannot sign in via OTP.",
+            })
+          }
+        }
+        return
+      }
+
+
       if (ctx.path === "/sign-in/email-otp") {
         const email = typeof ctx.body?.email === "string"
           ? ctx.body.email.toLowerCase()
@@ -31,13 +50,21 @@ export const auth = betterAuth({
           ? ctx.body.name.trim()
           : ""
 
-        if (!email || name) return
+        if (!email) return
 
         const existingUser = await ctx.context.internalAdapter.findUserByEmail(email)
-        if (!existingUser) {
+        if (!existingUser && !name) {
           throw new APIError("BAD_REQUEST", {
             code: "USER_NOT_FOUND",
             message: "No account was found for this email. Please register first.",
+          })
+        }
+
+        const role = (existingUser?.user as { role?: string } | undefined)?.role
+        if (role && role.trim().toLowerCase() === "admin") {
+          throw new APIError("FORBIDDEN", {
+            code: "ADMIN_LOGIN_RESTRICTED",
+            message: "Administrator accounts cannot sign in via OTP. Please use the Admin Portal",
           })
         }
 
@@ -81,12 +108,14 @@ export const auth = betterAuth({
         }
       },  
     }),
-    admin()
+    admin({
+      defaultRole: "resident",
+      adminRoles: ["admin"],
+    }),
     
   ],
   user: {
     additionalFields: {
-      role: { type: "string", required: true, defaultValue: "resident" },
       phone: { type: "string", required: false },
       apartmentId: { type: "string", required: false },
       flatId: { type: "string", required: false },

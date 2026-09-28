@@ -71,8 +71,11 @@ export default function AdminNavbar({ onMenuClick }: AdminNavbarProps) {
         </button>
 
         <div className="min-w-0">
-          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-[#0F172A] truncate">
-            {getGreeting()}, {userName ? userName.split(" ")[0] : "Admin"}
+          <h1
+            suppressHydrationWarning
+            className="text-lg sm:text-xl font-bold tracking-tight text-[#0F172A] truncate"
+          >
+            {getGreeting()}, {userName}
           </h1>
           <p className="text-xs text-[#64748B] truncate hidden sm:block">
             Here&apos;s what&apos;s happening across your platform today.

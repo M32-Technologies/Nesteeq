@@ -86,9 +86,38 @@ export default function InviteUsersPage() {
   const [form, setForm] = useState<SingleInviteForm>(getInitialInviteForm)
   const [file, setFile] = useState<File | null>(null)
   const [bulkResult, setBulkResult] = useState<BulkInviteResult | null>(null)
-  const { data: blocks = [], isLoading: isBlocksLoading } = useBlocksQuery()
-  const { data: flats = [], isLoading: isFlatsLoading } =
-    useFlatsQuery(form.blockId)
+  const { data: blocks = [], isLoading: isBlocksLoading } = useBlocksQuery({
+    status: "active",
+  })
+
+  // Only active blocks are selectable for invitations
+  const activeBlocks = useMemo(
+    () => blocks.filter((block) => !block.status || block.status === "active"),
+    [blocks]
+  )
+
+  const { data: flats = [], isLoading: isFlatsLoading } = useFlatsQuery(
+    form.blockId
+      ? {
+          blockId: form.blockId,
+          status: "active",
+          occupancyStatus: "VACANT",
+          limit: 500,
+        }
+      : undefined
+  )
+
+  // Only active & vacant (available) flats are selectable for invitations
+  const availableFlats = useMemo(
+    () =>
+      flats.filter(
+        (flat) =>
+          (!flat.status || flat.status === "active") &&
+          (!flat.occupancyStatus || flat.occupancyStatus === "VACANT")
+      ),
+    [flats]
+  )
+
   const createInvite = useCreateResidentInvitationMutation()
   const bulkInvite = useBulkCreateResidentInvitationsMutation()
   const downloadTemplate = useDownloadResidentInviteTemplateMutation()
@@ -111,9 +140,22 @@ export default function InviteUsersPage() {
     })
   }, [])
 
+  // Clear prefilled flat if it is not among available flats after loading
+  useEffect(() => {
+    if (form.blockId && !isFlatsLoading && flats.length > 0 && form.flatId) {
+      const isAvailable = availableFlats.some((f) => f.id === form.flatId)
+      if (!isAvailable) {
+        toast.warning(
+          "The selected flat is already occupied or inactive. Please choose an available flat."
+        )
+        setForm((current) => ({ ...current, flatId: "" }))
+      }
+    }
+  }, [form.blockId, isFlatsLoading, flats.length, form.flatId, availableFlats])
+
   const selectedBlockName = useMemo(
-    () => blocks.find((block) => block.id === form.blockId)?.name ?? "",
-    [blocks, form.blockId]
+    () => activeBlocks.find((block) => block.id === form.blockId)?.name ?? "",
+    [activeBlocks, form.blockId]
   )
 
   const updateForm = (key: keyof SingleInviteForm, value: string) => {
@@ -129,6 +171,11 @@ export default function InviteUsersPage() {
 
     if (!form.fullName.trim() || !form.email.trim() || !form.role || !form.flatId) {
       toast.error("Fill all required fields")
+      return
+    }
+
+    if (!availableFlats.some((flat) => flat.id === form.flatId)) {
+      toast.error("Please choose an available (vacant) flat")
       return
     }
 
@@ -187,7 +234,7 @@ export default function InviteUsersPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 p-4">
+    <div className="mx-auto max-w-6xl space-y-4">
       <div className="space-y-4">
         <Link
           href="/property-manager/users"
@@ -341,15 +388,24 @@ export default function InviteUsersPage() {
                         className={selectClassName}
                       >
                         <option value="">
-                          {isBlocksLoading ? "Loading blocks..." : "Select block"}
+                          {isBlocksLoading
+                            ? "Loading blocks..."
+                            : activeBlocks.length === 0
+                              ? "No active blocks found"
+                              : "Select active block"}
                         </option>
-                        {blocks.map((block) => (
+                        {activeBlocks.map((block) => (
                           <option key={block.id} value={block.id}>
                             {block.name}
                           </option>
                         ))}
                       </select>
                     </SelectWrap>
+                    {!isBlocksLoading && activeBlocks.length === 0 && (
+                      <p className="mt-1 text-xs text-amber-600">
+                        No active blocks available. Please create or activate a block first.
+                      </p>
+                    )}
                   </Field>
 
                   <Field label="Flat" required>
@@ -366,10 +422,12 @@ export default function InviteUsersPage() {
                           {!form.blockId
                             ? "Select block first"
                             : isFlatsLoading
-                              ? "Loading flats..."
-                              : "Select flat"}
+                              ? "Loading available flats..."
+                              : availableFlats.length === 0
+                                ? "No available flats in this block"
+                                : "Select available flat"}
                         </option>
-                        {flats.map((flat) => (
+                        {availableFlats.map((flat) => (
                           <option key={flat.id} value={flat.id}>
                             {flat.flatNumber.toLowerCase().startsWith("flat")
                               ? flat.flatNumber
@@ -378,6 +436,11 @@ export default function InviteUsersPage() {
                         ))}
                       </select>
                     </SelectWrap>
+                    {form.blockId && !isFlatsLoading && availableFlats.length === 0 && (
+                      <p className="mt-1 text-xs text-amber-600">
+                        All flats in this block are currently occupied or inactive.
+                      </p>
+                    )}
                   </Field>
                 </div>
               </div>
@@ -570,6 +633,7 @@ function InviteHelpPanel() {
             </h3>
             <ul className="mt-3 list-disc space-y-1.5 pl-4 text-xs font-medium text-slate-700">
               <li>Use a correct and active email address</li>
+              <li>Only active blocks and available (vacant) flats can be assigned</li>
               <li>Each invite is only for Owner or Tenant</li>
               <li>You can resend pending invitations later</li>
             </ul>
@@ -595,6 +659,7 @@ function BulkHelpPanel() {
             <div className="mt-3 space-y-2 text-xs font-medium leading-5 text-slate-700">
               <HelpItem>Download the Excel template first</HelpItem>
               <HelpItem>Use only Owner or Tenant as the role</HelpItem>
+              <HelpItem>Flats must be in active blocks and currently vacant</HelpItem>
               <HelpItem>Upload one .xlsx file at a time</HelpItem>
             </div>
           </div>

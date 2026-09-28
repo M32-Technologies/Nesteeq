@@ -4,6 +4,7 @@ import { GetAllApartmentsQuery, ApartmentAnalyticsQuery } from "../validation/ap
 import { Apartment } from "../../apartment/apartment.model.js";
 import { Subscription } from "../../subscription/subscription.model.js";
 import { getAuthDB } from "../../../config/auth-db.js";
+import { escapeRegExp } from "../../../utils/regex.js";
 import { AuthUserDoc, ApartmentStats, MonthlyRegistration, ApartmentAnalyticsData } from "../types.js";
 
 export const getAllApartment = async (query: GetAllApartmentsQuery) => {
@@ -16,14 +17,15 @@ export const getAllApartment = async (query: GetAllApartmentsQuery) => {
     const match: Record<string, unknown> = {};
 
     if (status) match.status = status;
-    if (city) match.city = { $regex: `^${city}$`, $options: "i" };
-    if (state) match.state = { $regex: `^${state}$`, $options: "i" };
+    if (city) match.city = { $regex: `^${escapeRegExp(city)}$`, $options: "i" };
+    if (state) match.state = { $regex: `^${escapeRegExp(state)}$`, $options: "i" };
 
     if (search) {
+        const safeSearch = escapeRegExp(search);
         match.$or = [
-            { name: { $regex: search, $options: "i" } },
-            { address: { $regex: search, $options: "i" } },
-            { city: { $regex: search, $options: "i" } },
+            { name: { $regex: safeSearch, $options: "i" } },
+            { address: { $regex: safeSearch, $options: "i" } },
+            { city: { $regex: safeSearch, $options: "i" } },
         ];
     }
 
@@ -231,7 +233,7 @@ export const getApartmentAnalytics = async (
     const currentYear = now.getUTCFullYear();
     const currentMonth = now.getUTCMonth();
 
-    // 1st day of the starting month at 00:00:00.000 UTC
+
     const startDate = new Date(Date.UTC(currentYear, currentMonth - (numMonths - 1), 1, 0, 0, 0, 0));
 
     const aggregatedResults = await Apartment.aggregate<{ _id: string; count: number }>([

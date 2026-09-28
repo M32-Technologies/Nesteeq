@@ -6,8 +6,9 @@ import { AppError } from "../../utils/AppError.js";
 import { Apartment } from "../apartment/apartment.model.js";
 import { SubscriptionPlan } from "./subscription-plan.model.js";
 import { Subscription } from "./subscription.model.js";
-
-
+import { SubscriptionPayment } from "../payment/subscription-payment.model.js";
+import { ObjectId } from "mongodb";
+import { getAuthDB } from "../../config/auth-db.js";
 
 export const GetSubscriptionPlans = async () => {
   return SubscriptionPlan.find({ isActive: true })
@@ -144,6 +145,7 @@ export const VerifySubscriptionPayment = async (
   razorpay_payment_id: string,
   razorpay_subscription_id: string,
   razorpay_signature: string,
+  userId?: string,
 ) => {
   const subscription = await Subscription.findOne({
     razorpaySubscriptionId: razorpay_subscription_id,
@@ -186,9 +188,7 @@ export const VerifySubscriptionPayment = async (
   subscription.remainingCount = Number(
     razorpaySubscription.remaining_count ?? 0,
   );
-
   subscription.razorpayCustomerId = razorpaySubscription.customer_id ?? null;
-
   subscription.currentStart = razorpaySubscription.current_start
     ? new Date(Number(razorpaySubscription.current_start) * 1000)
     : undefined;
@@ -215,23 +215,67 @@ export const VerifySubscriptionPayment = async (
 
   await subscription.save();
 
-  if (
+  const isPaymentValid =
+    Boolean(razorpay_payment_id) ||
     subscription.status === "active" ||
     subscription.status === "authenticated" ||
-    Number(subscription.paidCount ?? 0) > 0
-  ) {
-    await Apartment.updateOne(
-      {
-        _id: subscription.apartment,
-        status: "pending_payment",
-      },
-      {
-        $set: {
-          status: "active",
-        },
-      },
-    );
+    Number(subscription.paidCount ?? 0) > 0;
+
+  if (isPaymentValid) {
+    if (subscription.status !== "active" && subscription.status !== "authenticated") {
+      subscription.status = "active";
+      await subscription.save();
+    }
+
+    const apartment = await Apartment.findById(subscription.apartment);
+    if (apartment) {
+      apartment.status = "active";
+      await apartment.save();
+    }
+
+    const managerId = (userId || subscription.subscribedBy || apartment?.managerId)?.toString();
+    if (managerId) {
+      const userFilter = ObjectId.isValid(managerId)
+        ? { $or: [{ id: managerId }, { _id: new ObjectId(managerId) }] }
+        : { id: managerId };
+
+      await getAuthDB()
+        .collection("user")
+        .updateOne(
+          { ...userFilter, role: { $ne: "admin" } },
+          {
+            $set: {
+              role: "property_manager",
+              apartmentId: subscription.apartment.toString(),
+            },
+          },
+        );
+    }
   }
+  const GST_RATE = 0.18;
+  const totalPaid = Number(subscription.planSnapshot?.price || 0);
+  const netAmount = Math.round((totalPaid / (1 + GST_RATE)) * 100) / 100;
+  const taxAmount = Math.round((totalPaid - netAmount) * 100) / 100;
+  
+  await SubscriptionPayment.findOneAndUpdate(
+    { razorpayPaymentId: razorpay_payment_id },
+    {
+      apartment: subscription.apartment,  
+      subscription: subscription._id,
+      plan: subscription.plan,
+      planName: subscription.planSnapshot?.planName || "Subscription Plan",
+      amount: netAmount,
+      taxAmount,
+      totalAmount: totalPaid,
+      currency: subscription.planSnapshot?.currency || "INR",
+      razorpayPaymentId: razorpay_payment_id,
+      razorpaySubscriptionId: subscription.razorpaySubscriptionId,
+      status: "captured",
+      billingCycle: Math.max(1, Number(subscription.paidCount ?? 1)),
+      paidAt: new Date(),
+    },
+    { upsert: true, new: true }
+  );
 
   return {
     verified: true,

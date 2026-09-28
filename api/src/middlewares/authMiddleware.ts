@@ -17,7 +17,7 @@ export type UserRole =
     | "resident"
     | "owner"
     | "tenant";
-const normalizeRole = (role: string) => role.trim().toLowerCase().replace(/[\s-]+/g, "_");
+const normalizeRole = (role?: string | null) => (role ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
 
 const normalizeApartmentId = (apartmentId: ApartmentIdValue) => apartmentId?.toString().trim().toLowerCase();
 

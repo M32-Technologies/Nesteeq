@@ -15,10 +15,24 @@ import {
   Ban,
   UserCheck,
   Loader2,
+  Home,
 } from "lucide-react"
 import { toast } from "sonner"
 import { authClient } from "@/lib/auth-client"
 import type { BetterAuthUser } from "../types"
+
+function formatRoleTitle(role?: string | null): string {
+  if (!role) return "Resident"
+  const normalized = role.trim().toLowerCase().replace(/[\s-]+/g, "_")
+  if (normalized === "property_manager" || normalized === "propertymanager") return "Property Manager"
+  if (normalized === "resident") return "Resident"
+  if (normalized === "admin") return "Admin"
+  if (normalized === "super_admin") return "Super Admin"
+  if (normalized === "facility_manager") return "Facility Manager"
+  if (normalized === "security_staff") return "Security Staff"
+  if (normalized === "treasurer") return "Treasurer"
+  return role.charAt(0).toUpperCase() + role.slice(1).replace(/_/g, " ")
+}
 
 type ManagerDetailsModalProps = {
   user: BetterAuthUser | null
@@ -87,20 +101,20 @@ export default function ManagerDetailsModal({
       if (user.banned) {
         const { error } = await authClient.admin.unbanUser({ userId: user.id })
         if (error) {
-          toast.error(error.message || "Failed to reinstate property manager.")
+          toast.error(error.message || "Failed to reinstate user.")
           return
         }
-        toast.success(`${user.name || "Manager"} has been unbanned successfully.`)
+        toast.success(`${user.name || "User"} has been unbanned successfully.`)
       } else {
         const { error } = await authClient.admin.banUser({
           userId: user.id,
           banReason: banReason.trim() || "Administrative review / account suspended",
         })
         if (error) {
-          toast.error(error.message || "Failed to suspend property manager.")
+          toast.error(error.message || "Failed to suspend user.")
           return
         }
-        toast.success(`${user.name || "Manager"} has been suspended.`)
+        toast.success(`${user.name || "User"} has been suspended.`)
       }
 
       setShowBanInput(false)
@@ -130,7 +144,7 @@ export default function ManagerDetailsModal({
           <div className="flex items-center justify-between">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
               <ShieldCheck className="h-3.5 w-3.5" />
-              Property Manager
+              {formatRoleTitle(user.role)}
             </span>
             <button
               type="button"
@@ -164,7 +178,7 @@ export default function ManagerDetailsModal({
         <div className="px-6 pb-1 pt-3">
           <div className="flex items-center gap-2">
             <h4 className="truncate text-lg font-bold text-[#0F172A]">
-              {user.name || "Unnamed Manager"}
+              {user.name || "Unnamed User"}
             </h4>
             {user.banned ? (
               <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-[10.5px] font-semibold text-red-700">
@@ -184,6 +198,12 @@ export default function ManagerDetailsModal({
         {/* Content */}
         <div className="px-6 pb-6 pt-3">
           <div className="divide-y divide-[#F1F5F9] rounded-2xl border border-[#F1F5F9] px-4">
+            <DetailRow icon={ShieldCheck} label="System Role">
+              <span className="font-semibold text-[#07584F]">
+                {formatRoleTitle(user.role)}
+              </span>
+            </DetailRow>
+
             <DetailRow icon={Phone} label="Contact Phone">
               {user.phone || <span className="text-[#94A3B8] font-normal">Not provided</span>}
             </DetailRow>
@@ -191,6 +211,12 @@ export default function ManagerDetailsModal({
             <DetailRow icon={Hash} label="Apartment ID Reference" mono>
               {user.apartmentId || <span className="text-[#94A3B8] font-normal font-sans">None assigned yet</span>}
             </DetailRow>
+
+            {user.flatId && (
+              <DetailRow icon={Home} label="Flat ID Reference" mono>
+                {user.flatId}
+              </DetailRow>
+            )}
 
             <DetailRow icon={Calendar} label="Registered On">
               {formattedDate}
@@ -256,7 +282,7 @@ export default function ManagerDetailsModal({
               ) : (
                 <UserCheck className="h-3.5 w-3.5" />
               )}
-              <span>Reinstate Manager</span>
+              <span>Reinstate User</span>
             </button>
           ) : showBanInput ? (
             <div className="flex items-center gap-2">

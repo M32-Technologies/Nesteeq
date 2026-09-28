@@ -3,28 +3,72 @@ import { PipelineStage, Types } from "mongoose";
 import { GetAllSubscriptionsQuery, SubscriptionAnalyticsQuery } from "../validation/subscription.validation.js";
 import { Subscription } from "../../subscription/subscription.model.js";
 import { SubscriptionStats, MonthlyRegistration, SubscriptionAnalyticsData } from "../types.js";
+import { escapeRegExp } from "../../../utils/regex.js";
+
+const ALLOWED_SORT_FIELDS: Record<string, string> = {
+    createdAt: "createdAt",
+    updatedAt: "updatedAt",
+    currentStart: "currentStart",
+    currentEnd: "currentEnd",
+    status: "status",
+};
 
 export const getAllSubscriptions = async (query: GetAllSubscriptionsQuery) => {
     if (!query) {
         throw new AppError("Query parameters are required", 400);
     }
 
-    const { page, limit, search, status, plan, sortBy, sortOrder } = query;
+    const { page, limit, search, status, plan, startDate, endDate, sortBy, sortOrder } = query;
 
     const postLookupMatch: Record<string, unknown> = {};
 
-    if (status) postLookupMatch.status = status;
-    if (plan) postLookupMatch["planSnapshot.planName"] = { $regex: plan, $options: "i" };
-
-    if (search) {
-        postLookupMatch.$or = [
-            { "apartment.name": { $regex: search, $options: "i" } },
-            { "apartment.city": { $regex: search, $options: "i" } },
-            { "planSnapshot.planName": { $regex: search, $options: "i" } },
-        ];
+    if (status) {
+        postLookupMatch.status = status;
     }
 
-    const sortStage = { [sortBy]: sortOrder === "asc" ? 1 : -1 } as Record<string, 1 | -1>;
+    if (plan && plan.trim() !== "") {
+        postLookupMatch["planSnapshot.planName"] = plan.trim();
+    }
+
+    if (search && search.trim() !== "") {
+        const trimmed = search.trim();
+        const safeSearch = escapeRegExp(trimmed);
+        const orConditions: Record<string, unknown>[] = [
+            { "apartment.name": { $regex: safeSearch, $options: "i" } },
+            { "apartment.city": { $regex: safeSearch, $options: "i" } },
+            { "planSnapshot.planName": { $regex: safeSearch, $options: "i" } },
+            { razorpaySubscriptionId: { $regex: safeSearch, $options: "i" } },
+        ];
+
+        if (Types.ObjectId.isValid(trimmed)) {
+            orConditions.push({ _id: new Types.ObjectId(trimmed) });
+        }
+
+        postLookupMatch.$or = orConditions;
+    }
+
+    if (startDate || endDate) {
+        const dateFilter: Record<string, Date> = {};
+        if (startDate) {
+            const start = new Date(startDate);
+            if (!isNaN(start.getTime())) {
+                dateFilter.$gte = start;
+            }
+        }
+        if (endDate) {
+            const end = new Date(endDate);
+            if (!isNaN(end.getTime())) {
+                end.setUTCHours(23, 59, 59, 999);
+                dateFilter.$lte = end;
+            }
+        }
+        if (Object.keys(dateFilter).length > 0) {
+            postLookupMatch.createdAt = dateFilter;
+        }
+    }
+
+    const safeSortField = ALLOWED_SORT_FIELDS[sortBy] ?? "createdAt";
+    const sortStage: Record<string, 1 | -1> = { [safeSortField]: sortOrder === "asc" ? 1 : -1 };
     const skip = (page - 1) * limit;
 
     const pipeline: PipelineStage[] = [
@@ -73,6 +117,7 @@ export const getAllSubscriptions = async (query: GetAllSubscriptionsQuery) => {
                 cancelAtCycleEnd: 1,
                 createdAt: 1,
                 updatedAt: 1,
+                razorpaySubscriptionId: 1,
             },
         },
         {
@@ -103,6 +148,9 @@ export const getAllSubscriptions = async (query: GetAllSubscriptionsQuery) => {
 };
 
 export const getSubscriptionStats = async (): Promise<SubscriptionStats> => {
+    const now = new Date();
+    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
     const [stats] = await Subscription.aggregate<SubscriptionStats>([
         {
             $group: {
@@ -180,6 +228,22 @@ export const getSubscriptionStats = async (): Promise<SubscriptionStats> => {
                         },
                     },
                 },
+                expiringSoon: {
+                    $sum: {
+                        $cond: {
+                            if: {
+                                $and: [
+                                    { $eq: ["$status", "active"] },
+                                    { $eq: [{ $type: "$currentEnd" }, "date"] },
+                                    { $gte: ["$currentEnd", now] },
+                                    { $lte: ["$currentEnd", thirtyDaysFromNow] },
+                                ],
+                            },
+                            then: 1,
+                            else: 0,
+                        },
+                    },
+                },
             },
         },
         {
@@ -194,6 +258,7 @@ export const getSubscriptionStats = async (): Promise<SubscriptionStats> => {
                 cancelled: 1,
                 completed: 1,
                 expired: 1,
+                expiringSoon: 1,
             },
         },
     ]);
@@ -208,6 +273,7 @@ export const getSubscriptionStats = async (): Promise<SubscriptionStats> => {
         cancelled: stats?.cancelled ?? 0,
         completed: stats?.completed ?? 0,
         expired: stats?.expired ?? 0,
+        expiringSoon: stats?.expiringSoon ?? 0,
     };
 };
 
@@ -219,7 +285,8 @@ const MONTH_NAMES = [
 export const getSubscriptionAnalytics = async (
     query?: Partial<SubscriptionAnalyticsQuery>
 ): Promise<SubscriptionAnalyticsData> => {
-    const range = query?.range ?? "6m";
+    const rawRange = query?.range ?? "6m";
+    const range = ["3m", "6m", "12m", "1y"].includes(rawRange) ? rawRange : "6m";
     let numMonths = 6;
     if (range === "3m") {
         numMonths = 3;
@@ -284,6 +351,34 @@ export const getSubscriptionAnalytics = async (
     };
 };
 
+export interface SubscriptionPlanDistributionItem {
+    planName: string;
+    count: number;
+    percentage: number;
+}
+
+export const getSubscriptionPlanDistribution = async (): Promise<SubscriptionPlanDistributionItem[]> => {
+    const distribution = await Subscription.aggregate<{ _id: string | null; count: number }>([
+        {
+            $group: {
+                _id: "$planSnapshot.planName",
+                count: { $sum: 1 },
+            },
+        },
+        {
+            $sort: { count: -1 },
+        },
+    ]);
+
+    const total = distribution.reduce((sum, item) => sum + item.count, 0);
+
+    return distribution.map((item) => ({
+        planName: item._id || "Unspecified Plan",
+        count: item.count,
+        percentage: total > 0 ? Math.round((item.count / total) * 100) : 0,
+    }));
+};
+
 export const getSingleSubscription = async (subscriptionId: string) => {
     if (!subscriptionId || !Types.ObjectId.isValid(subscriptionId)) {
         throw new AppError("Invalid subscription ID", 400);
@@ -291,6 +386,7 @@ export const getSingleSubscription = async (subscriptionId: string) => {
 
     const subscription = await Subscription.findById(subscriptionId)
         .populate("apartment", "name city state address status contactNumber")
+        .populate("plan", "planName planType price currency durationMonths features status")
         .lean();
 
     if (!subscription) {
@@ -305,8 +401,9 @@ export const getSingleSubscription = async (subscriptionId: string) => {
         authAttempts: _aa,
         hasScheduledChanges: _hsc,
         scheduleChangeAt: _sca,
+        __v: _v,
         ...cleaned
-    } = subscription;
+    } = subscription as Record<string, unknown>;
 
     return cleaned;
 };

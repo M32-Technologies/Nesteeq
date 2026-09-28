@@ -125,7 +125,7 @@ export function ViewSlotDrawer({
     }
   }
 
-  const zoneDisplay = slot.zoneName || slot.zoneCode || null
+  const zoneDisplay = slot.zoneName?.trim() || null
 
   return (
     <>
@@ -251,29 +251,6 @@ export function ViewSlotDrawer({
                 </div>
               )}
 
-              {slot.zoneCode && (
-                <div className="flex items-center justify-between py-2">
-                  <span className="text-slate-500 flex items-center gap-2">
-                    <Compass size={14} className="text-slate-400" />
-                    Zone Code
-                  </span>
-                  <span className="font-mono font-medium text-slate-700 uppercase">
-                    {slot.zoneCode}
-                  </span>
-                </div>
-              )}
-
-              {slot.prefix && (
-                <div className="flex items-center justify-between py-2">
-                  <span className="text-slate-500 flex items-center gap-2">
-                    <Tag size={14} className="text-slate-400" />
-                    Prefix Code
-                  </span>
-                  <span className="font-mono font-medium text-slate-700">
-                    {slot.prefix}
-                  </span>
-                </div>
-              )}
 
               <div className="flex items-center justify-between py-2">
                 <span className="text-slate-500 flex items-center gap-2">

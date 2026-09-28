@@ -193,12 +193,10 @@ export default function PaymentSection({
   ) => {
     try {
       await verifyPaymentMutation.mutateAsync(response);
-      await promoteCurrentUserToPropertyManager();
       await refreshAuthSessionFromDatabase();
 
       toast.success("Payment verified. Welcome to your dashboard.");
-      router.push("/property-manager");
-      router.refresh();
+      window.location.href = "/property-manager";
     } catch (error) {
       toast.error(
         error instanceof Error
