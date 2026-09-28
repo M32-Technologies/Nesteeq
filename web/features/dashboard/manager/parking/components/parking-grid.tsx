@@ -132,7 +132,7 @@ export function ParkingGrid({
             ? slot.residentId.phoneNumber || null
             : null
 
-        const zoneDisplay = slot.zoneName || slot.zoneCode || null
+        const zoneDisplay = slot.zoneName?.trim() || null
 
         return (
           <div

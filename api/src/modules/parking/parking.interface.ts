@@ -178,6 +178,8 @@ export interface ParkingStatsResponse {
   inactive: number
   residentSlots: number
   visitorSlots: number
+  levels?: string[]
+  zones?: string[]
 }
 
 export type LeanManagerParkingSlot = Pick<

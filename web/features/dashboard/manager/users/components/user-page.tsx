@@ -12,7 +12,7 @@ export default function UsersPage() {
   const [activeTab, setActiveTab] = useState<UsersTab>("members")
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       <UsersHeader
         activeTab={activeTab}
         onTabChange={setActiveTab}

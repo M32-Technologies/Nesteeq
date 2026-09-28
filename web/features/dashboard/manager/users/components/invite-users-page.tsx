@@ -187,7 +187,7 @@ export default function InviteUsersPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 p-4">
+    <div className="mx-auto max-w-6xl space-y-4">
       <div className="space-y-4">
         <Link
           href="/property-manager/users"

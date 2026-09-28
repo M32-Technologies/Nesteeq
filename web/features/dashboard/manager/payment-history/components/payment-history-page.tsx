@@ -136,7 +136,7 @@ export default function PaymentHistoryPage() {
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-slate-900">
           Payment History

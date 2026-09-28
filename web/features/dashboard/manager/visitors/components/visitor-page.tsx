@@ -41,7 +41,7 @@ export default function VisitorPage() {
   }, [recordsData, activeData, records])
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       <VisitorHeader stats={stats} isLoading={isLoading} />
 
       <VisitorTableSection
