@@ -290,13 +290,13 @@ export default function DeliveryActivityChart({
       </div>
 
       {/* Stacked Bar Chart Area (height 205px for perfect 300px card balance) */}
-      <div className="h-[205px] w-full pt-1 outline-none select-none [&_.recharts-surface]:outline-none [&_.recharts-wrapper]:outline-none [&_.recharts-layer]:outline-none [&_svg]:outline-none">
+      <div className="h-[205px] w-full min-w-0 pt-1 outline-none select-none [&_.recharts-surface]:outline-none [&_.recharts-wrapper]:outline-none [&_.recharts-layer]:outline-none [&_svg]:outline-none">
         {isLoading ? (
           <div className="flex h-full w-full items-center justify-center">
             <div className="h-32 w-full animate-pulse rounded-xl bg-slate-100" />
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <BarChart
               data={chartData}
               margin={{ top: 12, right: 12, left: -10, bottom: 4 }}

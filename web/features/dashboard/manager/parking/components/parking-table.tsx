@@ -17,8 +17,10 @@ import {
   RotateCcw,
   Search,
   ShieldCheck,
+  SlidersHorizontal,
   UserCheck,
   UserX,
+  X,
   Zap,
 } from "lucide-react"
 
@@ -139,14 +141,23 @@ export default function ParkingTable({
   const [viewSlot, setViewSlot] = useState<ParkingSlot | null>(null)
   const [isViewOpen, setIsViewOpen] = useState(false)
 
+  const isSearchActive = searchQuery.trim().length > 0
+  const isStatusActive = statusFilter !== "ALL"
+  const isUsageActive = usageFilter !== "ALL"
+  const isVehicleActive = vehicleFilter !== "ALL"
+  const isLevelActive = levelFilter.trim().length > 0
+  const isZoneActive = zoneFilter.trim().length > 0
+  const isSortActive = sortOption !== "slot_asc"
+
   const hasActiveFilters =
-    searchQuery.trim().length > 0 ||
-    statusFilter !== "ALL" ||
-    usageFilter !== "ALL" ||
-    vehicleFilter !== "ALL" ||
-    levelFilter.trim().length > 0 ||
-    zoneFilter.trim().length > 0 ||
-    sortOption !== "slot_asc"
+    isSearchActive ||
+    isStatusActive ||
+    isUsageActive ||
+    isVehicleActive ||
+    isLevelActive ||
+    isZoneActive ||
+    isSortActive
+
   const startItem = totalCount > 0 ? (page - 1) * limit + 1 : 0
   const endItem = Math.min(page * limit, totalCount)
 
@@ -169,8 +180,8 @@ export default function ParkingTable({
   }
 
   const renderPagination = () => (
-    <div className="flex flex-col gap-3 border-t border-slate-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-sm font-medium text-slate-500">
+    <div className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between bg-slate-50/50">
+      <p className="text-xs font-medium text-slate-500">
         Showing <span className="font-semibold text-slate-800">{startItem}</span> to{" "}
         <span className="font-semibold text-slate-800">{endItem}</span> of{" "}
         <span className="font-semibold text-slate-800">{totalCount}</span> slots
@@ -180,27 +191,24 @@ export default function ParkingTable({
           type="button"
           disabled={page <= 1 || isLoading}
           onClick={() => onPageChange((current) => Math.max(1, current - 1))}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Previous page"
         >
-          <ChevronLeft size={16} />
+          <ChevronLeft size={15} />
         </button>
-        <button
-          type="button"
-          className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-[#0F5F45] px-2 text-sm font-medium text-white shadow-sm"
-        >
+        <span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-[#0F5F45] px-2 text-xs font-semibold text-white shadow-2xs">
           {page}
-        </button>
+        </span>
         <button
           type="button"
           disabled={page >= totalPages || isLoading}
           onClick={() =>
             onPageChange((current) => Math.min(totalPages, current + 1))
           }
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Next page"
         >
-          <ChevronRight size={16} />
+          <ChevronRight size={15} />
         </button>
       </div>
     </div>
@@ -208,30 +216,47 @@ export default function ParkingTable({
 
   return (
     <>
-      <div className="mt-7 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 p-4">
-          <div className="flex items-center gap-2.5 overflow-x-auto pb-0.5">
-            <div className="relative min-w-[220px] flex-1">
+      <div className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+        {/* Top Filters Toolbar */}
+        <div className="border-b border-slate-200 p-4 space-y-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Search Input with Clear Button */}
+            <div className="relative min-w-[200px] flex-1">
               <Search
-                size={17}
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
               />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(event) => onSearchChange(event.target.value)}
-                placeholder="Search by slot number or vehicle plate..."
-                className="h-10 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3.5 text-xs font-medium text-slate-800 outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-slate-400"
+                placeholder="Search slot number or vehicle plate..."
+                className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-8 text-xs font-medium text-slate-800 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-[#0F5F45] focus:ring-1 focus:ring-[#0F5F45]"
               />
+              {isSearchActive && (
+                <button
+                  type="button"
+                  onClick={() => onSearchChange("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full"
+                  aria-label="Clear search"
+                >
+                  <X size={13} />
+                </button>
+              )}
             </div>
 
-            <div className="relative w-[130px] shrink-0">
+            {/* Status Dropdown */}
+            <div className="relative min-w-[125px]">
               <select
                 value={statusFilter}
                 onChange={(event) =>
                   onStatusChange(event.target.value as ParkingStatusFilter)
                 }
-                className="h-10 w-full appearance-none rounded-lg border border-slate-300 bg-white pl-3 pr-8 text-xs font-medium text-slate-800 outline-none transition hover:border-slate-400"
+                className={`h-9 w-full appearance-none rounded-lg border bg-white pl-3 pr-8 text-xs font-medium outline-none transition cursor-pointer ${
+                  isStatusActive
+                    ? "border-[#0F5F45] text-[#0F5F45] font-semibold bg-[#E7F4EE]/30"
+                    : "border-slate-200 text-slate-700 hover:border-slate-300"
+                }`}
               >
                 <option value="ALL">All Status</option>
                 <option value="AVAILABLE">Available</option>
@@ -241,17 +266,22 @@ export default function ParkingTable({
               </select>
               <ChevronDown
                 size={13}
-                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600"
+                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500"
               />
             </div>
 
-            <div className="relative w-[125px] shrink-0">
+            {/* Usage Dropdown */}
+            <div className="relative min-w-[120px]">
               <select
                 value={usageFilter}
                 onChange={(event) =>
                   onUsageChange(event.target.value as ParkingUsageFilter)
                 }
-                className="h-10 w-full appearance-none rounded-lg border border-slate-300 bg-white pl-3 pr-8 text-xs font-medium text-slate-800 outline-none transition hover:border-slate-400"
+                className={`h-9 w-full appearance-none rounded-lg border bg-white pl-3 pr-8 text-xs font-medium outline-none transition cursor-pointer ${
+                  isUsageActive
+                    ? "border-[#0F5F45] text-[#0F5F45] font-semibold bg-[#E7F4EE]/30"
+                    : "border-slate-200 text-slate-700 hover:border-slate-300"
+                }`}
               >
                 <option value="ALL">All Usage</option>
                 <option value="RESIDENT">Resident</option>
@@ -259,35 +289,45 @@ export default function ParkingTable({
               </select>
               <ChevronDown
                 size={13}
-                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600"
+                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500"
               />
             </div>
 
-            <div className="relative w-[125px] shrink-0">
+            {/* Vehicle Dropdown */}
+            <div className="relative min-w-[120px]">
               <select
                 value={vehicleFilter}
                 onChange={(event) =>
                   onVehicleChange(event.target.value as ParkingVehicleFilter)
                 }
-                className="h-10 w-full appearance-none rounded-lg border border-slate-300 bg-white pl-3 pr-8 text-xs font-medium text-slate-800 outline-none transition hover:border-slate-400"
+                className={`h-9 w-full appearance-none rounded-lg border bg-white pl-3 pr-8 text-xs font-medium outline-none transition cursor-pointer ${
+                  isVehicleActive
+                    ? "border-[#0F5F45] text-[#0F5F45] font-semibold bg-[#E7F4EE]/30"
+                    : "border-slate-200 text-slate-700 hover:border-slate-300"
+                }`}
               >
                 <option value="ALL">All Vehicles</option>
                 <option value="CAR">Car</option>
-                <option value="BIKE">Bike</option>
-                <option value="EV">EV</option>
+                <option value="BIKE">Two-Wheeler</option>
+                <option value="EV">EV Bay</option>
                 <option value="OTHER">Other</option>
               </select>
               <ChevronDown
                 size={13}
-                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600"
+                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500"
               />
             </div>
 
-            <div className="relative w-[125px] shrink-0">
+            {/* Level Dropdown */}
+            <div className="relative min-w-[125px]">
               <select
                 value={levelFilter}
                 onChange={(event) => onLevelChange(event.target.value)}
-                className="h-10 w-full appearance-none rounded-lg border border-slate-300 bg-white pl-3 pr-8 text-xs font-medium text-slate-800 outline-none transition hover:border-slate-400"
+                className={`h-9 w-full appearance-none rounded-lg border bg-white pl-3 pr-8 text-xs font-medium outline-none transition cursor-pointer ${
+                  isLevelActive
+                    ? "border-[#0F5F45] text-[#0F5F45] font-semibold bg-[#E7F4EE]/30"
+                    : "border-slate-200 text-slate-700 hover:border-slate-300"
+                }`}
               >
                 <option value="">All Levels</option>
                 {availableLevels.map((level) => (
@@ -298,15 +338,20 @@ export default function ParkingTable({
               </select>
               <ChevronDown
                 size={13}
-                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600"
+                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500"
               />
             </div>
 
-            <div className="relative w-[125px] shrink-0">
+            {/* Zone Dropdown */}
+            <div className="relative min-w-[130px]">
               <select
                 value={zoneFilter}
                 onChange={(event) => onZoneChange(event.target.value)}
-                className="h-10 w-full appearance-none rounded-lg border border-slate-300 bg-white pl-3 pr-8 text-xs font-medium text-slate-800 outline-none transition hover:border-slate-400"
+                className={`h-9 w-full appearance-none rounded-lg border bg-white pl-3 pr-8 text-xs font-medium outline-none transition cursor-pointer ${
+                  isZoneActive
+                    ? "border-[#0F5F45] text-[#0F5F45] font-semibold bg-[#E7F4EE]/30"
+                    : "border-slate-200 text-slate-700 hover:border-slate-300"
+                }`}
               >
                 <option value="">All Zones</option>
                 {availableZones.map((zone) => (
@@ -317,81 +362,210 @@ export default function ParkingTable({
               </select>
               <ChevronDown
                 size={13}
-                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600"
+                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500"
               />
             </div>
 
-            {hasActiveFilters && (
+            {/* Sort Dropdown */}
+            <div className="relative min-w-[135px]">
+              <select
+                value={sortOption}
+                onChange={(event) => onSortChange(event.target.value as ParkingSortOption)}
+                className={`h-9 w-full appearance-none rounded-lg border bg-white pl-3 pr-8 text-xs font-medium outline-none transition cursor-pointer ${
+                  isSortActive
+                    ? "border-[#0F5F45] text-[#0F5F45] font-semibold bg-[#E7F4EE]/30"
+                    : "border-slate-200 text-slate-700 hover:border-slate-300"
+                }`}
+              >
+                <option value="slot_asc">Slot # (A &rarr; Z)</option>
+                <option value="slot_desc">Slot # (Z &rarr; A)</option>
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+              </select>
+              <ChevronDown
+                size={13}
+                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500"
+              />
+            </div>
+
+            {/* View Mode Switcher */}
+            {onViewModeChange && (
+              <div className="ml-auto flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => onViewModeChange("table")}
+                  className={`flex h-8 w-8 items-center justify-center rounded-md transition ${
+                    viewMode === "table"
+                      ? "bg-[#0F5F45] text-white shadow-2xs"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                  title="Table view"
+                >
+                  <List size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onViewModeChange("grid")}
+                  className={`flex h-8 w-8 items-center justify-center rounded-md transition ${
+                    viewMode === "grid"
+                      ? "bg-[#0F5F45] text-white shadow-2xs"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                  title="Grid view"
+                >
+                  <LayoutGrid size={14} />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Active Filter Chips Strip */}
+          {hasActiveFilters && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-2.5 border-t border-slate-100">
+              <span className="text-[11px] font-medium text-slate-500 mr-1 flex items-center gap-1">
+                <SlidersHorizontal size={11} className="text-slate-400" />
+                Active filters:
+              </span>
+
+              {isSearchActive && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-[#E7F4EE] text-[#0F5F45] border border-[#0F5F45]/20">
+                  <span>Search: &ldquo;{searchQuery}&rdquo;</span>
+                  <button
+                    type="button"
+                    onClick={() => onSearchChange("")}
+                    className="hover:bg-[#0F5F45]/15 rounded p-0.5 transition"
+                    aria-label="Clear search"
+                  >
+                    <X size={11} />
+                  </button>
+                </span>
+              )}
+
+              {isStatusActive && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-[#E7F4EE] text-[#0F5F45] border border-[#0F5F45]/20">
+                  <span>Status: {statusDisplay[statusFilter] || statusFilter}</span>
+                  <button
+                    type="button"
+                    onClick={() => onStatusChange("ALL")}
+                    className="hover:bg-[#0F5F45]/15 rounded p-0.5 transition"
+                    aria-label="Clear status filter"
+                  >
+                    <X size={11} />
+                  </button>
+                </span>
+              )}
+
+              {isUsageActive && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-[#E7F4EE] text-[#0F5F45] border border-[#0F5F45]/20">
+                  <span>Usage: {usageFilter === "RESIDENT" ? "Resident" : "Visitor"}</span>
+                  <button
+                    type="button"
+                    onClick={() => onUsageChange("ALL")}
+                    className="hover:bg-[#0F5F45]/15 rounded p-0.5 transition"
+                    aria-label="Clear usage filter"
+                  >
+                    <X size={11} />
+                  </button>
+                </span>
+              )}
+
+              {isVehicleActive && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-[#E7F4EE] text-[#0F5F45] border border-[#0F5F45]/20">
+                  <span>Vehicle: {vehicleFilter}</span>
+                  <button
+                    type="button"
+                    onClick={() => onVehicleChange("ALL")}
+                    className="hover:bg-[#0F5F45]/15 rounded p-0.5 transition"
+                    aria-label="Clear vehicle filter"
+                  >
+                    <X size={11} />
+                  </button>
+                </span>
+              )}
+
+              {isLevelActive && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-[#E7F4EE] text-[#0F5F45] border border-[#0F5F45]/20">
+                  <span>Level: {levelFilter}</span>
+                  <button
+                    type="button"
+                    onClick={() => onLevelChange("")}
+                    className="hover:bg-[#0F5F45]/15 rounded p-0.5 transition"
+                    aria-label="Clear level filter"
+                  >
+                    <X size={11} />
+                  </button>
+                </span>
+              )}
+
+              {isZoneActive && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-[#E7F4EE] text-[#0F5F45] border border-[#0F5F45]/20">
+                  <span>Zone: {zoneFilter}</span>
+                  <button
+                    type="button"
+                    onClick={() => onZoneChange("")}
+                    className="hover:bg-[#0F5F45]/15 rounded p-0.5 transition"
+                    aria-label="Clear zone filter"
+                  >
+                    <X size={11} />
+                  </button>
+                </span>
+              )}
+
+              {isSortActive && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                  <span>
+                    Sort:{" "}
+                    {sortOption === "newest"
+                      ? "Newest First"
+                      : sortOption === "oldest"
+                        ? "Oldest First"
+                        : sortOption === "slot_desc"
+                          ? "Slot (Desc)"
+                          : "Slot (Asc)"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onSortChange("slot_asc")}
+                    className="hover:bg-slate-200 rounded p-0.5 transition"
+                    aria-label="Reset sort"
+                  >
+                    <X size={11} />
+                  </button>
+                </span>
+              )}
+
               <button
                 type="button"
                 onClick={onClearFilters}
-                className="flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-rose-600 hover:text-rose-700 transition"
               >
-                <RotateCcw size={13} />
-                Reset
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-xs font-medium text-slate-500">
-            Showing <span className="font-semibold text-slate-800">{startItem}</span> to{" "}
-            <span className="font-semibold text-slate-800">{endItem}</span> of{" "}
-            <span className="font-semibold text-slate-800">{totalCount}</span> slots
-          </div>
-          {onViewModeChange && (
-            <div className="flex items-center rounded-lg border border-slate-300 bg-slate-100 p-0.5">
-              <button
-                type="button"
-                onClick={() => onViewModeChange("table")}
-                className={`flex h-8 w-8 items-center justify-center rounded-md transition ${
-                  viewMode === "table"
-                    ? "bg-[#0F5F45] text-white shadow-sm"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-                title="Table view"
-              >
-                <List size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={() => onViewModeChange("grid")}
-                className={`flex h-8 w-8 items-center justify-center rounded-md transition ${
-                  viewMode === "grid"
-                    ? "bg-[#0F5F45] text-white shadow-sm"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-                title="Grid view"
-              >
-                <LayoutGrid size={15} />
+                <RotateCcw size={11} />
+                Clear all
               </button>
             </div>
           )}
         </div>
-      </div>
 
-      {viewMode === "grid" ? (
-        <div className="mt-6 space-y-6">
-          <ParkingGrid
-            slots={slots}
-            isLoading={isLoading}
-            onViewSlot={openViewDrawer}
-            onEditSlot={setEditSlot}
-            onAssignSlot={openAssignDrawer}
-            onReleaseSlot={setReleaseSlot}
-            onToggleStatus={handleToggleStatus}
-          />
-          {!isLoading && slots.length === 0 && (
-            <EmptyState hasActiveFilters={hasActiveFilters} onClearFilters={onClearFilters} />
-          )}
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+        {/* View Mode Content */}
+        {viewMode === "grid" ? (
+          <div className="p-4 sm:p-6 space-y-6">
+            <ParkingGrid
+              slots={slots}
+              isLoading={isLoading}
+              onViewSlot={openViewDrawer}
+              onEditSlot={setEditSlot}
+              onAssignSlot={openAssignDrawer}
+              onReleaseSlot={setReleaseSlot}
+              onToggleStatus={handleToggleStatus}
+            />
+            {!isLoading && slots.length === 0 && (
+              <EmptyState hasActiveFilters={hasActiveFilters} onClearFilters={onClearFilters} />
+            )}
             {renderPagination()}
           </div>
-        </div>
-      ) : (
-        <div className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="min-h-[400px] overflow-x-auto">
+        ) : (
+          <>
+            <div className="overflow-x-auto">
             <table className="w-full min-w-[950px] border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/80">
@@ -439,7 +613,7 @@ export default function ParkingTable({
                       typeof slot.residentId === "object" && slot.residentId
                         ? slot.residentId.phoneNumber || null
                         : null
-                    const zoneDisplay = slot.zoneName || slot.zoneCode || null
+                    const zoneDisplay = slot.zoneName?.trim() || null
 
                     return (
                       <tr
@@ -546,10 +720,11 @@ export default function ParkingTable({
         {!isLoading && slots.length === 0 && (
           <EmptyState hasActiveFilters={hasActiveFilters} onClearFilters={onClearFilters} />
         )}
+            </div>
+            {renderPagination()}
+          </>
+        )}
       </div>
-      {renderPagination()}
-      </div>
-    )}
 
       {editSlot && (
         <EditSlotDialog slot={editSlot} onClose={() => setEditSlot(null)} />
@@ -704,21 +879,26 @@ function EmptyState({
   onClearFilters: () => void
 }) {
   return (
-    <div className="flex min-h-[350px] flex-col items-center justify-center px-4 text-center">
-      <p className="text-sm font-medium text-slate-900">No parking slots found</p>
-      <p className="mt-1 text-sm text-slate-500">
+    <div className="flex min-h-[320px] flex-col items-center justify-center p-8 text-center">
+      <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-[#0F5F45]">
+        <Car size={26} strokeWidth={1.8} />
+      </div>
+      <h3 className="text-base font-semibold text-slate-900">
+        {hasActiveFilters ? "No matching parking slots" : "No parking slots found"}
+      </h3>
+      <p className="mt-1 max-w-sm text-xs text-slate-500 leading-relaxed">
         {hasActiveFilters
-          ? "Try changing your search or status filter."
-          : "Get started by generating your first batch of parking slots."}
+          ? "No slots matched your selected zone, level, or filter criteria. Try adjusting or clearing your active filters."
+          : "No parking slots have been generated for this property yet."}
       </p>
       {hasActiveFilters && (
         <button
           type="button"
           onClick={onClearFilters}
-          className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-800 transition hover:bg-slate-50"
+          className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg bg-[#0F5F45] px-4 text-xs font-semibold text-white shadow-xs transition hover:bg-[#0B4D38]"
         >
-          <RotateCcw size={14} />
-          Clear Filters
+          <RotateCcw size={13} />
+          Reset All Filters
         </button>
       )}
     </div>

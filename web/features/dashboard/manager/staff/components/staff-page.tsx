@@ -11,7 +11,7 @@ export default function StaffPage() {
   const [inviteOpen, setInviteOpen] = useState(false)
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       <StaffHeader
         activeTab={activeTab}
         onTabChange={setActiveTab}

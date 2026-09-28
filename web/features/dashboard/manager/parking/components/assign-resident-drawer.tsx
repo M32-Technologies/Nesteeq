@@ -187,7 +187,7 @@ export function AssignResidentDrawer({
   }
 
   const VehicleIcon = VEHICLE_ICONS[slot.vehicleType] || Car
-  const zoneDisplay = slot.zoneName || slot.zoneCode || null
+  const zoneDisplay = slot.zoneName?.trim() || null
   const isResidentsLoading =
     isFlatSpecificResidentsLoading ||
     (isAllResidentsLoading && flatResidents.length === 0)

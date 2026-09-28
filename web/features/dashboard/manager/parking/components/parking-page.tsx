@@ -15,7 +15,7 @@ import type {
   ParkingUsageFilter,
   ParkingVehicleFilter,
 } from "../types/parking.types"
-import { GenerateSlotsDialog } from "./generate-slots-dialog"
+import { GenerateSlotsDrawer } from "./generate-slots-dialog"
 import ParkingSummary from "./parking-summary"
 import ParkingTable from "./parking-table"
 
@@ -85,6 +85,7 @@ export default function ParkingPage() {
     vehicleType: vehicleFilter === "ALL" ? undefined : vehicleFilter,
     level: debouncedLevelFilter || undefined,
     zoneCode: debouncedZoneFilter || undefined,
+    zoneName: debouncedZoneFilter || undefined,
     sortBy,
     sortOrder,
     page,
@@ -103,23 +104,31 @@ export default function ParkingPage() {
 
   const availableLevels = useMemo(() => {
     const set = new Set<string>()
+    stats?.levels?.forEach((lvl) => {
+      if (lvl?.trim()) set.add(lvl.trim())
+    })
     data?.parkingSlots?.forEach((slot) => {
       if (slot.level?.trim()) set.add(slot.level.trim())
     })
+    if (levelFilter.trim()) set.add(levelFilter.trim())
     return Array.from(set).sort()
-  }, [data?.parkingSlots])
+  }, [stats?.levels, data?.parkingSlots, levelFilter])
 
   const availableZones = useMemo(() => {
     const set = new Set<string>()
+    stats?.zones?.forEach((z) => {
+      if (z?.trim()) set.add(z.trim())
+    })
     data?.parkingSlots?.forEach((slot) => {
-      const zone = slot.zoneName?.trim() || slot.zoneCode?.trim()
+      const zone = slot.zoneName?.trim()
       if (zone) set.add(zone)
     })
+    if (zoneFilter.trim()) set.add(zoneFilter.trim())
     return Array.from(set).sort()
-  }, [data?.parkingSlots])
+  }, [stats?.zones, data?.parkingSlots, zoneFilter])
 
   return (
-    <div className="space-y-7 p-6">
+    <div className="space-y-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-slate-900">
@@ -215,7 +224,7 @@ export default function ParkingPage() {
         />
       )}
 
-      <GenerateSlotsDialog
+      <GenerateSlotsDrawer
         open={isGenerateOpen}
         onClose={() => setIsGenerateOpen(false)}
       />

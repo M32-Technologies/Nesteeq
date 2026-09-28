@@ -149,7 +149,7 @@ export function EditSlotDialog({ slot, onClose }: EditSlotDialogProps) {
               <div className="min-w-0">
                 <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">Zone / Block</span>
                 <span className="font-semibold truncate block text-slate-800">
-                  {slot.zoneName || slot.zoneCode || "Open Floor"}
+                  {slot.zoneName?.trim() || "Open Floor"}
                 </span>
               </div>
             </div>

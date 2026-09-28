@@ -54,6 +54,8 @@ export interface ParkingStats {
   inactive: number
   residentSlots: number
   visitorSlots: number
+  levels?: string[]
+  zones?: string[]
 }
 
 export interface ParkingPagination {
@@ -84,6 +86,7 @@ export interface ParkingFilterParams {
   status?: ParkingSlotStatus
   level?: string
   zoneCode?: string
+  zoneName?: string
   page?: number
   limit?: number
   sortBy?: ParkingSortBy

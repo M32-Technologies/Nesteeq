@@ -88,11 +88,25 @@ export const createResidentInvite = async (
     _id: flatObjectId,
     apartmentId: apartmentObjectId,
   })
-    .select("_id flatNumber")
+    .populate("blockId", "_id status blockname")
+    .select("_id flatNumber status occupancyStatus blockId")
     .lean()
 
   if (!flat) {
     throw new AppError("Flat not found in this apartment", 404)
+  }
+
+  if (flat.status !== "active") {
+    throw new AppError("Cannot invite resident to an inactive flat", 400)
+  }
+
+  const block = flat.blockId as unknown as { _id?: Types.ObjectId; status?: string; blockname?: string } | null
+  if (block && block.status === "inactive") {
+    throw new AppError("Cannot invite resident to a flat in an inactive block", 400)
+  }
+
+  if (flat.occupancyStatus && flat.occupancyStatus !== "VACANT") {
+    throw new AppError("Cannot invite resident to an already occupied flat", 400)
   }
 
   const existingUser = await getAuthDB()
@@ -751,8 +765,9 @@ export const bulkCreateResidentInvites = async (
     ? await Block.find({
       apartmentId: apartmentObjectId,
       blockname: { $in: blockNames },
+      status: "active",
     })
-      .select("_id blockname")
+      .select("_id blockname status")
       .lean()
     : []
 
@@ -792,9 +807,11 @@ export const bulkCreateResidentInvites = async (
   const flats = uniqueFlatQueries.length
     ? await Flat.find({
       apartmentId: apartmentObjectId,
+      status: "active",
+      occupancyStatus: "VACANT",
       $or: uniqueFlatQueries,
     })
-      .select("_id blockId flatNumber")
+      .select("_id blockId flatNumber status occupancyStatus")
       .lean()
     : []
 
@@ -815,7 +832,7 @@ export const bulkCreateResidentInvites = async (
         row: row.rowNumber,
         email: row.email,
         status: "failed",
-        reason: `Block "${row.block}" not found`,
+        reason: `Block "${row.block}" not found or is inactive`,
       })
 
       continue
@@ -829,7 +846,7 @@ export const bulkCreateResidentInvites = async (
         row: row.rowNumber,
         email: row.email,
         status: "failed",
-        reason: `Flat "${row.flatNumber}" not found in block "${row.block}"`,
+        reason: `Flat "${row.flatNumber}" in block "${row.block}" not found, is inactive, or is already occupied`,
       })
 
       continue
