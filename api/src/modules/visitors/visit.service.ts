@@ -212,7 +212,7 @@ export const getVisitorVisitsPage = async ({
     visitorName: v.visitorName, visitorPhone: v.visitorPhone ?? null, purpose: v.purpose ?? null,
     vehicleNumber: v.vehicleNumber ?? null, vehicleType: v.vehicleType ?? null, entryType: v.entryType,
     checkedInBy: v.checkedInBy, checkedInAt: v.checkedInAt, checkedOutBy: v.checkedOutBy ?? null,
-    checkedOutAt: v.checkedOutAt ?? null, status: v.status, createdAt: v.createdAt, updatedAt: v.updatedAt,
+    checkedOutAt: v.checkedOutAt ?? null, departedFromFlatAt: v.departedFromFlatAt ?? null, departedFromFlatBy: v.departedFromFlatBy ?? null, status: v.status, createdAt: v.createdAt, updatedAt: v.updatedAt,
   }))
   const totalPages = Math.ceil(total / limit)
   return { data, pagination: { page, limit, total, totalPages, hasNextPage: page < totalPages, hasPreviousPage: page > 1 } }
@@ -293,6 +293,7 @@ export const getVisitorRecordsService = async ({
     apartmentId: { $toString: "$apartmentId" }, flatId: { $toString: "$flatId" }, flatNumber: { $ifNull: ["$flat.flatNumber", null] },
     visitorName: 1, visitorPhone: 1, purpose: 1, vehicleNumber: 1, vehicleType: { $ifNull: ["$vehicleType", null] },
     entryType: 1, expectedAt: { $literal: null }, validUntil: { $literal: null }, checkedInAt: 1, checkedOutAt: { $ifNull: ["$checkedOutAt", null] },
+    departedFromFlatAt: { $ifNull: ["$departedFromFlatAt", null] }, departedFromFlatBy: { $ifNull: ["$departedFromFlatBy", null] },
     parkingAssignmentId: { $toString: "$parking._id" }, parkingSlotId: { $toString: "$parking.slotId" },
     parkingSlotNumber: { $ifNull: ["$parking.slot.slotNumber", null] }, parkingAssignmentStatus: { $ifNull: ["$parking.status", null] },
     parkingAssignedAt: { $ifNull: ["$parking.assignedAt", null] }, parkingReleasedAt: { $ifNull: ["$parking.releasedAt", null] },
@@ -306,6 +307,7 @@ export const getVisitorRecordsService = async ({
     flatId: { $toString: "$flatId" }, flatNumber: { $ifNull: ["$flat.flatNumber", null] }, visitorName: 1, visitorPhone: 1,
     purpose: 1, vehicleNumber: 1, vehicleType: { $ifNull: ["$vehicleType", null] }, entryType: { $literal: VisitorEntryType.PASS },
     expectedAt: "$validFrom", validUntil: 1, checkedInAt: { $literal: null }, checkedOutAt: { $literal: null },
+    departedFromFlatAt: { $literal: null }, departedFromFlatBy: { $literal: null },
     parkingAssignmentId: { $literal: null }, parkingSlotId: { $literal: null }, parkingSlotNumber: { $literal: null },
     parkingAssignmentStatus: { $literal: null }, parkingAssignedAt: { $literal: null }, parkingReleasedAt: { $literal: null },
     parkingVehicleNumber: { $literal: null }, parkingVehicleType: { $literal: null }, sortAt: "$validFrom",
@@ -743,25 +745,45 @@ export const getResidentGuestPassesService = async (
 
   const flatNumber = flat?.flatNumber || null;
 
-  const items = passes.map((p: any) => ({
-    _id: p._id.toString(),
-    id: p._id.toString(),
-    apartmentId: p.apartmentId.toString(),
-    flatId: p.flatId.toString(),
-    flatNumber,
-    visitorName: p.visitorName,
-    visitorPhone: p.visitorPhone || null,
-    purpose: p.purpose || null,
-    vehicleNumber: p.vehicleNumber || null,
-    vehicleType: p.vehicleType || null,
-    status: p.status,
-    validFrom: p.validFrom,
-    validUntil: p.validUntil,
-    token: p.rawToken || null,
-    qrCodeDataUrl: p.qrCodeDataUrl || null,
-    usedAt: p.usedAt || null,
-    createdAt: p.createdAt,
-  }));
+  const passIds = passes.map((p: any) => p._id);
+  const visits = passIds.length > 0
+    ? await VisitorVisitModel.find({ visitorPassId: { $in: passIds } })
+        .select("_id visitorPassId status checkedInAt checkedOutAt departedFromFlatAt departedFromFlatBy")
+        .lean()
+    : [];
+
+  const visitMap = new Map(
+    visits.map((v: any) => [v.visitorPassId?.toString(), v])
+  );
+
+  const items = passes.map((p: any) => {
+    const linkedVisit = p._id ? visitMap.get(p._id.toString()) : null;
+    return {
+      _id: p._id.toString(),
+      id: p._id.toString(),
+      apartmentId: p.apartmentId.toString(),
+      flatId: p.flatId.toString(),
+      flatNumber,
+      visitorName: p.visitorName,
+      visitorPhone: p.visitorPhone || null,
+      purpose: p.purpose || null,
+      vehicleNumber: p.vehicleNumber || null,
+      vehicleType: p.vehicleType || null,
+      status: p.status,
+      validFrom: p.validFrom,
+      validUntil: p.validUntil,
+      token: p.rawToken || null,
+      qrCodeDataUrl: p.qrCodeDataUrl || null,
+      usedAt: p.usedAt || null,
+      createdAt: p.createdAt,
+      visitId: linkedVisit ? linkedVisit._id.toString() : null,
+      visitStatus: linkedVisit ? linkedVisit.status : null,
+      checkedInAt: linkedVisit ? linkedVisit.checkedInAt : null,
+      checkedOutAt: linkedVisit ? linkedVisit.checkedOutAt : null,
+      departedFromFlatAt: linkedVisit ? linkedVisit.departedFromFlatAt : null,
+      departedFromFlatBy: linkedVisit ? linkedVisit.departedFromFlatBy : null,
+    };
+  });
 
   return {
     guestPasses: items,
@@ -829,3 +851,63 @@ export const cancelResidentGuestPassService = async (
     },
   };
 };
+
+export const markVisitorDepartedFromFlatService = async (
+  user: any,
+  id: string,
+  apartmentId?: string
+) => {
+  const { apartmentId: aptId, resident, flatId } = await resolveResidentContext(user, apartmentId);
+  const aptObjectId = new Types.ObjectId(aptId);
+
+  if (!Types.ObjectId.isValid(id)) {
+    throw new AppError("Invalid visitor or pass ID", 400);
+  }
+
+  const objId = new Types.ObjectId(id);
+
+  // Find the visit by visitId or visitorPassId
+  const visit = await VisitorVisitModel.findOne({
+    apartmentId: aptObjectId,
+    $or: [{ _id: objId }, { visitorPassId: objId }],
+  });
+
+  if (!visit) {
+    const pass = await GuestPassModel.findOne({
+      _id: objId,
+      apartmentId: aptObjectId,
+    });
+    if (!pass) {
+      throw new AppError("Active visitor record not found", 404);
+    }
+    throw new AppError("Visitor has not yet checked in at the gate", 400);
+  }
+
+  // Authorization check: ensure the visit belongs to the resident's flat
+  const residentFlatIdStr = flatId?.toString();
+  const visitFlatIdStr = visit.flatId.toString();
+  if (residentFlatIdStr && visitFlatIdStr !== residentFlatIdStr) {
+    throw new AppError("You are not authorized to update visitors for another flat", 403);
+  }
+
+  if (visit.status === VisitorVisitStatus.CHECKED_OUT) {
+    throw new AppError("This visitor has already been checked out at the gate", 400);
+  }
+
+  const now = new Date();
+  visit.departedFromFlatAt = now;
+  visit.departedFromFlatBy = user?.id || resident?._id?.toString() || "Resident";
+  await visit.save();
+
+  return {
+    success: true,
+    message: "Visitor marked as departed from flat. Security has been notified.",
+    visit: {
+      _id: visit._id.toString(),
+      visitorName: visit.visitorName,
+      status: visit.status,
+      departedFromFlatAt: visit.departedFromFlatAt,
+    },
+  };
+};
+

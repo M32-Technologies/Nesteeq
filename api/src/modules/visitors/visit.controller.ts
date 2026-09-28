@@ -17,6 +17,7 @@ import {
   createResidentGuestPassService,
   getResidentGuestPassesService,
   cancelResidentGuestPassService,
+  markVisitorDepartedFromFlatService,
 } from "./visit.service.js"
 
 const getSecurityContext = (req: Request) => {
@@ -316,4 +317,13 @@ export const cancelResidentGuestPassHandler = catchAsync(async (req: Request, re
     data: result,
   })
 })
+
+export const markVisitorDepartedHandler = catchAsync(async (req: Request, res: Response) => {
+  const apartmentId = req.user?.apartmentId || undefined
+  const id = String(req.params.visitId || req.params.passId || req.params.id)
+  const result = await markVisitorDepartedFromFlatService(req.user, id, apartmentId)
+
+  res.status(200).json(result)
+})
+
 

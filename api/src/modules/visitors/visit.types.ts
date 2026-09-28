@@ -133,6 +133,8 @@ export type VisitorVisitListItem = {
   checkedInAt: Date
   checkedOutBy?: string | null
   checkedOutAt?: Date | null
+  departedFromFlatAt?: Date | null
+  departedFromFlatBy?: string | null
   status: string
   createdAt?: Date
   updatedAt?: Date
@@ -166,6 +168,8 @@ export type VisitorRecordItem = {
   validUntil?: Date | null
   checkedInAt?: Date | null
   checkedOutAt?: Date | null
+  departedFromFlatAt?: Date | null
+  departedFromFlatBy?: string | null
 } & VisitorRecordParkingFields
 
 export type VisitorRecordsFacetResult = {

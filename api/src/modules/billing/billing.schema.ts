@@ -26,6 +26,7 @@ export const billTypeEnum = z.enum([
   "WATER",
   "COMMON_ELECTRICITY",
   "LIFT_MAINTENANCE",
+  "LIFT_AMC",
   "SPECIAL_REPAIR",
   "PARKING_MAINTENANCE",
   "OTHER",
@@ -176,6 +177,7 @@ export const waiveLateFeeSchema = z.object({
     amount: z
       .number()
       .positive("Waiver amount must be greater than 0"),
+    reason: z.string().trim().max(255).optional(),
   }),
 });
 

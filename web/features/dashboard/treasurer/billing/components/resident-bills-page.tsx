@@ -18,6 +18,11 @@ import {
   Info,
   ChevronDown,
   Sparkles,
+  Eye,
+  FileText,
+  Home,
+  Building2,
+  Users,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -74,6 +79,11 @@ const BILL_TYPE_CONFIG: Record<
     badgeColor: "bg-amber-50 text-amber-700 border-amber-200",
     icon: "⚡",
   },
+  LIFT_MAINTENANCE: {
+    label: "Lift Maintenance",
+    badgeColor: "bg-indigo-50 text-indigo-700 border-indigo-200",
+    icon: "🛗",
+  },
   LIFT_AMC: {
     label: "Lift AMC",
     badgeColor: "bg-indigo-50 text-indigo-700 border-indigo-200",
@@ -102,6 +112,7 @@ export function ResidentBillsPage() {
   const queryClient = useQueryClient();
   const { apartmentName, flatUnitName } = useResidentDashboard();
 
+  const [selectedScope, setSelectedScope] = useState<"ALL" | "COMMON" | "SEPARATE">("ALL");
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [invoicesPage, setInvoicesPage] = useState(1);
   const [receiptsPage, setReceiptsPage] = useState(1);
@@ -132,13 +143,32 @@ export function ResidentBillsPage() {
   const bills = billsData?.bills || [];
   const recentPayments = billsData?.recentPayments || [];
 
+  const commonBillsCount = useMemo(
+    () => bills.filter((b) => b.isCommonBill || b.billScope === "COMMON").length,
+    [bills]
+  );
+  const separateBillsCount = useMemo(
+    () => bills.filter((b) => !b.isCommonBill && b.billScope !== "COMMON").length,
+    [bills]
+  );
+
   const filteredBills = useMemo(() => {
-    return bills.filter((b) =>
-      selectedCategory === "ALL"
-        ? true
-        : (b.billType || "MONTHLY_MAINTENANCE") === selectedCategory
-    );
-  }, [bills, selectedCategory]);
+    return bills.filter((b) => {
+      // 1. Scope filter (Common vs Separate)
+      if (selectedScope === "COMMON" && !b.isCommonBill && b.billScope !== "COMMON") {
+        return false;
+      }
+      if (selectedScope === "SEPARATE" && (b.isCommonBill || b.billScope === "COMMON")) {
+        return false;
+      }
+      // 2. Category filter
+      if (selectedCategory !== "ALL") {
+        const type = b.billType || "MONTHLY_MAINTENANCE";
+        if (type !== selectedCategory) return false;
+      }
+      return true;
+    });
+  }, [bills, selectedScope, selectedCategory]);
 
   const totalInvoicePages = Math.ceil(filteredBills.length / ITEMS_PER_PAGE) || 1;
   const paginatedBills = useMemo(() => {
@@ -349,8 +379,71 @@ export function ResidentBillsPage() {
           </button>
         </div>
 
+        {/* Scope Filter Tabs (All / Society Common / Flat Separate) */}
+        <div className="border-b border-slate-200/80 bg-slate-50/70 px-5 py-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Bill Scope:
+            </span>
+            <div className="inline-flex rounded-lg bg-slate-200/70 p-0.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedScope("ALL");
+                  setInvoicesPage(1);
+                }}
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition cursor-pointer ${
+                  selectedScope === "ALL"
+                    ? "bg-white text-slate-900 shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                All Bills ({bills.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedScope("COMMON");
+                  setInvoicesPage(1);
+                }}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition cursor-pointer ${
+                  selectedScope === "COMMON"
+                    ? "bg-[#07584F] text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Building2 className="size-3.5" />
+                <span>Society Common ({commonBillsCount})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedScope("SEPARATE");
+                  setInvoicesPage(1);
+                }}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition cursor-pointer ${
+                  selectedScope === "SEPARATE"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Home className="size-3.5" />
+                <span>Flat Separate ({separateBillsCount})</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="text-xs text-slate-500 hidden sm:block">
+            {selectedScope === "COMMON"
+              ? "Showing shared society expenses distributed by Treasurer"
+              : selectedScope === "SEPARATE"
+              ? `Showing separate individual bills assigned to ${flatUnitName}`
+              : "Showing all common society and flat separate bills"}
+          </div>
+        </div>
+
         {/* Category Filter Pills */}
-        <div className="border-b border-slate-100 bg-slate-50/50 px-5 py-2.5 flex items-center gap-1.5 overflow-x-auto">
+        <div className="border-b border-slate-100 bg-slate-50/40 px-5 py-2.5 flex items-center gap-1.5 overflow-x-auto">
           <button
             type="button"
             onClick={() => {
@@ -363,12 +456,14 @@ export function ResidentBillsPage() {
                 : "text-slate-600 hover:bg-slate-100"
             }`}
           >
-            All Categories ({bills.length})
+            All Categories
           </button>
           {Object.entries(BILL_TYPE_CONFIG).map(([typeKey, cfg]) => {
-            const count = bills.filter(
-              (b) => (b.billType || "MONTHLY_MAINTENANCE") === typeKey
-            ).length;
+            const count = bills.filter((b) => {
+              if (selectedScope === "COMMON" && !b.isCommonBill && b.billScope !== "COMMON") return false;
+              if (selectedScope === "SEPARATE" && (b.isCommonBill || b.billScope === "COMMON")) return false;
+              return (b.billType || "MONTHLY_MAINTENANCE") === typeKey;
+            }).length;
             if (count === 0 && selectedCategory !== typeKey) return null;
             return (
               <button
@@ -441,7 +536,18 @@ export function ResidentBillsPage() {
                             <span>{typeCfg.icon}</span>
                             <span>{bill.title || typeCfg.label}</span>
                           </div>
-                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                            {bill.isCommonBill || bill.billScope === "COMMON" ? (
+                              <span className="inline-flex items-center gap-1 rounded bg-teal-50 border border-teal-200/80 px-1.5 py-0.5 text-[10px] font-semibold text-teal-800">
+                                <Building2 className="size-3 text-teal-600" />
+                                <span>Society Common</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded bg-blue-50 border border-blue-200/80 px-1.5 py-0.5 text-[10px] font-semibold text-blue-800">
+                                <Home className="size-3 text-blue-600" />
+                                <span>Flat Separate</span>
+                              </span>
+                            )}
                             <span className="font-mono text-[11px] text-slate-400">
                               #{bill._id.slice(-6).toUpperCase()}
                             </span>
@@ -456,6 +562,11 @@ export function ResidentBillsPage() {
                               {typeCfg.label}
                             </span>
                           </div>
+                          {bill.description && (
+                            <p className="mt-1 text-[11px] text-slate-500 line-clamp-1 italic max-w-sm">
+                              "{bill.description}"
+                            </p>
+                          )}
                         </td>
 
                         <td className="px-5 py-4 font-medium text-slate-800">
@@ -520,21 +631,32 @@ export function ResidentBillsPage() {
                         </td>
 
                         <td className="px-5 py-4 text-right whitespace-nowrap">
-                          {bill.balanceAmount > 0 ? (
+                          <div className="flex items-center justify-end gap-1.5">
                             <button
                               type="button"
-                              onClick={() => handleOpenPay(bill)}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-[#07584F] px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-[#064C44] cursor-pointer"
+                              onClick={() => setSelectedBill(bill)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                              title="View full bill breakdown and treasurer notes"
                             >
-                              <CreditCard className="size-3.5" />
-                              <span>Pay Dues</span>
+                              <Eye className="size-3.5 text-slate-500" />
+                              <span>Details</span>
                             </button>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
-                              <CheckCircle2 className="size-4" />
-                              <span>Settled</span>
-                            </span>
-                          )}
+                            {bill.balanceAmount > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenPay(bill)}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-[#07584F] px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-[#064C44] cursor-pointer"
+                              >
+                                <CreditCard className="size-3.5" />
+                                <span>Pay Dues</span>
+                              </button>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 ml-1">
+                                <CheckCircle2 className="size-4" />
+                                <span>Settled</span>
+                              </span>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -855,6 +977,232 @@ export function ResidentBillsPage() {
               >
                 {payMutation.isPending ? "Processing..." : `Confirm & Pay ${formatCurrency(payingBill.balanceAmount)}`}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bill Details Modal */}
+      {selectedBill && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 bg-slate-50/70">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-xs">
+                  <FileText className="size-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-900">
+                      {selectedBill.title || "Maintenance Bill"}
+                    </h3>
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        selectedBill.status === "PAID"
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : selectedBill.status === "OVERDUE"
+                          ? "bg-red-50 text-red-700 border border-red-200"
+                          : "bg-amber-50 text-amber-700 border border-amber-200"
+                      }`}
+                    >
+                      {selectedBill.status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 font-mono">
+                    Invoice #{selectedBill._id.slice(-6).toUpperCase()} •{" "}
+                    {selectedBill.billingPeriod || "Standard Cycle"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedBill(null)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200/60 transition cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="overflow-y-auto p-6 space-y-4 text-xs">
+              {/* Scope Banner */}
+              <div
+                className={`rounded-xl border p-3.5 flex items-start gap-3 ${
+                  selectedBill.isCommonBill || selectedBill.billScope === "COMMON"
+                    ? "bg-teal-50/60 border-teal-200/80 text-teal-900"
+                    : "bg-blue-50/60 border-blue-200/80 text-blue-900"
+                }`}
+              >
+                {selectedBill.isCommonBill || selectedBill.billScope === "COMMON" ? (
+                  <>
+                    <Building2 className="size-5 text-teal-700 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-bold text-xs">Society Common Bill</h4>
+                      <p className="text-[11px] text-teal-800 mt-0.5">
+                        Generated by Society Treasurer for shared society expenses (e.g. lift, common electricity, security, shared amenities).
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <Home className="size-5 text-blue-700 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-bold text-xs">Flat Separate Bill</h4>
+                      <p className="text-[11px] text-blue-800 mt-0.5">
+                        Issued specifically to {flatUnitName} for individual unit maintenance, flat-specific repairs, or dedicated utility charges.
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Bill Metadata Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-xl border border-slate-200/80 bg-slate-50/50 p-4">
+                <div>
+                  <span className="text-[10px] uppercase font-semibold text-slate-400">Target Flat</span>
+                  <p className="font-semibold text-slate-800 mt-0.5">{flatUnitName}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-semibold text-slate-400">Bill Type</span>
+                  <p className="font-semibold text-slate-800 mt-0.5">
+                    {BILL_TYPE_CONFIG[selectedBill.billType || "MONTHLY_MAINTENANCE"]?.label || selectedBill.billType || "Maintenance"}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-semibold text-slate-400">Billing Period</span>
+                  <p className="font-semibold text-slate-800 mt-0.5">{selectedBill.billingPeriod || "N/A"}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-semibold text-slate-400">Due Date</span>
+                  <p className="font-semibold text-slate-800 mt-0.5">{formatDate(selectedBill.dueDate)}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-semibold text-slate-400">Issued On</span>
+                  <p className="font-semibold text-slate-800 mt-0.5">{formatDate(selectedBill.createdAt)}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-semibold text-slate-400">Society Community</span>
+                  <p className="font-semibold text-slate-800 mt-0.5 truncate">{apartmentName}</p>
+                </div>
+              </div>
+
+              {/* Treasurer Description / Remarks */}
+              {selectedBill.description && (
+                <div className="rounded-xl border border-amber-200/80 bg-amber-50/50 p-3.5">
+                  <div className="flex items-center gap-1.5 text-amber-800 font-semibold mb-1">
+                    <Info className="size-3.5" />
+                    <span>Treasurer Notes & Description</span>
+                  </div>
+                  <p className="text-slate-700 leading-relaxed">
+                    {selectedBill.description}
+                  </p>
+                </div>
+              )}
+
+              {/* Itemized Cost Breakdown */}
+              <div className="rounded-xl border border-slate-200 overflow-hidden">
+                <div className="bg-slate-100/70 px-4 py-2 border-b border-slate-200 font-semibold text-slate-700 flex justify-between">
+                  <span>Charge Description</span>
+                  <span>Amount</span>
+                </div>
+                <div className="divide-y divide-slate-100 p-2 space-y-1">
+                  <div className="flex justify-between px-2 py-1 text-slate-700">
+                    <div>
+                      <span className="font-medium">Base Maintenance / Utility</span>
+                      <p className="text-[11px] text-slate-400">Standard rate for flat</p>
+                    </div>
+                    <span className="font-semibold">{formatCurrency(selectedBill.baseAmount)}</span>
+                  </div>
+
+                  {selectedBill.additionalCharges && selectedBill.additionalCharges.length > 0 && (
+                    <>
+                      {selectedBill.additionalCharges.map((charge, idx) => (
+                        <div key={idx} className="flex justify-between px-2 py-1 text-slate-700">
+                          <div>
+                            <span className="font-medium">{charge.title}</span>
+                            {charge.reason && (
+                              <p className="text-[11px] text-slate-400">{charge.reason}</p>
+                            )}
+                          </div>
+                          <span className="font-semibold text-slate-800">
+                            +{formatCurrency(charge.amount)}
+                          </span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  {selectedBill.lateFeeAmount > 0 && (
+                    <div className="flex justify-between px-2 py-1 text-amber-700">
+                      <div>
+                        <span className="font-medium">Accrued Late Fee</span>
+                        {selectedBill.lateFeePerDay > 0 && (
+                          <p className="text-[11px] text-amber-600">₹{selectedBill.lateFeePerDay}/day overdue penalty</p>
+                        )}
+                      </div>
+                      <span className="font-semibold">+{formatCurrency(selectedBill.lateFeeAmount)}</span>
+                    </div>
+                  )}
+
+                  {selectedBill.lateFeeWaivedAmount > 0 && (
+                    <div className="flex justify-between px-2 py-1 text-emerald-700">
+                      <span className="font-medium">Late Fee Waived by Treasurer</span>
+                      <span className="font-semibold">-{formatCurrency(selectedBill.lateFeeWaivedAmount)}</span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between px-2 pt-2 border-t border-slate-200 font-bold text-slate-900 text-sm">
+                    <span>Total Invoiced</span>
+                    <span>{formatCurrency(selectedBill.totalAmount)}</span>
+                  </div>
+
+                  {selectedBill.paidAmount > 0 && (
+                    <div className="flex justify-between px-2 py-1 text-emerald-700 font-medium">
+                      <span>Total Paid / Settled</span>
+                      <span>-{formatCurrency(selectedBill.paidAmount)}</span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between px-2 pt-2 border-t border-slate-200 font-bold text-base items-baseline">
+                    <span className="text-slate-900">Remaining Balance Due:</span>
+                    <span className={selectedBill.balanceAmount > 0 ? "text-amber-700" : "text-emerald-700"}>
+                      {formatCurrency(selectedBill.balanceAmount)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between border-t border-slate-200 px-6 py-4 bg-slate-50/70">
+              <button
+                type="button"
+                onClick={() => setSelectedBill(null)}
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+              >
+                Close
+              </button>
+
+              {selectedBill.balanceAmount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const billToPay = selectedBill;
+                    setSelectedBill(null);
+                    handleOpenPay(billToPay);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#07584F] px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#064C44] transition cursor-pointer"
+                >
+                  <CreditCard className="size-3.5" />
+                  <span>Pay Now ({formatCurrency(selectedBill.balanceAmount)})</span>
+                </button>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                  <CheckCircle2 className="size-4" />
+                  <span>Settled & Reconciled</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

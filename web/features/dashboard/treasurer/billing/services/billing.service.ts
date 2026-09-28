@@ -7,6 +7,7 @@ import type {
 export {
   createBill,
   createCommonBill,
+  deleteBill,
   getBillRecipients,
   getBills,
   getCommonBills,

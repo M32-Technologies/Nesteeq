@@ -49,6 +49,7 @@ export const getTreasurerChartService = async (
       {
         $match: {
           apartmentId: id,
+          reversed: { $ne: true },
           paidAt: { $gte: startOfYear, $lt: endOfYear },
         },
       },
@@ -178,7 +179,7 @@ export const getTreasurerDashboardService = async (
         .limit(5)
         .lean(),
 
-      Payment.find({ apartmentId: id })
+      Payment.find({ apartmentId: id, reversed: { $ne: true } })
         .sort({ paidAt: -1 })
         .limit(8)
         .lean(),

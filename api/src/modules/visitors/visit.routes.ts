@@ -14,6 +14,7 @@ import {
   createResidentGuestPassHandler,
   getResidentGuestPassesHandler,
   cancelResidentGuestPassHandler,
+  markVisitorDepartedHandler,
 } from "./visit.controller.js"
 
 import {
@@ -46,6 +47,8 @@ router.get("/passes", zodValidate(listResidentGuestPassesQuerySchema), getReside
 router.get("/passes/:guestPassId", zodValidate(guestPassIdParamsSchema), getGuestPassById)
 router.patch("/passes/:passId/cancel", zodValidate(residentGuestPassParamsSchema), cancelResidentGuestPassHandler)
 router.patch("/passes/:guestPassId/cancel", zodValidate(guestPassIdParamsSchema), cancelResidentGuestPassHandler)
+router.patch("/passes/:passId/depart-flat", zodValidate(residentGuestPassParamsSchema), markVisitorDepartedHandler)
+router.patch("/visits/:visitId/depart-flat", zodValidate(visitorVisitIdParamsSchema), markVisitorDepartedHandler)
 router.post("/visits/check-in", requireRole("security_staff"), zodValidate(checkInVisitorSchema), checkInVisitor)
 router.post("/visits/manual", requireRole("security_staff"), zodValidate(manualVisitorEntrySchema), createManualVisitorEntry)
 router.patch("/visits/:visitId/check-out", requireRole("security_staff", "property_manager"), zodValidate(visitorVisitIdParamsSchema), checkoutVisitor)
