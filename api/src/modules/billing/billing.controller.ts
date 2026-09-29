@@ -11,6 +11,7 @@ import {
   getCommonBillsService,
   getMyResidentBillsService,
   payResidentBillService,
+  payAllResidentBillsService,
   recordBillPaymentService,
   updateBillService,
   waiveLateFeeService,
@@ -193,7 +194,7 @@ export const getMyResidentBills = catchAsync(
   async (req: Request, res: Response) => {
     const user = {
       id: req.user!.id,
-      role: req.user!.role,
+      role: req.user?.role || "resident",
       apartmentId: req.user!.apartmentId ?? null,
       flatId: req.user!.flatId ?? null,
     };
@@ -212,7 +213,7 @@ export const payResidentBill = catchAsync(
     const user = {
       id: req.user!.id,
       name: req.user!.name,
-      role: req.user!.role,
+      role: req.user?.role || "resident",
       apartmentId: req.user!.apartmentId ?? null,
       flatId: req.user!.flatId ?? null,
     };
@@ -222,6 +223,22 @@ export const payResidentBill = catchAsync(
       user,
       req.body
     );
+
+    res.status(200).json(result);
+  }
+);
+
+export const payAllResidentBills = catchAsync(
+  async (req: Request, res: Response) => {
+    const user = {
+      id: req.user!.id,
+      name: req.user!.name,
+      role: req.user?.role || "resident",
+      apartmentId: req.user!.apartmentId ?? null,
+      flatId: req.user!.flatId ?? null,
+    };
+
+    const result = await payAllResidentBillsService(user, req.body);
 
     res.status(200).json(result);
   }

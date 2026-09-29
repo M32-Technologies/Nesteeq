@@ -193,3 +193,13 @@ export const payResidentBillSchema = z.object({
   }),
 });
 
+export const payAllResidentBillsSchema = z.object({
+  body: z.object({
+    paymentMethod: z.string().trim().max(50).optional(),
+    referenceNo: z.string().trim().max(100).optional(),
+    description: z.string().trim().max(255).optional(),
+    billIds: z.array(objectIdSchema).optional(),
+  }),
+});
+
+
