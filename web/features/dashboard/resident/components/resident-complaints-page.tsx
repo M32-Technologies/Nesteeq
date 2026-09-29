@@ -170,7 +170,7 @@ export function ResidentComplaintsPage() {
         <button
           type="button"
           onClick={() => setIsCreateModalOpen(true)}
-          className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#07584F] px-4 text-xs sm:text-sm font-medium text-white shadow-xs transition-colors hover:bg-[#064C44] cursor-pointer active:scale-95 self-start sm:self-auto"
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#07584F] px-4 text-xs sm:text-sm font-medium text-white shadow-xs transition-colors hover:bg-[#064C44] cursor-pointer active:scale-95 w-full sm:w-auto"
         >
           <Plus className="size-4" />
           <LifeBuoy className="size-4" />
@@ -191,7 +191,7 @@ export function ResidentComplaintsPage() {
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => refetch()}
@@ -203,7 +203,7 @@ export function ResidentComplaintsPage() {
             <span className="hidden sm:inline">Refresh</span>
           </button>
 
-          <div className="flex items-center gap-1 rounded-lg border border-[#DDE3DF] bg-[#F7F8F5] p-1">
+          <div className="flex items-center gap-1 rounded-lg border border-[#DDE3DF] bg-[#F7F8F5] p-1 overflow-x-auto w-full sm:w-auto shrink-0 [&::-webkit-scrollbar]:hidden">
             {(["ALL", "IN_PROGRESS", "RESOLVED"] as const).map((tab) => (
               <button
                 key={tab}
@@ -326,7 +326,7 @@ export function ResidentComplaintsPage() {
                       type="button"
                       onClick={() => handleConfirmResolution(ticketId)}
                       disabled={confirmingId === ticketId}
-                      className="inline-flex items-center gap-1.5 rounded-md bg-emerald-700 px-3 py-1 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-800 transition disabled:opacity-50 cursor-pointer self-start sm:self-auto shrink-0"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-800 transition disabled:opacity-50 cursor-pointer w-full sm:w-auto shrink-0"
                     >
                       <CheckCircle2 className="size-3.5" />
                       <span>{confirmingId === ticketId ? "Confirming..." : "Confirm Resolution"}</span>

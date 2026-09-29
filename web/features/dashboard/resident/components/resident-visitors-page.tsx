@@ -342,7 +342,7 @@ export function ResidentVisitorsPage() {
         <button
           type="button"
           onClick={() => setIsCreateModalOpen(true)}
-          className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#07584F] px-4 text-xs sm:text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#064C44] active:scale-95 cursor-pointer self-start sm:self-auto"
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#07584F] px-4 text-xs sm:text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#064C44] active:scale-95 cursor-pointer w-full sm:w-auto"
         >
           <Plus className="size-4" />
           <QrCode className="size-4" />
@@ -418,7 +418,7 @@ export function ResidentVisitorsPage() {
           />
         </div>
 
-        <div className="flex items-center gap-1 rounded-lg border border-[#DDE3DF] bg-[#F7F8F5] p-1 overflow-x-auto">
+        <div className="flex items-center gap-1 rounded-lg border border-[#DDE3DF] bg-[#F7F8F5] p-1 overflow-x-auto w-full sm:w-auto shrink-0 [&::-webkit-scrollbar]:hidden">
           {(["ALL", "ACTIVE", "USED", "EXPIRED"] as const).map((tab) => (
             <button
               key={tab}
@@ -591,7 +591,7 @@ export function ResidentVisitorsPage() {
                 </div>
 
                 {/* Footer Buttons */}
-                <div className="pt-2.5 border-t border-[#EEF1F4] flex items-center justify-between">
+                <div className="pt-2.5 border-t border-[#EEF1F4] flex flex-wrap items-center justify-between gap-2">
                   <button
                     type="button"
                     onClick={() => setActiveQrModalPass(pass)}
@@ -601,7 +601,7 @@ export function ResidentVisitorsPage() {
                     <span>View QR Code</span>
                   </button>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     {/* Mark as Left Flat Button for Resident */}
                     {isCheckedIn && !hasDeparted && (
                       <button
@@ -877,14 +877,14 @@ export function ResidentVisitorsPage() {
               </div>
 
               {/* Action Buttons */}
-              <div className="pt-3 border-t border-[#DDE3DF] flex items-center justify-end gap-2.5">
+              <div className="pt-3 border-t border-[#DDE3DF] flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-2.5">
                 <button
                   type="button"
                   onClick={() => {
                     setIsCreateModalOpen(false);
                     resetForm();
                   }}
-                  className="rounded-lg border border-[#DDE3DF] bg-white px-4 py-2 text-xs font-semibold text-[#111111] hover:bg-slate-50 transition cursor-pointer"
+                  className="w-full sm:w-auto rounded-lg border border-[#DDE3DF] bg-white px-4 py-2 text-xs font-semibold text-[#111111] hover:bg-slate-50 transition cursor-pointer text-center"
                 >
                   Cancel
                 </button>
@@ -892,7 +892,7 @@ export function ResidentVisitorsPage() {
                 <button
                   type="submit"
                   disabled={createPassMutation.isPending}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#07584F] px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#064C44] transition active:scale-95 disabled:opacity-60 cursor-pointer"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-[#07584F] px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#064C44] transition active:scale-95 disabled:opacity-60 cursor-pointer"
                 >
                   <QrCode className="size-4" />
                   <span>
@@ -1037,7 +1037,7 @@ export function ResidentVisitorsPage() {
               </div>
 
               {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-2.5 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() =>
@@ -1046,7 +1046,7 @@ export function ResidentVisitorsPage() {
                       activeQrModalPass.visitorName
                     )
                   }
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#DDE3DF] bg-white py-2 text-xs font-semibold text-[#111111] hover:bg-slate-50 transition cursor-pointer"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#DDE3DF] bg-white py-2 text-xs font-semibold text-[#111111] hover:bg-slate-50 transition cursor-pointer w-full"
                 >
                   <Download className="size-3.5 text-[#07584F]" />
                   <span>Download QR</span>
@@ -1055,7 +1055,7 @@ export function ResidentVisitorsPage() {
                 <button
                   type="button"
                   onClick={() => handleSharePass(activeQrModalPass)}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#07584F] py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#064C44] transition cursor-pointer"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#07584F] py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#064C44] transition cursor-pointer w-full"
                 >
                   <Share2 className="size-3.5" />
                   <span>Share Pass</span>
@@ -1094,11 +1094,11 @@ export function ResidentVisitorsPage() {
               ? Security will reject this QR code at the gate.
             </p>
 
-            <div className="flex items-center justify-end gap-2 pt-2">
+            <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setPassToCancel(null)}
-                className="rounded-lg border border-[#DDE3DF] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#111111] hover:bg-slate-50 transition cursor-pointer"
+                className="w-full sm:w-auto rounded-lg border border-[#DDE3DF] bg-white px-3.5 py-2 text-xs font-semibold text-[#111111] hover:bg-slate-50 transition cursor-pointer text-center"
               >
                 Keep Pass
               </button>
@@ -1107,7 +1107,7 @@ export function ResidentVisitorsPage() {
                 type="button"
                 disabled={cancelPassMutation.isPending}
                 onClick={() => cancelPassMutation.mutate(passToCancel._id)}
-                className="rounded-lg bg-rose-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-rose-700 transition cursor-pointer disabled:opacity-60"
+                className="w-full sm:w-auto rounded-lg bg-rose-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-rose-700 transition cursor-pointer disabled:opacity-60 text-center"
               >
                 {cancelPassMutation.isPending ? "Cancelling..." : "Confirm Cancel"}
               </button>

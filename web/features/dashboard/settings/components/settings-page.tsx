@@ -58,7 +58,7 @@ export default function SettingsPage() {
     staleTime: 1000 * 60 * 5,
   })
 
-  // Fetch real subscription data from database via existing endpoint
+  // Fetch real subscription data from database via existing endpoint (only for Property Manager)
   const { data: subscriptionData, isLoading: subscriptionLoading } = useQuery<SubscriptionData | null>({
     queryKey: ["current-subscription-details"],
     queryFn: async () => {
@@ -69,6 +69,11 @@ export default function SettingsPage() {
         return null
       }
     },
+    enabled: Boolean(
+      user?.role === "property_manager" ||
+      user?.role === "admin" ||
+      user?.role === "super_admin"
+    ),
     staleTime: 1000 * 60 * 5,
   })
 
@@ -117,11 +122,19 @@ export default function SettingsPage() {
     }
   }, [user])
 
-  // Role detection
+  // Role detection: strictly Property Manager or Admin can view/edit apartment and subscriptions
   const userRole = (user?.role || "resident").toLowerCase()
-  const isOwner = userRole === "owner" || userRole.includes("owner")
-  const isManager = userRole === "property_manager" || userRole.includes("manager")
-  const isOwnerOrManager = isOwner || isManager
+  const isOwnerOrManager =
+    userRole === "property_manager" ||
+    userRole === "admin" ||
+    userRole === "super_admin"
+
+  // Ensure non-property-managers cannot view apartment or subscription tabs
+  useEffect(() => {
+    if (!isOwnerOrManager && activeTab !== "profile") {
+      setActiveTab("profile")
+    }
+  }, [isOwnerOrManager, activeTab])
 
   // Track if profile changes have been made
   const originalName = user?.name || ""
@@ -280,6 +293,7 @@ export default function SettingsPage() {
           onTabChange={handleTabChange}
           apartmentName={apartmentData?.name}
           subscriptionStatus={subscriptionData?.status}
+          isOwnerOrManager={isOwnerOrManager}
         />
 
         {/* Right Content Panel */}
@@ -304,7 +318,7 @@ export default function SettingsPage() {
             />
           )}
 
-          {activeTab === "apartment" && (
+          {isOwnerOrManager && activeTab === "apartment" && (
             <ApartmentSettingsPanel
               apartmentData={apartmentData}
               isLoading={apartmentLoading}
@@ -335,7 +349,7 @@ export default function SettingsPage() {
             />
           )}
 
-          {activeTab === "subscription" && (
+          {isOwnerOrManager && activeTab === "subscription" && (
             <SubscriptionSettingsPanel
               subscriptionData={subscriptionData}
               isLoading={subscriptionLoading}

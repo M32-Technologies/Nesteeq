@@ -459,12 +459,12 @@ export function CreateComplaintModal({
           </div>
 
           {/* Modal Footer */}
-          <div className="flex items-center justify-end gap-2 border-t border-[#DDE3DF] px-5 sm:px-6 py-3.5 bg-[#F7F8F5]/60">
+          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 border-t border-[#DDE3DF] px-5 sm:px-6 py-3.5 bg-[#F7F8F5]/60">
             <button
               type="button"
               onClick={handleClose}
               disabled={isSubmitting}
-              className="rounded-lg border border-[#DDE3DF] bg-white px-4 py-2 text-xs font-medium text-[#637083] hover:bg-[#F7F8F5] hover:text-[#111111] transition cursor-pointer disabled:opacity-50"
+              className="w-full sm:w-auto rounded-lg border border-[#DDE3DF] bg-white px-4 py-2 text-xs font-medium text-[#637083] hover:bg-[#F7F8F5] hover:text-[#111111] transition cursor-pointer disabled:opacity-50 text-center"
             >
               Cancel
             </button>
@@ -472,7 +472,7 @@ export function CreateComplaintModal({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#07584F] px-4 py-2 text-xs font-medium text-white shadow-xs hover:bg-[#064C44] transition cursor-pointer disabled:opacity-50"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-[#07584F] px-4 py-2 text-xs font-medium text-white shadow-xs hover:bg-[#064C44] transition cursor-pointer disabled:opacity-50 text-center"
             >
               {isSubmitting ? (
                 <>

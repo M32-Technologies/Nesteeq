@@ -61,3 +61,18 @@ export async function payResidentBill(
   return res.data;
 }
 
+export interface PayAllResidentBillsPayload {
+  paymentMethod?: string;
+  referenceNo?: string;
+  description?: string;
+  billIds?: string[];
+}
+
+export async function payAllResidentBills(
+  payload: PayAllResidentBillsPayload
+) {
+  const res = await api.post("/api/v1/bills/pay-all", payload);
+  return res.data;
+}
+
+

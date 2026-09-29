@@ -142,12 +142,12 @@ export function ResidentDashboardView() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
           <button
             type="button"
             onClick={handleRefresh}
             disabled={isRefetching}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#DDE3DF] bg-white px-3.5 text-xs sm:text-sm font-medium text-[#111111] transition-colors hover:bg-[#F7F8F5] disabled:opacity-50 cursor-pointer"
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#DDE3DF] bg-white px-3.5 text-xs sm:text-sm font-medium text-[#111111] transition-colors hover:bg-[#F7F8F5] disabled:opacity-50 cursor-pointer w-full sm:w-auto"
           >
             <RefreshCw className={`size-3.5 ${isRefetching ? "animate-spin text-[#07584F]" : "text-[#637083]"}`} />
             <span>Refresh</span>
@@ -156,7 +156,7 @@ export function ResidentDashboardView() {
           <button
             type="button"
             onClick={() => setIsComplaintModalOpen(true)}
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#DDE3DF] bg-white px-3.5 text-xs sm:text-sm font-medium text-[#111111] transition-colors hover:bg-[#F7F8F5] cursor-pointer"
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#DDE3DF] bg-white px-3.5 text-xs sm:text-sm font-medium text-[#111111] transition-colors hover:bg-[#F7F8F5] cursor-pointer w-full sm:w-auto"
           >
             <Plus className="size-3.5 text-[#637083]" />
             <span>Raise Complaint</span>
@@ -165,7 +165,7 @@ export function ResidentDashboardView() {
           <button
             type="button"
             onClick={() => setIsVisitorModalOpen(true)}
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#07584F] px-4 text-xs sm:text-sm font-medium text-white shadow-xs transition-colors hover:bg-[#064C44] cursor-pointer"
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#07584F] px-4 text-xs sm:text-sm font-medium text-white shadow-xs transition-colors hover:bg-[#064C44] cursor-pointer w-full sm:w-auto"
           >
             <QrCode className="size-3.5" />
             <span>Pre-approve Visitor</span>
@@ -174,7 +174,7 @@ export function ResidentDashboardView() {
       </div>
 
       {/* 2. SUMMARY KPI STAT CARDS (5-column grid matching SecuritySummaryCards) */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <SummaryCard
           label="Active Guest Passes"
           value={activeVisitorsCount}
@@ -406,23 +406,39 @@ export function ResidentDashboardView() {
                   Monthly maintenance & utility billing
                 </p>
               </div>
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
-                <CheckCircle2 className="size-3" />
-                <span>Cleared</span>
-              </span>
+              {(billsSummary?.totalOutstanding ?? 0) > 0 ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">
+                  <AlertTriangle className="size-3 text-amber-600" />
+                  <span>{(billsSummary?.overdueCount ?? 0) > 0 ? "Overdue" : "Pending"}</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                  <CheckCircle2 className="size-3" />
+                  <span>Cleared</span>
+                </span>
+              )}
             </div>
 
             <div className="rounded-lg bg-[#F7F8F5] p-3.5 border border-[#EEF1F4]">
               <p className="text-xs font-medium text-[#637083]">Current Outstanding Balance</p>
-              <p className="text-2xl font-bold text-[#111111] mt-1">₹0.00</p>
+              <p className="text-2xl font-bold text-[#111111] mt-1">
+                {isBillsLoading
+                  ? "..."
+                  : `₹${(billsSummary?.totalOutstanding ?? 0).toLocaleString("en-IN", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}`}
+              </p>
               <p className="text-xs text-[#637083] mt-1" suppressHydrationWarning>
-                All maintenance dues and utility charges are completely settled for {isMounted ? flatUnitName : "your unit"}.
+                {(billsSummary?.totalOutstanding ?? 0) > 0
+                  ? `You have ${billsSummary?.pendingCount ?? 1} unpaid invoice(s) for ${isMounted ? flatUnitName : "your unit"}.`
+                  : `All maintenance dues and utility charges are completely settled for ${isMounted ? flatUnitName : "your unit"}.`}
               </p>
             </div>
 
             <Link
               href="/resident/bills"
-              className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-[#DDE3DF] bg-white px-3 text-xs font-medium text-[#111111] hover:bg-[#F7F8F5] transition-colors"
+              className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-[#DDE3DF] bg-white px-3 text-xs font-semibold text-[#111111] hover:bg-[#F7F8F5] transition-colors shadow-2xs"
             >
               <span>View Statements & Receipts</span>
               <ChevronRight className="size-3.5 text-[#637083]" />

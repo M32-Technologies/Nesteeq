@@ -1,12 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import Image from "next/image";
+import { useEffect, useState, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, LogOut, Menu, UserCircle, X } from "lucide-react";
+import {
+  ArrowRight,
+  LogOut,
+  Menu,
+  Settings,
+  UserRound,
+  X,
+} from "lucide-react";
 import { signOut, useSession } from "@/lib/auth-client";
-import { getUserDashboardHref } from "@/features/dashboard/config/sidebar-navigation";
+import {
+  dashboardRoleLabels,
+  normalizeDashboardRole,
+} from "@/features/dashboard/config/sidebar-navigation";
 
 const navItems = [
   { label: "Home", href: "/" },
@@ -14,6 +25,15 @@ const navItems = [
   { label: "Pricing", href: "/pricing" },
   { label: "Contact", href: "/contact" },
 ];
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((word) => word.charAt(0))
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -23,6 +43,8 @@ export default function Navbar() {
   const [isMounted, setIsMounted] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -30,15 +52,39 @@ export default function Navbar() {
 
   const user = isMounted ? session?.user : null;
   const userName = user?.name || user?.email || "Profile";
-  const userInitial = userName.charAt(0).toUpperCase();
+  const userInitials = user?.name ? getInitials(user.name) : userName.charAt(0).toUpperCase();
   const isAuthLoading = !isMounted || isPending;
+
+  const userRole = normalizeDashboardRole(user?.role);
+  const roleLabel =
+    user?.role?.trim().toLowerCase() === "admin"
+      ? "Administrator"
+      : dashboardRoleLabels[userRole] || "Resident";
 
   const handleSignOut = async () => {
     await signOut();
+    setIsProfileOpen(false);
     setIsMenuOpen(false);
     router.push("/");
     router.refresh();
   };
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        profileDropdownRef.current &&
+        !profileDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsProfileOpen(false);
+      }
+    }
+    if (isProfileOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isProfileOpen]);
 
   useEffect(() => {
     let scrolled = false;
@@ -116,26 +162,110 @@ export default function Navbar() {
           {isAuthLoading ? (
             <div className="h-10 w-40 animate-pulse rounded-full bg-black/[0.06]" />
           ) : user ? (
-            <>
-              <Link
-                href={getUserDashboardHref(user?.role)}
-                className="flex h-10 items-center gap-2 rounded-full border border-black/[0.08] bg-white px-3 text-sm font-semibold text-[var(--ink)] hover:border-[var(--brand)] hover:text-[var(--brand)] transition"
-              >
-                <span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--brand)] text-xs text-white">
-                  {userInitial}
-                </span>
-                <span className="max-w-32 truncate">{userName}</span>
-              </Link>
-
+            <div ref={profileDropdownRef} className="relative">
               <button
                 type="button"
-                onClick={() => void handleSignOut()}
-                className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--ink)] transition hover:bg-black/[0.04]"
-                aria-label="Sign out"
+                aria-label="User Profile Menu"
+                aria-expanded={isProfileOpen}
+                onClick={() => setIsProfileOpen((prev) => !prev)}
+                className="
+                  flex
+                  h-10
+                  cursor-pointer
+                  items-center
+                  gap-2.5
+                  rounded-lg
+                  px-2
+                  text-left
+                  transition-colors
+                  duration-150
+                  hover:bg-black/[0.04]
+                "
               >
-                <LogOut className="h-4 w-4" />
+                {/* Avatar */}
+                <span
+                  className="
+                    flex
+                    size-8
+                    shrink-0
+                    items-center
+                    justify-center
+                    overflow-hidden
+                    rounded-full
+                    bg-[#0F766E]
+                    text-[11px]
+                    font-bold
+                    tracking-wide
+                    text-white
+                    ring-2
+                    ring-white
+                  "
+                  style={{ boxShadow: '0 0 0 2px #E2E8F0' }}
+                >
+                  {user.image ? (
+                    <Image
+                      src={user.image}
+                      alt={userName}
+                      width={32}
+                      height={32}
+                      unoptimized
+                      className="size-full object-cover"
+                    />
+                  ) : userInitials ? (
+                    userInitials
+                  ) : (
+                    <UserRound className="size-4" />
+                  )}
+                </span>
+
+                {/* Name + role */}
+                <span className="min-w-0 text-left">
+                  <span className="block max-w-36 truncate text-[13px] font-semibold leading-[1.3] text-[#0F172A]">
+                    {userName}
+                  </span>
+                  <span className="block max-w-36 truncate text-[11px] font-medium leading-[1.3] text-[#94A3B8]">
+                    {roleLabel}
+                  </span>
+                </span>
               </button>
-            </>
+
+              {/* Profile Menu Dropdown */}
+              {isProfileOpen && (
+                <div className="absolute right-0 mt-2 w-56 rounded-lg border border-[#DDE3DF] bg-white p-2 shadow-lg z-50 animate-in fade-in duration-150">
+                  <div className="px-3 py-2 border-b border-[#EEF1F4] mb-1">
+                    <p className="text-xs font-semibold text-[#111111] truncate">
+                      {userName}
+                    </p>
+                    <p className="text-[11px] text-[#637083] truncate">
+                      {user.email}
+                    </p>
+                    <p className="text-[11px] text-[#0F766E] font-semibold mt-0.5">
+                      {roleLabel}
+                    </p>
+                  </div>
+
+                  <Link
+                    href="/profile"
+                    onClick={() => setIsProfileOpen(false)}
+                    className="flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium text-[#111111] hover:bg-[#F7F8F5] transition-colors"
+                  >
+                    <Settings className="size-3.5 text-[#637083]" />
+                    <span>Account Settings</span>
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleSignOut();
+                    }}
+                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50 transition-colors cursor-pointer"
+                  >
+                    <LogOut className="size-3.5 text-red-600" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              )}
+            </div>
           ) : (
             <>
               <Link
@@ -192,23 +322,29 @@ export default function Navbar() {
               {isAuthLoading ? (
                 <div className="mt-4 h-11 animate-pulse rounded-full bg-black/[0.06]" />
               ) : user ? (
-                <div className="mt-4 space-y-3">
+                <div className="mt-4 space-y-2 border-t border-black/[0.05] pt-3">
+                  <div className="px-3 py-2 bg-slate-50 rounded-lg mb-2">
+                    <p className="text-xs font-semibold text-[#111111] truncate">{userName}</p>
+                    <p className="text-[11px] text-[#637083] truncate">{user.email}</p>
+                    <p className="text-[11px] text-[#0F766E] font-semibold mt-0.5">{roleLabel}</p>
+                  </div>
+
                   <Link
-                    href={getUserDashboardHref(user?.role)}
+                    href="/profile"
                     onClick={() => setIsMenuOpen(false)}
-                    className="flex h-11 items-center gap-2 rounded-full border border-black/[0.08] px-3 text-sm font-semibold text-[var(--ink)] hover:border-[var(--brand)] hover:text-[var(--brand)] transition"
+                    className="flex items-center gap-2 rounded-md px-3 py-2.5 text-xs font-medium text-[#111111] hover:bg-[#F7F8F5] transition-colors"
                   >
-                    <UserCircle className="h-5 w-5 text-[var(--brand)]" />
-                    <span className="truncate">{userName}</span>
+                    <Settings className="size-3.5 text-[#637083]" />
+                    <span>Account Settings</span>
                   </Link>
 
                   <button
                     type="button"
                     onClick={() => void handleSignOut()}
-                    className="flex h-11 w-full items-center justify-center gap-2 rounded-full border border-black/[0.08] text-sm font-semibold"
+                    className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-xs font-medium text-red-700 hover:bg-red-50 transition-colors cursor-pointer"
                   >
-                    <LogOut size={15} />
-                    Sign out
+                    <LogOut className="size-3.5 text-red-600" />
+                    <span>Sign Out</span>
                   </button>
                 </div>
               ) : (

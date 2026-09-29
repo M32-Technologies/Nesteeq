@@ -7,6 +7,10 @@ import { toast } from "sonner"
 
 import { authClient, useSession } from "@/lib/auth-client"
 import api from "@/lib/axios"
+import {
+  dashboardRoleLabels,
+  normalizeDashboardRole,
+} from "@/features/dashboard/config/sidebar-navigation"
 import { ProfileHeader } from "../shared/ProfileHeader"
 import { PersonalDetails } from "../shared/PersonalDetails"
 import { ManagementInformation } from "./ManagementInformation"
@@ -32,6 +36,25 @@ export function ManagementProfile() {
   const { data: session, isPending: isSessionLoading } = useSession()
   const user = session?.user
 
+  const normalizedRole = normalizeDashboardRole(user?.role)
+  const isPropertyManager =
+    normalizedRole === "property_manager" ||
+    user?.role?.trim().toLowerCase() === "admin" ||
+    user?.role?.trim().toLowerCase() === "super_admin"
+
+  const roleBadge =
+    user?.role?.trim().toLowerCase() === "admin"
+      ? "Administrator"
+      : dashboardRoleLabels[normalizedRole] || "Management"
+
+  const defaultTagline = isPropertyManager
+    ? "Well-managed spaces create better lives."
+    : normalizedRole === "treasurer"
+      ? "Ensuring financial transparency and sound management."
+      : normalizedRole === "facility_manager"
+        ? "Maintaining excellence across our facilities."
+        : "Dedicated to our community."
+
   const [activeTab, setActiveTab] = useState<ProfileTab>("profile")
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
@@ -50,7 +73,7 @@ export function ManagementProfile() {
     staleTime: 1000 * 60 * 5,
   })
 
-  // Fetch real Subscription data for secondary subscription tab
+  // Fetch real Subscription data only for Property Manager
   const { data: subscriptionData, isLoading: isSubscriptionLoading } = useQuery<SubscriptionData | null>({
     queryKey: ["current-subscription-details"],
     queryFn: async () => {
@@ -61,6 +84,7 @@ export function ManagementProfile() {
         return null
       }
     },
+    enabled: isPropertyManager,
     staleTime: 1000 * 60 * 5,
   })
 
@@ -152,8 +176,8 @@ export function ManagementProfile() {
       {/* 1. Shared Profile Header (Community Banner + Identity Info) */}
       <ProfileHeader
         bannerUrl="/images/apartment-banner.png"
-        name={user?.name || "Property Manager"}
-        roleBadge="Property Manager"
+        name={user?.name || roleBadge}
+        roleBadge={roleBadge}
         email={user?.email || ""}
         phone={user?.phone || apartmentData?.contactNumber || ""}
         location={formattedLocation}
@@ -161,96 +185,98 @@ export function ManagementProfile() {
         memberSince={memberSince}
         avatarUrl={user?.image}
         isVerified={Boolean(user?.emailVerified ?? true)}
-        tagline="Well-managed spaces create better lives."
+        tagline={defaultTagline}
         onAvatarChange={handleAvatarUpload}
         isUpdatingAvatar={isUploadingAvatar}
       />
 
-      {/* 2. Sub-Navigation Tabs */}
-      <div className="border-b border-slate-200">
-        <nav className="flex space-x-6" aria-label="Profile navigation tabs">
-          {/* Tab 1: My Profile */}
-          <button
-            type="button"
-            onClick={() => setActiveTab("profile")}
-            className={`
-              flex
-              items-center
-              gap-1.5
-              pb-2
-              text-xs
-              sm:text-[13px]
-              font-semibold
-              border-b-2
-              transition-colors
-              cursor-pointer
-              ${
-                activeTab === "profile"
-                  ? "border-[#08281E] text-[#08281E]"
-                  : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
-              }
-            `}
-          >
-            <UserRound className="size-3.5 stroke-[2.2]" />
-            <span>My Profile</span>
-          </button>
+      {/* 2. Sub-Navigation Tabs (Only Property Manager can access Apartment & Subscription) */}
+      {isPropertyManager && (
+        <div className="border-b border-slate-200">
+          <nav className="flex space-x-6" aria-label="Profile navigation tabs">
+            {/* Tab 1: My Profile */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("profile")}
+              className={`
+                flex
+                items-center
+                gap-1.5
+                pb-2
+                text-xs
+                sm:text-[13px]
+                font-semibold
+                border-b-2
+                transition-colors
+                cursor-pointer
+                ${
+                  activeTab === "profile"
+                    ? "border-[#08281E] text-[#08281E]"
+                    : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
+                }
+              `}
+            >
+              <UserRound className="size-3.5 stroke-[2.2]" />
+              <span>My Profile</span>
+            </button>
 
-          {/* Tab 2: Apartment */}
-          <button
-            type="button"
-            onClick={() => setActiveTab("apartment")}
-            className={`
-              flex
-              items-center
-              gap-1.5
-              pb-2
-              text-xs
-              sm:text-[13px]
-              font-semibold
-              border-b-2
-              transition-colors
-              cursor-pointer
-              ${
-                activeTab === "apartment"
-                  ? "border-[#08281E] text-[#08281E]"
-                  : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
-              }
-            `}
-          >
-            <Building2 className="size-3.5" />
-            <span>Apartment</span>
-          </button>
+            {/* Tab 2: Apartment */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("apartment")}
+              className={`
+                flex
+                items-center
+                gap-1.5
+                pb-2
+                text-xs
+                sm:text-[13px]
+                font-semibold
+                border-b-2
+                transition-colors
+                cursor-pointer
+                ${
+                  activeTab === "apartment"
+                    ? "border-[#08281E] text-[#08281E]"
+                    : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
+                }
+              `}
+            >
+              <Building2 className="size-3.5" />
+              <span>Apartment</span>
+            </button>
 
-          {/* Tab 3: Subscription */}
-          <button
-            type="button"
-            onClick={() => setActiveTab("subscription")}
-            className={`
-              flex
-              items-center
-              gap-1.5
-              pb-2
-              text-xs
-              sm:text-[13px]
-              font-semibold
-              border-b-2
-              transition-colors
-              cursor-pointer
-              ${
-                activeTab === "subscription"
-                  ? "border-[#08281E] text-[#08281E]"
-                  : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
-              }
-            `}
-          >
-            <CreditCard className="size-3.5" />
-            <span>Subscription</span>
-          </button>
-        </nav>
-      </div>
+            {/* Tab 3: Subscription */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("subscription")}
+              className={`
+                flex
+                items-center
+                gap-1.5
+                pb-2
+                text-xs
+                sm:text-[13px]
+                font-semibold
+                border-b-2
+                transition-colors
+                cursor-pointer
+                ${
+                  activeTab === "subscription"
+                    ? "border-[#08281E] text-[#08281E]"
+                    : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
+                }
+              `}
+            >
+              <CreditCard className="size-3.5" />
+              <span>Subscription</span>
+            </button>
+          </nav>
+        </div>
+      )}
 
       {/* 3. Tab Content */}
-      {activeTab === "profile" && (
+      {(!isPropertyManager || activeTab === "profile") && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 items-start">
           {/* Left Column: Personal Details Form (approx 68%) */}
           <div className="lg:col-span-8">
@@ -272,7 +298,7 @@ export function ManagementProfile() {
           {/* Right Column: Account / Management Information (approx 35%) */}
           <div className="lg:col-span-4">
             <ManagementInformation
-              role="Property Manager"
+              role={roleBadge}
               apartmentName={apartmentData?.name || "Community"}
               accountStatus={apartmentData?.status === "active" ? "Active" : "Active"}
               isEmailVerified={Boolean(user?.emailVerified ?? true)}
@@ -282,8 +308,8 @@ export function ManagementProfile() {
         </div>
       )}
 
-      {/* 2. Apartment Tab Panel matching design */}
-      {activeTab === "apartment" && (
+      {/* 2. Apartment Tab Panel (Property Manager only) */}
+      {isPropertyManager && activeTab === "apartment" && (
         <div className="pt-1">
           <ApartmentDetails
             apartmentData={apartmentData}
@@ -292,8 +318,8 @@ export function ManagementProfile() {
         </div>
       )}
 
-      {/* Optional Subscription Tab Panel using existing component */}
-      {activeTab === "subscription" && (
+      {/* 3. Subscription Tab Panel (Property Manager only) */}
+      {isPropertyManager && activeTab === "subscription" && (
         <div className="pt-2">
           <SubscriptionSettingsPanel
             subscriptionData={subscriptionData}
