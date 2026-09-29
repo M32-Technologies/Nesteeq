@@ -36,6 +36,7 @@ import scheduleRoutes from "./modules/schedule/schedule.routes.js";
 import treasurerRoutes from "./modules/treasurer/treasurer.routes.js";
 import uploadRoutes from "./modules/upload/upload.routes.js";
 import adminRoutes from "./modules/admin/admin.routes.js";
+import notificationRoutes from "./modules/notification/notification.routes.js";
 const app = express();
 
 app.use(
@@ -92,6 +93,8 @@ app.use("/api/security/alerts", alertRoutes);
 app.use("/api/v1/announcements", announcementRoutes);
 app.use("/api/announcements", announcementRoutes);
 app.use("/api/security", securityRoutes);
+
+app.use("/api/v1/notifications", notificationRoutes);
 
 app.use("/api/maintenance-technician", maintenanceTechnicianRoutes);
 

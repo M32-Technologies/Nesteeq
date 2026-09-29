@@ -9,6 +9,7 @@ import { toast } from "sonner"
 
 import { authClient, useSession } from "@/lib/auth-client"
 import { cn } from "@/lib/utils"
+import { NotificationDropdown } from "@/features/notifications"
 
 type AdminNavbarProps = {
   onMenuClick?: () => void
@@ -107,14 +108,24 @@ export default function AdminNavbar({ onMenuClick }: AdminNavbarProps) {
         </Link>
 
         {/* Notification Button */}
-        <button
-          type="button"
-          aria-label="Notifications"
-          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200/80 bg-white text-[#334155] shadow-2xs transition-colors hover:bg-slate-50 hover:text-[#0F172A] cursor-pointer"
-        >
-          <Bell className="h-4 w-4 text-[#334155]" />
-          <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-[#EF4444] ring-2 ring-white" />
-        </button>
+        <NotificationDropdown>
+          {({ unreadCount }) => (
+            <button
+              type="button"
+              aria-label={
+                unreadCount > 0
+                  ? `${unreadCount} unread notifications`
+                  : "Notifications"
+              }
+              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200/80 bg-white text-[#334155] shadow-2xs transition-colors hover:bg-slate-50 hover:text-[#0F172A] cursor-pointer"
+            >
+              <Bell className="h-4 w-4 text-[#334155]" />
+              {unreadCount > 0 && (
+                <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-[#EF4444] ring-2 ring-white" />
+              )}
+            </button>
+          )}
+        </NotificationDropdown>
 
         {/* Super Admin Profile Area */}
         <div className="relative" ref={profileRef}>
