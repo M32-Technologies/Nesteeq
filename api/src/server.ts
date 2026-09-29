@@ -3,7 +3,7 @@ import "dotenv/config";
 import { connectDB } from "./config/db.js";
 import { connectAuthDB } from "./config/auth-db.js";
 import { env } from "./config/env.js";
-
+import "./config/redis.js";
 const startServer = async (): Promise<void> => {
     try {
         await connectDB();
