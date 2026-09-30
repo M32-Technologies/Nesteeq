@@ -1,4 +1,4 @@
-import { Router, type RequestHandler } from "express";
+import { Router } from "express";
 
 import {
   getFinanceSummary,
@@ -12,40 +12,20 @@ import {
 
 import { zodValidate } from "../../middlewares/zodValidate.js";
 import {
-  ensureApartmentAccess,
-  getAuthenticatedApartmentId,
   protect,
   requireRole,
 } from "../../middlewares/authMiddleware.js";
 
 const router = Router();
 
-const requireParamApartmentAccess: RequestHandler = (
-  req,
-  _res,
-  next
-) => {
-  ensureApartmentAccess(req, req.params.apartmentId);
-  next();
-};
+router.use(protect, requireRole("treasurer", "property_manager"));
 
-const useAuthenticatedApartmentParam: RequestHandler = (
-  req,
-  _res,
-  next
-) => {
-  req.params.apartmentId = getAuthenticatedApartmentId(req);
-  next();
-};
+router.get("/summary", zodValidate(getFinanceSummarySchema), getFinanceSummary);
 
-router.use(protect, requireRole("treasurer" , "property_manager"));
+router.get("/summary/:apartmentId", zodValidate(getFinanceSummarySchema), getFinanceSummary);
 
-router.get("/summary", useAuthenticatedApartmentParam, zodValidate(getFinanceSummarySchema), getFinanceSummary);
+router.get("/monthly", zodValidate(getMonthlyFinanceSchema), getMonthlyFinance);
 
-router.get("/summary/:apartmentId", zodValidate(getFinanceSummarySchema), requireParamApartmentAccess, getFinanceSummary);
-
-router.get("/monthly", useAuthenticatedApartmentParam, zodValidate(getMonthlyFinanceSchema), getMonthlyFinance);
-
-router.get("/monthly/:apartmentId", zodValidate(getMonthlyFinanceSchema), requireParamApartmentAccess, getMonthlyFinance);
+router.get("/monthly/:apartmentId", zodValidate(getMonthlyFinanceSchema), getMonthlyFinance);
 
 export default router;

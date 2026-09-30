@@ -1,54 +1,18 @@
-import { Router, type Request, type RequestHandler } from "express";
+import { Router } from "express";
 
 import { getPayments, reversePayment } from "./payment.controller.js";
 import { getPaymentsSchema, reversePaymentSchema } from "./payment.schema.js";
 import { zodValidate } from "../../middlewares/zodValidate.js";
 import {
-  ensureApartmentAccess,
-  getAuthenticatedApartmentId,
   protect,
   requireRole,
 } from "../../middlewares/authMiddleware.js";
 
 const router = Router();
 
-const setQueryApartmentId = (
-  req: Request,
-  apartmentId: string
-) => {
-  Object.defineProperty(req, "query", {
-    value: {
-      ...req.query,
-      apartmentId,
-    },
-    writable: true,
-    enumerable: true,
-    configurable: true,
-  });
-};
-
-const requireQueryApartmentAccess: RequestHandler = (
-  req,
-  _res,
-  next
-) => {
-  const authenticatedApartmentId =
-    getAuthenticatedApartmentId(req);
-
-  if (req.query.apartmentId) {
-    ensureApartmentAccess(
-      req,
-      req.query.apartmentId as string
-    );
-  }
-
-  setQueryApartmentId(req, authenticatedApartmentId);
-  next();
-};
-
 router.use(protect, requireRole("treasurer", "property_manager"));
 
-router.get("/", zodValidate(getPaymentsSchema), requireQueryApartmentAccess, getPayments);
+router.get("/", zodValidate(getPaymentsSchema), getPayments);
 router.post("/:id/reverse", zodValidate(reversePaymentSchema), reversePayment);
 
 export default router;

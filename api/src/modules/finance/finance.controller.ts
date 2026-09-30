@@ -6,12 +6,23 @@ import {
 } from "./finance.service.js";
 
 import { catchAsync } from "../../utils/catchAsync.js";
+import {
+  ensureApartmentAccess,
+  getAuthenticatedApartmentId,
+} from "../../middlewares/authMiddleware.js";
+
+const getApartmentId = (req: Request) => {
+  const apartmentId = (req.params.apartmentId as string) || getAuthenticatedApartmentId(req);
+  if (req.params.apartmentId) {
+    ensureApartmentAccess(req, req.params.apartmentId);
+  }
+  return apartmentId;
+};
 
 export const getFinanceSummary = catchAsync(
   async (req: Request, res: Response) => {
-    const summary = await getFinanceSummaryService(
-      req.params.apartmentId as string
-    );
+    const apartmentId = getApartmentId(req);
+    const summary = await getFinanceSummaryService(apartmentId);
 
     res.status(200).json({
       success: true,
@@ -30,8 +41,9 @@ export const getMonthlyFinance = catchAsync(
       ? Number(req.query.year)
       : undefined;
 
+    const apartmentId = getApartmentId(req);
     const data = await getMonthlyFinanceService(
-      req.params.apartmentId as string,
+      apartmentId,
       month,
       year
     );
@@ -41,4 +53,4 @@ export const getMonthlyFinance = catchAsync(
       data,
     });
   }
-);
+);
