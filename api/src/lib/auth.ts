@@ -106,13 +106,13 @@ export const auth = betterAuth({
         } else if (type == "email-verification") {
           await emailService.sendVerificationOtp(email, otp)
         }
-      },  
+      },
     }),
     admin({
       defaultRole: "resident",
       adminRoles: ["admin"],
     }),
-    
+
   ],
   user: {
     additionalFields: {

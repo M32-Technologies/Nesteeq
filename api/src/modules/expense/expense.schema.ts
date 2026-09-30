@@ -11,7 +11,7 @@ const objectIdSchema = z
 
 export const createExpenseSchema = z.object({
   body: z.object({
-    apartmentId: objectIdSchema,
+    apartmentId: objectIdSchema.optional(),
 
     title: z
       .string()

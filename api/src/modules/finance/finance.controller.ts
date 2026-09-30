@@ -12,9 +12,11 @@ import {
 } from "../../middlewares/authMiddleware.js";
 
 const getApartmentId = (req: Request) => {
-  const apartmentId = (req.params.apartmentId as string) || getAuthenticatedApartmentId(req);
-  if (req.params.apartmentId) {
-    ensureApartmentAccess(req, req.params.apartmentId);
+  const explicitApartmentId =
+    (req.params.apartmentId as string) || (req.query.apartmentId as string);
+  const apartmentId = explicitApartmentId || getAuthenticatedApartmentId(req);
+  if (explicitApartmentId) {
+    ensureApartmentAccess(req, explicitApartmentId);
   }
   return apartmentId;
 };

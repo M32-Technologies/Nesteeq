@@ -101,7 +101,7 @@ function RegisterForm() {
 
   return (
     <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-[var(--background)] px-4 py-8 sm:px-6">
-    
+
       <div className="pointer-events-none absolute -left-32 -top-32 h-[360px] w-[360px] rounded-full bg-[var(--soft-mint)] blur-[110px]" />
       <div className="pointer-events-none absolute -bottom-36 -right-32 h-[400px] w-[400px] rounded-full bg-[var(--cream)] blur-[120px]" />
 

@@ -104,10 +104,10 @@ export const processMaintenancePayout = catchAsync(
 export const getDefaultersReport = catchAsync(
   async (req: Request, res: Response) => {
     const apartmentId = getApartmentId(req);
-    const { overdueDays, search, page, limit } = req.query;
+    const { overdueDays, days, search, page, limit } = req.query;
 
     const data = await getDefaultersReportService(apartmentId, {
-      overdueDays: overdueDays ? Number(overdueDays) : undefined,
+      overdueDays: overdueDays ? Number(overdueDays) : days ? Number(days) : undefined,
       search: search as string | undefined,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
@@ -123,10 +123,18 @@ export const getDefaultersReport = catchAsync(
 export const getExpenseBreakdownReport = catchAsync(
   async (req: Request, res: Response) => {
     const apartmentId = getApartmentId(req);
-    const year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
+    const startDate = req.query.startDate as string | undefined;
+    const endDate = req.query.endDate as string | undefined;
+    const year = req.query.year ? Number(req.query.year) : undefined;
     const month = req.query.month ? Number(req.query.month) : undefined;
 
-    const data = await getExpenseBreakdownReportService(apartmentId, year, month);
+    const data = await getExpenseBreakdownReportService(
+      apartmentId,
+      year,
+      month,
+      startDate,
+      endDate
+    );
 
     res.status(200).json({
       success: true,

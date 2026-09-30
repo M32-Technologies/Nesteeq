@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   useMutation,
   useQuery,
@@ -482,10 +482,18 @@ export default function TreasurerBilling() {
   }, [bills, selectedStatusFilter, searchTerm]);
 
   const totalPages = Math.ceil(filteredBills.length / ITEMS_PER_PAGE) || 1;
+  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const paginatedBills = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    const start = (validCurrentPage - 1) * ITEMS_PER_PAGE;
     return filteredBills.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredBills, currentPage]);
+  }, [filteredBills, validCurrentPage]);
   const serverSummary = billingSummaryQuery.data;
   const billingStats = useMemo(() => {
     if (selectedCategoryFilter === "ALL" && serverSummary) {

@@ -135,6 +135,7 @@ export default function AdminNavbar({ onMenuClick }: AdminNavbarProps) {
                   alt={userName || "Super Admin"}
                   width={32}
                   height={32}
+                  unoptimized
                   className="h-full w-full object-cover"
                 />
               ) : userInitial ? (
