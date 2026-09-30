@@ -33,9 +33,10 @@ import technicianRoutes from "./modules/technician/technician.routes.js";
 import facilityRoutes from "./modules/facility/facility.routes.js";
 import reportRoutes from "./modules/report/report.routes.js";
 import scheduleRoutes from "./modules/schedule/schedule.routes.js";
-import treasurerRoutes from "./modules/treasurer/treasurer.routes.js";
 import uploadRoutes from "./modules/upload/upload.routes.js";
 import adminRoutes from "./modules/admin/admin.routes.js";
+import treasurerRoutes from "./modules/treasurer/treasurer.routes.js";
+
 const app = express();
 
 app.use(
@@ -94,6 +95,9 @@ app.use("/api/announcements", announcementRoutes);
 app.use("/api/security", securityRoutes);
 
 app.use("/api/maintenance-technician", maintenanceTechnicianRoutes);
+
+app.use("/api/v1/upload", uploadRoutes);
+app.use("/api/upload", uploadRoutes);
 
 app.use("/api/v1", complaintRoutes);
 app.use("/api/v1", maintenanceRoutes);

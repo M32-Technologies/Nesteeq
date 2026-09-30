@@ -52,22 +52,6 @@ const validateWorkReference = (
   },
   context: z.RefinementCtx
 ) => {
-  if (data.workType === "complaint" && !data.complaint) {
-    context.addIssue({
-      code: "custom",
-      path: ["complaint"],
-      message: "Complaint is required for complaint schedules",
-    });
-  }
-
-  if (data.workType === "maintenance" && !data.maintenance) {
-    context.addIssue({
-      code: "custom",
-      path: ["maintenance"],
-      message: "Maintenance is required for maintenance schedules",
-    });
-  }
-
   if (data.workType === "complaint" && data.maintenance) {
     context.addIssue({
       code: "custom",
@@ -121,20 +105,37 @@ export const createScheduleBodySchema = z
   .object({
     title: nonEmptyText("Title", 120),
     description: optionalText("Description", 3000),
-    technician: technicianIdSchema,
+    technician: z.string().trim().optional(),
+    technicianId: z.string().trim().optional(),
+    assignedStaff: z.string().trim().optional(),
+    assignedTo: z.string().trim().optional(),
     workType: z.enum(scheduleWorkTypes, {
       error: "Work type is required",
     }),
     complaint: complaintIdSchema.optional(),
+    complaintId: complaintIdSchema.optional(),
     maintenance: maintenanceIdSchema.optional(),
+    maintenanceId: maintenanceIdSchema.optional(),
     scheduledDate: dateSchema,
-    startTime: timeSchema("Start time"),
-    endTime: timeSchema("End time"),
+    startTime: timeSchema("Start time").optional().default("09:00"),
+    endTime: timeSchema("End time").optional().default("10:00"),
     priority: z.enum(complaintPriorities).default("MEDIUM"),
     notes: optionalText("Notes", 1000),
   })
-  .strict()
+  .passthrough()
   .superRefine((data, context) => {
+    const techId =
+      data.technician ||
+      data.technicianId ||
+      data.assignedStaff ||
+      data.assignedTo;
+    if (!techId) {
+      context.addIssue({
+        code: "custom",
+        path: ["technician"],
+        message: "Technician is required",
+      });
+    }
     validateWorkReference(data, context);
     validateTimeRange(data, context);
   });
@@ -143,17 +144,22 @@ export const updateScheduleBodySchema = z
   .object({
     title: nonEmptyText("Title", 120).optional(),
     description: optionalText("Description", 3000),
-    technician: technicianIdSchema.optional(),
+    technician: z.string().trim().optional(),
+    technicianId: z.string().trim().optional(),
+    assignedStaff: z.string().trim().optional(),
+    assignedTo: z.string().trim().optional(),
     workType: z.enum(scheduleWorkTypes).optional(),
     complaint: complaintIdSchema.optional(),
+    complaintId: complaintIdSchema.optional(),
     maintenance: maintenanceIdSchema.optional(),
+    maintenanceId: maintenanceIdSchema.optional(),
     scheduledDate: dateSchema.optional(),
     startTime: timeSchema("Start time").optional(),
     endTime: timeSchema("End time").optional(),
     priority: z.enum(complaintPriorities).optional(),
     notes: optionalText("Notes", 1000),
   })
-  .strict()
+  .passthrough()
   .refine(requireAtLeastOneField, {
     message: "At least one field is required",
   })

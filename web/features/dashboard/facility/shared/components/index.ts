@@ -27,3 +27,4 @@ export {
   PageHeader,
   Toolbar,
 } from "./facility-layout"
+export { TechnicianSelect } from "./technician-select"

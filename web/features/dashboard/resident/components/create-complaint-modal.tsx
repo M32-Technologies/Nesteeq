@@ -17,6 +17,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   createResidentComplaint,
+  uploadComplaintImage,
   type CreateResidentComplaintPayload,
 } from "../api/resident-dashboard.api";
 
@@ -142,6 +143,17 @@ export function CreateComplaintModal({
         return;
       }
 
+      let uploadedImageUrl: string | null = null;
+      if (selectedFile) {
+        try {
+          uploadedImageUrl = await uploadComplaintImage(selectedFile);
+        } catch (uploadErr) {
+          console.error("Image upload failed:", uploadErr);
+          toast.error("Failed to upload the attached photo. Please try again.");
+          return;
+        }
+      }
+
       const locationPrefix = `[Location: ${values.location}]\n\n`;
       let fullDescription = `${locationPrefix}${values.description.trim()}`;
       if (selectedFile) {
@@ -153,6 +165,8 @@ export function CreateComplaintModal({
         description: fullDescription,
         category: values.category as CreateResidentComplaintPayload["category"],
         priority: values.priority as CreateResidentComplaintPayload["priority"],
+        images: uploadedImageUrl ? [uploadedImageUrl] : [],
+        attachments: uploadedImageUrl ? [uploadedImageUrl] : [],
       });
 
       toast.success("Complaint registered successfully! The facility team will review it.");

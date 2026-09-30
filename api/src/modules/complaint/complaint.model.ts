@@ -18,6 +18,7 @@ export const complaintStatuses = [
   "UNDER_REVIEW",
   "ASSIGNED",
   "IN_PROGRESS",
+  "RESOLVED",
   "WORK_COMPLETED",
   "AWAITING_APPROVAL",
   "APPROVED",
@@ -153,16 +154,30 @@ const complaintSchema = new Schema(
       trim: true,
       index: true,
     },
+    residentId: {
+      type: Schema.Types.Mixed,
+      index: true,
+    },
     apartment: {
-      type: String,
+      type: Schema.Types.Mixed,
+      ref: "Apartment",
       required: true,
-      trim: true,
+      index: true,
+    },
+    apartmentId: {
+      type: Schema.Types.Mixed,
+      ref: "Apartment",
       index: true,
     },
     flat: {
       type: String,
       required: true,
       trim: true,
+      index: true,
+    },
+    flatId: {
+      type: Schema.Types.Mixed,
+      ref: "Flat",
       index: true,
     },
     title: {
@@ -199,9 +214,22 @@ const complaintSchema = new Schema(
       default: "PENDING",
       index: true,
     },
+    images: {
+      type: [String],
+      default: [],
+    },
+    attachments: {
+      type: [String],
+      default: [],
+    },
     assignedStaff: {
       type: String,
       trim: true,
+      default: null,
+      index: true,
+    },
+    assignedTo: {
+      type: Schema.Types.Mixed,
       default: null,
       index: true,
     },
@@ -270,6 +298,7 @@ const complaintSchema = new Schema(
 
 complaintSchema.index({ resident: 1, createdAt: -1 });
 complaintSchema.index({ apartment: 1, status: 1, createdAt: -1 });
+complaintSchema.index({ apartmentId: 1, status: 1, createdAt: -1 });
 complaintSchema.index({ assignedStaff: 1, status: 1, createdAt: -1 });
 
 export type ComplaintDocument = InferSchemaType<typeof complaintSchema>;

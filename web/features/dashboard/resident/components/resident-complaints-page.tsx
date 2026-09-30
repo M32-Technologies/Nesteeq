@@ -6,13 +6,14 @@ import {
   Plus,
   Search,
   Clock,
-  CheckCircle2,
   KeyRound,
   LifeBuoy,
+  Image as ImageIcon,
+  ChevronRight,
+  RefreshCw,
   CircleDollarSign,
   ShieldCheck,
   FileText,
-  RefreshCw,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -21,6 +22,10 @@ import {
   fetchResidentComplaints,
 } from "../api/resident-dashboard.api";
 import { CreateComplaintModal } from "./create-complaint-modal";
+import {
+  ResidentComplaintDetailsDrawer,
+  type ResidentComplaintItem,
+} from "./resident-complaint-details-drawer";
 
 const isResolvedStatus = (status?: string) =>
   Boolean(
@@ -96,6 +101,7 @@ export function ResidentComplaintsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"ALL" | "IN_PROGRESS" | "RESOLVED">("ALL");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedComplaint, setSelectedComplaint] = useState<ResidentComplaintItem | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -114,7 +120,8 @@ export function ResidentComplaintsPage() {
     refetchOnWindowFocus: true,
   });
 
-  const complaintsList = complaintsData?.complaints || [];
+  const complaintsList: ResidentComplaintItem[] =
+    (complaintsData?.complaints as unknown as ResidentComplaintItem[]) || [];
 
   const filtered = useMemo(() => {
     return complaintsList.filter((c) => {
@@ -222,26 +229,43 @@ export function ResidentComplaintsPage() {
         </div>
       </div>
 
-      {/* Tickets List */}
+      {/* Complaints List */}
       {isLoading ? (
-        <div className="py-12 text-center text-sm text-[#637083]">
-          Loading maintenance tickets...
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="h-32 rounded-xl border border-[#DDE3DF] bg-white p-5 animate-pulse"
+            />
+          ))}
         </div>
       ) : filtered.length === 0 ? (
-        /* Empty State */
-        <div className="rounded-lg border border-dashed border-[#DDE3DF] bg-[#F7F8F5] p-12 text-center space-y-3">
-          <Wrench className="size-8 text-[#7C8782] mx-auto" />
-          <p className="text-base font-semibold text-[#111111]">
-            No Maintenance Tickets
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#DDE3DF] bg-white py-14 px-4 text-center">
+          <div className="flex size-12 items-center justify-center rounded-full bg-[#07584F]/10 text-[#07584F] mb-3">
+            <Wrench className="size-6" />
+          </div>
+          <h3 className="text-base font-semibold text-[#111111]">
+            {searchQuery ? "No matching complaints found" : "No complaints logged"}
+          </h3>
+          <p className="mt-1 max-w-sm text-xs text-[#637083]">
+            {searchQuery
+              ? "Try searching with a different term or clear your search."
+              : "Raise a ticket anytime you experience plumbing, electrical, or society issues."}
           </p>
-          <p className="text-xs sm:text-sm text-[#637083] max-w-sm mx-auto">
-            Everything is in order! If you have any electrical, plumbing, carpentry, or common area issues, raise a ticket here.
-          </p>
-          <div className="pt-2">
+          <div className="mt-4 flex gap-2">
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="rounded-lg border border-[#DDE3DF] bg-white px-3 py-1.5 text-xs font-medium text-[#111111] hover:bg-[#F7F8F5]"
+              >
+                Clear Search
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setIsCreateModalOpen(true)}
-              className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#07584F] px-4 text-xs sm:text-sm font-medium text-white shadow-xs hover:bg-[#064C44] transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#07584F] px-3.5 py-1.5 text-xs font-medium text-white hover:bg-[#064C44] cursor-pointer"
             >
               <Plus className="size-4" />
               <span>Raise Maintenance Ticket</span>
@@ -251,21 +275,22 @@ export function ResidentComplaintsPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((ticket, index) => {
+            const isResolved = ticket.status === "RESOLVED" || ticket.status === "CLOSED";
+            const isInProgress = ticket.status === "IN_PROGRESS";
+            const completionOtp = ticket.completionOtp;
+            const hasPhotos = (ticket.images && ticket.images.length > 0) || (ticket.attachments && ticket.attachments.length > 0);
             const statusBadge = getStatusBadge(ticket.status);
-            const canConfirmResolution =
-              ticket.status === "WORK_COMPLETED" || ticket.status === "APPROVED";
-            const completionOtp = (ticket as Record<string, any>).completionOtp;
-            const maintenance = ticket.maintenance;
-            const ticketId = ticket._id || ticket.id || String(index);
+            const maintenance = (ticket as any).maintenance;
 
             return (
               <div
-                key={ticketId}
-                className="rounded-lg border border-[#DDE3DF] bg-white p-4.5 shadow-xs space-y-3 hover:border-slate-300 transition-colors"
+                key={ticket._id || ticket.id || index}
+                onClick={() => setSelectedComplaint(ticket)}
+                className="group relative rounded-xl border border-[#DDE3DF] bg-white p-5 shadow-xs space-y-3.5 cursor-pointer hover:border-[#07584F]/40 hover:shadow-md transition-all active:scale-[0.99]"
               >
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
+                  <div className="space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-xs font-semibold text-[#7C8782]">
                         #{ticket.ticketNumber || (ticket._id ? ticket._id.slice(-6).toUpperCase() : "TKT")}
                       </span>
@@ -279,70 +304,73 @@ export function ResidentComplaintsPage() {
                           {ticket.priority}
                         </span>
                       )}
-                      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-600">
-                        {ticket.category}
-                      </span>
+                      {ticket.category && (
+                        <span className="rounded bg-[#F7F8F5] border border-[#E2E8EE] px-1.5 py-0.5 text-[10px] font-medium text-[#4E5B67]">
+                          {ticket.category}
+                        </span>
+                      )}
                     </div>
-                    <h3 className="text-base font-semibold text-[#111111]">
+
+                    <h3 className="text-base font-semibold text-[#111111] group-hover:text-[#07584F] transition-colors">
                       {ticket.title}
                     </h3>
                   </div>
 
-                  <span className="text-xs text-[#7C8782] flex items-center gap-1">
-                    <Clock className="size-3.5" />
-                    {new Date(ticket.createdAt).toLocaleDateString()}
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-[#7C8782] flex items-center gap-1 shrink-0">
+                      <Clock className="size-3.5" />
+                      {new Date(ticket.createdAt).toLocaleDateString()}
+                    </span>
+                    <ChevronRight className="size-4 text-[#7C8782] group-hover:text-[#07584F] group-hover:translate-x-0.5 transition-all hidden sm:block" />
+                  </div>
+                </div>
+
+                <p className="text-xs sm:text-sm text-[#637083] leading-relaxed line-clamp-2">
+                  {ticket.description.replace(/^\[Location:\s*[^\static\]]+\]\s*/i, "").replace(/^\[Location:\s*[^\]]+\]\s*/i, "")}
+                </p>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-[#F2F4F7]">
+                  <div className="flex items-center gap-3 text-xs">
+                    {ticket.assignedStaff ? (
+                      <div className="flex items-center gap-1.5 text-slate-700">
+                        <span className="text-[#7C8782]">Technician:</span>
+                        <span className="font-semibold text-[#111111]">
+                          {ticket.assignedStaff.name}
+                        </span>
+                        <span className="text-[10px] text-[#7C8782]">
+                          ({ticket.assignedStaff.role || "Staff"})
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-[11px] font-medium">
+                        Awaiting Technician Allocation
+                      </span>
+                    )}
+
+                    {hasPhotos && (
+                      <div className="flex items-center gap-1 text-[#07584F] font-medium text-[11px]">
+                        <ImageIcon className="size-3.5" />
+                        <span>Attached Photo</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <span className="text-xs font-medium text-[#07584F] group-hover:underline flex items-center gap-1">
+                    View Details &amp; Track &rarr;
                   </span>
                 </div>
 
-                <p className="text-xs sm:text-sm text-[#637083] leading-relaxed">
-                  {ticket.description}
-                </p>
-
-                {ticket.assignedStaff && (
-                  <div className="rounded-md bg-[#F7F8F5] border border-[#EEF1F4] p-2.5 flex items-center justify-between text-xs">
-                    <div>
-                      <span className="text-[#7C8782]">Assigned Technician: </span>
-                      <span className="font-semibold text-[#111111]">
-                        {typeof ticket.assignedStaff === "object" ? ticket.assignedStaff.name : "Facility Staff"}{" "}
-                        ({typeof ticket.assignedStaff === "object" ? ticket.assignedStaff.role || "Staff" : "Staff"})
-                      </span>
-                    </div>
-                    {typeof ticket.assignedStaff === "object" && ticket.assignedStaff.phone && (
-                      <span className="font-mono text-[#07584F] font-semibold">
-                        {ticket.assignedStaff.phone}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {/* Confirm Resolution Prompt */}
-                {canConfirmResolution && (
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-md bg-emerald-50/70 border border-emerald-200 p-2.5 text-xs text-emerald-900">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
-                      <span>Work is completed on this ticket. Please confirm if the issue is resolved.</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleConfirmResolution(ticketId)}
-                      disabled={confirmingId === ticketId}
-                      className="inline-flex items-center justify-center gap-1.5 rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-800 transition disabled:opacity-50 cursor-pointer w-full sm:w-auto shrink-0"
-                    >
-                      <CheckCircle2 className="size-3.5" />
-                      <span>{confirmingId === ticketId ? "Confirming..." : "Confirm Resolution"}</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Completion OTP */}
                 {completionOtp && (
-                  <div className="flex items-center gap-2 rounded-md bg-amber-50 border border-amber-200 p-2 text-xs text-amber-900">
-                    <KeyRound className="size-3.5 text-amber-600" />
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-900"
+                  >
+                    <KeyRound className="size-3.5 text-amber-600 shrink-0" />
                     <span>Completion Verification OTP: </span>
                     <span className="font-mono font-bold text-amber-950">
                       {completionOtp}
                     </span>
-                    <span className="text-[10px] text-amber-700">
+                    <span className="text-[10px] text-amber-700 hidden sm:inline">
                       (Share only when work is fully completed)
                     </span>
                   </div>
@@ -398,10 +426,17 @@ export function ResidentComplaintsPage() {
         </div>
       )}
 
-      {/* Modal Dialog */}
+      {/* Complaint Creation Modal */}
       <CreateComplaintModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
+      />
+
+      {/* Complaint Details Drawer */}
+      <ResidentComplaintDetailsDrawer
+        complaint={selectedComplaint}
+        open={!!selectedComplaint}
+        onClose={() => setSelectedComplaint(null)}
       />
     </div>
   );

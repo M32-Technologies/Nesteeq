@@ -52,6 +52,8 @@ export const createComplaintBodySchema = z
     priority: z.enum(complaintPriorities, {
       error: "Complaint priority is required",
     }),
+    images: z.array(z.string().trim()).optional().default([]),
+    attachments: z.array(z.string().trim()).optional().default([]),
   })
   .strict();
 
@@ -72,8 +74,10 @@ export const updateComplaintBodySchema = z
     category: z.enum(complaintCategories).optional(),
     priority: z.enum(complaintPriorities).optional(),
     estimatedCost: costSchema.optional(),
-    remarks: optionalText(1000),
-    notes: optionalText(1000),
+    images: z.array(z.string().trim()).optional(),
+    attachments: z.array(z.string().trim()).optional(),
+    remarks: nonEmptyText("Remarks", 1000).optional(),
+    notes: nonEmptyText("Notes", 1000).optional(),
   })
   .refine(requireAtLeastOneField, {
     message: "At least one field is required",
@@ -92,59 +96,37 @@ export const updateComplaintBodySchema = z
     if (data.category !== undefined) res.category = data.category;
     if (data.priority !== undefined) res.priority = data.priority;
     if (data.estimatedCost !== undefined) res.estimatedCost = data.estimatedCost;
-    const rem = data.remarks || data.notes;
+    const rem = data.remarks || (data as { notes?: string })?.notes;
     if (rem !== undefined) res.remarks = rem;
     return res;
   });
 
 export const assignComplaintBodySchema = z
   .object({
-    assignedStaff: authUserIdSchema.optional(),
-    assignedTo: authUserIdSchema.optional(),
-    technicianId: authUserIdSchema.optional(),
-    estimatedCost: costSchema.optional(),
-    remarks: optionalText(1000),
-    notes: optionalText(1000),
-    scheduledDate: z.string().optional(),
-    estimatedDurationHours: z.number().optional(),
+    assignedStaff: z.string().trim().min(1, "Assigned staff is required").optional().nullable(),
+    assignedTo: z.string().trim().min(1, "Assigned staff is required").optional().nullable(),
+    technicianId: z.string().trim().min(1).optional().nullable(),
+    estimatedCost: costSchema.optional().nullable(),
+    remarks: z.string().trim().max(1000).optional().nullable().or(z.literal("")),
+    notes: z.string().trim().max(1000).optional().nullable().or(z.literal("")),
   })
-  .refine((data) => Boolean(data.assignedStaff || data.assignedTo || data.technicianId), {
-    message: "Technician user ID is required",
-    path: ["assignedStaff"],
-  })
-  .transform((data) => {
-    const res: {
-      assignedStaff: string;
-      estimatedCost?: number;
-      remarks?: string;
-    } = {
-      assignedStaff: (data.assignedStaff || data.assignedTo || data.technicianId)!,
-    };
-    if (data.estimatedCost !== undefined) res.estimatedCost = data.estimatedCost;
-    const rem = data.remarks || data.notes;
-    if (rem !== undefined) res.remarks = rem;
-    return res;
-  });
+  .passthrough()
+  .refine(
+    (data) => Boolean(data.assignedStaff || data.assignedTo || data.technicianId),
+    {
+      message: "Assigned staff is required",
+    }
+  );
 
 export const updateComplaintStatusBodySchema = z
   .object({
     status: z.enum(complaintStatuses, {
       error: "Complaint status is required",
     }),
-    remarks: optionalText(1000),
-    notes: optionalText(1000),
+    remarks: z.string().trim().max(1000).optional().nullable().or(z.literal("")),
+    notes: z.string().trim().max(1000).optional().nullable().or(z.literal("")),
   })
-  .transform((data) => {
-    const res: {
-      status: (typeof complaintStatuses)[number];
-      remarks?: string;
-    } = {
-      status: data.status,
-    };
-    const rem = data.remarks || data.notes;
-    if (rem !== undefined) res.remarks = rem;
-    return res;
-  });
+  .passthrough();
 
 export const completeComplaintWorkBodySchema = z
   .object({
@@ -173,68 +155,67 @@ export const completeComplaintWorkBodySchema = z
 
 export const approveComplaintBodySchema = z
   .object({
-    remarks: optionalText(1000),
-    notes: optionalText(1000),
+    remarks: z.string().trim().max(1000).optional().nullable(),
+    notes: z.string().trim().max(1000).optional().nullable(),
   })
-  .transform((data) => {
-    const rem = data.remarks || data.notes;
-    const res: { remarks?: string } = {};
-    if (rem !== undefined) res.remarks = rem;
-    return res;
-  });
+  .passthrough();
 
 export const rejectComplaintBodySchema = z
   .object({
-    reason: nonEmptyText("Rejection reason", 1000),
-    remarks: optionalText(1000),
-    notes: optionalText(1000),
+    reason: z.string().trim().max(1000).optional().nullable(),
+    remarks: z.string().trim().max(1000).optional().nullable(),
+    notes: z.string().trim().max(1000).optional().nullable(),
   })
-  .transform((data) => {
-    const res: { reason: string; remarks?: string } = {
-      reason: data.reason,
-    };
-    const rem = data.remarks || data.notes;
-    if (rem !== undefined) res.remarks = rem;
-    return res;
-  });
+  .passthrough();
 
 export const cancelComplaintBodySchema = z
   .object({
-    reason: optionalText(1000),
-    notes: optionalText(1000),
+    reason: z.string().trim().max(1000).optional().nullable(),
+    remarks: z.string().trim().max(1000).optional().nullable(),
+    notes: z.string().trim().max(1000).optional().nullable(),
   })
-  .transform((data) => {
-    const reason = data.reason || data.notes;
-    const res: { reason?: string } = {};
-    if (reason !== undefined) res.reason = reason;
-    return res;
-  });
+  .passthrough();
 
 export const confirmComplaintResolutionBodySchema = z
   .object({
-    remarks: optionalText(1000),
-    notes: optionalText(1000),
+    remarks: z.string().trim().max(1000).optional().nullable(),
+    notes: z.string().trim().max(1000).optional().nullable(),
   })
-  .transform((data) => {
-    const rem = data.remarks || data.notes;
-    const res: { remarks?: string } = {};
-    if (rem !== undefined) res.remarks = rem;
-    return res;
-  });
+  .passthrough();
+
+const preprocessEnumFilter = <T extends readonly string[]>(
+  allowedValues: T,
+  transform?: (val: string) => string
+) =>
+  z.preprocess((val) => {
+    if (typeof val === "string") {
+      const trimmed = val.trim();
+      if (!trimmed || trimmed.toLowerCase() === "all") return undefined;
+      return transform ? transform(trimmed) : trimmed;
+    }
+    return val;
+  }, z.enum(allowedValues as unknown as [string, ...string[]]).optional());
 
 export const getComplaintsQuerySchema = z
   .object({
-    status: z.enum([...complaintStatuses, "RESOLVED", "all"] as [string, ...string[]]).optional(),
-    category: z.enum(complaintCategories).optional(),
-    priority: z.enum(complaintPriorities).optional(),
-    search: z.string().trim().optional(),
+    status: preprocessEnumFilter(complaintStatuses, (s) =>
+      s.toUpperCase().replace(/[\s-]+/g, "_")
+    ),
+    category: preprocessEnumFilter(complaintCategories, (c) => c.toUpperCase()),
+    priority: preprocessEnumFilter(complaintPriorities, (p) => p.toUpperCase()),
     apartment: z.string().trim().min(1, "Apartment ID cannot be empty").optional(),
+    apartmentId: z.string().trim().min(1, "Apartment ID cannot be empty").optional(),
     flat: z.string().trim().min(1, "Flat ID cannot be empty").optional(),
+    flatId: z.string().trim().min(1, "Flat ID cannot be empty").optional(),
     resident: authUserIdSchema.optional(),
+    residentId: authUserIdSchema.optional(),
     assignedStaff: authUserIdSchema.optional(),
+    assignedTo: authUserIdSchema.optional(),
+    search: z.string().trim().optional(),
     page: z.coerce.number().int("Page must be a whole number").min(1).default(1),
     limit: z.coerce.number().int("Limit must be a whole number").min(1).max(100).default(20),
-  });
+  })
+  .passthrough();
 
 export const createComplaintSchema = z.object({
   body: createComplaintBodySchema,

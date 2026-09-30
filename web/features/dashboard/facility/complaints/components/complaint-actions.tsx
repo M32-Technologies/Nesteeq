@@ -1,9 +1,13 @@
-import type { FormEventHandler } from "react"
+import { useState, useRef, useEffect, useMemo, type FormEventHandler } from "react"
 import {
   AlertTriangle,
+  Check,
   CheckCircle2,
+  ChevronDown,
   Gauge,
+  Loader2,
   Pencil,
+  Search,
   UserRoundCog,
 } from "lucide-react"
 
@@ -19,7 +23,9 @@ import {
   SubmitButton,
   TextArea,
   TextInput,
+  TechnicianSelect,
 } from "@/features/dashboard/facility/shared/components/facility-ui"
+import { useTechniciansQuery } from "@/features/dashboard/facility/technicians/hooks/use-technicians-queries"
 
 export function ComplaintActions({
   complaint,
@@ -56,6 +62,17 @@ export function ComplaintActions({
   isRejecting: boolean
   isCancelling: boolean
 }) {
+  const { data: techData, isLoading: isTechLoading } = useTechniciansQuery({
+    status: "ACTIVE",
+    limit: 100,
+  })
+  const technicians = techData?.technicians ?? []
+
+  const currentAssignedId =
+    typeof complaint.assignedTo === "object"
+      ? (complaint.assignedTo?._id || (complaint.assignedTo as any)?.id || "")
+      : (complaint.assignedTo || (complaint as any)?.assignedStaff || "")
+
   return (
     <section className="border-b border-[#E8EDF2] py-5">
       <h3 className="text-[15px] font-semibold text-[#111111]">
@@ -71,16 +88,13 @@ export function ComplaintActions({
             <UserRoundCog className="size-4 text-[#2E639B]" />
             Assign Technician
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <FormLabel label="Technician user ID">
-              <TextInput
-                name="assignedStaff"
-                required
-                placeholder="64f..."
-                defaultValue={typeof complaint.assignedTo === 'object' ? complaint.assignedTo?._id : complaint.assignedTo}
-              />
-            </FormLabel>
-          </div>
+          <FormLabel label="Select Technician">
+            <TechnicianSelect
+              technicians={technicians}
+              isLoading={isTechLoading}
+              defaultValue={currentAssignedId}
+            />
+          </FormLabel>
           <FormLabel label="Remarks">
             <TextArea name="remarks" placeholder="Remarks" />
           </FormLabel>
@@ -104,7 +118,7 @@ export function ComplaintActions({
               <FormSelect
                 name="status"
                 options={statusOptions}
-                defaultValue={statusOptions[0]}
+                defaultValue={statusOptions.includes(complaint.status) ? complaint.status : statusOptions[0]}
                 required
               />
             </FormLabel>

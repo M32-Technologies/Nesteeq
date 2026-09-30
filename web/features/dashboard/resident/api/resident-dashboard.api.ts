@@ -56,20 +56,8 @@ export interface ResidentComplaintsResponse {
       role?: string;
       phone?: string;
     } | null;
-    maintenance?: {
-      _id: string;
-      costReview?: {
-        status: string;
-        submittedAmount?: number;
-        remarks?: string;
-        forwardedToRole?: string;
-        forwardedAt?: string;
-      };
-      finalCost?: number;
-      isSocietyCovered?: boolean;
-      assignedStaff?: string;
-      status?: string;
-    } | null;
+    images?: string[];
+    attachments?: string[];
     createdAt: string;
     updatedAt: string;
   }>;
@@ -318,6 +306,32 @@ export interface CreateResidentComplaintPayload {
   description: string;
   category: "PLUMBING" | "ELECTRICAL" | "CLEANING" | "SECURITY" | "LIFT" | "WATER" | "MAINTENANCE" | "OTHER";
   priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+  images?: string[];
+  attachments?: string[];
+}
+
+export async function uploadComplaintImage(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await api.post<{
+    success: boolean;
+    data: {
+      url: string;
+      path: string;
+      filename: string;
+    };
+  }>("/api/v1/upload", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  if (!res.data?.success || !res.data?.data?.url) {
+    throw new Error("Failed to upload image");
+  }
+
+  return res.data.data.url;
 }
 
 export async function createResidentComplaint(payload: CreateResidentComplaintPayload) {

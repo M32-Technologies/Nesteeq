@@ -25,6 +25,7 @@ export type JobDetails = {
     status: string
     createdAt: string
     complaintImage?: string
+    complaintImages?: string[]
   }
   locationInfo: {
     block: string
@@ -209,24 +210,43 @@ export const getJobById = async (jobId: string): Promise<JobDetails> => {
   const createdDateVal = doc.createdAt || new Date()
   const mappedStatus = mapStatus(doc.status)
   const mappedPriority = mapPriority(doc.priority)
-  const complaintObj =
+  let complaintObj: any =
     doc.complaint && typeof doc.complaint === "object" ? doc.complaint : null
+
+  if (!complaintObj && (doc.complaint || doc.complaintId)) {
+    const cid = doc.complaint || doc.complaintId
+    if (Types.ObjectId.isValid(cid)) {
+      complaintObj = await Complaint.findById(cid).lean().catch(() => null)
+    }
+  }
+
+  const resolvedImages: string[] = [
+    ...(Array.isArray(complaintObj?.images) ? complaintObj.images : []),
+    ...(Array.isArray(complaintObj?.attachments) ? complaintObj.attachments : []),
+    ...(Array.isArray(doc.images) ? doc.images : []),
+    ...(Array.isArray(doc.attachments) ? doc.attachments : []),
+    ...(complaintObj?.image ? [complaintObj.image] : []),
+    ...(doc.image ? [doc.image] : []),
+  ].filter(Boolean)
+
+  const primaryImage =
+    resolvedImages[0] ||
+    "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&auto=format&fit=crop&q=80"
 
   return {
     jobId: doc._id.toString(),
     complaintInfo: {
-      title: doc.title || "Maintenance Request",
+      title: doc.title || complaintObj?.title || "Maintenance Request",
       description:
         doc.description ||
+        complaintObj?.description ||
         "General maintenance and inspection required for this unit.",
-      category: doc.category || "General Maintenance",
+      category: doc.category || complaintObj?.category || "General Maintenance",
       priority: mappedPriority,
       status: mappedStatus,
       createdAt: new Date(createdDateVal).toISOString(),
-      complaintImage:
-        complaintObj?.image ||
-        doc.image ||
-        "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&auto=format&fit=crop&q=80",
+      complaintImage: primaryImage,
+      complaintImages: resolvedImages,
     },
     locationInfo: {
       block: doc.apartment || "Block A",
