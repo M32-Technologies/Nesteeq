@@ -16,6 +16,7 @@ import {
 } from "../api/resident-dashboard.api";
 import { fetchResidentBills } from "@/features/dashboard/treasurer/billing/services/billing.service";
 import type { ResidentBillsSummary, ResidentBillItem } from "@/features/dashboard/treasurer/billing/types/billing.types";
+import type { AnnouncementItem } from "@/features/announcements/types";
 
 export interface UnifiedFeedItem {
   id: string;
@@ -38,6 +39,7 @@ export interface UnifiedFeedItem {
   ctaHref: string;
   date: string;
   rawDate: Date;
+  noticeData?: AnnouncementItem;
 }
 
 export function useResidentDashboard() {
@@ -203,10 +205,17 @@ export function useResidentDashboard() {
   // Build Unified Feed Items for Center Column (from backend feed if available, or fallback)
   const unifiedFeedItems = useMemo<UnifiedFeedItem[]>(() => {
     if (dashboardFeed?.feed && dashboardFeed.feed.length > 0) {
-      return dashboardFeed.feed.map((item) => ({
-        ...item,
-        rawDate: new Date(item.rawDate),
-      }));
+      return dashboardFeed.feed.map((item) => {
+        const cleanId = item.id.replace(/^ann-/, "");
+        const matched = announcements.find(
+          (a) => a.id === cleanId || (a as { _id?: string })._id === cleanId
+        );
+        return {
+          ...item,
+          rawDate: new Date(item.rawDate),
+          noticeData: matched,
+        };
+      });
     }
 
     const items: UnifiedFeedItem[] = [];
@@ -236,6 +245,7 @@ export function useResidentDashboard() {
           ? rawDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })
           : "Recent",
         rawDate: !isNaN(rawDate.getTime()) ? rawDate : new Date(),
+        noticeData: a,
       });
     }
 
