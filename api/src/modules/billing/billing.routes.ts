@@ -7,6 +7,7 @@ import {
 import {
   createBill,
   createCommonBill,
+  deleteBill,
   getBillById,
   getBillRecipients,
   getBillingSummary,
@@ -142,5 +143,7 @@ router.patch("/:id", requireRole("treasurer"), zodValidate(updateBillSchema), re
 router.patch("/:id/payment", requireRole("treasurer"), zodValidate(recordBillPaymentSchema), requireBillApartmentAccess, recordBillPayment);
 
 router.patch("/:id/waive-late-fee", requireRole("treasurer"), zodValidate(waiveLateFeeSchema), requireBillApartmentAccess, waiveLateFee);
+
+router.delete("/:id", requireRole("treasurer"), requireBillApartmentAccess, deleteBill);
 
 export default router;

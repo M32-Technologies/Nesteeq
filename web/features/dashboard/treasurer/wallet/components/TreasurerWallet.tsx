@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   useMutation,
   useQuery,
@@ -96,6 +96,9 @@ export default function TreasurerWallet() {
         queryKey: ["treasurer", "wallet-summary"],
       }),
       queryClient.invalidateQueries({
+        queryKey: ["treasurer", "wallet-bills"],
+      }),
+      queryClient.invalidateQueries({
         queryKey: ["treasurer", "bills"],
       }),
       queryClient.invalidateQueries({
@@ -106,6 +109,12 @@ export default function TreasurerWallet() {
       }),
       queryClient.invalidateQueries({
         queryKey: ["treasurer", "monthly-finance"],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ["treasurer", "dashboard"],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ["treasurer", "chart"],
       }),
       queryClient.invalidateQueries({
         queryKey: ["treasurer", "audit"],
@@ -205,11 +214,35 @@ export default function TreasurerWallet() {
   }, [wallets, search, statusFilter]);
 
   // Pagination
-  const totalPages = Math.ceil(filteredWallets.length / ITEMS_PER_PAGE) || 1;
+  const totalPages = Math.max(1, Math.ceil(filteredWallets.length / ITEMS_PER_PAGE));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const paginatedWallets = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    const start = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
     return filteredWallets.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredWallets, currentPage]);
+  }, [filteredWallets, safeCurrentPage]);
+
+  // Escape key listener for open modals
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        if (selectedWallet && !deductMutation.isPending) {
+          closeDeductionModal();
+        } else if (historyWallet) {
+          setHistoryWallet(null);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedWallet, historyWallet, deductMutation.isPending]);
 
   const handleAddAdvancePayment = async (
     newPayment: NewAdvancePaymentData
@@ -236,10 +269,16 @@ export default function TreasurerWallet() {
   const handleBillSelect = (selectedId: string) => {
     setBillId(selectedId);
     setDeductionError(null);
+    if (!selectedId) {
+      setDeductionAmount("");
+      return;
+    }
     const bill = unpaidBills.find((b) => b._id === selectedId);
     if (bill && selectedWallet) {
       const suggestedAmount = Math.min(selectedWallet.balance, bill.balanceAmount);
       setDeductionAmount(suggestedAmount > 0 ? suggestedAmount.toString() : "");
+    } else {
+      setDeductionAmount("");
     }
   };
 
@@ -420,7 +459,7 @@ export default function TreasurerWallet() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {paginatedWallets.map((wallet) => {
-                    const latestTransaction = wallet.transactions.at(-1);
+                    const latestTransaction = (wallet.transactions ?? []).at(-1);
 
                     return (
                       <tr
@@ -483,7 +522,7 @@ export default function TreasurerWallet() {
                                 : "rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600"
                             }
                           >
-                            {wallet.balance > 0 ? "Active" : "Empty"}
+                            {wallet.balance > 0 ? "Active" : "Zero Balance"}
                           </span>
                         </td>
                         <td className="py-3.5 text-right">
@@ -521,11 +560,11 @@ export default function TreasurerWallet() {
                 <p>
                   Showing{" "}
                   <span className="font-semibold text-slate-800">
-                    {(currentPage - 1) * ITEMS_PER_PAGE + 1}
+                    {(safeCurrentPage - 1) * ITEMS_PER_PAGE + 1}
                   </span>{" "}
                   to{" "}
                   <span className="font-semibold text-slate-800">
-                    {Math.min(currentPage * ITEMS_PER_PAGE, filteredWallets.length)}
+                    {Math.min(safeCurrentPage * ITEMS_PER_PAGE, filteredWallets.length)}
                   </span>{" "}
                   of{" "}
                   <span className="font-semibold text-slate-800">
@@ -537,18 +576,18 @@ export default function TreasurerWallet() {
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    disabled={currentPage === 1}
+                    disabled={safeCurrentPage === 1}
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                     className="rounded-md border border-slate-200 p-1.5 transition hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
                   <span className="px-2 text-xs font-semibold text-slate-700">
-                    Page {currentPage} of {totalPages}
+                    Page {safeCurrentPage} of {totalPages}
                   </span>
                   <button
                     type="button"
-                    disabled={currentPage === totalPages}
+                    disabled={safeCurrentPage === totalPages}
                     onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                     className="rounded-md border border-slate-200 p-1.5 transition hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white"
                   >
@@ -571,11 +610,21 @@ export default function TreasurerWallet() {
 
       {/* Deduct Wallet Modal */}
       {selectedWallet ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="deduct-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !deductMutation.isPending) {
+              closeDeductionModal();
+            }
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        >
           <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">
+                <h2 id="deduct-modal-title" className="text-lg font-semibold text-slate-900">
                   Deduct Wallet Funds
                 </h2>
                 <p className="mt-1 text-xs text-slate-500">
@@ -589,8 +638,9 @@ export default function TreasurerWallet() {
               <button
                 type="button"
                 onClick={closeDeductionModal}
+                disabled={deductMutation.isPending}
                 aria-label="Close wallet deduction modal"
-                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100"
+                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -713,7 +763,8 @@ export default function TreasurerWallet() {
                 <button
                   type="button"
                   onClick={closeDeductionModal}
-                  className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                  disabled={deductMutation.isPending}
+                  className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -732,11 +783,21 @@ export default function TreasurerWallet() {
 
       {/* Transaction History Modal */}
       {historyWallet ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="history-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setHistoryWallet(null);
+            }
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        >
           <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div>
-                <h3 className="font-bold text-slate-900">
+                <h3 id="history-modal-title" className="font-bold text-slate-900">
                   {historyWallet.residentName || "Resident"}&apos;s Wallet History
                 </h3>
                 <p className="text-xs text-slate-500">
@@ -774,15 +835,15 @@ export default function TreasurerWallet() {
             {/* Ledger Transactions */}
             <div className="mt-3">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-                Transaction Ledger ({historyWallet.transactions.length})
+                Transaction Ledger ({(historyWallet.transactions ?? []).length})
               </h4>
               <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-100">
-                {historyWallet.transactions.length === 0 ? (
+                {(historyWallet.transactions ?? []).length === 0 ? (
                   <div className="p-8 text-center text-xs text-slate-400">
                     No transactions recorded for this wallet yet.
                   </div>
                 ) : (
-                  historyWallet.transactions
+                  (historyWallet.transactions ?? [])
                     .slice()
                     .reverse()
                     .map((tx: WalletTransaction, idx: number) => {

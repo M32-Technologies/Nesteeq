@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   useMutation,
   useQuery,
@@ -76,6 +76,25 @@ const CATEGORIES: Array<{ value: ExpenseCategory; label: string }> = [
   { value: "OTHER", label: "Other" },
 ];
 
+const categoryLabels: Record<string, string> = {
+  MAINTENANCE: "Maintenance",
+  ELECTRICITY: "Electricity",
+  WATER: "Water",
+  SECURITY: "Security",
+  CLEANING: "Cleaning",
+  REPAIR: "Repair",
+  SALARY: "Salary",
+  OTHER: "Other",
+};
+
+const getTodayDateString = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const PAYMENT_METHODS = [
   "Bank Transfer",
   "UPI",
@@ -104,29 +123,62 @@ export default function TreasurerExpenses() {
   const [payExpense, setPayExpense] = useState<Expense | null>(null);
   const [paymentMethod, setPaymentMethod] = useState("Bank Transfer");
   const [paymentRefNo, setPaymentRefNo] = useState("");
-  const [paymentDate, setPaymentDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+  const [paymentDate, setPaymentDate] = useState(getTodayDateString());
 
   // Maintenance Payouts state
   const [activeTab, setActiveTab] = useState<"society_expenses" | "maintenance_payouts">("society_expenses");
   const [selectedPayout, setSelectedPayout] = useState<MaintenancePayout | null>(null);
   const [payoutMethod, setPayoutMethod] = useState("UPI");
+  const [payoutRef, setPayoutRef] = useState("");
   const [payoutNotes, setPayoutNotes] = useState("");
   const [maintenanceSearch, setMaintenanceSearch] = useState("");
   const [maintenancePage, setMaintenancePage] = useState(1);
 
   // Search, Filter & Pagination
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Debounce search query to prevent flooding API
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Modal Escape key support
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (selectedPayout) setSelectedPayout(null);
+        else if (payExpense) setPayExpense(null);
+        else if (rejectExpense) {
+          setRejectExpense(null);
+          setRejectReason("");
+        } else if (approveExpense) setApproveExpense(null);
+        else if (detailExpense) setDetailExpense(null);
+        else if (isAddExpenseOpen) setIsAddExpenseOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    selectedPayout,
+    payExpense,
+    rejectExpense,
+    approveExpense,
+    detailExpense,
+    isAddExpenseOpen,
+  ]);
+
   const expensesQuery = useQuery({
-    queryKey: ["treasurer", "expenses", search, statusFilter, categoryFilter],
+    queryKey: ["treasurer", "expenses", debouncedSearch, statusFilter, categoryFilter],
     queryFn: () =>
       getExpenses({
-        search: search.trim() || undefined,
+        search: debouncedSearch.trim() || undefined,
         status:
           statusFilter === "ALL"
             ? undefined
@@ -170,6 +222,12 @@ export default function TreasurerExpenses() {
       queryClient.invalidateQueries({
         queryKey: ["treasurer", "audit"],
       }),
+      queryClient.invalidateQueries({
+        queryKey: ["treasurer", "chart"],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ["treasurer", "dashboard"],
+      }),
     ]);
   };
 
@@ -179,11 +237,12 @@ export default function TreasurerExpenses() {
       payload,
     }: {
       jobId: string;
-      payload: { paymentMethod?: string; notes?: string };
+      payload: { paymentMethod?: string; paymentReference?: string; notes?: string };
     }) => processMaintenancePayout(jobId, payload),
     onSuccess: async () => {
       toast.success("Maintenance payout recorded and added to Expenses!");
       setSelectedPayout(null);
+      setPayoutRef("");
       setPayoutNotes("");
       await invalidateExpenseData();
     },
@@ -273,10 +332,18 @@ export default function TreasurerExpenses() {
 
   // Paginated Expenses
   const totalPages = Math.ceil(expenses.length / ITEMS_PER_PAGE) || 1;
+  const validCurrentPage = Math.min(currentPage, totalPages);
   const paginatedExpenses = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    const start = (validCurrentPage - 1) * ITEMS_PER_PAGE;
     return expenses.slice(start, start + ITEMS_PER_PAGE);
-  }, [expenses, currentPage]);
+  }, [expenses, validCurrentPage]);
+
+  // Keep pagination in sync when data changes
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   // Filtered & Paginated Maintenance Payouts
   const filteredMaintenancePayouts = useMemo(() => {
@@ -295,10 +362,17 @@ export default function TreasurerExpenses() {
 
   const totalMaintenancePages =
     Math.ceil(filteredMaintenancePayouts.length / ITEMS_PER_PAGE) || 1;
+  const validMaintenancePage = Math.min(maintenancePage, totalMaintenancePages);
   const paginatedMaintenancePayouts = useMemo(() => {
-    const start = (maintenancePage - 1) * ITEMS_PER_PAGE;
+    const start = (validMaintenancePage - 1) * ITEMS_PER_PAGE;
     return filteredMaintenancePayouts.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredMaintenancePayouts, maintenancePage]);
+  }, [filteredMaintenancePayouts, validMaintenancePage]);
+
+  useEffect(() => {
+    if (maintenancePage > totalMaintenancePages) {
+      setMaintenancePage(totalMaintenancePages);
+    }
+  }, [maintenancePage, totalMaintenancePages]);
 
   // CSV Export
   const handleExportCSV = () => {
@@ -320,17 +394,23 @@ export default function TreasurerExpenses() {
       "Rejection Reason",
       "Description",
     ];
+    const formatCsvDate = (dateVal: string | undefined | null) => {
+      if (!dateVal) return "";
+      const d = new Date(dateVal);
+      return Number.isNaN(d.getTime()) ? "" : d.toISOString().split("T")[0];
+    };
+
     const rows = expenses.map((e) => [
       `"${(e.title || "").replace(/"/g, '""')}"`,
       `"${(e.invoiceRef || "").replace(/"/g, '""')}"`,
       `"${(e.category || "").replace(/"/g, '""')}"`,
       `"${(e.vendorName || "Not recorded").replace(/"/g, '""')}"`,
       e.amount,
-      e.expenseDate ? new Date(e.expenseDate).toISOString().split("T")[0] : "",
+      formatCsvDate(e.expenseDate),
       e.status,
       `"${(e.paymentMethod || "").replace(/"/g, '""')}"`,
       `"${(e.paymentReference || "").replace(/"/g, '""')}"`,
-      e.paidAt ? new Date(e.paidAt).toISOString().split("T")[0] : "",
+      formatCsvDate(e.paidAt),
       `"${(e.rejectionReason || "").replace(/"/g, '""')}"`,
       `"${(e.description || "").replace(/"/g, '""')}"`,
     ]);
@@ -346,6 +426,7 @@ export default function TreasurerExpenses() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
     toast.success("Expenses exported to CSV.");
   };
 
@@ -418,15 +499,19 @@ export default function TreasurerExpenses() {
                   className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${item.accent}`}
                 />
                 <div className="flex items-center justify-between">
-                  <div>
+                  <div className="w-full">
                     <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                       {item.title}
                     </p>
-                    <p className="mt-2 text-2xl font-bold text-slate-900">
-                      {item.value}
-                    </p>
+                    {summaryQuery.isLoading ? (
+                      <div className="mt-2 h-7 w-28 animate-pulse rounded-md bg-slate-100" />
+                    ) : (
+                      <p className="mt-2 text-2xl font-bold text-slate-900">
+                        {item.value}
+                      </p>
+                    )}
                   </div>
-                  <div className="rounded-lg bg-slate-50 p-3 border border-slate-100">
+                  <div className="rounded-lg bg-slate-50 p-3 border border-slate-100 shrink-0">
                     <Icon className="h-5 w-5 text-slate-700" />
                   </div>
                 </div>
@@ -451,7 +536,7 @@ export default function TreasurerExpenses() {
               <WalletCards className="h-4 w-4" />
               Society Expenses
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                {expenses.length}
+                {summary.totalCount ?? expenses.length}
               </span>
             </button>
             <button
@@ -627,18 +712,25 @@ export default function TreasurerExpenses() {
                             </span>
                           </td>
                           <td className="py-3.5 text-right">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedPayout(item);
-                                setPayoutMethod("UPI");
-                                setPayoutNotes("");
-                              }}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-[#07584F] px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-[#064e46]"
-                            >
-                              <CreditCard className="h-3.5 w-3.5" />
-                              Disburse Payout
-                            </button>
+                            {item.amount <= 0 ? (
+                              <span className="inline-flex rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
+                                No Payout Due
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedPayout(item);
+                                  setPayoutMethod("UPI");
+                                  setPayoutRef("");
+                                  setPayoutNotes("");
+                                }}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-[#07584F] px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-[#064e46]"
+                              >
+                                <CreditCard className="h-3.5 w-3.5" />
+                                Disburse Payout
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -652,12 +744,14 @@ export default function TreasurerExpenses() {
                     <p>
                       Showing{" "}
                       <span className="font-semibold text-slate-800">
-                        {(maintenancePage - 1) * ITEMS_PER_PAGE + 1}
+                        {filteredMaintenancePayouts.length === 0
+                          ? 0
+                          : (validMaintenancePage - 1) * ITEMS_PER_PAGE + 1}
                       </span>{" "}
                       to{" "}
                       <span className="font-semibold text-slate-800">
                         {Math.min(
-                          maintenancePage * ITEMS_PER_PAGE,
+                          validMaintenancePage * ITEMS_PER_PAGE,
                           filteredMaintenancePayouts.length
                         )}
                       </span>{" "}
@@ -671,7 +765,7 @@ export default function TreasurerExpenses() {
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        disabled={maintenancePage === 1}
+                        disabled={validMaintenancePage <= 1}
                         onClick={() =>
                           setMaintenancePage((p) => Math.max(1, p - 1))
                         }
@@ -680,11 +774,11 @@ export default function TreasurerExpenses() {
                         <ChevronLeft className="h-4 w-4" />
                       </button>
                       <span className="px-2 text-xs font-semibold text-slate-700">
-                        Page {maintenancePage} of {totalMaintenancePages}
+                        Page {validMaintenancePage} of {totalMaintenancePages}
                       </span>
                       <button
                         type="button"
-                        disabled={maintenancePage === totalMaintenancePages}
+                        disabled={validMaintenancePage >= totalMaintenancePages}
                         onClick={() =>
                           setMaintenancePage((p) =>
                             Math.min(totalMaintenancePages, p + 1)
@@ -837,7 +931,7 @@ export default function TreasurerExpenses() {
                             </div>
                           </td>
                           <td className="py-3.5 text-slate-600">
-                            {expense.category}
+                            {categoryLabels[expense.category] || expense.category}
                           </td>
                           <td className="py-3.5 text-slate-600">
                             {expense.vendorName || "Not recorded"}
@@ -875,7 +969,10 @@ export default function TreasurerExpenses() {
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => setRejectExpense(expense)}
+                                    onClick={() => {
+                                      setRejectReason("");
+                                      setRejectExpense(expense);
+                                    }}
                                     className="rounded-md bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 border border-red-200 hover:bg-red-100"
                                   >
                                     Reject
@@ -890,9 +987,7 @@ export default function TreasurerExpenses() {
                                     setPayExpense(expense);
                                     setPaymentMethod("Bank Transfer");
                                     setPaymentRefNo("");
-                                    setPaymentDate(
-                                      new Date().toISOString().split("T")[0]
-                                    );
+                                    setPaymentDate(getTodayDateString());
                                   }}
                                   className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-700"
                                 >
@@ -926,12 +1021,14 @@ export default function TreasurerExpenses() {
                     <p>
                       Showing{" "}
                       <span className="font-semibold text-slate-800">
-                        {(currentPage - 1) * ITEMS_PER_PAGE + 1}
+                        {expenses.length === 0
+                          ? 0
+                          : (validCurrentPage - 1) * ITEMS_PER_PAGE + 1}
                       </span>{" "}
                       to{" "}
                       <span className="font-semibold text-slate-800">
                         {Math.min(
-                          currentPage * ITEMS_PER_PAGE,
+                          validCurrentPage * ITEMS_PER_PAGE,
                           expenses.length
                         )}
                       </span>{" "}
@@ -945,18 +1042,18 @@ export default function TreasurerExpenses() {
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        disabled={currentPage === 1}
+                        disabled={validCurrentPage <= 1}
                         onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                         className="rounded-md border border-slate-200 p-1.5 transition hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white"
                       >
                         <ChevronLeft className="h-4 w-4" />
                       </button>
                       <span className="px-2 text-xs font-semibold text-slate-700">
-                        Page {currentPage} of {totalPages}
+                        Page {validCurrentPage} of {totalPages}
                       </span>
                       <button
                         type="button"
-                        disabled={currentPage === totalPages}
+                        disabled={validCurrentPage >= totalPages}
                         onClick={() =>
                           setCurrentPage((p) => Math.min(totalPages, p + 1))
                         }
@@ -1044,7 +1141,10 @@ export default function TreasurerExpenses() {
               </h3>
               <button
                 type="button"
-                onClick={() => setRejectExpense(null)}
+                onClick={() => {
+                  setRejectExpense(null);
+                  setRejectReason("");
+                }}
                 className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
               >
                 <X className="h-4 w-4" />
@@ -1081,7 +1181,10 @@ export default function TreasurerExpenses() {
             <div className="flex justify-end gap-2.5 border-t border-slate-100 pt-3">
               <button
                 type="button"
-                onClick={() => setRejectExpense(null)}
+                onClick={() => {
+                  setRejectExpense(null);
+                  setRejectReason("");
+                }}
                 className="rounded-lg border border-slate-200 px-3.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
               >
                 Cancel
@@ -1245,7 +1348,7 @@ export default function TreasurerExpenses() {
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Category:</span>
                 <span className="font-semibold text-slate-800">
-                  {detailExpense.category}
+                  {categoryLabels[detailExpense.category] || detailExpense.category}
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
@@ -1418,17 +1521,34 @@ export default function TreasurerExpenses() {
 
               <div>
                 <label
+                  htmlFor="payoutRef"
+                  className="block font-semibold text-slate-700 mb-1"
+                >
+                  Transaction / Cheque / UTR Ref (Optional)
+                </label>
+                <input
+                  id="payoutRef"
+                  type="text"
+                  value={payoutRef}
+                  onChange={(e) => setPayoutRef(e.target.value)}
+                  placeholder="e.g. UTR-982187319"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#07584F]"
+                />
+              </div>
+
+              <div>
+                <label
                   htmlFor="payoutNotes"
                   className="block font-semibold text-slate-700 mb-1"
                 >
-                  Transaction / Cheque / UTR Ref & Notes (Optional)
+                  Disbursement Notes (Optional)
                 </label>
                 <input
                   id="payoutNotes"
                   type="text"
                   value={payoutNotes}
                   onChange={(e) => setPayoutNotes(e.target.value)}
-                  placeholder="e.g. Paid via UPI Ref 4029188219"
+                  placeholder="e.g. Approved and settled after inspection"
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#07584F]"
                 />
               </div>
@@ -1450,6 +1570,7 @@ export default function TreasurerExpenses() {
                     jobId: selectedPayout._id,
                     payload: {
                       paymentMethod: payoutMethod,
+                      paymentReference: payoutRef.trim() || undefined,
                       notes: payoutNotes.trim() || undefined,
                     },
                   });

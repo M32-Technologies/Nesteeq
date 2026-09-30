@@ -20,6 +20,12 @@ export interface GuestPassItem {
   qrCodeDataUrl?: string;
   usedAt?: string | null;
   createdAt: string;
+  visitId?: string | null;
+  visitStatus?: "ACTIVE" | "CHECKED_OUT" | null;
+  checkedInAt?: string | null;
+  checkedOutAt?: string | null;
+  departedFromFlatAt?: string | null;
+  departedFromFlatBy?: string | null;
 }
 
 export interface ResidentComplaintsResponse {
@@ -175,6 +181,24 @@ export async function fetchResidentGuestPasses(params?: {
     } catch {
       return [];
     }
+  }
+}
+
+export async function markResidentVisitorDeparted(passIdOrVisitId: string) {
+  try {
+    const res = await api.patch<{
+      success: boolean;
+      message: string;
+      visit?: any;
+    }>(`/api/v1/residents/passes/${encodeURIComponent(passIdOrVisitId)}/depart-flat`);
+    return res.data;
+  } catch {
+    const fallbackRes = await api.patch<{
+      success: boolean;
+      message: string;
+      visit?: any;
+    }>(`/api/visitors/passes/${encodeURIComponent(passIdOrVisitId)}/depart-flat`);
+    return fallbackRes.data;
   }
 }
 

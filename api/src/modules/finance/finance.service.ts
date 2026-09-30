@@ -107,6 +107,7 @@ const buildMonthlyRow = async (
       {
         $match: {
           apartmentId,
+          reversed: { $ne: true },
           paidAt: { $gte: start, $lt: end },
         },
       },

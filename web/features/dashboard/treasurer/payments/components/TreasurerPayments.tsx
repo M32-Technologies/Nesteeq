@@ -12,17 +12,22 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleDollarSign,
-  Clock3,
   CreditCard,
   Download,
-  Eye,
+  Filter,
   Info,
+  Plus,
   Printer,
   Receipt,
+  RotateCcw,
   Search,
-  User,
+  ShieldAlert,
+  Smartphone,
   Wallet,
   X,
+  Banknote,
+  Calendar,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -30,6 +35,7 @@ import {
   getBills,
   getPayments,
   recordBillPayment,
+  reversePayment,
   type Bill,
   type Payment,
 } from "../../services/treasurer.service";
@@ -37,92 +43,114 @@ import {
   formatCurrency,
   formatDate,
 } from "../../utils/format";
+import TransactionReceiptModal from "./TransactionReceiptModal";
+
+const ITEMS_PER_PAGE = 10;
+
+const PAYMENT_METHODS = [
+  "ALL",
+  "UPI",
+  "Bank Transfer",
+  "Cash",
+  "Cheque",
+  "Wallet",
+  "Card",
+  "Other",
+];
+
+const DATE_PRESETS = [
+  { id: "ALL", label: "All Time" },
+  { id: "TODAY", label: "Today" },
+  { id: "THIS_WEEK", label: "This Week" },
+  { id: "THIS_MONTH", label: "This Month" },
+  { id: "LAST_MONTH", label: "Last Month" },
+];
 
 const getSafeErrorMessage = (error: unknown) =>
   error instanceof Error
     ? error.message
-    : "Unable to complete the payment request.";
-
-const statusLabels: Record<Bill["status"], string> = {
-  PENDING: "Pending",
-  PARTIALLY_PAID: "Partially Paid",
-  PAID: "Paid",
-  OVERDUE: "Overdue",
-};
-
-const statusClassNames: Record<Bill["status"], string> = {
-  PENDING:
-    "rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 border border-amber-200",
-  PARTIALLY_PAID:
-    "rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 border border-blue-200",
-  PAID:
-    "rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 border border-emerald-200",
-  OVERDUE:
-    "rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 border border-red-200",
-};
-
-const PAYMENT_METHODS = [
-  "UPI",
-  "Bank Transfer",
-  "Cash",
-  "Card",
-  "Cheque",
-  "Other",
-];
-
-const ITEMS_PER_PAGE = 8;
-
-interface ReceiptData {
-  receiptId: string;
-  billId: string;
-  residentName: string;
-  unitName: string;
-  amount: number;
-  paymentMethod: string;
-  referenceNo?: string;
-  paidAt: string;
-  balanceRemaining: number;
-  totalBillAmount: number;
-}
+    : "Unable to process the request.";
 
 export default function TreasurerPayments() {
   const queryClient = useQueryClient();
 
-  // Modal States
-  const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
-  const [paymentAmount, setPaymentAmount] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("UPI");
-  const [referenceNo, setReferenceNo] = useState("");
-  const [paymentDescription, setPaymentDescription] = useState("");
-  const [paymentError, setPaymentError] = useState<string | null>(null);
+  // Search & Filters
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedMethod, setSelectedMethod] = useState("ALL");
+  const [datePreset, setDatePreset] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "VALID" | "REVERSED">("ALL");
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // Receipt & Details Modals
-  const [receiptModalData, setReceiptModalData] = useState<ReceiptData | null>(null);
-  const [detailBill, setDetailBill] = useState<Bill | null>(null);
+  // Modals state
+  const [viewingReceiptPayment, setViewingReceiptPayment] = useState<Payment | null>(null);
+  const [reversingPayment, setReversingPayment] = useState<Payment | null>(null);
+  const [reversalReason, setReversalReason] = useState("");
+  const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
 
-  // Search & Filter States
-  const [recordsSearch, setRecordsSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("ALL");
-  const [historySearch, setHistorySearch] = useState("");
-  const [sourceFilter, setSourceFilter] = useState<string>("ALL");
-
-  // Pagination States
-  const [recordsPage, setRecordsPage] = useState(1);
-  const [historyPage, setHistoryPage] = useState(1);
+  // Record Payment Form State
+  const [recordBillId, setRecordBillId] = useState("");
+  const [recordAmount, setRecordAmount] = useState("");
+  const [recordMethod, setRecordMethod] = useState("UPI");
+  const [recordRefNo, setRecordRefNo] = useState("");
+  const [recordDescription, setRecordDescription] = useState("");
 
   // Data Queries
+  const paymentsQuery = useQuery({
+    queryKey: ["treasurer", "payments-ledger"],
+    queryFn: () => getPayments({ limit: 500, includeReversed: true }),
+  });
+
   const billsQuery = useQuery({
-    queryKey: ["treasurer", "bills"],
+    queryKey: ["treasurer", "outstanding-bills"],
     queryFn: () => getBills(),
   });
 
-  const paymentsQuery = useQuery({
-    queryKey: ["treasurer", "payments"],
-    queryFn: () => getPayments({ limit: 100 }),
+  const allPayments = paymentsQuery.data ?? [];
+  const allBills = billsQuery.data ?? [];
+
+  // Filter bills that have unpaid balances for the quick record modal
+  const unpaidBills = useMemo(() => {
+    return allBills.filter((b) => b.balanceAmount > 0 && b.status !== "PAID");
+  }, [allBills]);
+
+  // Selected bill in the record payment modal
+  const selectedRecordBill = useMemo(() => {
+    return unpaidBills.find((b) => b._id === recordBillId) || null;
+  }, [unpaidBills, recordBillId]);
+
+  // Handle bill selection in record modal
+  const handleSelectRecordBill = (billId: string) => {
+    setRecordBillId(billId);
+    const b = unpaidBills.find((x) => x._id === billId);
+    if (b) {
+      setRecordAmount(String(b.balanceAmount));
+    }
+  };
+
+  // Reversal Mutation
+  const reverseMutation = useMutation({
+    mutationFn: ({ paymentId, reason }: { paymentId: string; reason: string }) =>
+      reversePayment(paymentId, reason),
+    onSuccess: async () => {
+      toast.success("Payment successfully reversed & bill balance restored.");
+      setReversingPayment(null);
+      setReversalReason("");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["treasurer", "payments-ledger"] }),
+        queryClient.invalidateQueries({ queryKey: ["treasurer", "bills"] }),
+        queryClient.invalidateQueries({ queryKey: ["treasurer", "outstanding-bills"] }),
+        queryClient.invalidateQueries({ queryKey: ["treasurer", "finance-summary"] }),
+        queryClient.invalidateQueries({ queryKey: ["treasurer", "monthly-finance"] }),
+        queryClient.invalidateQueries({ queryKey: ["treasurer", "audit"] }),
+      ]);
+    },
+    onError: (error) => {
+      toast.error(getSafeErrorMessage(error));
+    },
   });
 
   // Record Payment Mutation
-  const paymentMutation = useMutation({
+  const recordMutation = useMutation({
     mutationFn: ({
       billId,
       amount,
@@ -132,7 +160,7 @@ export default function TreasurerPayments() {
     }: {
       billId: string;
       amount: number;
-      method?: string;
+      method: string;
       refNo?: string;
       desc?: string;
     }) =>
@@ -143,1026 +171,866 @@ export default function TreasurerPayments() {
       }),
     onSuccess: async (updatedBill) => {
       toast.success("Payment recorded successfully.");
+      setIsRecordModalOpen(false);
+      setRecordBillId("");
+      setRecordAmount("");
+      setRecordRefNo("");
+      setRecordDescription("");
 
-      // Open Receipt for immediate confirmation
-      if (selectedBill) {
-        const remaining = Math.max(0, selectedBill.balanceAmount - Number(paymentAmount));
-        setReceiptModalData({
-          receiptId: `REC-${Date.now().toString().slice(-6)}`,
-          billId: selectedBill._id,
-          residentName: selectedBill.residentName || "Resident",
-          unitName: selectedBill.unitName || (selectedBill.flatNumber ? `Flat ${selectedBill.flatNumber}` : "Unit"),
-          amount: Number(paymentAmount),
-          paymentMethod,
-          referenceNo: referenceNo.trim() || undefined,
-          paidAt: new Date().toISOString(),
-          balanceRemaining: remaining,
-          totalBillAmount: selectedBill.totalAmount,
-        });
-      }
-
-      closeRecordPaymentModal();
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["treasurer", "payments-ledger"] }),
         queryClient.invalidateQueries({ queryKey: ["treasurer", "bills"] }),
-        queryClient.invalidateQueries({ queryKey: ["treasurer", "payments"] }),
+        queryClient.invalidateQueries({ queryKey: ["treasurer", "outstanding-bills"] }),
         queryClient.invalidateQueries({ queryKey: ["treasurer", "finance-summary"] }),
         queryClient.invalidateQueries({ queryKey: ["treasurer", "monthly-finance"] }),
         queryClient.invalidateQueries({ queryKey: ["treasurer", "audit"] }),
       ]);
     },
     onError: (error) => {
-      const message = getSafeErrorMessage(error);
-      setPaymentError(message);
-      toast.error(message);
+      toast.error(getSafeErrorMessage(error));
     },
   });
 
-  const bills = billsQuery.data ?? [];
-  const payments = paymentsQuery.data ?? [];
-
-  // Summary Metrics
-  const totalCollected = bills.reduce((total, bill) => total + bill.paidAmount, 0);
-  const pendingAmount = bills
-    .filter((bill) => bill.status !== "PAID")
-    .reduce((total, bill) => total + bill.balanceAmount, 0);
-  const completedPayments = bills.filter((bill) => bill.status === "PAID").length;
-  const pendingBillCount = bills.filter((bill) => bill.balanceAmount > 0).length;
-
-  const paymentSummary = [
-    {
-      title: "Total Collected",
-      value: formatCurrency(totalCollected, 2),
-      icon: CircleDollarSign,
-      accent: "from-[#07584F] to-emerald-600",
-    },
-    {
-      title: "Pending Amount",
-      value: formatCurrency(pendingAmount, 2),
-      icon: Clock3,
-      accent: "from-amber-500 to-amber-600",
-    },
-    {
-      title: "Completed Bills",
-      value: completedPayments.toString(),
-      icon: CheckCircle2,
-      accent: "from-blue-500 to-blue-600",
-    },
-    {
-      title: "Pending Bills",
-      value: pendingBillCount.toString(),
-      icon: CreditCard,
-      accent: "from-rose-500 to-rose-600",
-    },
-  ];
-
-  // Filtered Bills
-  const filteredBills = useMemo(() => {
-    return bills.filter((bill) => {
-      const resident = (bill.residentName || "").toLowerCase();
-      const unit = (bill.unitName || bill.flatNumber || "").toLowerCase();
-      const term = recordsSearch.toLowerCase().trim();
-      const matchesSearch = !term || resident.includes(term) || unit.includes(term);
-      const matchesStatus = statusFilter === "ALL" || bill.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [bills, recordsSearch, statusFilter]);
-
-  // Paginated Bills
-  const totalBillPages = Math.ceil(filteredBills.length / ITEMS_PER_PAGE) || 1;
-  const paginatedBills = useMemo(() => {
-    const start = (recordsPage - 1) * ITEMS_PER_PAGE;
-    return filteredBills.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredBills, recordsPage]);
-
-  // Filtered History
-  const filteredPayments = useMemo(() => {
-    return payments.filter((payment) => {
-      const resident = (payment.residentName || "").toLowerCase();
-      const unit = (payment.unitName || payment.flatNumber || "").toLowerCase();
-      const term = historySearch.toLowerCase().trim();
-      const matchesSearch = !term || resident.includes(term) || unit.includes(term);
-      const matchesSource = sourceFilter === "ALL" || payment.source === sourceFilter;
-      return matchesSearch && matchesSource;
-    });
-  }, [payments, historySearch, sourceFilter]);
-
-  // Paginated History
-  const totalHistoryPages = Math.ceil(filteredPayments.length / ITEMS_PER_PAGE) || 1;
-  const paginatedPayments = useMemo(() => {
-    const start = (historyPage - 1) * ITEMS_PER_PAGE;
-    return filteredPayments.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredPayments, historyPage]);
-
-  // Modal Handlers
-  const openRecordPaymentModal = (bill: Bill) => {
-    setSelectedBill(bill);
-    setPaymentAmount(bill.balanceAmount > 0 ? String(bill.balanceAmount) : "");
-    setPaymentMethod("UPI");
-    setReferenceNo("");
-    setPaymentDescription("");
-    setPaymentError(null);
-  };
-
-  const closeRecordPaymentModal = () => {
-    setSelectedBill(null);
-    setPaymentAmount("");
-    setPaymentMethod("UPI");
-    setReferenceNo("");
-    setPaymentDescription("");
-    setPaymentError(null);
-  };
-
-  const handleRecordPayment = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!selectedBill) return;
-
-    const amount = Number(paymentAmount);
-
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setPaymentError("Payment amount must be greater than 0.");
+  const handleRecordSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!recordBillId) {
+      toast.error("Please select a bill to record payment against.");
       return;
     }
-
-    if (amount > selectedBill.balanceAmount) {
-      setPaymentError(
-        `Payment amount cannot exceed remaining balance of ${formatCurrency(selectedBill.balanceAmount)}.`
+    const amt = Number(recordAmount);
+    if (isNaN(amt) || amt <= 0) {
+      toast.error("Please enter a valid payment amount.");
+      return;
+    }
+    if (selectedRecordBill && amt > selectedRecordBill.balanceAmount) {
+      toast.error(
+        `Payment amount cannot exceed remaining balance (₹${selectedRecordBill.balanceAmount}).`
       );
       return;
     }
 
-    setPaymentError(null);
-    paymentMutation.mutate({
-      billId: selectedBill._id,
-      amount,
-      method: paymentMethod,
-      refNo: referenceNo.trim() || undefined,
-      desc: paymentDescription.trim() || undefined,
+    recordMutation.mutate({
+      billId: recordBillId,
+      amount: amt,
+      method: recordMethod,
+      refNo: recordRefNo.trim() || undefined,
+      desc: recordDescription.trim() || undefined,
     });
   };
 
-  const handlePrintReceipt = () => {
-    window.print();
+  const handleConfirmReversal = (e: FormEvent) => {
+    e.preventDefault();
+    if (!reversingPayment) return;
+    if (!reversalReason.trim() || reversalReason.trim().length < 3) {
+      toast.error("Please provide a valid reason (at least 3 characters) for the reversal.");
+      return;
+    }
+    reverseMutation.mutate({
+      paymentId: reversingPayment._id,
+      reason: reversalReason.trim(),
+    });
+  };
+
+  // Date Filter Range Computation
+  const dateRangeBounds = useMemo(() => {
+    const now = new Date();
+    if (datePreset === "TODAY") {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      return { start, end: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999) };
+    }
+    if (datePreset === "THIS_WEEK") {
+      const day = now.getDay();
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Monday
+      const start = new Date(now.setDate(diff));
+      start.setHours(0, 0, 0, 0);
+      return { start, end: new Date() };
+    }
+    if (datePreset === "THIS_MONTH") {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { start, end: new Date() };
+    }
+    if (datePreset === "LAST_MONTH") {
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+      return { start, end };
+    }
+    return null;
+  }, [datePreset]);
+
+  // Filtered Payments
+  const filteredPayments = useMemo(() => {
+    return allPayments.filter((p) => {
+      // Status Filter
+      if (statusFilter === "VALID" && p.reversed) return false;
+      if (statusFilter === "REVERSED" && !p.reversed) return false;
+
+      // Method Filter
+      if (selectedMethod !== "ALL") {
+        const methodUpper = (p.paymentMethod || p.source || "").toUpperCase();
+        const targetUpper = selectedMethod.toUpperCase();
+        if (!methodUpper.includes(targetUpper)) return false;
+      }
+
+      // Date Range Filter
+      if (dateRangeBounds) {
+        const pDate = new Date(p.paidAt);
+        if (pDate < dateRangeBounds.start || pDate > dateRangeBounds.end) return false;
+      }
+
+      // Search Query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const receiptNo = (p.receiptNumber || "").toLowerCase();
+        const resident = (p.residentName || "").toLowerCase();
+        const flat = (p.flatNumber || p.unitName || "").toLowerCase();
+        const refNo = (p.referenceNo || "").toLowerCase();
+        const desc = (p.description || "").toLowerCase();
+        const bill = (p.billTitle || "").toLowerCase();
+
+        const matches =
+          receiptNo.includes(q) ||
+          resident.includes(q) ||
+          flat.includes(q) ||
+          refNo.includes(q) ||
+          desc.includes(q) ||
+          bill.includes(q);
+
+        if (!matches) return false;
+      }
+
+      return true;
+    });
+  }, [allPayments, statusFilter, selectedMethod, dateRangeBounds, searchQuery]);
+
+  // Metrics (calculated from filtered valid payments)
+  const metrics = useMemo(() => {
+    let totalCollected = 0;
+    let digitalCollected = 0;
+    let cashCollected = 0;
+    let reversedCount = 0;
+    let validCount = 0;
+
+    for (const p of filteredPayments) {
+      if (p.reversed) {
+        reversedCount++;
+        continue;
+      }
+      validCount++;
+      totalCollected += p.amount;
+      const m = (p.paymentMethod || p.source || "").toUpperCase();
+      if (m.includes("CASH")) {
+        cashCollected += p.amount;
+      } else {
+        digitalCollected += p.amount;
+      }
+    }
+
+    return {
+      totalCollected,
+      digitalCollected,
+      cashCollected,
+      totalCount: filteredPayments.length,
+      validCount,
+      reversedCount,
+    };
+  }, [filteredPayments]);
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filteredPayments.length / ITEMS_PER_PAGE));
+  const paginatedPayments = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredPayments.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredPayments, currentPage]);
+
+  // CSV Export Handler
+  const handleExportCSV = () => {
+    if (filteredPayments.length === 0) {
+      toast.error("No transactions to export.");
+      return;
+    }
+
+    const headers = [
+      "Receipt Number",
+      "Date",
+      "Flat",
+      "Resident Name",
+      "Payment Purpose / Bill",
+      "Payment Mode",
+      "Reference / UTR",
+      "Amount (INR)",
+      "Status",
+      "Reversal Reason",
+    ];
+
+    const rows = filteredPayments.map((p) => [
+      p.receiptNumber || `REC-${p._id.slice(-6).toUpperCase()}`,
+      new Date(p.paidAt).toLocaleString("en-IN"),
+      p.unitName || (p.flatNumber ? `Flat ${p.flatNumber}` : "Unit"),
+      `"${(p.residentName || "").replace(/"/g, '""')}"`,
+      `"${(p.billTitle || "Maintenance").replace(/"/g, '""')}"`,
+      p.paymentMethod || p.source,
+      `"${(p.referenceNo || "").replace(/"/g, '""')}"`,
+      p.amount,
+      p.reversed ? "REVERSED" : "COMPLETED",
+      `"${(p.reversalReason || "").replace(/"/g, '""')}"`,
+    ]);
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute(
+      "download",
+      `Nesteeq_Collection_Register_${new Date().toISOString().split("T")[0]}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Collection register successfully exported to CSV.");
+  };
+
+  // Helper badge for payment method
+  const renderMethodBadge = (method?: string, source?: string) => {
+    const m = (method || source || "OTHER").toUpperCase();
+    if (m.includes("UPI")) {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-md bg-purple-50 px-2 py-0.5 text-xs font-semibold text-purple-700 border border-purple-200">
+          <Smartphone className="h-3 w-3" />
+          UPI
+        </span>
+      );
+    }
+    if (m.includes("CASH")) {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 border border-amber-200">
+          <Banknote className="h-3 w-3" />
+          Cash
+        </span>
+      );
+    }
+    if (m.includes("BANK") || m.includes("NEFT") || m.includes("RTGS") || m.includes("IMPS")) {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200">
+          <Building className="h-3 w-3" />
+          Bank Transfer
+        </span>
+      );
+    }
+    if (m.includes("WALLET")) {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200">
+          <Wallet className="h-3 w-3" />
+          Wallet
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700 border border-slate-200">
+        <CreditCard className="h-3 w-3" />
+        {method || "Manual"}
+      </span>
+    );
   };
 
   return (
-    <>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              Payments
+              Official Collection Register
             </h1>
-            <p className="text-sm text-slate-500">
-              Track maintenance dues, search by resident or unit, and record verified receipts.
+            <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+              Transaction Ledger
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-slate-500">
+            Society maintenance collection register, bank reconciliation, payment receipts & transaction reversals.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setIsRecordModalOpen(true)}
+            className="inline-flex items-center gap-2 rounded-xl bg-[#07584F] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#064e46] transition"
+          >
+            <Plus className="h-4 w-4" />
+            Record Payment
+          </button>
+
+          <button
+            onClick={handleExportCSV}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition"
+          >
+            <Download className="h-4 w-4 text-slate-500" />
+            Export CSV
+          </button>
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Card 1: Total Collections */}
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Total Collections
             </p>
-          </div>
-        </div>
-
-        {/* Metric Cards */}
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {paymentSummary.map((item) => {
-            const Icon = item.icon;
-            return (
-              <div
-                key={item.title}
-                className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-xs"
-              >
-                <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${item.accent}`} />
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                      {item.title}
-                    </p>
-                    <p className="mt-2 text-2xl font-bold text-slate-900">
-                      {item.value}
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-slate-50 p-3 border border-slate-100">
-                    <Icon className="h-5 w-5 text-slate-700" />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Section 1: Payment Records (Dues & Invoices) */}
-        <div className="rounded-xl border border-slate-200 bg-white shadow-xs">
-          <div className="border-b border-slate-200 p-5 sm:p-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">
-                  Payment Records
-                </h2>
-                <p className="mt-0.5 text-sm text-slate-500">
-                  Resident bills, current balances, and payment collection.
-                </p>
-              </div>
-
-              {/* Search & Status Filter */}
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <div className="relative min-w-[240px]">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    value={recordsSearch}
-                    onChange={(e) => {
-                      setRecordsSearch(e.target.value);
-                      setRecordsPage(1);
-                    }}
-                    placeholder="Search resident or flat..."
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50/50 py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-[#07584F] focus:bg-white"
-                  />
-                  {recordsSearch ? (
-                    <button
-                      type="button"
-                      onClick={() => setRecordsSearch("")}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  ) : null}
-                </div>
-
-                <select
-                  value={statusFilter}
-                  onChange={(e) => {
-                    setStatusFilter(e.target.value);
-                    setRecordsPage(1);
-                  }}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-[#07584F]"
-                >
-                  <option value="ALL">All Statuses</option>
-                  <option value="PENDING">Pending</option>
-                  <option value="PARTIALLY_PAID">Partially Paid</option>
-                  <option value="OVERDUE">Overdue</option>
-                  <option value="PAID">Paid</option>
-                </select>
-              </div>
+            <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600">
+              <CircleDollarSign className="h-5 w-5" />
             </div>
           </div>
-
-          {/* Records Table */}
-          <div className="overflow-x-auto p-5 sm:p-6">
-            {billsQuery.isLoading ? (
-              <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                Loading bills...
-              </p>
-            ) : billsQuery.isError ? (
-              <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {getSafeErrorMessage(billsQuery.error)}
-              </p>
-            ) : filteredBills.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-slate-200 p-8 text-center">
-                <Search className="mx-auto h-8 w-8 text-slate-300" />
-                <p className="mt-2 text-sm font-medium text-slate-700">
-                  No matching payment records found
-                </p>
-                <p className="text-xs text-slate-500">
-                  Try adjusting your search keyword or status filter.
-                </p>
-              </div>
-            ) : (
-              <table className="w-full min-w-[980px] text-left text-sm">
-                <thead className="border-b border-slate-200 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  <tr>
-                    <th className="pb-3">Resident</th>
-                    <th className="pb-3">Flat / Unit</th>
-                    <th className="pb-3">Total Bill</th>
-                    <th className="pb-3">Paid</th>
-                    <th className="pb-3">Balance</th>
-                    <th className="pb-3">Due Date</th>
-                    <th className="pb-3">Status</th>
-                    <th className="pb-3 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {paginatedBills.map((bill) => {
-                    const residentDisplayName = bill.residentName || "Resident";
-                    const unitDisplayName =
-                      bill.unitName || (bill.flatNumber ? `Flat ${bill.flatNumber}` : "Unit");
-
-                    return (
-                      <tr
-                        key={bill._id}
-                        className="transition hover:bg-slate-50/70"
-                      >
-                        <td className="py-3.5 font-medium text-slate-900">
-                          <div className="flex items-center gap-2.5">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#07584F]/10 text-xs font-bold text-[#07584F]">
-                              {residentDisplayName.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <span className="block font-semibold text-slate-900">
-                                {residentDisplayName}
-                              </span>
-                              <span className="block text-[11px] text-slate-400">
-                                Bill #{bill._id.slice(-6).toUpperCase()}
-                              </span>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3.5 font-medium text-slate-700">
-                          <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-800">
-                            <Building className="h-3.5 w-3.5 text-slate-500" />
-                            {unitDisplayName}
-                          </span>
-                        </td>
-                        <td className="py-3.5 font-semibold text-slate-900">
-                          {formatCurrency(bill.totalAmount, 2)}
-                        </td>
-                        <td className="py-3.5 font-medium text-emerald-700">
-                          {formatCurrency(bill.paidAmount, 2)}
-                        </td>
-                        <td className="py-3.5 font-semibold text-slate-900">
-                          {bill.balanceAmount > 0 ? (
-                            <span className="text-amber-700">
-                              {formatCurrency(bill.balanceAmount, 2)}
-                            </span>
-                          ) : (
-                            <span className="text-slate-400">₹0.00</span>
-                          )}
-                        </td>
-                        <td className="py-3.5 text-slate-600">
-                          {formatDate(bill.dueDate)}
-                        </td>
-                        <td className="py-3.5">
-                          <span className={statusClassNames[bill.status]}>
-                            {statusLabels[bill.status]}
-                          </span>
-                        </td>
-                        <td className="py-3.5 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setDetailBill(bill)}
-                              title="View Bill Breakdown"
-                              className="rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                            </button>
-
-                            {bill.balanceAmount > 0 ? (
-                              <button
-                                type="button"
-                                onClick={() => openRecordPaymentModal(bill)}
-                                className="rounded-lg bg-[#07584F] px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-[#064e46]"
-                              >
-                                Record Payment
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setReceiptModalData({
-                                    receiptId: `REC-${bill._id.slice(-6).toUpperCase()}`,
-                                    billId: bill._id,
-                                    residentName: residentDisplayName,
-                                    unitName: unitDisplayName,
-                                    amount: bill.paidAmount,
-                                    paymentMethod: "Settled",
-                                    paidAt: bill.updatedAt || bill.dueDate,
-                                    balanceRemaining: 0,
-                                    totalBillAmount: bill.totalAmount,
-                                  });
-                                }}
-                                className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
-                              >
-                                <Receipt className="h-3 w-3" />
-                                Receipt
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-
-            {/* Pagination for Bills */}
-            {filteredBills.length > ITEMS_PER_PAGE ? (
-              <div className="flex items-center justify-between border-t border-slate-100 pt-4 text-xs text-slate-500">
-                <p>
-                  Showing{" "}
-                  <span className="font-semibold text-slate-800">
-                    {(recordsPage - 1) * ITEMS_PER_PAGE + 1}
-                  </span>{" "}
-                  to{" "}
-                  <span className="font-semibold text-slate-800">
-                    {Math.min(recordsPage * ITEMS_PER_PAGE, filteredBills.length)}
-                  </span>{" "}
-                  of{" "}
-                  <span className="font-semibold text-slate-800">
-                    {filteredBills.length}
-                  </span>{" "}
-                  records
-                </p>
-
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    disabled={recordsPage === 1}
-                    onClick={() => setRecordsPage((p) => Math.max(1, p - 1))}
-                    className="rounded-md border border-slate-200 p-1.5 transition hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <span className="px-2 text-xs font-semibold text-slate-700">
-                    Page {recordsPage} of {totalBillPages}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={recordsPage === totalBillPages}
-                    onClick={() => setRecordsPage((p) => Math.min(totalBillPages, p + 1))}
-                    className="rounded-md border border-slate-200 p-1.5 transition hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            ) : null}
-          </div>
+          <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900">
+            {formatCurrency(metrics.totalCollected)}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            {metrics.validCount} successful transaction{metrics.validCount === 1 ? "" : "s"}
+          </p>
         </div>
 
-        {/* Section 2: Payment History */}
-        <div className="rounded-xl border border-slate-200 bg-white shadow-xs">
-          <div className="border-b border-slate-200 p-5 sm:p-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">
-                  Payment History
-                </h2>
-                <p className="mt-0.5 text-sm text-slate-500">
-                  Persisted record of manual collections and automatic wallet settlements.
-                </p>
-              </div>
-
-              {/* Search & Source Filter */}
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <div className="relative min-w-[240px]">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    value={historySearch}
-                    onChange={(e) => {
-                      setHistorySearch(e.target.value);
-                      setHistoryPage(1);
-                    }}
-                    placeholder="Search resident or flat..."
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50/50 py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-[#07584F] focus:bg-white"
-                  />
-                  {historySearch ? (
-                    <button
-                      type="button"
-                      onClick={() => setHistorySearch("")}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  ) : null}
-                </div>
-
-                <select
-                  value={sourceFilter}
-                  onChange={(e) => {
-                    setSourceFilter(e.target.value);
-                    setHistoryPage(1);
-                  }}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-[#07584F]"
-                >
-                  <option value="ALL">All Sources</option>
-                  <option value="MANUAL">Manual</option>
-                  <option value="WALLET">Wallet</option>
-                </select>
-              </div>
+        {/* Card 2: Digital / UPI / Bank */}
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              UPI & Bank Inflows
+            </p>
+            <div className="rounded-xl bg-indigo-50 p-2.5 text-indigo-600">
+              <CreditCard className="h-5 w-5" />
             </div>
           </div>
+          <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900">
+            {formatCurrency(metrics.digitalCollected)}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Direct online credits & bank transfers
+          </p>
+        </div>
 
-          {/* History Table */}
-          <div className="overflow-x-auto p-5 sm:p-6">
-            {paymentsQuery.isLoading ? (
-              <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                Loading payment history...
-              </p>
-            ) : paymentsQuery.isError ? (
-              <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {getSafeErrorMessage(paymentsQuery.error)}
-              </p>
-            ) : filteredPayments.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-slate-200 p-8 text-center">
-                <Receipt className="mx-auto h-8 w-8 text-slate-300" />
-                <p className="mt-2 text-sm font-medium text-slate-700">
-                  No payment transactions recorded
-                </p>
-                <p className="text-xs text-slate-500">
-                  Recorded payments and wallet debits will be displayed here.
-                </p>
-              </div>
+        {/* Card 3: Cash In Hand */}
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Cash In Hand
+            </p>
+            <div className="rounded-xl bg-amber-50 p-2.5 text-amber-600">
+              <Banknote className="h-5 w-5" />
+            </div>
+          </div>
+          <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900">
+            {formatCurrency(metrics.cashCollected)}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Physical currency received by treasurer
+          </p>
+        </div>
+
+        {/* Card 4: Ledger Entries */}
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Ledger Volume
+            </p>
+            <div className="rounded-xl bg-cyan-50 p-2.5 text-cyan-600">
+              <Receipt className="h-5 w-5" />
+            </div>
+          </div>
+          <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900">
+            {metrics.totalCount}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            {metrics.reversedCount > 0 ? (
+              <span className="text-rose-600 font-medium">
+                {metrics.reversedCount} reversed entry{metrics.reversedCount === 1 ? "" : "s"}
+              </span>
             ) : (
-              <table className="w-full min-w-[850px] text-left text-sm">
-                <thead className="border-b border-slate-200 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  <tr>
-                    <th className="pb-3">Date</th>
-                    <th className="pb-3">Flat / Unit</th>
-                    <th className="pb-3">Resident</th>
-                    <th className="pb-3">Bill Ref</th>
-                    <th className="pb-3">Amount</th>
-                    <th className="pb-3">Source</th>
-                    <th className="pb-3 text-right">Receipt</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {paginatedPayments.map((payment) => {
-                    const residentDisplayName = payment.residentName || "Resident";
-                    const unitDisplayName =
-                      payment.unitName || (payment.flatNumber ? `Flat ${payment.flatNumber}` : "Unit");
-
-                    return (
-                      <tr
-                        key={payment._id}
-                        className="transition hover:bg-slate-50/70"
-                      >
-                        <td className="py-3.5 text-slate-600">
-                          {formatDate(payment.paidAt)}
-                        </td>
-                        <td className="py-3.5 font-medium text-slate-800">
-                          <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold">
-                            {unitDisplayName}
-                          </span>
-                        </td>
-                        <td className="py-3.5 font-medium text-slate-900">
-                          {residentDisplayName}
-                        </td>
-                        <td className="py-3.5 font-mono text-xs text-slate-500">
-                          #{payment.billId.slice(-6).toUpperCase()}
-                        </td>
-                        <td className="py-3.5 font-semibold text-emerald-700">
-                          {formatCurrency(payment.amount, 2)}
-                        </td>
-                        <td className="py-3.5">
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                              payment.source === "WALLET"
-                                ? "bg-purple-50 text-purple-700 border border-purple-200"
-                                : "bg-blue-50 text-blue-700 border border-blue-200"
-                            }`}
-                          >
-                            {payment.source === "WALLET" ? (
-                              <Wallet className="h-3 w-3" />
-                            ) : (
-                              <CreditCard className="h-3 w-3" />
-                            )}
-                            {payment.source}
-                          </span>
-                        </td>
-                        <td className="py-3.5 text-right">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setReceiptModalData({
-                                receiptId: `REC-${payment._id.slice(-6).toUpperCase()}`,
-                                billId: payment.billId,
-                                residentName: residentDisplayName,
-                                unitName: unitDisplayName,
-                                amount: payment.amount,
-                                paymentMethod: payment.source === "WALLET" ? "Wallet Credit" : "Manual Payment",
-                                referenceNo: payment.description || undefined,
-                                paidAt: payment.paidAt,
-                                balanceRemaining: 0,
-                                totalBillAmount: payment.amount,
-                              });
-                            }}
-                            className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
-                          >
-                            <Receipt className="h-3 w-3 text-slate-500" />
-                            View
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              "All entries in good standing"
             )}
+          </p>
+        </div>
+      </div>
 
-            {/* Pagination for History */}
-            {filteredPayments.length > ITEMS_PER_PAGE ? (
-              <div className="flex items-center justify-between border-t border-slate-100 pt-4 text-xs text-slate-500">
-                <p>
-                  Showing{" "}
-                  <span className="font-semibold text-slate-800">
-                    {(historyPage - 1) * ITEMS_PER_PAGE + 1}
-                  </span>{" "}
-                  to{" "}
-                  <span className="font-semibold text-slate-800">
-                    {Math.min(historyPage * ITEMS_PER_PAGE, filteredPayments.length)}
-                  </span>{" "}
-                  of{" "}
-                  <span className="font-semibold text-slate-800">
-                    {filteredPayments.length}
-                  </span>{" "}
-                  payments
-                </p>
+      {/* Filter Toolbar */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Search Box */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Search receipt, resident, flat, UTR..."
+              className="w-full rounded-xl border border-slate-200 pl-9 pr-4 py-2 text-xs focus:border-[#07584F] focus:outline-none focus:ring-1 focus:ring-[#07584F]"
+            />
+          </div>
 
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    disabled={historyPage === 1}
-                    onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
-                    className="rounded-md border border-slate-200 p-1.5 transition hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <span className="px-2 text-xs font-semibold text-slate-700">
-                    Page {historyPage} of {totalHistoryPages}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={historyPage === totalHistoryPages}
-                    onClick={() => setHistoryPage((p) => Math.min(totalHistoryPages, p + 1))}
-                    className="rounded-md border border-slate-200 p-1.5 transition hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            ) : null}
+          {/* Date Range Preset */}
+          <div className="relative">
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <select
+              value={datePreset}
+              onChange={(e) => {
+                setDatePreset(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full appearance-none rounded-xl border border-slate-200 bg-white pl-9 pr-8 py-2 text-xs focus:border-[#07584F] focus:outline-none focus:ring-1 focus:ring-[#07584F]"
+            >
+              {DATE_PRESETS.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Payment Method */}
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <select
+              value={selectedMethod}
+              onChange={(e) => {
+                setSelectedMethod(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full appearance-none rounded-xl border border-slate-200 bg-white pl-9 pr-8 py-2 text-xs focus:border-[#07584F] focus:outline-none focus:ring-1 focus:ring-[#07584F]"
+            >
+              {PAYMENT_METHODS.map((m) => (
+                <option key={m} value={m}>
+                  {m === "ALL" ? "All Payment Methods" : m}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Status Filter */}
+          <div className="relative">
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as any);
+                setCurrentPage(1);
+              }}
+              className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs focus:border-[#07584F] focus:outline-none focus:ring-1 focus:ring-[#07584F]"
+            >
+              <option value="ALL">All Entries (Valid & Reversed)</option>
+              <option value="VALID">Valid Collections Only</option>
+              <option value="REVERSED">Reversals Only</option>
+            </select>
           </div>
         </div>
       </div>
 
+      {/* Collection Register Table */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50/75 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                <th className="py-3 px-4">Receipt & Date</th>
+                <th className="py-3 px-4">Flat & Resident</th>
+                <th className="py-3 px-4">Purpose / Bill</th>
+                <th className="py-3 px-4">Method & Ref</th>
+                <th className="py-3 px-4 text-right">Amount Paid</th>
+                <th className="py-3 px-4 text-center">Status</th>
+                <th className="py-3 px-4 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {paymentsQuery.isLoading ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                    Loading collection register...
+                  </td>
+                </tr>
+              ) : paginatedPayments.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                    No collection records found matching your filters.
+                  </td>
+                </tr>
+              ) : (
+                paginatedPayments.map((p) => {
+                  const isReversed = p.reversed;
+                  const receiptNo =
+                    p.receiptNumber ||
+                    `REC-${p._id.slice(-6).toUpperCase()}`;
+
+                  return (
+                    <tr
+                      key={p._id}
+                      className={`hover:bg-slate-50/75 transition ${
+                        isReversed ? "bg-rose-50/30 text-slate-400" : ""
+                      }`}
+                    >
+                      {/* Receipt & Date */}
+                      <td className="py-3.5 px-4">
+                        <div className="font-mono font-bold text-slate-900">
+                          {receiptNo}
+                        </div>
+                        <div className="text-[11px] text-slate-400">
+                          {formatDate(p.paidAt)}
+                        </div>
+                      </td>
+
+                      {/* Flat & Resident */}
+                      <td className="py-3.5 px-4">
+                        <div className="font-semibold text-slate-900">
+                          {p.unitName || (p.flatNumber ? `Flat ${p.flatNumber}` : "Unit")}
+                        </div>
+                        <div className="text-[11px] text-slate-500">
+                          {p.residentName || "Resident"}
+                        </div>
+                      </td>
+
+                      {/* Purpose / Bill */}
+                      <td className="py-3.5 px-4">
+                        <div className="font-medium text-slate-800">
+                          {p.billTitle || "Maintenance Fee"}
+                        </div>
+                        {p.billingPeriod && (
+                          <div className="text-[11px] text-slate-400 font-mono">
+                            {p.billingPeriod}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Method & Ref */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-1.5">
+                          {renderMethodBadge(p.paymentMethod, p.source)}
+                        </div>
+                        {p.referenceNo ? (
+                          <div className="mt-1 text-[11px] font-mono text-slate-500 truncate max-w-[140px]" title={p.referenceNo}>
+                            Ref: {p.referenceNo}
+                          </div>
+                        ) : p.description ? (
+                          <div className="mt-0.5 text-[10px] text-slate-400 truncate max-w-[140px]" title={p.description}>
+                            {p.description}
+                          </div>
+                        ) : null}
+                      </td>
+
+                      {/* Amount Paid */}
+                      <td className="py-3.5 px-4 text-right">
+                        <div
+                          className={`font-mono font-bold text-sm ${
+                            isReversed
+                              ? "line-through text-slate-400"
+                              : "text-emerald-700"
+                          }`}
+                        >
+                          {formatCurrency(p.amount)}
+                        </div>
+                      </td>
+
+                      {/* Status */}
+                      <td className="py-3.5 px-4 text-center">
+                        {isReversed ? (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700 border border-rose-200"
+                            title={p.reversalReason || "Payment was reversed"}
+                          >
+                            <AlertTriangle className="h-3 w-3" />
+                            Reversed
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 className="h-3 w-3" />
+                            Settled
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-3.5 px-4 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => setViewingReceiptPayment(p)}
+                            title="View / Print Official Receipt"
+                            className="p-1.5 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition"
+                          >
+                            <Printer className="h-4 w-4" />
+                          </button>
+
+                          {!isReversed && (
+                            <button
+                              onClick={() => {
+                                setReversingPayment(p);
+                                setReversalReason("");
+                              }}
+                              title="Reverse Payment"
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination Toolbar */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-xs">
+            <span className="text-slate-500">
+              Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{" "}
+              {Math.min(currentPage * ITEMS_PER_PAGE, filteredPayments.length)} of{" "}
+              {filteredPayments.length} entries
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 transition"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="font-semibold text-slate-700">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 transition"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Record Payment Modal */}
-      {selectedBill ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">
-                  Record Payment
-                </h2>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  {selectedBill.unitName || `Flat ${selectedBill.flatNumber || ""}`} •{" "}
-                  {selectedBill.residentName || "Resident"}
-                </p>
+      {isRecordModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 overflow-y-auto backdrop-blur-sm">
+          <div className="relative w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-4">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700">
+                  <Plus className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Record Offline / Direct Payment
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Log cash, cheque, or bank transfer collection against an invoice
+                  </p>
+                </div>
               </div>
               <button
-                type="button"
-                onClick={closeRecordPaymentModal}
-                aria-label="Close record payment modal"
-                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100"
+                onClick={() => setIsRecordModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <form onSubmit={handleRecordPayment}>
-              <div className="space-y-4 p-6">
-                {paymentError ? (
-                  <p className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-medium text-red-700">
-                    {paymentError}
-                  </p>
-                ) : null}
-
-                {/* Account Balances Card */}
-                <div className="grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 text-xs">
-                  <div>
-                    <span className="text-slate-400">Total Bill:</span>
-                    <p className="font-semibold text-slate-900">
-                      {formatCurrency(selectedBill.totalAmount, 2)}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-slate-400">Already Paid:</span>
-                    <p className="font-semibold text-emerald-700">
-                      {formatCurrency(selectedBill.paidAmount, 2)}
-                    </p>
-                  </div>
-                  <div className="col-span-2 border-t border-slate-200/80 pt-2 flex items-center justify-between">
-                    <span className="font-medium text-slate-600">Remaining Balance:</span>
-                    <span className="text-sm font-bold text-[#07584F]">
-                      {formatCurrency(selectedBill.balanceAmount, 2)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Amount Input */}
-                <div>
-                  <div className="flex items-center justify-between">
-                    <label
-                      htmlFor="paymentAmount"
-                      className="block text-xs font-semibold uppercase tracking-wider text-slate-700"
-                    >
-                      Payment Amount (₹)
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentAmount(String(selectedBill.balanceAmount))}
-                      className="text-xs font-semibold text-[#07584F] hover:underline"
-                    >
-                      Pay Full (₹{selectedBill.balanceAmount})
-                    </button>
-                  </div>
-                  <input
-                    id="paymentAmount"
-                    type="number"
-                    min="0.01"
-                    max={selectedBill.balanceAmount}
-                    step="0.01"
-                    value={paymentAmount}
-                    onChange={(event) => setPaymentAmount(event.target.value)}
-                    required
-                    className="mt-1.5 w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm font-semibold text-slate-900 outline-none transition focus:border-[#07584F]"
-                  />
-                </div>
-
-                {/* Payment Method Selector */}
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label
-                      htmlFor="paymentMethod"
-                      className="block text-xs font-semibold uppercase tracking-wider text-slate-700"
-                    >
-                      Payment Method
-                    </label>
-                    <select
-                      id="paymentMethod"
-                      value={paymentMethod}
-                      onChange={(e) => setPaymentMethod(e.target.value)}
-                      className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-[#07584F]"
-                    >
-                      {PAYMENT_METHODS.map((method) => (
-                        <option key={method} value={method}>
-                          {method}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Reference No */}
-                  <div>
-                    <label
-                      htmlFor="referenceNo"
-                      className="block text-xs font-semibold uppercase tracking-wider text-slate-700"
-                    >
-                      Reference / UTR No.
-                    </label>
-                    <input
-                      id="referenceNo"
-                      type="text"
-                      value={referenceNo}
-                      onChange={(e) => setReferenceNo(e.target.value)}
-                      placeholder="Optional reference"
-                      className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#07584F]"
-                    />
-                  </div>
-                </div>
-
-                {/* Notes */}
-                <div>
-                  <label
-                    htmlFor="paymentDescription"
-                    className="block text-xs font-semibold uppercase tracking-wider text-slate-700"
-                  >
-                    Notes / Memo (Optional)
-                  </label>
-                  <input
-                    id="paymentDescription"
-                    type="text"
-                    value={paymentDescription}
-                    onChange={(e) => setPaymentDescription(e.target.value)}
-                    placeholder="e.g. Cleared by resident via Google Pay"
-                    className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#07584F]"
-                  />
-                </div>
+            <form onSubmit={handleRecordSubmit} className="p-6 space-y-4 text-xs">
+              {/* Bill Selector */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Select Pending Bill / Invoice *
+                </label>
+                <select
+                  value={recordBillId}
+                  onChange={(e) => handleSelectRecordBill(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-[#07584F] focus:outline-none focus:ring-1 focus:ring-[#07584F]"
+                  required
+                >
+                  <option value="">-- Choose a pending bill --</option>
+                  {unpaidBills.map((b) => (
+                    <option key={b._id} value={b._id}>
+                      {b.unitName || `Flat ${b.flatNumber}`} ({b.residentName}) —{" "}
+                      {b.title || b.billType?.replace(/_/g, " ")} (Due: ₹{b.balanceAmount})
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
+              {/* Amount */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Payment Amount (₹) *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="1"
+                  value={recordAmount}
+                  onChange={(e) => setRecordAmount(e.target.value)}
+                  placeholder="Enter amount"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-mono font-bold focus:border-[#07584F] focus:outline-none focus:ring-1 focus:ring-[#07584F]"
+                  required
+                />
+                {selectedRecordBill && (
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    Outstanding balance:{" "}
+                    <span className="font-semibold text-rose-600">
+                      ₹{selectedRecordBill.balanceAmount}
+                    </span>
+                  </p>
+                )}
+              </div>
+
+              {/* Payment Method */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Payment Method *
+                </label>
+                <select
+                  value={recordMethod}
+                  onChange={(e) => setRecordMethod(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-[#07584F] focus:outline-none focus:ring-1 focus:ring-[#07584F]"
+                >
+                  <option value="UPI">UPI (GooglePay, PhonePe, Paytm)</option>
+                  <option value="Bank Transfer">Bank Transfer (NEFT / RTGS / IMPS)</option>
+                  <option value="Cash">Cash in Hand</option>
+                  <option value="Cheque">Cheque</option>
+                  <option value="Card">Debit / Credit Card</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              {/* Reference Number */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Reference / UTR / Cheque Number
+                </label>
+                <input
+                  type="text"
+                  value={recordRefNo}
+                  onChange={(e) => setRecordRefNo(e.target.value)}
+                  placeholder="e.g. UPI Ref / Bank UTR / Cheque #123456"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-mono focus:border-[#07584F] focus:outline-none focus:ring-1 focus:ring-[#07584F]"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Remarks / Notes
+                </label>
+                <input
+                  type="text"
+                  value={recordDescription}
+                  onChange={(e) => setRecordDescription(e.target.value)}
+                  placeholder="Optional collection note"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-[#07584F] focus:outline-none focus:ring-1 focus:ring-[#07584F]"
+                />
+              </div>
+
+              {/* Modal Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={closeRecordPaymentModal}
-                  className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  onClick={() => setIsRecordModalOpen(false)}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={paymentMutation.isPending}
-                  className="rounded-lg bg-[#07584F] px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-[#064e46] disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={recordMutation.isPending}
+                  className="rounded-xl bg-[#07584F] px-4 py-2 text-xs font-semibold text-white hover:bg-[#064e46] transition disabled:opacity-50"
                 >
-                  {paymentMutation.isPending ? "Recording..." : "Confirm & Save Payment"}
+                  {recordMutation.isPending ? "Recording..." : "Record & Issue Receipt"}
                 </button>
               </div>
             </form>
           </div>
         </div>
-      ) : null}
+      )}
 
-      {/* Receipt Modal */}
-      {receiptModalData ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+      {/* Payment Reversal Modal */}
+      {reversingPayment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 overflow-y-auto backdrop-blur-sm">
+          <div className="relative w-full max-w-md rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-rose-50 px-6 py-4 text-rose-900">
               <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#07584F] text-white">
-                  <Receipt className="h-4 w-4" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900">Payment Receipt</h3>
-                  <p className="text-xs text-slate-500 font-mono">
-                    {receiptModalData.receiptId}
-                  </p>
-                </div>
+                <ShieldAlert className="h-5 w-5 text-rose-600" />
+                <h3 className="text-sm font-bold">Reverse Payment Confirmation</h3>
               </div>
               <button
-                type="button"
-                onClick={() => setReceiptModalData(null)}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                onClick={() => setReversingPayment(null)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="my-6 space-y-4">
-              {/* Receipt Body */}
-              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center">
-                <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
-                  Amount Received
+            <form onSubmit={handleConfirmReversal} className="p-6 space-y-4 text-xs">
+              <div className="rounded-xl bg-amber-50 p-3.5 border border-amber-200 text-amber-900 space-y-1">
+                <p className="font-semibold flex items-center gap-1.5">
+                  <Info className="h-4 w-4 text-amber-600" />
+                  Important Accounting Notice
                 </p>
-                <p className="mt-1 text-3xl font-extrabold text-[#07584F]">
-                  {formatCurrency(receiptModalData.amount, 2)}
+                <p className="text-[11px] text-amber-800">
+                  Reversing will void receipt{" "}
+                  <span className="font-mono font-bold">
+                    {reversingPayment.receiptNumber || reversingPayment._id.slice(-6).toUpperCase()}
+                  </span>
+                  , reduce society total collections by{" "}
+                  <span className="font-bold text-rose-700">
+                    {formatCurrency(reversingPayment.amount)}
+                  </span>
+                  , and restore the outstanding balance on the resident&apos;s invoice.
                 </p>
-                <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
-                  <CheckCircle2 className="h-3 w-3" />
-                  Verified Payment
-                </span>
               </div>
 
-              <div className="space-y-2 text-xs divide-y divide-slate-100">
-                <div className="flex justify-between pt-2">
-                  <span className="text-slate-500">Resident:</span>
-                  <span className="font-semibold text-slate-900">
-                    {receiptModalData.residentName}
-                  </span>
-                </div>
-                <div className="flex justify-between pt-2">
-                  <span className="text-slate-500">Unit / Flat:</span>
-                  <span className="font-semibold text-slate-900">
-                    {receiptModalData.unitName}
-                  </span>
-                </div>
-                <div className="flex justify-between pt-2">
-                  <span className="text-slate-500">Payment Date:</span>
-                  <span className="font-semibold text-slate-900">
-                    {formatDate(receiptModalData.paidAt)}
-                  </span>
-                </div>
-                <div className="flex justify-between pt-2">
-                  <span className="text-slate-500">Payment Method:</span>
-                  <span className="font-semibold text-slate-900">
-                    {receiptModalData.paymentMethod}
-                  </span>
-                </div>
-                {receiptModalData.referenceNo ? (
-                  <div className="flex justify-between pt-2">
-                    <span className="text-slate-500">Reference No:</span>
-                    <span className="font-mono font-semibold text-slate-900">
-                      {receiptModalData.referenceNo}
-                    </span>
-                  </div>
-                ) : null}
-                <div className="flex justify-between pt-2">
-                  <span className="text-slate-500">Remaining Balance:</span>
-                  <span className="font-semibold text-slate-900">
-                    {formatCurrency(receiptModalData.balanceRemaining, 2)}
-                  </span>
-                </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Reason for Reversal *
+                </label>
+                <textarea
+                  value={reversalReason}
+                  onChange={(e) => setReversalReason(e.target.value)}
+                  placeholder="e.g. Wrong flat selected / Bounced cheque / Duplicate entry..."
+                  rows={3}
+                  required
+                  className="w-full rounded-xl border border-slate-200 p-3 text-xs focus:border-rose-600 focus:outline-none focus:ring-1 focus:ring-rose-600"
+                />
               </div>
-            </div>
 
-            <div className="flex gap-2.5 border-t border-slate-100 pt-4">
-              <button
-                type="button"
-                onClick={handlePrintReceipt}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                <Printer className="h-4 w-4" />
-                Print / Save PDF
-              </button>
-              <button
-                type="button"
-                onClick={() => setReceiptModalData(null)}
-                className="flex-1 rounded-lg bg-[#07584F] py-2.5 text-xs font-semibold text-white hover:bg-[#064e46]"
-              >
-                Done
-              </button>
-            </div>
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setReversingPayment(null)}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={reverseMutation.isPending}
+                  className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 transition disabled:opacity-50"
+                >
+                  {reverseMutation.isPending ? "Reversing..." : "Confirm Reversal"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-      ) : null}
+      )}
 
-      {/* Bill Details Modal */}
-      {detailBill ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
-                  <Info className="h-4 w-4" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900">Bill Breakdown</h3>
-                  <p className="text-xs text-slate-500 font-mono">
-                    #{detailBill._id.slice(-6).toUpperCase()}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDetailBill(null)}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="my-5 space-y-3 text-xs">
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Resident:</span>
-                <span className="font-semibold text-slate-900">
-                  {detailBill.residentName || "Resident"}
-                </span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Unit / Flat:</span>
-                <span className="font-semibold text-slate-900">
-                  {detailBill.unitName || (detailBill.flatNumber ? `Flat ${detailBill.flatNumber}` : "Unit")}
-                </span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Base Amount:</span>
-                <span className="font-semibold text-slate-900">
-                  {formatCurrency(detailBill.baseAmount, 2)}
-                </span>
-              </div>
-              {detailBill.additionalCharges?.length ? (
-                <div className="py-1 border-b border-slate-100">
-                  <span className="text-slate-500 block mb-1">Additional Charges:</span>
-                  {detailBill.additionalCharges.map((c, i) => (
-                    <div key={i} className="flex justify-between text-[11px] text-slate-600 pl-2">
-                      <span>• {c.title}</span>
-                      <span>{formatCurrency(c.amount, 2)}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Late Fee:</span>
-                <span className="font-semibold text-slate-900">
-                  {formatCurrency(detailBill.lateFeeAmount, 2)}
-                </span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Total Amount:</span>
-                <span className="font-bold text-slate-900">
-                  {formatCurrency(detailBill.totalAmount, 2)}
-                </span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Paid Amount:</span>
-                <span className="font-bold text-emerald-700">
-                  {formatCurrency(detailBill.paidAmount, 2)}
-                </span>
-              </div>
-              <div className="flex justify-between py-1.5 border-t border-slate-200">
-                <span className="font-semibold text-slate-700">Remaining Balance:</span>
-                <span className="text-sm font-bold text-[#07584F]">
-                  {formatCurrency(detailBill.balanceAmount, 2)}
-                </span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-500">Due Date:</span>
-                <span className="font-semibold text-slate-900">
-                  {formatDate(detailBill.dueDate)}
-                </span>
-              </div>
-            </div>
-
-            <div className="border-t border-slate-100 pt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setDetailBill(null)}
-                className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-    </>
+      {/* Official Transaction Receipt Modal */}
+      <TransactionReceiptModal
+        isOpen={Boolean(viewingReceiptPayment)}
+        onClose={() => setViewingReceiptPayment(null)}
+        payment={viewingReceiptPayment}
+      />
+    </div>
   );
 }

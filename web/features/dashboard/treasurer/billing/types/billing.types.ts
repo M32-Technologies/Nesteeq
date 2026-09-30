@@ -30,12 +30,15 @@ export interface ResidentBillItem {
   apartmentId: string;
   unitId: string;
   residentId: string;
-  commonBillId?: string;
+  commonBillId?: string | null;
+  isCommonBill?: boolean;
+  billScope?: "COMMON" | "SEPARATE";
   title?: string;
   billType?:
     | "MONTHLY_MAINTENANCE"
     | "WATER"
     | "COMMON_ELECTRICITY"
+    | "LIFT_MAINTENANCE"
     | "LIFT_AMC"
     | "SPECIAL_REPAIR"
     | "PARKING_MAINTENANCE"

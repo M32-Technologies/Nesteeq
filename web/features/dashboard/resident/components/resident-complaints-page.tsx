@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   Wrench,
   Plus,
@@ -97,6 +97,15 @@ export function ResidentComplaintsPage() {
   const [activeTab, setActiveTab] = useState<"ALL" | "IN_PROGRESS" | "RESOLVED">("ALL");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("create") === "true" || params.get("action") === "create") {
+        setIsCreateModalOpen(true);
+      }
+    }
+  }, []);
 
   const { data: complaintsData, isLoading, isFetching, refetch } = useQuery({
     queryKey: ["resident", "complaints"],

@@ -47,6 +47,7 @@ export interface Bill {
   paidAmount: number;
   balanceAmount: number;
   dueDate: string;
+  settledAt?: string | null;
   status: BillStatus;
   createdBy?: string;
   createdAt?: string;
@@ -108,12 +109,18 @@ export interface BillRecipient {
   residentName: string;
   hasResident: boolean;
   residentType: string | null;
+  blockId?: string | null;
+  blockName?: string | null;
 }
 
 export interface CreateBillPayload {
   apartmentId?: string;
   residentId?: string;
   unitId: string;
+  title?: string;
+  billType?: string;
+  billingPeriod?: string | null;
+  description?: string | null;
   baseAmount: number;
   additionalCharges?: AdditionalCharge[];
   lateFeePerDay?: number;
@@ -144,6 +151,9 @@ export interface Payment {
   unitId: string;
   amount: number;
   source: PaymentSource;
+  paymentMethod?: string;
+  referenceNo?: string;
+  receiptNumber?: string;
   description?: string;
   recordedBy?: string;
   paidAt: string;
@@ -151,6 +161,15 @@ export interface Payment {
   unitName?: string;
   flatNumber?: string;
   residentName?: string;
+  billTitle?: string;
+  billType?: string;
+  billTotalAmount?: number;
+  billBalanceAmount?: number;
+  billingPeriod?: string;
+  reversed?: boolean;
+  reversedAt?: string;
+  reversedBy?: string;
+  reversalReason?: string;
 }
 
 export interface FinanceSummary {
@@ -201,6 +220,7 @@ export interface ExpenseSummary {
   approvedExpenses: number;
   pendingExpenses: number;
   pendingCount: number;
+  totalCount?: number;
 }
 
 export interface CreateExpensePayload {
@@ -421,12 +441,21 @@ export const recordBillPayment = (
     },
   );
 
-export const waiveLateFee = (billId: string, amount: number) =>
+export const waiveLateFee = (billId: string, amount: number, reason?: string) =>
   request<Bill>(
     `/api/bills/${encodeURIComponent(billId)}/waive-late-fee`,
     {
       method: "PATCH",
-      body: JSON.stringify({ amount }),
+      body: JSON.stringify({ amount, reason }),
+    },
+  );
+
+export const deleteBill = (billId: string, reason?: string) =>
+  request<{ success: boolean; message: string }>(
+    `/api/bills/${encodeURIComponent(billId)}`,
+    {
+      method: "DELETE",
+      body: JSON.stringify({ reason }),
     },
   );
 
@@ -436,9 +465,23 @@ export const getPayments = (
     billId?: string;
     residentId?: string;
     source?: PaymentSource;
+    paymentMethod?: string;
+    startDate?: string;
+    endDate?: string;
+    search?: string;
+    includeReversed?: boolean;
     limit?: number;
   } = {},
 ) => request<Payment[]>(`/api/payments${toQuery(params)}`);
+
+export const reversePayment = (paymentId: string, reason: string) =>
+  request<{ success: boolean; message: string; data: Payment }>(
+    `/api/payments/${encodeURIComponent(paymentId)}/reverse`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    },
+  );
 
 export const getFinanceSummary = () =>
   request<FinanceSummary>("/api/finance/summary");
@@ -548,7 +591,7 @@ export const getMaintenancePayouts = () =>
 
 export const processMaintenancePayout = (
   jobId: string,
-  payload: { paymentMethod?: string; notes?: string } = {}
+  payload: { paymentMethod?: string; paymentReference?: string; notes?: string } = {}
 ) =>
   request<Expense>(
     `/api/treasurer/maintenance-payouts/${encodeURIComponent(jobId)}/process`,

@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { X } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 
 import { getBillRecipients } from "../services/billing.service";
 import type {
@@ -34,17 +34,39 @@ export default function CreateBillModal({
   const [residentId, setResidentId] = useState("");
   const [residentName, setResidentName] = useState("");
   const [unitId, setUnitId] = useState("");
+  const [billType, setBillType] = useState("MONTHLY_MAINTENANCE");
+  const [title, setTitle] = useState("");
+  const [billingPeriod, setBillingPeriod] = useState("");
+  const [description, setDescription] = useState("");
   const [baseAmount, setBaseAmount] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [lateFeePerDay, setLateFeePerDay] = useState("0");
-  const [additionalChargeTitle, setAdditionalChargeTitle] =
-    useState("");
-  const [additionalChargeAmount, setAdditionalChargeAmount] =
-    useState("");
-  const [additionalChargeReason, setAdditionalChargeReason] =
-    useState("");
+  const [additionalCharges, setAdditionalCharges] = useState<
+    { title: string; amount: string; reason: string }[]
+  >([]);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const addAdditionalCharge = () => {
+    setAdditionalCharges((prev) => [
+      ...prev,
+      { title: "", amount: "", reason: "" },
+    ]);
+  };
+
+  const updateAdditionalCharge = (
+    index: number,
+    field: "title" | "amount" | "reason",
+    value: string
+  ) => {
+    setAdditionalCharges((prev) =>
+      prev.map((c, i) => (i === index ? { ...c, [field]: value } : c))
+    );
+  };
+
+  const removeAdditionalCharge = (index: number) => {
+    setAdditionalCharges((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const recipientsQuery = useQuery<BillRecipient[]>({
     queryKey: ["bill-recipients"],
@@ -63,12 +85,14 @@ export default function CreateBillModal({
     setResidentId("");
     setResidentName("");
     setUnitId("");
+    setBillType("MONTHLY_MAINTENANCE");
+    setTitle("");
+    setBillingPeriod("");
+    setDescription("");
     setBaseAmount("");
     setDueDate("");
     setLateFeePerDay("0");
-    setAdditionalChargeTitle("");
-    setAdditionalChargeAmount("");
-    setAdditionalChargeReason("");
+    setAdditionalCharges([]);
     setError("");
     setIsSubmitting(false);
   };
@@ -84,21 +108,11 @@ export default function CreateBillModal({
     event.preventDefault();
 
     const trimmedUnitId = unitId.trim();
-    const trimmedChargeTitle = additionalChargeTitle.trim();
-    const trimmedChargeReason = additionalChargeReason.trim();
     const parsedBaseAmount = Number(baseAmount);
     const parsedLateFeePerDay = Number(lateFeePerDay || "0");
-    const parsedChargeAmount = Number(
-      additionalChargeAmount || "0",
-    );
 
     if (!trimmedUnitId) {
       setError("Please select a Unit / Flat.");
-      return;
-    }
-
-    if (!residentId && (!selectedRecipient || !selectedRecipient.hasResident)) {
-      setError("The selected unit has no active resident assigned.");
       return;
     }
 
@@ -123,36 +137,38 @@ export default function CreateBillModal({
       return;
     }
 
-    if (
-      additionalChargeAmount &&
-      (!Number.isFinite(parsedChargeAmount) ||
-        parsedChargeAmount < 0)
-    ) {
-      setError("Additional charge amount must be 0 or greater.");
-      return;
+    const validAdditionalCharges: { title: string; amount: number; reason?: string }[] = [];
+    for (const [idx, charge] of additionalCharges.entries()) {
+      const chargeTitle = charge.title.trim();
+      const chargeAmount = Number(charge.amount);
+      if (!chargeTitle && !charge.amount) continue;
+      if (!chargeTitle) {
+        setError(`Additional charge #${idx + 1} needs a title.`);
+        return;
+      }
+      if (!Number.isFinite(chargeAmount) || chargeAmount < 0) {
+        setError(`Additional charge "${chargeTitle}" amount must be 0 or greater.`);
+        return;
+      }
+      validAdditionalCharges.push({
+        title: chargeTitle,
+        amount: chargeAmount,
+        ...(charge.reason.trim() ? { reason: charge.reason.trim() } : {}),
+      });
     }
 
     const payload: CreateBillPayload = {
       unitId: trimmedUnitId,
       ...(residentId ? { residentId } : {}),
+      title: title.trim() || undefined,
+      billType,
+      billingPeriod: billingPeriod.trim() || undefined,
+      description: description.trim() || undefined,
       baseAmount: parsedBaseAmount,
       dueDate,
       lateFeePerDay: parsedLateFeePerDay,
+      ...(validAdditionalCharges.length > 0 ? { additionalCharges: validAdditionalCharges } : {}),
     };
-
-    if (trimmedChargeTitle) {
-      payload.additionalCharges = [
-        {
-          title: trimmedChargeTitle,
-          amount: parsedChargeAmount,
-          ...(trimmedChargeReason
-            ? {
-                reason: trimmedChargeReason,
-              }
-            : {}),
-        },
-      ];
-    }
 
     setIsSubmitting(true);
     setError("");
@@ -239,12 +255,11 @@ export default function CreateBillModal({
                   <option
                     key={recipient.unitId}
                     value={recipient.unitId}
-                    disabled={!recipient.hasResident}
                   >
                     {recipient.unitName}{" "}
                     {recipient.hasResident
                       ? `— ${recipient.residentName} (${recipient.residentType || "Resident"})`
-                      : "(Vacant - No Resident)"}
+                      : "— Vacant / No Resident"}
                   </option>
                 ))}
               </select>
@@ -281,6 +296,99 @@ export default function CreateBillModal({
                   </span>
                 ) : null}
               </div>
+            </div>
+
+            <div>
+              <label
+                htmlFor="billType"
+                className="mb-2 block text-sm font-medium text-slate-700"
+              >
+                Bill Category
+              </label>
+
+              <select
+                id="billType"
+                value={billType}
+                onChange={(e) => {
+                  setBillType(e.target.value);
+                  if (!title) {
+                    const labels: Record<string, string> = {
+                      MONTHLY_MAINTENANCE: "Monthly Maintenance",
+                      WATER: "Water Bill",
+                      COMMON_ELECTRICITY: "Common Electricity",
+                      LIFT_MAINTENANCE: "Lift Maintenance AMC",
+                      SPECIAL_REPAIR: "Special Repair Charge",
+                      PARKING_MAINTENANCE: "Parking Maintenance",
+                      OTHER: "Individual Fee",
+                    };
+                    setTitle(labels[e.target.value] || "Maintenance Bill");
+                  }
+                }}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+              >
+                <option value="MONTHLY_MAINTENANCE">Monthly Maintenance</option>
+                <option value="WATER">Water Supply</option>
+                <option value="COMMON_ELECTRICITY">Electricity</option>
+                <option value="LIFT_MAINTENANCE">Lift Maintenance AMC</option>
+                <option value="SPECIAL_REPAIR">Special Repair / Repair Fine</option>
+                <option value="PARKING_MAINTENANCE">Parking Maintenance</option>
+                <option value="OTHER">Custom / Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label
+                htmlFor="title"
+                className="mb-2 block text-sm font-medium text-slate-700"
+              >
+                Bill Title (Optional)
+              </label>
+
+              <input
+                id="title"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. October Maintenance or Balcony Repair"
+                className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="billingPeriod"
+                className="mb-2 block text-sm font-medium text-slate-700"
+              >
+                Billing Period (YYYY-MM)
+              </label>
+
+              <input
+                id="billingPeriod"
+                type="text"
+                pattern="^\d{4}-(0[1-9]|1[0-2])$"
+                value={billingPeriod}
+                onChange={(e) => setBillingPeriod(e.target.value)}
+                placeholder="e.g. 2026-09"
+                className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label
+                htmlFor="description"
+                className="mb-2 block text-sm font-medium text-slate-700"
+              >
+                Description / Notes for Resident (Optional)
+              </label>
+
+              <textarea
+                id="description"
+                rows={2}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Enter notes or breakdown details for this separate invoice..."
+                className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 resize-none"
+              />
             </div>
 
             <div>
@@ -347,75 +455,73 @@ export default function CreateBillModal({
             </div>
 
             <div className="border-t border-slate-200 pt-5 sm:col-span-2">
-              <h3 className="text-sm font-semibold text-slate-900">
-                Additional Charge
-              </h3>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Additional Charges (Optional)
+                  </h3>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Add extra items like Sinking Fund, Parking, Festival cess, etc.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={addAdditionalCharge}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 hover:border-slate-300"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Charge
+                </button>
+              </div>
 
-              <p className="mt-1 text-xs text-slate-500">
-                Leave the title empty to skip this optional charge.
-              </p>
-            </div>
-
-            <div>
-              <label
-                htmlFor="additionalChargeTitle"
-                className="mb-2 block text-sm font-medium text-slate-700"
-              >
-                Charge Title
-              </label>
-
-              <input
-                id="additionalChargeTitle"
-                type="text"
-                value={additionalChargeTitle}
-                onChange={(event) =>
-                  setAdditionalChargeTitle(event.target.value)
-                }
-                placeholder="Parking fee"
-                className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="additionalChargeAmount"
-                className="mb-2 block text-sm font-medium text-slate-700"
-              >
-                Charge Amount
-              </label>
-
-              <input
-                id="additionalChargeAmount"
-                type="number"
-                min="0"
-                step="0.01"
-                value={additionalChargeAmount}
-                onChange={(event) =>
-                  setAdditionalChargeAmount(event.target.value)
-                }
-                placeholder="0"
-                className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400"
-              />
-            </div>
-
-            <div className="sm:col-span-2">
-              <label
-                htmlFor="additionalChargeReason"
-                className="mb-2 block text-sm font-medium text-slate-700"
-              >
-                Charge Reason
-              </label>
-
-              <input
-                id="additionalChargeReason"
-                type="text"
-                value={additionalChargeReason}
-                onChange={(event) =>
-                  setAdditionalChargeReason(event.target.value)
-                }
-                placeholder="Optional reason"
-                className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400"
-              />
+              {additionalCharges.length > 0 && (
+                <div className="mt-3 space-y-2.5">
+                  {additionalCharges.map((charge, index) => (
+                    <div
+                      key={index}
+                      className="flex flex-col gap-2 rounded-lg border border-slate-100 bg-slate-50/70 p-3 sm:flex-row sm:items-center"
+                    >
+                      <input
+                        type="text"
+                        placeholder="Charge Title (e.g. Sinking Fund)"
+                        value={charge.title}
+                        onChange={(e) =>
+                          updateAdditionalCharge(index, "title", e.target.value)
+                        }
+                        className="flex-1 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="Amount (₹)"
+                        value={charge.amount}
+                        onChange={(e) =>
+                          updateAdditionalCharge(index, "amount", e.target.value)
+                        }
+                        className="w-full sm:w-28 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Reason / Note (optional)"
+                        value={charge.reason}
+                        onChange={(e) =>
+                          updateAdditionalCharge(index, "reason", e.target.value)
+                        }
+                        className="flex-1 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeAdditionalCharge(index)}
+                        className="self-end sm:self-center p-1.5 text-slate-400 hover:text-rose-600 rounded-md transition"
+                        title="Remove Charge"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

@@ -40,9 +40,7 @@ import { useFinanceSummaryQuery } from "@/features/dashboard/manager/payment-his
 import { useAnnouncementsQuery } from "@/features/announcements/hooks/use-announcements-query"
 
 export default function ManagerOverviewPage() {
-  // Live API Queries (strictly 100% dynamic, zero dummy data)
-  const { data: apartment, isLoading: isApartmentLoading } =
-    useCurrentPropertyApartmentQuery()
+  const { data: apartment, isLoading: isApartmentLoading } = useCurrentPropertyApartmentQuery()
   const { data: propertyStats, isLoading: isPropertyStatsLoading } =
     usePropertyStatsQuery()
   const { data: blocks = [], isLoading: isBlocksLoading } =
@@ -68,29 +66,22 @@ export default function ManagerOverviewPage() {
   const totalUnits = propertyStats?.totalFlats ?? apartment?.totalUnits ?? 0
   const occupiedUnits = propertyStats?.occupiedFlats ?? 0
   const vacantUnits = propertyStats?.vacantFlats ?? 0
-  const occupancyRate =
-    totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0
+  const occupancyRate = totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0
 
-  const activeVisitorsCount =
-    activeVisitorsData?.pagination?.total ?? 0
-  const todayVisitorsCount =
-    visitorRecordsData?.pagination?.total ?? 0
+  const activeVisitorsCount = activeVisitorsData?.pagination?.total ?? 0
+  const todayVisitorsCount = visitorRecordsData?.pagination?.total ?? 0
 
   const waitingDeliveries = deliveryAnalytics?.summary?.waiting ?? 0
   const todayDeliveries = deliveryAnalytics?.summary?.total ?? 0
 
   const parkingTotal = parkingStats?.total ?? 0
   const parkingAvailable = parkingStats?.available ?? 0
-  const parkingOccupied =
-    (parkingStats?.occupied ?? 0) + (parkingStats?.assigned ?? 0)
-  const parkingRate =
-    parkingTotal > 0 ? Math.round((parkingOccupied / parkingTotal) * 100) : 0
-
+  const parkingOccupied = (parkingStats?.occupied ?? 0) + (parkingStats?.assigned ?? 0)
+  const parkingRate = parkingTotal > 0 ? Math.round((parkingOccupied / parkingTotal) * 100) : 0
   const totalCollected = financeSummary?.totalCollection ?? 0
   const pendingDues = financeSummary?.totalOutstanding ?? 0
   const totalBilled = totalCollected + pendingDues
-  const collectionRate =
-    totalBilled > 0 ? Math.round((totalCollected / totalBilled) * 100) : 0
+  const collectionRate = totalBilled > 0 ? Math.round((totalCollected / totalBilled) * 100) : 0
 
   const recentVisitors = useMemo(() => {
     return visitorRecordsData?.records ?? []
@@ -117,10 +108,6 @@ export default function ManagerOverviewPage() {
                 {apartment?.name || "Property Overview"}
               </h1>
             )}
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-[#0F5F45] ring-1 ring-[#0F5F45]/20">
-              <span className="size-1.5 rounded-full bg-[#10B981] animate-pulse" />
-              Live Operations
-            </span>
           </div>
           <p className="mt-1 text-sm text-slate-500">
             Real-time management console for unit occupancy, gate security, deliveries, and community services.

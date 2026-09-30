@@ -12,10 +12,16 @@ export interface IPayment {
   unitId: Types.ObjectId;
   amount: number;
   source: PaymentSource;
+  paymentMethod?: string;
+  referenceNo?: string;
   receiptNumber?: string;
   description?: string;
   recordedBy?: string;
   paidAt: Date;
+  reversed?: boolean;
+  reversedAt?: Date;
+  reversedBy?: string;
+  reversalReason?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }

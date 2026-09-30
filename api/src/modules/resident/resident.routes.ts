@@ -13,6 +13,7 @@ import {
   createResidentGuestPassHandler,
   getResidentGuestPassesHandler,
   cancelResidentGuestPassHandler,
+  markVisitorDepartedHandler,
   getCurrentResidentProfileHandler,
   getResidentDashboardFeedHandler,
 } from "./resident.controller.js";
@@ -36,6 +37,7 @@ router.delete("/vehicles/:vehicleId", protect, requireRole("resident", "owner", 
 router.post("/passes", protect, requireRole("resident", "owner", "tenant", "property_manager"), zodValidate(createResidentGuestPassSchema), createResidentGuestPassHandler);
 router.get("/passes", protect, requireRole("resident", "owner", "tenant", "property_manager"), zodValidate(listResidentGuestPassesQuerySchema), getResidentGuestPassesHandler);
 router.patch("/passes/:passId/cancel", protect, requireRole("resident", "owner", "tenant", "property_manager"), zodValidate(residentGuestPassParamsSchema), cancelResidentGuestPassHandler);
+router.patch("/passes/:passId/depart-flat", protect, requireRole("resident", "owner", "tenant", "property_manager"), zodValidate(residentGuestPassParamsSchema), markVisitorDepartedHandler);
 
 router.get("/", protect, requireRole("property_manager"), zodValidate(residentListQuerySchema), getResidentHandler);
 

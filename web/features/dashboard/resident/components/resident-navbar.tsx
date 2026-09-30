@@ -20,6 +20,7 @@ import {
   Home,
 } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
+import { NotificationDropdown } from "@/features/notifications";
 import { useResidentDashboard } from "../hooks/use-resident-dashboard";
 import { ResidentSearch } from "./resident-search";
 
@@ -60,42 +61,42 @@ export function ResidentNavbar({ user }: ResidentNavbarProps) {
     icon: React.ComponentType<{ className?: string }>;
     badge?: string;
   }> = [
-    {
-      label: "Dashboard",
-      href: "/resident",
-      icon: LayoutDashboard,
-    },
-    {
-      label: "Visitors & Passes",
-      href: "/resident/visitors",
-      icon: QrCode,
-    },
-    {
-      label: "Complaints & Service",
-      href: "/resident/complaints",
-      icon: Wrench,
-    },
-    {
-      label: "Bills & Society Finance",
-      href: "/resident/bills",
-      icon: ReceiptText,
-    },
-    {
-      label: "My Parking",
-      href: "/resident/parking",
-      icon: Car,
-    },
-    {
-      label: "Announcements",
-      href: "/resident/announcements",
-      icon: Bell,
-    },
-    {
-      label: "Emergency SOS",
-      href: "/resident/alerts",
-      icon: ShieldAlert,
-    },
-  ];
+      {
+        label: "Dashboard",
+        href: "/resident",
+        icon: LayoutDashboard,
+      },
+      {
+        label: "Visitors & Passes",
+        href: "/resident/visitors",
+        icon: QrCode,
+      },
+      {
+        label: "Complaints & Service",
+        href: "/resident/complaints",
+        icon: Wrench,
+      },
+      {
+        label: "Bills & Society Finance",
+        href: "/resident/bills",
+        icon: ReceiptText,
+      },
+      {
+        label: "My Parking",
+        href: "/resident/parking",
+        icon: Car,
+      },
+      {
+        label: "Announcements",
+        href: "/resident/announcements",
+        icon: Bell,
+      },
+      {
+        label: "Emergency SOS",
+        href: "/resident/alerts",
+        icon: ShieldAlert,
+      },
+    ];
 
   const isTabActive = (href: string) => {
     if (href === "/resident") {
@@ -161,15 +162,35 @@ export function ResidentNavbar({ user }: ResidentNavbarProps) {
               <Search className="size-4" />
             </button>
 
-            {/* Notifications Bell */}
-            <Link
-              href="/resident/announcements"
-              title="Notices & Broadcasts"
-              className="relative flex size-9 items-center justify-center rounded-lg border border-[#DDE3DF] bg-white text-[#637083] hover:bg-[#F7F8F5] hover:text-[#111111] transition-colors"
-            >
-              <Bell className="size-4" />
-              <span className="absolute right-2 top-2 size-2 rounded-full bg-red-500 ring-2 ring-white" />
-            </Link>
+            {/* Notifications Bell (Opens Notification Drawer Modal) */}
+            <NotificationDropdown>
+              {({ unreadCount }) => (
+                <button
+                  type="button"
+                  title={
+                    unreadCount > 0
+                      ? `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}`
+                      : "Notifications"
+                  }
+                  aria-label={
+                    unreadCount > 0
+                      ? `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}`
+                      : "Notifications"
+                  }
+                  className="group relative flex size-9 items-center justify-center rounded-lg border border-[#DDE3DF] bg-white text-[#475467] hover:border-[#07584F]/40 hover:bg-[#F7F8F5] hover:text-[#07584F] transition-all cursor-pointer shadow-2xs"
+                >
+                  <Bell className="size-4.5 transition-transform duration-200 group-hover:rotate-12" />
+                  {unreadCount > 0 && (
+                    <span
+                      className="absolute -top-1.5 -right-1.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white shadow-xs ring-2 ring-white animate-in zoom-in-75"
+                      aria-hidden="true"
+                    >
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  )}
+                </button>
+              )}
+            </NotificationDropdown>
 
             {/* Profile Dropdown */}
             <div className="relative">
@@ -264,21 +285,19 @@ export function ResidentNavbar({ user }: ResidentNavbarProps) {
                 <Link
                   key={tab.href}
                   href={tab.href}
-                  className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs sm:text-sm font-medium tracking-tight whitespace-nowrap transition-colors cursor-pointer ${
-                    active
+                  className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs sm:text-sm font-medium tracking-tight whitespace-nowrap transition-colors cursor-pointer ${active
                       ? "bg-[#07584F] text-white shadow-xs font-semibold"
                       : "text-[#637083] hover:bg-slate-100/80 hover:text-[#111111]"
-                  }`}
+                    }`}
                 >
                   <Icon className="size-4 shrink-0" />
                   <span>{tab.label}</span>
                   {tab.badge && (
                     <span
-                      className={`ml-1 rounded px-1.5 py-0.2 text-[10px] font-bold uppercase tracking-wider ${
-                        active
+                      className={`ml-1 rounded px-1.5 py-0.2 text-[10px] font-bold uppercase tracking-wider ${active
                           ? "bg-white/20 text-white"
                           : "bg-emerald-100 text-emerald-800"
-                      }`}
+                        }`}
                     >
                       {tab.badge}
                     </span>

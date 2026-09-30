@@ -1,7 +1,7 @@
 import { Router, type Request, type RequestHandler } from "express";
 
-import { getPayments } from "./payment.controller.js";
-import { getPaymentsSchema } from "./payment.schema.js";
+import { getPayments, reversePayment } from "./payment.controller.js";
+import { getPaymentsSchema, reversePaymentSchema } from "./payment.schema.js";
 import { zodValidate } from "../../middlewares/zodValidate.js";
 import {
   ensureApartmentAccess,
@@ -46,8 +46,9 @@ const requireQueryApartmentAccess: RequestHandler = (
   next();
 };
 
-router.use(protect, requireRole("treasurer" , "property_manager"));
+router.use(protect, requireRole("treasurer", "property_manager"));
 
 router.get("/", zodValidate(getPaymentsSchema), requireQueryApartmentAccess, getPayments);
+router.post("/:id/reverse", zodValidate(reversePaymentSchema), reversePayment);
 
 export default router;

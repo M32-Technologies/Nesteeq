@@ -40,6 +40,7 @@ const billingSchema = new Schema<IBilling>(
 
     residentId: {
       type: Schema.Types.ObjectId,
+      ref: "Resident",
       required: true,
       index: true,
     },

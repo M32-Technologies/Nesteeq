@@ -174,6 +174,9 @@ export interface IVisitorVisit {
   checkedOutBy?: string | null
   checkedOutAt?: Date | null
 
+  departedFromFlatAt?: Date | null
+  departedFromFlatBy?: string | null
+
   status: VisitorVisitStatus
 
   createdAt?: Date
@@ -265,6 +268,17 @@ const visitorVisitSchema = new Schema<IVisitorVisit>(
 
     checkedOutAt: {
       type: Date,
+      default: null,
+    },
+
+    departedFromFlatAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+
+    departedFromFlatBy: {
+      type: String,
       default: null,
     },
 

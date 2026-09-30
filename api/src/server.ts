@@ -1,8 +1,14 @@
 import "dotenv/config";
 
+import http from "node:http";
+
 import { connectDB } from "./config/db.js";
 import { connectAuthDB } from "./config/auth-db.js";
 import { env } from "./config/env.js";
+import "./config/redis.js";
+import { initSocket } from "./socket/socket.js";
+import "./infrastructure/workers/notification.worker.js";
+
 
 const startServer = async (): Promise<void> => {
     try {
@@ -11,7 +17,10 @@ const startServer = async (): Promise<void> => {
 
         const { default: app } = await import("./app.js");
 
-        app.listen(env.port, () => {
+        const server = http.createServer(app);
+        initSocket(server);
+
+        server.listen(env.port, () => {
             console.log(`Server running on port ${env.port}`);
         });
     } catch (error: unknown) {

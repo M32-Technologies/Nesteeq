@@ -4,6 +4,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Bell, Menu, ShieldAlert, UserRound } from "lucide-react"
+import { NotificationDropdown } from "@/features/notifications"
 
 import {
   dashboardRoleLabels,
@@ -169,31 +170,7 @@ export default function DashboardNavbar({
         )}
 
         {/* Notification bell */}
-        <button
-          type="button"
-          aria-label="Notifications"
-          className="
-            relative
-            flex
-            size-9
-            cursor-pointer
-            items-center
-            justify-center
-            rounded-lg
-            text-[#475569]
-            transition-colors
-            duration-150
-            hover:bg-[#F1F5F9]
-            hover:text-[#0F172A]
-          "
-        >
-          <Bell className="size-[18px]" />
-          {/* notification dot */}
-          <span
-            className="absolute right-[9px] top-[9px] size-[7px] rounded-full bg-red-500 ring-[1.5px] ring-white"
-            aria-hidden="true"
-          />
-        </button>
+        <NotificationDropdown />
 
         {/* Divider */}
         <div className="hidden h-7 w-px bg-[#E2E8F0] sm:block" />
