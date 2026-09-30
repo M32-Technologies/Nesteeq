@@ -356,17 +356,19 @@ export function NotificationDrawer({
         onClick={() => setOpen(true)}
         aria-label={
           unreadCount > 0
-            ? `${unreadCount} unread notifications`
+            ? `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}`
             : "Notifications"
         }
-        className="relative flex size-9 cursor-pointer items-center justify-center rounded-xl border border-slate-200/80 bg-white text-slate-600 transition-all hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#07584F]/30"
+        className="group relative flex size-9.5 cursor-pointer items-center justify-center rounded-xl border border-slate-200/80 bg-white text-slate-600 transition-all hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#07584F]/30 shadow-2xs"
       >
-        <Bell className="size-4" />
+        <Bell className="size-4.5 transition-transform duration-200 group-hover:rotate-12" />
         {unreadCount > 0 && (
           <span
-            className="absolute right-2 top-2 size-2 rounded-full bg-rose-500 ring-2 ring-white"
+            className="absolute -top-1.5 -right-1.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white shadow-xs ring-2 ring-white animate-in zoom-in-75"
             aria-hidden="true"
-          />
+          >
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
         )}
       </button>
     );

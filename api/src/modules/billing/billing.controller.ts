@@ -193,7 +193,7 @@ export const getMyResidentBills = catchAsync(
   async (req: Request, res: Response) => {
     const user = {
       id: req.user!.id,
-      role: req.user!.role,
+      role: req.user!.role ?? "RESIDENT",
       apartmentId: req.user!.apartmentId ?? null,
       flatId: req.user!.flatId ?? null,
     };
@@ -212,7 +212,7 @@ export const payResidentBill = catchAsync(
     const user = {
       id: req.user!.id,
       name: req.user!.name,
-      role: req.user!.role,
+      role: req.user!.role ?? "RESIDENT",
       apartmentId: req.user!.apartmentId ?? null,
       flatId: req.user!.flatId ?? null,
     };

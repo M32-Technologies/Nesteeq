@@ -3,7 +3,12 @@ export type NotificationSeverity =
   | "warning"
   | "error"
   | "critical"
-  | "success";
+  | "success"
+  | "INFO"
+  | "WARNING"
+  | "ERROR"
+  | "CRITICAL"
+  | "SUCCESS";
 
 export interface NotificationItem {
   _id: string;

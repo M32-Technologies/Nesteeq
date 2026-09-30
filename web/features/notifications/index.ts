@@ -20,3 +20,4 @@ export {
 } from "./components/notification-item";
 export * from "./components/notification-skeleton";
 export * from "./components/notification-socket-listener";
+export * from "./components/emergency-alert-modal";
