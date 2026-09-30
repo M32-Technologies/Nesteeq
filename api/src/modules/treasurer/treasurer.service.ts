@@ -289,7 +289,7 @@ export const updateTreasurerSettingsService = async (
   const settings = await TreasurerSetting.findOneAndUpdate(
     { apartmentId: id },
     { $set: updateData },
-    { new: true, upsert: true }
+    { returnDocument: "after", upsert: true }
   );
   return settings;
 };

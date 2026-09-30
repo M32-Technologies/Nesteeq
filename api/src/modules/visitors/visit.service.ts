@@ -480,7 +480,7 @@ export const checkInVisitorService = async ({ apartmentId, userId, visitorPassId
   const claimed = await GuestPassModel.findOneAndUpdate(
     { _id: pass._id, apartmentId, ...(tokenHash ? { tokenHash } : {}), status: GuestPassStatus.ACTIVE },
     { $set: { status: GuestPassStatus.USED, usedAt: now, usedBy: userId } },
-    { new: true }
+    { returnDocument: "after" }
   )
   if (!claimed) throw new AppError("This guest pass has already been used", 409)
 
@@ -552,7 +552,7 @@ export const checkoutVisitorService = async ({ apartmentId, userId, visitId }: C
   const updated = await VisitorVisitModel.findOneAndUpdate(
     { _id: visitId, apartmentId, status: VisitorVisitStatus.ACTIVE },
     { $set: { status: VisitorVisitStatus.CHECKED_OUT, checkedOutBy: userId, checkedOutAt: now } },
-    { new: true }
+    { returnDocument: "after" }
   )
   if (!updated) throw new AppError("Visitor is already checked out", 400)
 

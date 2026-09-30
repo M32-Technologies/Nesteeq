@@ -42,6 +42,7 @@ export const initSocket = (server: HttpServer): SocketIOServer => {
       (data: { userId?: string; apartmentId?: string; role?: string }) => {
         if (typeof data?.userId === "string" && data.userId.trim()) {
           socket.join(`user:${data.userId.trim()}`);
+          console.log("user joined")
         }
         if (typeof data?.apartmentId === "string" && data.apartmentId.trim()) {
           socket.join(`apartment:${data.apartmentId.trim()}`);
@@ -114,5 +115,36 @@ export const sendRealtimeNotificationToApartment = (
 ): boolean => {
   if (!io) return false;
   io.to(`apartment:${apartmentId}`).emit("notification", notification);
+  return true;
+};
+
+export const sendRealtimeEmergencyAlert = ({
+  apartmentId,
+  alert,
+}: {
+  apartmentId: string;
+  alert: Record<string, unknown>;
+}): boolean => {
+  if (!io) return false;
+
+  const secRole = normalizeRole("security_staff");
+
+  // Emit sos_alert directly to security staff room so tables/cards update
+  io.to(`apartment:${apartmentId}:role:${secRole}`).emit("sos_alert", alert);
+
+  return true;
+};
+
+export const sendRealtimeAlertUpdate = (
+  apartmentId: string,
+  alert: Record<string, unknown>
+): boolean => {
+  if (!io) return false;
+
+  io.to(`apartment:${apartmentId}`).emit("sos_alert_updated", alert);
+  if (alert.triggeredBy && typeof alert.triggeredBy === "string") {
+    io.to(`user:${alert.triggeredBy}`).emit("sos_alert_updated", alert);
+  }
+
   return true;
 };
