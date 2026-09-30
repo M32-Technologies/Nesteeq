@@ -20,7 +20,12 @@ export const getNotificationsHandler = catchAsync(
 
     const query = req.query as unknown as GetNotificationsQuery;
 
-    const result = await getMyNotifications({userId: user.id,apartmentId: user.apartmentId ?? null, query,});
+    const result = await getMyNotifications({
+      userId: user.id,
+      role: user.role ?? null,
+      apartmentId: user.apartmentId ?? null,
+      query,
+    });
 
     res.status(200).json({
       success: true,
@@ -40,6 +45,7 @@ export const getUnreadNotificationCountHandler = catchAsync(
 
     const result = await getUnreadNotificationCount({
       userId: user.id,
+      role: user.role ?? null,
       apartmentId: user.apartmentId ?? null,
     });
 
@@ -62,6 +68,7 @@ export const markNotificationAsReadHandler = catchAsync(
     const result = await markNotificationAsRead({
       notificationId: String(req.params.id),
       userId: user.id,
+      role: user.role ?? null,
     });
 
     res.status(200).json({
@@ -82,6 +89,7 @@ export const markAllNotificationsAsReadHandler = catchAsync(
 
     const result = await markAllNotificationsAsRead({
       userId: user.id,
+      role: user.role ?? null,
       apartmentId: user.apartmentId ?? null,
     });
 
@@ -109,6 +117,7 @@ export const deleteNotificationHandler = catchAsync(
     await deleteNotification({
       notificationId: String(req.params.id),
       userId: user.id,
+      role: user.role ?? null,
     });
 
     res.status(200).json({
@@ -118,7 +127,3 @@ export const deleteNotificationHandler = catchAsync(
     });
   }
 );
-
-
-
-

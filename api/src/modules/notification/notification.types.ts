@@ -11,6 +11,10 @@ export const notificationTypes = [
   "SCHEDULE_CREATED",
   "SCHEDULE_UPDATED",
   "SCHEDULE_CANCELLED",
+  "ANNOUNCEMENT",
+  "EMERGENCY_ANNOUNCEMENT",
+  "RESIDENT_REGISTERED",
+  "STAFF_REGISTERED",
 ] as const;
 
 export const notificationSeverities = ["INFO", "SUCCESS", "WARNING", "ERROR"] as const;

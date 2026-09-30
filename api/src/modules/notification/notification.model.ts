@@ -78,6 +78,16 @@ const notificationSchema = new Schema<INotification>(
 
 notificationSchema.index({ recipientUserId: 1, readAt: 1, createdAt: -1 });
 notificationSchema.index({ recipientRole: 1, apartment: 1, readAt: 1, createdAt: -1 });
+notificationSchema.index(
+  { relatedResourceId: 1, recipientUserId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      relatedResourceId: { $type: "string" },
+      recipientUserId: { $type: "string" },
+    },
+  }
+);
 
 export type NotificationDocument = HydratedDocument<INotification>;
 

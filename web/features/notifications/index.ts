@@ -19,3 +19,4 @@ export {
   type NotificationItemProps,
 } from "./components/notification-item";
 export * from "./components/notification-skeleton";
+export * from "./components/notification-socket-listener";

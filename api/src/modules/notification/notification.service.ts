@@ -1,5 +1,9 @@
 import { AppError } from "../../utils/AppError.js";
 import { normalizeRole } from "../../utils/role.js";
+import {
+  sendRealtimeNotification,
+  sendRealtimeNotificationToRole,
+} from "../../socket/socket.js";
 
 import { Notification } from "./notification.model.js";
 import type {
@@ -8,16 +12,19 @@ import type {
 } from "./notification.types.js";
 import type { GetNotificationsQuery } from "./notification.validation.js";
 
-const normalizeOptionalString = (value: string | null | undefined): string | undefined => {
+const normalizeOptionalString = (
+  value: string | null | undefined
+): string | undefined => {
   if (!value) return undefined;
   const trimmed = value.trim();
   return trimmed === "" ? undefined : trimmed;
 };
 
-export const createNotification = async (data: CreateNotificationInput): Promise<void> => {
-
+export const createNotification = async (
+  data: CreateNotificationInput
+): Promise<void> => {
   try {
-    await Notification.create({
+    const doc = await Notification.create({
       apartment: normalizeOptionalString(data.apartment),
       recipientUserId: normalizeOptionalString(data.recipientUserId),
       recipientRole: data.recipientRole ? normalizeRole(data.recipientRole) : null,
@@ -29,13 +36,41 @@ export const createNotification = async (data: CreateNotificationInput): Promise
       relatedResourceId: normalizeOptionalString(data.relatedResourceId),
       createdBy: normalizeOptionalString(data.createdBy),
     });
+
+    const payload = {
+      _id: doc._id.toString(),
+      id: doc._id.toString(),
+      apartment: doc.apartment,
+      recipientUserId: doc.recipientUserId,
+      recipientRole: doc.recipientRole,
+      type: doc.type,
+      severity: doc.severity,
+      title: doc.title,
+      message: doc.message,
+      relatedResourceType: doc.relatedResourceType,
+      relatedResourceId: doc.relatedResourceId,
+      readAt: doc.readAt,
+      createdAt: doc.createdAt,
+    };
+
+    if (doc.recipientUserId) {
+      sendRealtimeNotification(doc.recipientUserId, payload);
+    }
+
+    if (doc.recipientRole) {
+      sendRealtimeNotificationToRole(
+        doc.recipientRole,
+        payload,
+        doc.apartment ?? undefined
+      );
+    }
   } catch (error) {
     console.error("Notification creation failed:", error);
   }
 };
 
 export const createBulkNotifications = async (
-  data: CreateBulkNotificationsInput,
+  data: CreateBulkNotificationsInput
 ): Promise<void> => {
   const uniqueIds = [...new Set(data.recipientUserIds)]
     .map((id) => id?.trim())
@@ -63,27 +98,58 @@ export const createBulkNotifications = async (
 
   try {
     await Notification.insertMany(docs, { ordered: false });
+
+    // Emit real-time events to all recipient users
+    const now = new Date();
+    for (const userId of uniqueIds) {
+      sendRealtimeNotification(userId, {
+        apartment: sharedFields.apartment,
+        recipientUserId: userId,
+        type: sharedFields.type,
+        severity: sharedFields.severity,
+        title: sharedFields.title,
+        message: sharedFields.message,
+        relatedResourceType: sharedFields.relatedResourceType,
+        relatedResourceId: sharedFields.relatedResourceId,
+        readAt: null,
+        createdAt: now,
+      });
+    }
   } catch (error) {
-    console.error(`Bulk notification creation failed (attempted ${docs.length}):`, error);
+    console.error(
+      `Bulk notification creation failed (attempted ${docs.length}):`,
+      error
+    );
   }
 };
 
 export type GetMyNotificationsParams = {
   userId: string;
+  role?: string | null;
   apartmentId?: string | null;
   query: GetNotificationsQuery;
 };
 
 export const getMyNotifications = async ({
   userId,
+  role,
   apartmentId,
   query,
 }: GetMyNotificationsParams) => {
   const { page, limit, unreadOnly } = query;
   const skip = (page - 1) * limit;
 
+  const normalizedRole = role ? normalizeRole(role) : null;
+  const recipientConditions: Record<string, unknown>[] = [
+    { recipientUserId: userId },
+  ];
+
+  if (normalizedRole) {
+    recipientConditions.push({ recipientRole: normalizedRole });
+  }
+
   const filter: Record<string, unknown> = {
-    recipientUserId: userId,
+    $or: recipientConditions,
   };
 
   if (unreadOnly) {
@@ -92,11 +158,9 @@ export const getMyNotifications = async ({
 
   const normalizedApartmentId = normalizeOptionalString(apartmentId);
   if (normalizedApartmentId) {
-    filter.$or = [
-      { apartment: normalizedApartmentId },
-      { apartment: null },
-      { apartment: { $exists: false } },
-    ];
+    filter.apartment = {
+      $in: [normalizedApartmentId, null, undefined],
+    };
   }
 
   const [notifications, total] = await Promise.all([
@@ -122,25 +186,34 @@ export const getMyNotifications = async ({
 
 export type GetUnreadNotificationCountParams = {
   userId: string;
+  role?: string | null;
   apartmentId?: string | null;
 };
 
 export const getUnreadNotificationCount = async ({
   userId,
+  role,
   apartmentId,
 }: GetUnreadNotificationCountParams): Promise<{ count: number }> => {
+  const normalizedRole = role ? normalizeRole(role) : null;
+  const recipientConditions: Record<string, unknown>[] = [
+    { recipientUserId: userId },
+  ];
+
+  if (normalizedRole) {
+    recipientConditions.push({ recipientRole: normalizedRole });
+  }
+
   const filter: Record<string, unknown> = {
-    recipientUserId: userId,
+    $or: recipientConditions,
     readAt: null,
   };
 
   const normalizedApartmentId = normalizeOptionalString(apartmentId);
   if (normalizedApartmentId) {
-    filter.$or = [
-      { apartment: normalizedApartmentId },
-      { apartment: null },
-      { apartment: { $exists: false } },
-    ];
+    filter.apartment = {
+      $in: [normalizedApartmentId, null, undefined],
+    };
   }
 
   const count = await Notification.countDocuments(filter);
@@ -151,15 +224,26 @@ export const getUnreadNotificationCount = async ({
 export type MarkNotificationAsReadParams = {
   notificationId: string;
   userId: string;
+  role?: string | null;
 };
 
 export const markNotificationAsRead = async ({
   notificationId,
   userId,
+  role,
 }: MarkNotificationAsReadParams) => {
+  const normalizedRole = role ? normalizeRole(role) : null;
+  const recipientConditions: Record<string, unknown>[] = [
+    { recipientUserId: userId },
+  ];
+
+  if (normalizedRole) {
+    recipientConditions.push({ recipientRole: normalizedRole });
+  }
+
   const notification = await Notification.findOne({
     _id: notificationId,
-    recipientUserId: userId,
+    $or: recipientConditions,
   })
     .select("-__v")
     .lean();
@@ -175,7 +259,7 @@ export const markNotificationAsRead = async ({
   const updatedNotification = await Notification.findOneAndUpdate(
     {
       _id: notificationId,
-      recipientUserId: userId,
+      $or: recipientConditions,
       readAt: null,
     },
     {
@@ -193,25 +277,34 @@ export const markNotificationAsRead = async ({
 
 export type MarkAllNotificationsAsReadParams = {
   userId: string;
+  role?: string | null;
   apartmentId?: string | null;
 };
 
 export const markAllNotificationsAsRead = async ({
   userId,
+  role,
   apartmentId,
 }: MarkAllNotificationsAsReadParams): Promise<{ modifiedCount: number }> => {
+  const normalizedRole = role ? normalizeRole(role) : null;
+  const recipientConditions: Record<string, unknown>[] = [
+    { recipientUserId: userId },
+  ];
+
+  if (normalizedRole) {
+    recipientConditions.push({ recipientRole: normalizedRole });
+  }
+
   const filter: Record<string, unknown> = {
-    recipientUserId: userId,
+    $or: recipientConditions,
     readAt: null,
   };
 
   const normalizedApartmentId = normalizeOptionalString(apartmentId);
   if (normalizedApartmentId) {
-    filter.$or = [
-      { apartment: normalizedApartmentId },
-      { apartment: null },
-      { apartment: { $exists: false } },
-    ];
+    filter.apartment = {
+      $in: [normalizedApartmentId, null, undefined],
+    };
   }
 
   const result = await Notification.updateMany(filter, {
@@ -226,15 +319,26 @@ export const markAllNotificationsAsRead = async ({
 export type DeleteNotificationParams = {
   notificationId: string;
   userId: string;
+  role?: string | null;
 };
 
 export const deleteNotification = async ({
   notificationId,
   userId,
+  role,
 }: DeleteNotificationParams) => {
+  const normalizedRole = role ? normalizeRole(role) : null;
+  const recipientConditions: Record<string, unknown>[] = [
+    { recipientUserId: userId },
+  ];
+
+  if (normalizedRole) {
+    recipientConditions.push({ recipientRole: normalizedRole });
+  }
+
   const notification = await Notification.findOneAndDelete({
     _id: notificationId,
-    recipientUserId: userId,
+    $or: recipientConditions,
   }).lean();
 
   if (!notification) {
@@ -243,8 +347,3 @@ export const deleteNotification = async ({
 
   return { notificationId };
 };
-
-
-
-
-

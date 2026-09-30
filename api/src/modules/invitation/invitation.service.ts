@@ -31,6 +31,7 @@ import { env } from "../../config/env.js"
 import { AppError } from "../../utils/AppError.js"
 import { getAuthDB } from "../../config/auth-db.js"
 import { parseInviteWorkbook } from "./excel/resident-parser.js"
+import { createNotification } from "../notification/notification.service.js"
 
 const INVITE_EXPIRY_DAYS = 7
 
@@ -597,6 +598,55 @@ export const acceptInvitation = async (
       status: "accepted" as const,
     }
   })
+
+  // Notify Facility Manager and Property Manager that a new resident or staff registered
+  if (RESIDENT_INVITE_ROLES.includes(result.role as ResidentInviteRole)) {
+    const flatDoc = result.flatId
+      ? await Flat.findById(result.flatId).select("flatNumber").lean()
+      : null;
+    const flatLabel = flatDoc?.flatNumber ? `Flat ${flatDoc.flatNumber}` : "their flat";
+    const residentIdentifier = authenticatedUser.email || "A new resident";
+
+    createNotification({
+      apartment: result.apartmentId,
+      recipientRole: "FACILITY_MANAGER",
+      type: "RESIDENT_REGISTERED",
+      severity: "INFO",
+      title: "New Resident Registered",
+      message: `${residentIdentifier} has registered for ${flatLabel}.`,
+      relatedResourceType: "RESIDENT",
+      relatedResourceId: authenticatedUser.id,
+    }).catch((err) =>
+      console.error("Failed to notify facility manager of resident registration:", err)
+    );
+
+    createNotification({
+      apartment: result.apartmentId,
+      recipientRole: "PROPERTY_MANAGER",
+      type: "RESIDENT_REGISTERED",
+      severity: "INFO",
+      title: "New Resident Registered",
+      message: `${residentIdentifier} has registered for ${flatLabel}.`,
+      relatedResourceType: "RESIDENT",
+      relatedResourceId: authenticatedUser.id,
+    }).catch((err) =>
+      console.error("Failed to notify property manager of resident registration:", err)
+    );
+  } else if (STAFF_INVITE_ROLES.includes(result.role as StaffInviteRole)) {
+    const staffIdentifier = authenticatedUser.email || "A new staff member";
+    createNotification({
+      apartment: result.apartmentId,
+      recipientRole: "FACILITY_MANAGER",
+      type: "STAFF_REGISTERED",
+      severity: "INFO",
+      title: "New Staff Registered",
+      message: `${staffIdentifier} has joined as ${result.role}.`,
+      relatedResourceType: "STAFF",
+      relatedResourceId: authenticatedUser.id,
+    }).catch((err) =>
+      console.error("Failed to notify facility manager of staff registration:", err)
+    );
+  }
 
   return result
 }
