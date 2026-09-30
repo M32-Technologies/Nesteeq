@@ -52,6 +52,14 @@ export type JobDetails = {
     assignedDate: string
     currentStatus: string
   }
+  expenseInfo?: {
+    expenseAmount?: number
+    expenseDescription?: string
+    expenseReceiptUrl?: string | null
+    expenseStatus?: "PENDING_FACILITY_APPROVAL" | "APPROVED" | "REJECTED" | string
+    expenseSubmittedAt?: string
+    expenseRejectionReason?: string
+  }
 }
 
 const mapPriority = (rawPriority?: string | null): "High" | "Medium" | "Low" => {
@@ -744,6 +752,59 @@ export const getJobById = async (
 
     const loc = await resolveSingleDocLocation(maintDoc)
 
+    const expenseAmountVal =
+      maintDoc.expenseAmount != null
+        ? maintDoc.expenseAmount
+        : complaintObj?.expenseAmount != null
+        ? complaintObj.expenseAmount
+        : maintDoc.costReview?.submittedAmount != null
+        ? maintDoc.costReview.submittedAmount
+        : null
+
+    const expenseDescVal =
+      maintDoc.expenseDescription ??
+      complaintObj?.expenseDescription ??
+      maintDoc.costReview?.remarks ??
+      null
+
+    const expenseReceiptVal =
+      maintDoc.expenseReceiptUrl ??
+      complaintObj?.expenseReceiptUrl ??
+      null
+
+    const expenseStatusVal =
+      maintDoc.expenseStatus ??
+      complaintObj?.expenseStatus ??
+      (maintDoc.costReview?.status === "SUBMITTED"
+        ? "PENDING_FACILITY_APPROVAL"
+        : maintDoc.costReview?.status) ??
+      null
+
+    const expenseSubmittedAtVal =
+      maintDoc.expenseSubmittedAt ||
+      complaintObj?.expenseSubmittedAt ||
+      maintDoc.costReview?.submittedAt ||
+      null
+
+    const expenseRejectionReasonVal =
+      maintDoc.expenseRejectionReason ||
+      complaintObj?.expenseRejectionReason ||
+      null
+
+    const expenseInfo =
+      expenseAmountVal != null
+        ? {
+            expenseAmount: Number(expenseAmountVal),
+            expenseDescription: expenseDescVal || "",
+            expenseReceiptUrl: expenseReceiptVal || null,
+            expenseStatus: expenseStatusVal || "PENDING_FACILITY_APPROVAL",
+            expenseSubmittedAt: expenseSubmittedAtVal
+              ? new Date(expenseSubmittedAtVal).toISOString()
+              : undefined,
+            expenseRejectionReason: expenseRejectionReasonVal || undefined,
+          }
+        : undefined
+
     return {
       jobId: maintDoc._id.toString(),
       complaintInfo: {
@@ -780,6 +841,7 @@ export const getJobById = async (
         assignedDate: new Date(assignedDateVal).toISOString(),
         currentStatus: mappedStatus,
       },
+      expenseInfo,
     }
   }
 
@@ -794,6 +856,25 @@ export const getJobById = async (
     const mappedPriority = mapPriority(complaintDoc.priority)
 
     const loc = await resolveSingleDocLocation(complaintDoc)
+
+    const expenseAmountVal =
+      complaintDoc.expenseAmount != null ? complaintDoc.expenseAmount : null
+
+    const expenseInfo =
+      expenseAmountVal != null
+        ? {
+            expenseAmount: Number(expenseAmountVal),
+            expenseDescription: complaintDoc.expenseDescription || "",
+            expenseReceiptUrl: complaintDoc.expenseReceiptUrl || null,
+            expenseStatus:
+              complaintDoc.expenseStatus || "PENDING_FACILITY_APPROVAL",
+            expenseSubmittedAt: complaintDoc.expenseSubmittedAt
+              ? new Date(complaintDoc.expenseSubmittedAt).toISOString()
+              : undefined,
+            expenseRejectionReason:
+              complaintDoc.expenseRejectionReason || undefined,
+          }
+        : undefined
 
     return {
       jobId: complaintDoc._id.toString(),
@@ -832,6 +913,7 @@ export const getJobById = async (
         assignedDate: new Date(assignedDateVal).toISOString(),
         currentStatus: mappedStatus,
       },
+      expenseInfo,
     }
   }
 
@@ -1074,6 +1156,7 @@ export const submitCost = async (
   jobId: string,
   amount: number,
   description: string,
+  receiptUrl: string | null,
   technicianUserId: string
 ) => {
   const ids = await resolveTechnicianIds(technicianUserId)
@@ -1093,13 +1176,19 @@ export const submitCost = async (
           submittedAt: now,
           remarks: description || null,
         },
+        expenseAmount: numAmount,
+        expenseDescription: description || "",
+        expenseReceiptUrl: receiptUrl || null,
+        expenseStatus: "PENDING_FACILITY_APPROVAL",
+        expenseSubmittedAt: now,
+        expenseSubmittedBy: technicianUserId,
         updatedBy: technicianUserId,
       },
       $push: {
         workNotes: {
           message: `Maintenance cost estimate submitted: ₹${numAmount}${
             description ? ` - ${description}` : ""
-          }`,
+          }${receiptUrl ? ` (Receipt: ${receiptUrl})` : ""}`,
           by: technicianUserId,
           role: "maintenance_technician",
           createdAt: now,
@@ -1112,13 +1201,27 @@ export const submitCost = async (
   if (maintJob) {
     if (maintJob.complaint) {
       await Complaint.findByIdAndUpdate(maintJob.complaint, {
-        $set: { finalCost: numAmount, estimatedCost: numAmount },
+        $set: {
+          finalCost: numAmount,
+          estimatedCost: numAmount,
+          expenseAmount: numAmount,
+          expenseDescription: description || "",
+          expenseReceiptUrl: receiptUrl || null,
+          expenseStatus: "PENDING_FACILITY_APPROVAL",
+          expenseSubmittedAt: now,
+          expenseSubmittedBy: technicianUserId,
+        },
       })
     }
     return {
       success: true,
       amount: numAmount,
+      expenseAmount: numAmount,
       description,
+      expenseDescription: description,
+      receiptUrl,
+      expenseReceiptUrl: receiptUrl,
+      expenseStatus: "PENDING_FACILITY_APPROVAL",
       submittedAt: now.toISOString(),
     }
   }
@@ -1129,12 +1232,18 @@ export const submitCost = async (
       $set: {
         finalCost: numAmount,
         estimatedCost: numAmount,
+        expenseAmount: numAmount,
+        expenseDescription: description || "",
+        expenseReceiptUrl: receiptUrl || null,
+        expenseStatus: "PENDING_FACILITY_APPROVAL",
+        expenseSubmittedAt: now,
+        expenseSubmittedBy: technicianUserId,
       },
       $push: {
         remarks: {
           message: `Maintenance cost estimate submitted: ₹${numAmount}${
             description ? ` - ${description}` : ""
-          }`,
+          }${receiptUrl ? ` (Receipt: ${receiptUrl})` : ""}`,
           by: technicianUserId,
           role: "maintenance_technician",
           createdAt: now,
@@ -1148,10 +1257,30 @@ export const submitCost = async (
     throw new AppError("Maintenance job not found", 404)
   }
 
+  await Maintenance.updateMany(
+    { complaint: complaintJob._id },
+    {
+      $set: {
+        finalCost: numAmount,
+        expenseAmount: numAmount,
+        expenseDescription: description || "",
+        expenseReceiptUrl: receiptUrl || null,
+        expenseStatus: "PENDING_FACILITY_APPROVAL",
+        expenseSubmittedAt: now,
+        expenseSubmittedBy: technicianUserId,
+      },
+    }
+  )
+
   return {
     success: true,
     amount: numAmount,
+    expenseAmount: numAmount,
     description,
+    expenseDescription: description,
+    receiptUrl,
+    expenseReceiptUrl: receiptUrl,
+    expenseStatus: "PENDING_FACILITY_APPROVAL",
     submittedAt: now.toISOString(),
   }
 }

@@ -44,6 +44,11 @@ router.post(
   submitCostController
 )
 router.patch(
+  "/jobs/:jobId/cost",
+  zodValidate(costSubmissionSchema),
+  submitCostController
+)
+router.patch(
   "/jobs/:jobId/complete",
   zodValidate(completeWorkSchema),
   completeJobController

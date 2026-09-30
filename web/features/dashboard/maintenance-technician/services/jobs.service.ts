@@ -56,6 +56,14 @@ export type JobDetails = {
     assignedDate: string
     currentStatus: string
   }
+  expenseInfo?: {
+    expenseAmount?: number
+    expenseDescription?: string
+    expenseReceiptUrl?: string | null
+    expenseStatus?: "PENDING_FACILITY_APPROVAL" | "APPROVED" | "REJECTED" | string
+    expenseSubmittedAt?: string
+    expenseRejectionReason?: string
+  }
 }
 
 const getApiErrorMessage = (error: unknown, fallback: string) => {
@@ -157,14 +165,23 @@ export type UploadEvidenceResponse = {
 }
 
 export type SubmitCostPayload = {
-  amount: number
-  description: string
+  amount?: number
+  expenseAmount?: number
+  description?: string
+  expenseDescription?: string
+  receiptUrl?: string | null
+  expenseReceiptUrl?: string | null
 }
 
 export type SubmitCostResponse = {
   success: boolean
-  amount: number
-  description: string
+  amount?: number
+  expenseAmount?: number
+  description?: string
+  expenseDescription?: string
+  receiptUrl?: string | null
+  expenseReceiptUrl?: string | null
+  expenseStatus?: string
   submittedAt: string
 }
 

@@ -6,10 +6,12 @@ import { toast } from "sonner"
 
 import {
   approveComplaint,
+  approveComplaintExpense,
   assignComplaint,
   cancelComplaint,
   createMaintenance,
   rejectComplaint,
+  rejectComplaintExpense,
   updateComplaint,
   updateComplaintStatus,
 } from "@/features/dashboard/facility/complaints/api/complaints.api"
@@ -255,6 +257,22 @@ export function FacilityComplaintsPage() {
       toast.error(getApiErrorMessage(error, "Unable to create maintenance")),
   })
 
+  const approveExpenseMutation = useMutation({
+    mutationFn: ({ id, remarks }: { id: string; remarks?: string }) =>
+      approveComplaintExpense(id, { remarks }),
+    onSuccess: () => void handleSuccess("Maintenance expense approved"),
+    onError: (error) =>
+      toast.error(getApiErrorMessage(error, "Unable to approve expense")),
+  })
+
+  const rejectExpenseMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      rejectComplaintExpense(id, { reason }),
+    onSuccess: () => void handleSuccess("Maintenance expense rejected"),
+    onError: (error) =>
+      toast.error(getApiErrorMessage(error, "Unable to reject expense")),
+  })
+
   const handleAssign = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!selectedComplaint) return
@@ -460,6 +478,16 @@ export function FacilityComplaintsPage() {
         onReject={handleReject}
         onCancel={handleCancel}
         onCreateMaintenance={handleCreateMaintenance}
+        onApproveExpense={() => {
+          if (!selectedComplaint) return
+          approveExpenseMutation.mutate({ id: selectedComplaint._id })
+        }}
+        onRejectExpense={(reason?: string) => {
+          if (!selectedComplaint) return
+          rejectExpenseMutation.mutate({ id: selectedComplaint._id, reason })
+        }}
+        isApprovingExpense={approveExpenseMutation.isPending}
+        isRejectingExpense={rejectExpenseMutation.isPending}
         isAssigning={assignMutation.isPending}
         isUpdatingStatus={statusMutation.isPending}
         isUpdating={updateMutation.isPending}

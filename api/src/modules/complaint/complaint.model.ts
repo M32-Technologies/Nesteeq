@@ -248,6 +248,50 @@ const complaintSchema = new Schema(
       min: 0,
       default: null,
     },
+    expenseAmount: {
+      type: Number,
+      min: 0,
+      default: null,
+    },
+    expenseDescription: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    expenseReceiptUrl: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    expenseStatus: {
+      type: String,
+      enum: ["PENDING_FACILITY_APPROVAL", "APPROVED", "REJECTED"],
+      default: null,
+      index: true,
+    },
+    expenseSubmittedAt: {
+      type: Date,
+      default: null,
+    },
+    expenseSubmittedBy: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    expenseReviewedAt: {
+      type: Date,
+      default: null,
+    },
+    expenseReviewedBy: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    expenseRejectionReason: {
+      type: String,
+      trim: true,
+      default: null,
+    },
     completionDetails: {
       type: completionDetailsSchema,
       default: null,

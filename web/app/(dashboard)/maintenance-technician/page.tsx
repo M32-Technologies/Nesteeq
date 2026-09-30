@@ -1,4 +1,4 @@
-﻿import MaintenanceStats from "@/features/dashboard/maintenance-technician/components/maintenance-stats"
+import MaintenanceStats from "@/features/dashboard/maintenance-technician/components/maintenance-stats"
 
 export default function MaintenanceTechnicianPage() {
   return (
