@@ -255,7 +255,9 @@ function EmergencyBroadcastForm({
       onClose();
     } catch (err: unknown) {
       const msg =
-        err instanceof Error ? err.message : "Failed to broadcast emergency alert";
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        (err as Error)?.message ||
+        "Failed to broadcast emergency alert";
       setValidationError(msg);
       setStep("compose");
     }

@@ -14,6 +14,8 @@ import {
   type CurrentApartment,
   type ResidentProfileItem,
 } from "../api/resident-dashboard.api";
+import { fetchResidentBills } from "@/features/dashboard/treasurer/billing/services/billing.service";
+import type { ResidentBillsSummary, ResidentBillItem } from "@/features/dashboard/treasurer/billing/types/billing.types";
 
 export interface UnifiedFeedItem {
   id: string;
@@ -130,6 +132,26 @@ export function useResidentDashboard() {
     queryFn: fetchResidentDashboardFeed,
     staleTime: 30 * 1000,
   });
+
+  // 9. Bills & Dues Query
+  const {
+    data: billsData,
+    isLoading: isBillsLoading,
+    refetch: refetchBills,
+  } = useQuery({
+    queryKey: ["resident", "bills"],
+    queryFn: fetchResidentBills,
+    staleTime: 30 * 1000,
+  });
+
+  const billsSummary: ResidentBillsSummary = billsData?.summary || {
+    totalOutstanding: 0,
+    totalPaid: 0,
+    pendingCount: 0,
+    overdueCount: 0,
+    lateFees: 0,
+  };
+  const billsList: ResidentBillItem[] = billsData?.bills || [];
 
   // Resolve clean human-readable flat unit without any raw IDs or dummy fallbacks
   const flatUnitName = useMemo(() => {
@@ -280,13 +302,16 @@ export function useResidentDashboard() {
   }, [dashboardFeed, announcements, complaintsList, guestPasses, apartmentName]);
 
   // Refetch all queries
-  const refetchAll = () => {
-    refetchApartment();
-    refetchProfile();
-    refetchVisitors();
-    refetchComplaints();
-    refetchAnnouncements();
-    refetchFeed();
+  const refetchAll = async () => {
+    await Promise.all([
+      refetchApartment(),
+      refetchProfile(),
+      refetchVisitors(),
+      refetchComplaints(),
+      refetchAnnouncements(),
+      refetchFeed(),
+      refetchBills(),
+    ]);
   };
 
   return {
@@ -321,6 +346,11 @@ export function useResidentDashboard() {
     announcements,
     criticalAlert,
     isAnnouncementsLoading,
+
+    // Bills & Society Finance
+    billsSummary,
+    billsList,
+    isBillsLoading,
 
     refetchAll,
   };

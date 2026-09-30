@@ -32,6 +32,13 @@ api.interceptors.response.use(
       }
     }
 
+    // Populate human-readable error message from backend API response
+    const backendMessage =
+      error.response?.data?.message || error.response?.data?.error;
+    if (backendMessage && typeof backendMessage === "string") {
+      error.message = backendMessage;
+    }
+
     return Promise.reject(error);
   }
 );

@@ -85,6 +85,8 @@ export interface VisitorRecord {
   validUntil?: string | null
   checkedInAt?: string | null
   checkedOutAt?: string | null
+  departedFromFlatAt?: string | null
+  departedFromFlatBy?: string | null
   parkingAssignmentId?: string | null
   parkingSlotId?: string | null
   parkingSlotNumber?: string | null

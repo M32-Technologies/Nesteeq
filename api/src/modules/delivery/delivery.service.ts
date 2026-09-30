@@ -126,9 +126,9 @@ const enrichDeliveries = async (
 
   const residents = orConditions.length
     ? await ResidentModel.find(residentsQuery)
-        .sort({ residentType: 1, joinedAt: -1 })
-        .select("_id userId flatId phoneNumber residentType status")
-        .lean()
+      .sort({ residentType: 1, joinedAt: -1 })
+      .select("_id userId flatId phoneNumber residentType status")
+      .lean()
     : []
 
   const residentRecords = residents as unknown as Array<{
@@ -367,8 +367,8 @@ export const listDeliveriesService = async ({
 
     const residentFlatIds = residentIds.length
       ? await ResidentModel.distinct("flatId", {
-          _id: { $in: residentIds },
-        })
+        _id: { $in: residentIds },
+      })
       : []
 
     const allFlatIds = Array.from(

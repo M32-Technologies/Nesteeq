@@ -225,6 +225,7 @@ export const getWalletsService = async (
     const info = residentInfoMap.get(w.residentId.toString());
     return {
       ...w,
+      transactions: w.transactions || [],
       residentName: info?.residentName || "Resident",
       flatNumber: info?.flatNumber || "",
       unitName: info?.unitName || "",
@@ -240,6 +241,11 @@ export const getWalletsService = async (
         (w.flatNumber || "").toLowerCase().includes(term) ||
         (w.unitName || "").toLowerCase().includes(term)
     );
+  }
+
+  if (query?.page && query?.limit) {
+    const start = (query.page - 1) * query.limit;
+    return mappedWallets.slice(start, start + query.limit);
   }
 
   return mappedWallets;
@@ -446,10 +452,32 @@ export const deductWalletFundsService = async (
         residentId: residentObjectId,
       }).session(session);
 
+      const resident = await ResidentModel.findOne({
+        _id: residentObjectId,
+        apartmentId: apartmentObjectId,
+      })
+        .select("_id userId flatId")
+        .session(session)
+        .lean();
+
+      const residentQueryConditions: Record<string, unknown>[] = [
+        { residentId: residentObjectId },
+      ];
+
+      if (resident?.userId && Types.ObjectId.isValid(resident.userId)) {
+        residentQueryConditions.push({
+          residentId: new Types.ObjectId(resident.userId),
+        });
+      }
+
+      if (resident?.flatId) {
+        residentQueryConditions.push({ unitId: resident.flatId });
+      }
+
       const bill = await Billing.findOne({
         _id: billObjectId,
         apartmentId: apartmentObjectId,
-        residentId: residentObjectId,
+        $or: residentQueryConditions,
       }).session(session);
 
       if (!wallet) {

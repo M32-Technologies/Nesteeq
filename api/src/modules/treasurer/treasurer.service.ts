@@ -8,6 +8,8 @@ import { ResidentModel } from "../resident/resident.model.js";
 import { Maintenance } from "../maintenance/maintenance.model.js";
 import { ExpenseCategory, ExpenseStatus } from "../expense/expense.interface.js";
 import { createExpenseService } from "../expense/expense.service.js";
+import { AuditAction } from "../audit/audit.interface.js";
+import { createAuditLogService } from "../audit/audit.service.js";
 import { getAuthDB } from "../../config/auth-db.js";
 import { TreasurerSetting } from "./treasurer.model.js";
 import {
@@ -49,6 +51,7 @@ export const getTreasurerChartService = async (
       {
         $match: {
           apartmentId: id,
+          reversed: { $ne: true },
           paidAt: { $gte: startOfYear, $lt: endOfYear },
         },
       },
@@ -178,7 +181,7 @@ export const getTreasurerDashboardService = async (
         .limit(5)
         .lean(),
 
-      Payment.find({ apartmentId: id })
+      Payment.find({ apartmentId: id, reversed: { $ne: true } })
         .sort({ paidAt: -1 })
         .limit(8)
         .lean(),
@@ -375,7 +378,7 @@ export const getMaintenancePayoutsService = async (apartmentId: string) => {
 export const processMaintenancePayoutService = async (
   jobId: string,
   apartmentId: string,
-  input: { paymentMethod?: string; notes?: string },
+  input: { paymentMethod?: string; paymentReference?: string; notes?: string },
   actor: { userId: string; name?: string }
 ) => {
   const aptId = getApartmentObjectId(apartmentId);
@@ -383,67 +386,118 @@ export const processMaintenancePayoutService = async (
     throw new AppError("Invalid maintenance job ID", 400);
   }
 
-  const job = await (Maintenance as any).findOne({
-    _id: new Types.ObjectId(jobId),
-    apartment: aptId,
-  });
+  // Atomically claim the payout to prevent race conditions and duplicate payouts
+  const job = await (Maintenance as any).findOneAndUpdate(
+    {
+      _id: new Types.ObjectId(jobId),
+      $or: [{ apartment: aptId }, { apartment: apartmentId }],
+      "costReview.status": "APPROVED",
+      "costReview.forwardedToRole": "TREASURER",
+    },
+    {
+      $set: {
+        "costReview.forwardedToRole": "SETTLED",
+      },
+    },
+    { new: false }
+  );
 
   if (!job) {
-    throw new AppError("Maintenance job not found", 404);
-  }
-
-  if (
-    job.costReview?.status !== "APPROVED" ||
-    job.costReview?.forwardedToRole !== "TREASURER"
-  ) {
     throw new AppError(
-      "Only approved maintenance costs forwarded to Treasurer can be processed",
+      "Maintenance job not found, not approved, or payout has already been processed",
       400
     );
   }
 
   const amount = job.costReview?.submittedAmount ?? job.finalCost ?? 0;
   if (amount <= 0) {
+    // Revert state if amount is invalid
+    await (Maintenance as any).findByIdAndUpdate(job._id, {
+      $set: { "costReview.forwardedToRole": "TREASURER" },
+    });
     throw new AppError("Maintenance payout amount must be greater than 0", 400);
   }
+
+  // Resolve technician name from Auth DB
+  let vendorName = "Maintenance Staff";
+  const staffUserId =
+    job.costReview?.submittedBy?.toString() || job.assignedStaff?.toString();
+  if (staffUserId) {
+    const objectIds = Types.ObjectId.isValid(staffUserId)
+      ? [new Types.ObjectId(staffUserId)]
+      : [];
+    const authUser = await getAuthDB()
+      .collection("user")
+      .findOne({
+        $or: [
+          { id: staffUserId },
+          ...(objectIds.length ? [{ _id: objectIds[0] }] : []),
+        ],
+      });
+    if (authUser?.name) {
+      vendorName = authUser.name;
+    }
+  }
+
+  const baseDesc = `Maintenance payout approved by Facility Manager for ${job.title}${
+    job.costReview?.remarks ? ` (${job.costReview.remarks})` : ""
+  }`.trim();
+  const description = input.notes ? `${baseDesc}. Note: ${input.notes}` : baseDesc;
 
   // Create an official Expense record
   const createdExpense = await createExpenseService(
     {
       apartmentId: aptId.toString(),
       title: `Maintenance: ${job.title}`,
-      description:
-        input.notes ||
-        `Maintenance payout approved by Facility Manager for ${job.title} (${
-          job.costReview?.remarks || ""
-        })`.trim(),
+      description,
       invoiceRef: `MAINT-${job._id.toString().slice(-6).toUpperCase()}`,
       category: ExpenseCategory.MAINTENANCE,
       amount,
-      vendorName: job.costReview?.submittedBy || "Maintenance Staff",
+      vendorName,
       expenseDate: new Date(),
-      createdBy: actor.userId,
+      createdBy: Types.ObjectId.isValid(actor.userId) ? actor.userId : undefined,
     },
     { userId: actor.userId }
   );
 
   const expense = createdExpense as any;
 
-  // Mark the expense as PAID with the selected payment method
+  // Mark the expense as PAID with the selected payment details
   expense.status = ExpenseStatus.PAID;
   expense.paymentMethod = input.paymentMethod || "UPI";
+  if (input.paymentReference) {
+    expense.paymentReference = input.paymentReference;
+  }
   expense.paidAt = new Date();
   await expense.save();
 
-  // Update the Maintenance document to mark payout settled
-  await (Maintenance as any).findByIdAndUpdate(job._id, {
-    $set: {
-      "costReview.forwardedToRole": "SETTLED",
+  // Create audit log for payment settlement
+  await createAuditLogService({
+    apartmentId: aptId.toString(),
+    performedBy: actor.userId,
+    action: AuditAction.EXPENSE_UPDATED,
+    entityType: "Expense",
+    entityId: expense._id.toString(),
+    oldValue: { status: ExpenseStatus.PENDING },
+    newValue: {
+      status: ExpenseStatus.PAID,
+      paymentMethod: expense.paymentMethod,
+      paymentReference: expense.paymentReference,
+      paidAt: expense.paidAt,
     },
+    description: `Maintenance payout expense ${expense._id.toString()} marked as paid via ${
+      expense.paymentMethod
+    }${expense.paymentReference ? ` (Ref: ${expense.paymentReference})` : ""}`,
+  });
+
+  // Update the Maintenance document work notes
+  await (Maintenance as any).findByIdAndUpdate(job._id, {
     $push: {
       workNotes: {
         message: `Treasurer settled payout of ₹${amount} via ${
-          input.paymentMethod || "UPI"
+          expense.paymentMethod
+        }${
+          expense.paymentReference ? ` (Ref: ${expense.paymentReference})` : ""
         } (Recorded as Society Expense #${expense._id.toString().slice(-6).toUpperCase()})`,
         by: actor.name || "Treasurer",
         role: "treasurer",

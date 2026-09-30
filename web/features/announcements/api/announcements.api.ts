@@ -180,18 +180,26 @@ export const getActiveBlocks = async (): Promise<BlockItem[]> => {
 export const broadcastEmergency = async (
   formData: EmergencyBroadcastFormData
 ): Promise<EmergencyBroadcastResponse> => {
-  const response = await api.post<ApiResponse<EmergencyBroadcastResponse>>(
-    "/api/v1/announcements/emergency",
-    formData
-  );
-
-  if (!response.data.success) {
-    throw new Error(
-      response.data.message || "Failed to broadcast emergency alert"
+  try {
+    const response = await api.post<ApiResponse<EmergencyBroadcastResponse>>(
+      "/api/v1/announcements/emergency",
+      formData
     );
-  }
 
-  return response.data.data;
+    if (!response.data.success) {
+      throw new Error(
+        response.data.message || "Failed to broadcast emergency alert"
+      );
+    }
+
+    return response.data.data;
+  } catch (error: any) {
+    const message =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Failed to broadcast emergency alert";
+    throw new Error(message);
+  }
 };
 
 export const getResidentFeed = async (): Promise<AnnouncementItem[]> => {

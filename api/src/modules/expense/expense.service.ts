@@ -196,14 +196,25 @@ export const getExpensesService = async (
   }
 
   if (filters.search) {
-    const safeSearch = escapeRegex(filters.search.trim());
+    const rawSearch = filters.search.trim();
+    const safeSearch = escapeRegex(rawSearch);
     const searchRegex = new RegExp(safeSearch, "i");
-    query.$or = [
+    const searchConditions: Array<Record<string, unknown>> = [
       { title: searchRegex },
       { vendorName: searchRegex },
       { invoiceRef: searchRegex },
       { description: searchRegex },
+      { category: searchRegex },
+      { paymentReference: searchRegex },
+      { paymentMethod: searchRegex },
     ];
+
+    const numericAmount = Number(rawSearch);
+    if (Number.isFinite(numericAmount) && numericAmount > 0) {
+      searchConditions.push({ amount: numericAmount });
+    }
+
+    query.$or = searchConditions;
   }
 
   if (filters.startDate || filters.endDate) {
@@ -212,7 +223,9 @@ export const getExpensesService = async (
       dateQuery.$gte = filters.startDate;
     }
     if (filters.endDate) {
-      dateQuery.$lte = filters.endDate;
+      const endOfDay = new Date(filters.endDate);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+      dateQuery.$lte = endOfDay;
     }
     query.expenseDate = dateQuery;
   }
@@ -261,6 +274,19 @@ export const updateExpenseService = async (
         existingExpense.status,
         input.status
       );
+
+      if (existingExpense.status === ExpenseStatus.PAID) {
+        if (
+          (input.amount !== undefined && input.amount !== existingExpense.amount) ||
+          (input.category !== undefined && input.category !== existingExpense.category) ||
+          (input.vendorName !== undefined && input.vendorName !== existingExpense.vendorName)
+        ) {
+          throw new AppError(
+            "Cannot modify financial details (amount, category, vendor) of an already settled expense",
+            400
+          );
+        }
+      }
 
       const updateData: UpdateExpenseInput = { ...input };
       if (
@@ -349,7 +375,20 @@ export const getExpenseSummaryService = async (
     {
       $group: {
         _id: null,
-        totalExpenses: { $sum: "$amount" },
+        totalExpenses: {
+          $sum: {
+            $cond: [
+              {
+                $in: [
+                  "$status",
+                  [ExpenseStatus.APPROVED, ExpenseStatus.PAID],
+                ],
+              },
+              "$amount",
+              0,
+            ],
+          },
+        },
         approvedExpenses: {
           $sum: {
             $cond: [
@@ -382,6 +421,7 @@ export const getExpenseSummaryService = async (
             ],
           },
         },
+        totalCount: { $sum: 1 },
       },
     },
   ]);
@@ -391,5 +431,6 @@ export const getExpenseSummaryService = async (
     approvedExpenses: result?.approvedExpenses ?? 0,
     pendingExpenses: result?.pendingExpenses ?? 0,
     pendingCount: result?.pendingCount ?? 0,
+    totalCount: result?.totalCount ?? 0,
   };
 };

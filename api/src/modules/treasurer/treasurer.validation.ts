@@ -56,6 +56,7 @@ export const processMaintenancePayoutSchema = z.object({
   }),
   body: z.object({
     paymentMethod: z.string().trim().optional(),
+    paymentReference: z.string().trim().optional(),
     notes: z.string().trim().optional(),
   }),
 });

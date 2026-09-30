@@ -3,6 +3,7 @@ import { Request, Response } from "express";
 import {
   createBillService,
   createCommonBillService,
+  deleteBillService,
   getBillByIdService,
   getBillRecipientsService,
   getBillingSummaryService,
@@ -176,7 +177,8 @@ export const waiveLateFee = catchAsync(
     const bill = await waiveLateFeeService(
       req.params.id as string,
       req.body.amount,
-      getAuditActor(req)
+      getAuditActor(req),
+      req.body.reason
     );
 
     res.status(200).json({
@@ -191,7 +193,7 @@ export const getMyResidentBills = catchAsync(
   async (req: Request, res: Response) => {
     const user = {
       id: req.user!.id,
-      role: req.user!.role,
+      role: req.user!.role ?? "RESIDENT",
       apartmentId: req.user!.apartmentId ?? null,
       flatId: req.user!.flatId ?? null,
     };
@@ -210,7 +212,7 @@ export const payResidentBill = catchAsync(
     const user = {
       id: req.user!.id,
       name: req.user!.name,
-      role: req.user!.role,
+      role: req.user!.role ?? "RESIDENT",
       apartmentId: req.user!.apartmentId ?? null,
       flatId: req.user!.flatId ?? null,
     };
@@ -224,4 +226,21 @@ export const payResidentBill = catchAsync(
     res.status(200).json(result);
   }
 );
+
+export const deleteBill = catchAsync(
+  async (req: Request, res: Response) => {
+    const reason = (req.body?.reason || req.query?.reason) as string | undefined;
+    const result = await deleteBillService(
+      req.params.id as string,
+      getAuditActor(req),
+      reason
+    );
+
+    res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  }
+);
+
 

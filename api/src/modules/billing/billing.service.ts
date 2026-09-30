@@ -12,6 +12,7 @@ import {
 import {
   applyBillValues,
   calculateBillValues,
+  getAdditionalTotal,
   roundMoney,
 } from "./billing.calculation.js";
 import { Billing } from "./billing.model.js";
@@ -24,6 +25,7 @@ import {
 import { AuditAction } from "../audit/audit.interface.js";
 import { createAuditLogService } from "../audit/audit.service.js";
 import { Flat } from "../flat/flat.model.js";
+import { Block } from "../block/block.model.js";
 import { ResidentModel } from "../resident/resident.model.js";
 import { Wallet } from "../wallet/wallet.model.js";
 import { WalletTransactionType } from "../wallet/wallet.interface.js";
@@ -128,18 +130,10 @@ const getBillAuditValue = (bill: BillingDocument) => ({
 
 const validateResidentAndUnitOwnership = async (
   apartmentId: Types.ObjectId,
-  residentId: Types.ObjectId,
+  residentId: Types.ObjectId | null | undefined,
   unitId: Types.ObjectId,
   session?: ClientSession
 ) => {
-  const resident = await ResidentModel.findOne({
-    _id: residentId,
-    apartmentId,
-  })
-    .select("_id flatId")
-    .session(session ?? null)
-    .lean();
-
   const flat = await Flat.findOne({
     _id: unitId,
     apartmentId,
@@ -148,13 +142,6 @@ const validateResidentAndUnitOwnership = async (
     .session(session ?? null)
     .lean();
 
-  if (!resident) {
-    throw new AppError(
-      "Resident does not belong to this apartment",
-      403
-    );
-  }
-
   if (!flat) {
     throw new AppError(
       "Unit does not belong to this apartment",
@@ -162,15 +149,68 @@ const validateResidentAndUnitOwnership = async (
     );
   }
 
-  if (
-    resident.flatId?.toString() !== unitId.toString() &&
-    flat.residentId?.toString() !== resident._id.toString()
-  ) {
-    throw new AppError(
-      "Resident is not assigned to this unit",
-      403
-    );
+  if (residentId) {
+    const resident = await ResidentModel.findOne({
+      _id: residentId,
+      apartmentId,
+    })
+      .select("_id flatId")
+      .session(session ?? null)
+      .lean();
+
+    if (!resident) {
+      throw new AppError(
+        "Resident does not belong to this apartment",
+        403
+      );
+    }
+
+    if (
+      resident.flatId?.toString() !== unitId.toString() &&
+      flat.residentId?.toString() !== resident._id.toString()
+    ) {
+      throw new AppError(
+        "Resident is not assigned to this unit",
+        403
+      );
+    }
   }
+};
+
+const resolveOrCreateResidentForUnit = async (
+  apartmentId: Types.ObjectId,
+  unitId: Types.ObjectId,
+  session?: ClientSession
+): Promise<Types.ObjectId> => {
+  const resident = await ResidentModel.findOne({
+    apartmentId,
+    flatId: unitId,
+    status: { $ne: "inactive" },
+  }).session(session ?? null);
+
+  if (resident) {
+    return resident._id;
+  }
+
+  const flat = await Flat.findOne({ _id: unitId, apartmentId }).session(session ?? null);
+  if (flat?.residentId && Types.ObjectId.isValid(flat.residentId)) {
+    return new Types.ObjectId(flat.residentId);
+  }
+
+  const newResident = new ResidentModel({
+    apartmentId,
+    flatId: unitId,
+    residentType: "owner",
+    status: "pending",
+  });
+  await newResident.save({ session });
+
+  if (flat && !flat.residentId) {
+    flat.residentId = newResident._id;
+    await flat.save({ session });
+  }
+
+  return newResident._id;
 };
 
 const applyPaymentToBill = async (
@@ -179,7 +219,11 @@ const applyPaymentToBill = async (
   source: PaymentSource,
   actor: AuditActor,
   description: string,
-  session: ClientSession
+  session: ClientSession,
+  paymentDetails?: {
+    paymentMethod?: string;
+    referenceNo?: string;
+  }
 ) => {
   const paymentAmount = roundMoney(amount);
   const currentValues = calculateBillValues(bill);
@@ -216,6 +260,8 @@ const applyPaymentToBill = async (
       unitId: bill.unitId,
       amount: paymentAmount,
       source,
+      paymentMethod: paymentDetails?.paymentMethod,
+      referenceNo: paymentDetails?.referenceNo,
       description,
       recordedBy: actor.userId,
     },
@@ -253,7 +299,7 @@ const applyWalletCreditToBill = async (
 ) => {
   const currentValues = calculateBillValues(bill);
 
-  if (currentValues.balanceAmount <= 0) {
+  if (!bill.residentId || currentValues.balanceAmount <= 0) {
     return;
   }
 
@@ -339,31 +385,23 @@ export const createBillService = async (
   const apartmentId = toObjectId(input.apartmentId, "apartmentId");
   const unitId = toObjectId(input.unitId, "unitId");
 
-  let residentId: Types.ObjectId;
+  let residentId: Types.ObjectId | null = null;
   if (input.residentId) {
     residentId = toObjectId(input.residentId, "residentId");
-  } else {
-    const resident = await ResidentModel.findOne({
-      apartmentId,
-      flatId: unitId,
-      status: { $ne: "inactive" },
-    });
-    if (!resident) {
-      const flat = await Flat.findOne({ _id: unitId, apartmentId });
-      if (flat?.residentId) {
-        residentId = flat.residentId;
-      } else {
-        throw new AppError("No active resident assigned to this unit", 400);
-      }
-    } else {
-      residentId = resident._id;
-    }
   }
 
   let createdBill: BillingDocument | null = null;
 
   try {
     await session.withTransaction(async () => {
+      if (!residentId) {
+        residentId = await resolveOrCreateResidentForUnit(
+          apartmentId,
+          unitId,
+          session
+        );
+      }
+
       await validateResidentAndUnitOwnership(
         apartmentId,
         residentId,
@@ -479,7 +517,7 @@ export const getBillsService = async (
   }
 
   const unitIds = bills.map((b) => b.unitId);
-  const residentIds = bills.map((b) => b.residentId);
+  const residentIds = bills.map((b) => b.residentId).filter(Boolean);
 
   const [flats, residents] = await Promise.all([
     Flat.find({ _id: { $in: unitIds } }, "flatNumber").lean(),
@@ -515,9 +553,10 @@ export const getBillsService = async (
     const unitName = flatNum
       ? `Flat ${flatNum}`
       : `Unit ${bill.unitId.toString().slice(-4).toUpperCase()}`;
-    const residentName =
-      residentNameMap.get(bill.residentId.toString()) ||
-      `Resident #${bill.residentId.toString().slice(-4).toUpperCase()}`;
+    const residentName = bill.residentId
+      ? residentNameMap.get(bill.residentId.toString()) ||
+      `Resident #${bill.residentId.toString().slice(-4).toUpperCase()}`
+      : "Vacant (No Resident)";
 
     return {
       ...bill,
@@ -532,7 +571,7 @@ export const getBillsService = async (
 export const getBillRecipientsService = async (apartmentId: string) => {
   const aptId = toObjectId(apartmentId, "apartmentId");
 
-  const [flats, residents] = await Promise.all([
+  const [flats, residents, blocks] = await Promise.all([
     Flat.find({ apartmentId: aptId, status: { $ne: "inactive" } })
       .sort({ flatNumber: 1 })
       .lean(),
@@ -540,7 +579,10 @@ export const getBillRecipientsService = async (apartmentId: string) => {
       apartmentId: aptId,
       status: { $ne: "inactive" },
     }).lean(),
+    Block.find({ apartmentId: aptId, status: { $ne: "inactive" } }).lean(),
   ]);
+
+  const blockMap = new Map(blocks.map((b) => [b._id.toString(), b.blockname]));
 
   const userIds = residents
     .map((r) => r.userId)
@@ -577,6 +619,8 @@ export const getBillRecipientsService = async (apartmentId: string) => {
       residentName: resName || (res ? "Resident" : "Vacant / No Resident"),
       hasResident: Boolean(res?._id),
       residentType: res?.residentType || null,
+      blockId: flat.blockId ? flat.blockId.toString() : null,
+      blockName: flat.blockId ? blockMap.get(flat.blockId.toString()) || null : null,
     };
   });
 };
@@ -652,7 +696,17 @@ export const updateBillService = async (
       };
 
       if (input.baseAmount !== undefined) {
-        bill.baseAmount = roundMoney(input.baseAmount);
+        const newBase = roundMoney(input.baseAmount);
+        const additionalTotal = getAdditionalTotal(
+          input.additionalCharges ?? bill.additionalCharges
+        );
+        if (newBase + additionalTotal < bill.paidAmount) {
+          throw new AppError(
+            `Total bill amount cannot be less than the amount already paid (₹${bill.paidAmount})`,
+            400
+          );
+        }
+        bill.baseAmount = newBase;
       }
 
       if (input.additionalCharges !== undefined) {
@@ -734,7 +788,11 @@ export const recordBillPaymentService = async (
         PaymentSource.MANUAL,
         actor,
         paymentDescription,
-        session
+        session,
+        {
+          paymentMethod: options?.paymentMethod,
+          referenceNo: options?.referenceNo,
+        }
       );
 
       paymentId = payment._id.toString();
@@ -759,7 +817,8 @@ export const recordBillPaymentService = async (
 export const waiveLateFeeService = async (
   billId: string,
   amount: number,
-  actor: AuditActor
+  actor: AuditActor,
+  reason?: string
 ) => {
   const session = await mongoose.startSession();
   const id = toObjectId(billId, "billId");
@@ -774,12 +833,20 @@ export const waiveLateFeeService = async (
       }
 
       const currentValues = calculateBillValues(bill);
+
+      if (currentValues.status === BillStatus.PAID || currentValues.balanceAmount <= 0) {
+        throw new AppError(
+          "Cannot waive late fee on an already paid or settled bill",
+          400
+        );
+      }
+
       const waiverAmount = roundMoney(amount);
       const availableLateFee = roundMoney(
         Math.max(
           0,
           currentValues.lateFeeAmount -
-            bill.lateFeeWaivedAmount
+          bill.lateFeeWaivedAmount
         )
       );
 
@@ -832,8 +899,11 @@ export const waiveLateFeeService = async (
             ),
             balanceAmount: bill.balanceAmount,
             status: bill.status,
+            reason: reason || undefined,
           },
-          description: `Late fee waiver of ${waiverAmount} applied to bill ${bill._id.toString()}`,
+          description: reason
+            ? `Late fee waiver of ${waiverAmount} applied to bill ${bill._id.toString()} (Reason: ${reason})`
+            : `Late fee waiver of ${waiverAmount} applied to bill ${bill._id.toString()}`,
         },
         session
       );
@@ -858,6 +928,7 @@ export const getBillingSummaryService = async (
     apartmentId,
     "apartmentId"
   );
+  const now = new Date();
 
   const [agg] = await Billing.aggregate([
     {
@@ -875,7 +946,17 @@ export const getBillingSummaryService = async (
         totalOverdue: {
           $sum: {
             $cond: [
-              { $eq: ["$status", "OVERDUE"] },
+              {
+                $and: [
+                  { $gt: ["$balanceAmount", 0] },
+                  {
+                    $or: [
+                      { $eq: ["$status", "OVERDUE"] },
+                      { $lt: ["$dueDate", now] },
+                    ],
+                  },
+                ],
+              },
               "$balanceAmount",
               0,
             ],
@@ -902,7 +983,43 @@ export const getMyResidentBillsService = async (user: {
   apartmentId?: string | null;
   flatId?: string | null;
 }) => {
-  const apartmentId = user.apartmentId;
+  let apartmentId = user.apartmentId;
+  let flatId = user.flatId;
+  let residentRecord: any = null;
+
+  // 1. Resolve apartment and resident profile from DB if not present in session
+  if (!apartmentId && Types.ObjectId.isValid(user.id)) {
+    residentRecord = await ResidentModel.findOne({
+      $or: [
+        { userId: user.id },
+        { _id: new Types.ObjectId(user.id) },
+      ],
+      status: { $ne: "inactive" },
+    }).lean();
+
+    if (residentRecord) {
+      apartmentId = residentRecord.apartmentId?.toString();
+      flatId = residentRecord.flatId?.toString();
+    }
+  } else if (apartmentId && Types.ObjectId.isValid(apartmentId)) {
+    residentRecord = await ResidentModel.findOne({
+      apartmentId: new Types.ObjectId(apartmentId),
+      $or: [
+        { userId: user.id },
+        ...(Types.ObjectId.isValid(user.id) ? [{ _id: new Types.ObjectId(user.id) }] : []),
+      ],
+      status: { $ne: "inactive" },
+    }).lean();
+
+    if (residentRecord && !flatId) {
+      flatId = residentRecord.flatId?.toString();
+    }
+  }
+
+  if (!flatId && user.flatId) {
+    flatId = user.flatId;
+  }
+
   if (!apartmentId) {
     return {
       summary: {
@@ -917,25 +1034,101 @@ export const getMyResidentBillsService = async (user: {
     };
   }
 
-  let flatId = user.flatId;
-  let residentRecord = null;
-  if (Types.ObjectId.isValid(apartmentId)) {
-    residentRecord = await ResidentModel.findOne({
-      apartmentId: new Types.ObjectId(apartmentId),
-      userId: user.id,
-    }).lean();
+  const aptObjectId = new Types.ObjectId(apartmentId);
 
-    if (residentRecord && !flatId) {
-      flatId = residentRecord.flatId?.toString();
+  // 2. Resolve flat document if flatId is missing or needs lookup
+  let flatDoc: any = null;
+  if (flatId && Types.ObjectId.isValid(flatId)) {
+    flatDoc = await Flat.findById(flatId).lean();
+  } else if (residentRecord?._id) {
+    flatDoc = await Flat.findOne({
+      apartmentId: aptObjectId,
+      residentId: residentRecord._id,
+    }).lean();
+    if (flatDoc) {
+      flatId = flatDoc._id.toString();
     }
   }
 
+  // 3. Ensure any Common Bills created by the Treasurer targeting this flat are instantiated
+  if (flatDoc) {
+    try {
+      const activeCommonBills = await CommonBill.find({
+        apartmentId: aptObjectId,
+        status: CommonBillStatus.ACTIVE,
+      }).lean();
+
+      for (const cb of activeCommonBills) {
+        let isTargeted = false;
+        if (cb.targetType === CommonBillTargetType.ALL_FLATS) {
+          isTargeted = true;
+        } else if (cb.targetType === CommonBillTargetType.BY_BLOCK && flatDoc.blockId) {
+          isTargeted = (cb.targetBlockIds || []).some(
+            (bId: any) => bId.toString() === flatDoc.blockId.toString()
+          );
+        } else if (cb.targetType === CommonBillTargetType.CUSTOM_FLATS) {
+          isTargeted = (cb.targetFlatIds || []).some(
+            (fId: any) => fId.toString() === flatDoc._id.toString()
+          );
+        }
+
+        if (isTargeted) {
+          const existingBill = await Billing.findOne({
+            apartmentId: aptObjectId,
+            commonBillId: cb._id,
+            unitId: flatDoc._id,
+          });
+
+          if (!existingBill) {
+            const values = calculateBillValues({
+              baseAmount: cb.baseAmount,
+              additionalCharges: cb.additionalCharges || [],
+              lateFeePerDay: cb.lateFeePerDay || 0,
+              lateFeeWaivedAmount: 0,
+              paidAmount: 0,
+              dueDate: cb.dueDate,
+            });
+
+            await Billing.create({
+              apartmentId: aptObjectId,
+              residentId: residentRecord?._id || new Types.ObjectId(user.id),
+              unitId: flatDoc._id,
+              commonBillId: cb._id,
+              title: cb.title,
+              billType: cb.billType,
+              billingPeriod: cb.billingPeriod || undefined,
+              description: cb.description || undefined,
+              baseAmount: roundMoney(cb.baseAmount),
+              additionalCharges: cb.additionalCharges || [],
+              lateFeePerDay: roundMoney(cb.lateFeePerDay || 0),
+              lateFeeAmount: values.lateFeeAmount,
+              lateFeeWaivedAmount: 0,
+              totalAmount: values.totalAmount,
+              paidAmount: 0,
+              balanceAmount: values.balanceAmount,
+              dueDate: cb.dueDate,
+              status: values.status,
+              createdBy: cb.createdBy || undefined,
+            });
+          }
+        }
+      }
+    } catch (syncErr) {
+      // Non-blocking sync error logging
+      console.error("Common bill sync error in getMyResidentBillsService:", syncErr);
+    }
+  }
+
+  // 4. Build query conditions for this resident's bills (both separate & common)
   const queryConditions: any[] = [];
   if (flatId && Types.ObjectId.isValid(flatId)) {
     queryConditions.push({ unitId: new Types.ObjectId(flatId) });
   }
   if (residentRecord?._id) {
     queryConditions.push({ residentId: residentRecord._id });
+  }
+  if (Types.ObjectId.isValid(user.id)) {
+    queryConditions.push({ residentId: new Types.ObjectId(user.id) });
   }
 
   if (queryConditions.length === 0) {
@@ -952,7 +1145,6 @@ export const getMyResidentBillsService = async (user: {
     };
   }
 
-  const aptObjectId = new Types.ObjectId(apartmentId);
   const bills = await Billing.find({
     apartmentId: aptObjectId,
     $or: queryConditions,
@@ -960,13 +1152,52 @@ export const getMyResidentBillsService = async (user: {
     .sort({ dueDate: -1, createdAt: -1 })
     .lean();
 
+  // 5. Fetch associated CommonBills for parent details
+  const commonBillIds = Array.from(
+    new Set(
+      bills
+        .map((b) => b.commonBillId?.toString())
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+
+  let commonBillMap = new Map<string, any>();
+  if (commonBillIds.length > 0) {
+    const commonBills = await CommonBill.find({
+      _id: { $in: commonBillIds.map((id) => new Types.ObjectId(id)) },
+    }).lean();
+    commonBillMap = new Map(commonBills.map((cb) => [cb._id.toString(), cb]));
+  }
+
   const formattedBills = bills.map((bill) => {
     const values = calculateBillValues(bill);
+    const common = bill.commonBillId
+      ? commonBillMap.get(bill.commonBillId.toString())
+      : null;
+
+    const isCommonBill = Boolean(bill.commonBillId);
+    const billScope = isCommonBill ? "COMMON" : "SEPARATE";
+    const title =
+      bill.title ||
+      common?.title ||
+      (isCommonBill ? "Society Common Bill" : "Individual Maintenance Bill");
+    const billType = bill.billType || common?.billType || "MONTHLY_MAINTENANCE";
+    const billingPeriod =
+      bill.billingPeriod || common?.billingPeriod || undefined;
+    const description = bill.description || common?.description || undefined;
+
     return {
       _id: bill._id.toString(),
       apartmentId: bill.apartmentId.toString(),
       unitId: bill.unitId.toString(),
       residentId: bill.residentId.toString(),
+      commonBillId: bill.commonBillId ? bill.commonBillId.toString() : null,
+      isCommonBill,
+      billScope,
+      title,
+      billType,
+      billingPeriod,
+      description,
       baseAmount: bill.baseAmount,
       additionalCharges: bill.additionalCharges || [],
       lateFeePerDay: bill.lateFeePerDay,
@@ -1000,6 +1231,7 @@ export const getMyResidentBillsService = async (user: {
 
   const paymentsRaw = await Payment.find({
     apartmentId: aptObjectId,
+    reversed: { $ne: true },
     $or: queryConditions,
   })
     .sort({ paidAt: -1 })
@@ -1176,16 +1408,17 @@ export const createCommonBillService = async (
   const aptId = toObjectId(input.apartmentId, "apartmentId");
 
   // 1. Deduplication check: if billingPeriod is specified, prevent duplicate active common bill for same type & period
-  if (input.billingPeriod) {
+  if (input.billingPeriod && input.targetType === "ALL_FLATS") {
     const existing = await CommonBill.findOne({
       apartmentId: aptId,
       billType: input.billType,
       billingPeriod: input.billingPeriod,
+      targetType: CommonBillTargetType.ALL_FLATS,
       status: CommonBillStatus.ACTIVE,
     });
     if (existing) {
       throw new AppError(
-        `A common bill for "${existing.title}" (${input.billingPeriod}) has already been generated for this apartment.`,
+        `A broadcast common bill for "${existing.title}" (${input.billingPeriod}) has already been generated for all flats.`,
         409
       );
     }
@@ -1223,20 +1456,45 @@ export const createCommonBillService = async (
   const residentByFlat = new Map(residents.map((r) => [r.flatId.toString(), r]));
 
   // Also check if any flat has a direct residentId assigned
-  const validUnits: { flat: typeof flats[0]; residentId: Types.ObjectId }[] = [];
+  let validUnits: { flat: typeof flats[0]; residentId?: Types.ObjectId }[] = [];
   for (const flat of flats) {
     const res = residentByFlat.get(flat._id.toString());
     const resId = res?._id || (flat.residentId && Types.ObjectId.isValid(flat.residentId) ? flat.residentId : null);
-    if (resId) {
-      validUnits.push({
-        flat,
-        residentId: new Types.ObjectId(resId),
-      });
-    }
+    validUnits.push({
+      flat,
+      residentId: resId ? new Types.ObjectId(resId) : undefined,
+    });
   }
 
   if (validUnits.length === 0) {
-    throw new AppError("None of the targeted flats have active residents assigned.", 400);
+    throw new AppError("No matching flats found for the selected target criteria.", 400);
+  }
+
+  // Deduplicate against already billed units for the same billType and billingPeriod
+  if (input.billingPeriod && validUnits.length > 0) {
+    const alreadyBilled = await Billing.find({
+      apartmentId: aptId,
+      unitId: { $in: validUnits.map((u) => u.flat._id) },
+      billType: input.billType,
+      billingPeriod: input.billingPeriod,
+    })
+      .select("unitId")
+      .lean();
+
+    if (alreadyBilled.length > 0) {
+      if (alreadyBilled.length === validUnits.length) {
+        throw new AppError(
+          `All targeted flats have already been billed for ${input.billType} in ${input.billingPeriod}.`,
+          409
+        );
+      }
+      const alreadyBilledSet = new Set(
+        alreadyBilled.map((b) => b.unitId.toString())
+      );
+      validUnits = validUnits.filter(
+        (u) => !alreadyBilledSet.has(u.flat._id.toString())
+      );
+    }
   }
 
   // 4. Calculate unit financial values
@@ -1258,6 +1516,19 @@ export const createCommonBillService = async (
 
   try {
     await session.withTransaction(async () => {
+      // Resolve residentIds for any vacant flats in target
+      const resolvedUnits: { flat: typeof flats[0]; residentId: Types.ObjectId }[] = [];
+      for (const unit of validUnits) {
+        let resId = unit.residentId;
+        if (!resId) {
+          resId = await resolveOrCreateResidentForUnit(aptId, unit.flat._id, session);
+        }
+        resolvedUnits.push({
+          flat: unit.flat,
+          residentId: resId,
+        });
+      }
+
       // 5. Create Parent CommonBill document
       const common = new CommonBill({
         apartmentId: aptId,
@@ -1272,7 +1543,7 @@ export const createCommonBillService = async (
         targetType: input.targetType,
         targetBlockIds: (input.targetBlockIds || []).map((id) => toObjectId(id, "targetBlockId")),
         targetFlatIds: (input.targetFlatIds || []).map((id) => toObjectId(id, "targetFlatId")),
-        totalFlatsCount: validUnits.length,
+        totalFlatsCount: resolvedUnits.length,
         totalAmount,
         status: CommonBillStatus.ACTIVE,
         createdBy:
@@ -1285,7 +1556,7 @@ export const createCommonBillService = async (
       createdCommonBill = common;
 
       // 6. Create child Billing documents
-      const billsToCreate = validUnits.map(({ flat, residentId }) => ({
+      const billsToCreate = resolvedUnits.map(({ flat, residentId }) => ({
         apartmentId: aptId,
         residentId,
         unitId: flat._id,
@@ -1311,7 +1582,9 @@ export const createCommonBillService = async (
 
       // 7. Auto-apply advance wallet credit where residents have positive balances
       for (const billDoc of childBills) {
-        await applyWalletCreditToBill(billDoc, actor, session);
+        if (billDoc.residentId) {
+          await applyWalletCreditToBill(billDoc, actor, session);
+        }
       }
 
       // 8. Audit logging
@@ -1411,5 +1684,72 @@ export const getCommonBillsService = async (
     };
   });
 };
+
+export const deleteBillService = async (
+  billId: string,
+  actor: AuditActor,
+  reason?: string
+) => {
+  const session = await mongoose.startSession();
+  const id = toObjectId(billId, "billId");
+
+  try {
+    await session.withTransaction(async () => {
+      const bill = await Billing.findById(id).session(session);
+
+      if (!bill) {
+        throw new AppError("Bill not found", 404);
+      }
+
+      if (bill.paidAmount > 0) {
+        throw new AppError(
+          `Cannot cancel or delete a bill with recorded payments (Paid: ₹${bill.paidAmount}). Please adjust payments before deleting.`,
+          400
+        );
+      }
+
+      const auditValue = getBillAuditValue(bill);
+
+      await Billing.findByIdAndDelete(id).session(session);
+
+      if (bill.commonBillId) {
+        await CommonBill.findByIdAndUpdate(
+          bill.commonBillId,
+          {
+            $inc: {
+              totalFlatsCount: -1,
+              totalAmount: -bill.totalAmount,
+            },
+          },
+          { session }
+        );
+      }
+
+      await createAuditLogService(
+        {
+          apartmentId: bill.apartmentId.toString(),
+          performedBy: actor.userId,
+          action: AuditAction.BILL_UPDATED,
+          entityType: "Billing",
+          entityId: bill._id.toString(),
+          oldValue: auditValue,
+          newValue: {
+            status: "DELETED",
+            reason: reason || "Bill cancelled / deleted by treasurer",
+          },
+          description: reason
+            ? `Bill ${bill._id.toString()} deleted/cancelled (Reason: ${reason})`
+            : `Bill ${bill._id.toString()} deleted/cancelled by treasurer`,
+        },
+        session
+      );
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  return { success: true, message: "Bill deleted successfully" };
+};
+
 
 

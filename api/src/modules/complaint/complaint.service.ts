@@ -27,6 +27,7 @@ const sameId = (id1: any, id2: any): boolean => {
 import { Complaint, type ComplaintDocument } from "./complaint.model.js";
 import { ResidentModel } from "../resident/resident.model.js";
 import { Maintenance } from "../maintenance/maintenance.model.js";
+import { createNotification } from "../notification/notification.service.js";
 import {
   approvalAllowedStatuses,
   assertNotTerminal,
@@ -297,7 +298,18 @@ export const createComplaint = async (
     status: "PENDING",
   });
 
-
+  createNotification({
+    apartment,
+    recipientRole: "FACILITY_MANAGER",
+    type: "NEW_COMPLAINT",
+    severity: data.priority === "URGENT" || data.priority === "HIGH" ? "WARNING" : "INFO",
+    title: "New Complaint Filed",
+    message: `${data.title} (${data.category})`,
+    relatedResourceType: "COMPLAINT",
+    relatedResourceId: complaint._id.toString(),
+  }).catch((err) =>
+    console.error("Failed to notify facility manager of complaint:", err)
+  );
 
   return complaint;
 };

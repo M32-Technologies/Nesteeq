@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   QrCode,
   Plus,
@@ -25,6 +25,7 @@ import {
   HelpCircle,
   ExternalLink,
   Sparkles,
+  LogOut,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -34,6 +35,7 @@ import {
   fetchResidentGuestPasses,
   createResidentGuestPass,
   cancelResidentGuestPass,
+  markResidentVisitorDeparted,
   type GuestPassItem,
   type CreateResidentGuestPassPayload,
 } from "../api/resident-dashboard.api";
@@ -75,6 +77,15 @@ export function ResidentVisitorsPage() {
   const [activeQrModalPass, setActiveQrModalPass] = useState<GuestPassItem | null>(null);
   const [copiedToken, setCopiedToken] = useState(false);
   const [passToCancel, setPassToCancel] = useState<GuestPassItem | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("create") === "true" || params.get("action") === "create") {
+        setIsCreateModalOpen(true);
+      }
+    }
+  }, []);
 
   // Form State
   const [visitorName, setVisitorName] = useState("");
@@ -140,6 +151,24 @@ export function ResidentVisitorsPage() {
     },
     onError: (err: any) => {
       const msg = err?.response?.data?.message || "Failed to cancel visitor pass";
+      toast.error(msg);
+    },
+  });
+
+  // Mark Visitor Departed Mutation
+  const departVisitorMutation = useMutation({
+    mutationFn: (passId: string) => markResidentVisitorDeparted(passId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["resident", "passes"] });
+      queryClient.invalidateQueries({ queryKey: ["resident", "parking-info"] });
+      queryClient.invalidateQueries({ queryKey: ["resident", "dashboard-feed"] });
+      toast.success("Visitor marked as departed from flat. Security has been notified.");
+    },
+    onError: (err: any) => {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to mark visitor as departed";
       toast.error(msg);
     },
   });
@@ -454,6 +483,9 @@ export function ResidentVisitorsPage() {
             const isUsed = pass.status === "USED";
             const isExpired = pass.status === "EXPIRED";
             const isCancelled = pass.status === "CANCELLED";
+            const isCheckedIn = pass.status === "USED" && pass.visitStatus !== "CHECKED_OUT";
+            const isExited = pass.visitStatus === "CHECKED_OUT";
+            const hasDeparted = Boolean(pass.departedFromFlatAt);
             const code = pass.token || (pass._id ? pass._id.slice(-8).toUpperCase() : "PASS");
 
             return (
@@ -468,19 +500,27 @@ export function ResidentVisitorsPage() {
                   <div className="space-y-1">
                     <span
                       className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ring-1 ${
-                        isActive
+                        isExited
+                          ? "bg-slate-100 text-slate-700 ring-slate-200"
+                          : isCheckedIn
+                          ? hasDeparted
+                            ? "bg-amber-50 text-amber-800 ring-amber-300 animate-pulse"
+                            : "bg-blue-50 text-blue-700 ring-blue-200"
+                          : isActive
                           ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                          : isUsed
-                          ? "bg-blue-50 text-blue-700 ring-blue-200"
                           : isExpired
                           ? "bg-amber-50 text-amber-700 ring-amber-200"
                           : "bg-rose-50 text-rose-700 ring-rose-200"
                       }`}
                     >
-                      {isActive
+                      {isExited
+                        ? "Checked Out"
+                        : isCheckedIn
+                        ? hasDeparted
+                          ? "🚶 Left Flat"
+                          : "Inside Flat"
+                        : isActive
                         ? "Active Pass"
-                        : isUsed
-                        ? "Checked In"
                         : isExpired
                         ? "Expired"
                         : "Cancelled"}
@@ -562,6 +602,30 @@ export function ResidentVisitorsPage() {
                   </button>
 
                   <div className="flex items-center gap-2">
+                    {/* Mark as Left Flat Button for Resident */}
+                    {isCheckedIn && !hasDeparted && (
+                      <button
+                        type="button"
+                        disabled={departVisitorMutation.isPending}
+                        onClick={() =>
+                          departVisitorMutation.mutate(
+                            pass._id || pass.id || pass.visitId || ""
+                          )
+                        }
+                        className="inline-flex items-center gap-1 rounded-md bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 text-xs font-semibold shadow-2xs transition cursor-pointer"
+                        title="Notify security that this visitor has departed your flat and is heading to the gate"
+                      >
+                        <LogOut className="size-3" />
+                        <span>Left Flat</span>
+                      </button>
+                    )}
+
+                    {isCheckedIn && hasDeparted && (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 text-[10px] font-semibold">
+                        <span>🚶 Headed to Gate</span>
+                      </span>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => handleSharePass(pass)}

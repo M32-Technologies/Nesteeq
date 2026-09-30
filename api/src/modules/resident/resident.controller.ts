@@ -131,6 +131,7 @@ export {
     createResidentGuestPassHandler,
     getResidentGuestPassesHandler,
     cancelResidentGuestPassHandler,
+    markVisitorDepartedHandler,
 } from "../visitors/visit.controller.js";
 
 export const getCurrentResidentProfileHandler = catchAsync(async (req: Request, res: Response) => {

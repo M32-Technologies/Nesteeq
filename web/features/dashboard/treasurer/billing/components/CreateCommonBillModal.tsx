@@ -6,6 +6,7 @@ import {
   AlertCircle,
   ArrowUpCircle,
   Building,
+  Building2,
   Calendar,
   Car,
   CheckCircle2,
@@ -152,6 +153,8 @@ export default function CreateCommonBillModal({
   const [targetType, setTargetType] = useState<
     "ALL_FLATS" | "BY_BLOCK" | "CUSTOM_FLATS"
   >("ALL_FLATS");
+  const [selectedBlockId, setSelectedBlockId] = useState<string>("");
+  const [flatSearch, setFlatSearch] = useState<string>("");
   const [selectedFlatIds, setSelectedFlatIds] = useState<string[]>([]);
   const [error, setError] = useState("");
 
@@ -167,10 +170,16 @@ export default function CreateCommonBillModal({
   });
 
   const recipients = recipientsQuery.data ?? [];
-  const occupiedRecipients = useMemo(
-    () => recipients.filter((r) => r.hasResident),
-    [recipients]
-  );
+
+  const availableBlocks = useMemo(() => {
+    const map = new Map<string, string>();
+    recipients.forEach((r) => {
+      if (r.blockId && r.blockName) {
+        map.set(r.blockId, r.blockName);
+      }
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [recipients]);
 
   // Automatic title generator based on type & period
   const handleBillTypeChange = (type: string) => {
@@ -225,13 +234,18 @@ export default function CreateCommonBillModal({
 
   const targetCount = useMemo(() => {
     if (targetType === "ALL_FLATS") {
-      return occupiedRecipients.length;
+      return recipients.length;
+    }
+    if (targetType === "BY_BLOCK") {
+      return selectedBlockId
+        ? recipients.filter((r) => r.blockId === selectedBlockId).length
+        : 0;
     }
     if (targetType === "CUSTOM_FLATS") {
       return selectedFlatIds.length;
     }
-    return occupiedRecipients.length;
-  }, [targetType, occupiedRecipients, selectedFlatIds]);
+    return recipients.length;
+  }, [targetType, recipients, selectedBlockId, selectedFlatIds]);
 
   const grandTotalAmount = totalPerFlat * targetCount;
 
@@ -241,6 +255,25 @@ export default function CreateCommonBillModal({
         ? prev.filter((id) => id !== unitId)
         : [...prev, unitId]
     );
+  };
+
+  const filteredRecipients = useMemo(() => {
+    if (!flatSearch.trim()) return recipients;
+    const q = flatSearch.toLowerCase().trim();
+    return recipients.filter(
+      (r) =>
+        r.unitName.toLowerCase().includes(q) ||
+        r.flatNumber.toLowerCase().includes(q) ||
+        r.residentName.toLowerCase().includes(q)
+    );
+  }, [recipients, flatSearch]);
+
+  const handleSelectAllFlats = () => {
+    setSelectedFlatIds(recipients.map((r) => r.unitId));
+  };
+
+  const handleDeselectAllFlats = () => {
+    setSelectedFlatIds([]);
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -262,13 +295,18 @@ export default function CreateCommonBillModal({
       return;
     }
 
+    if (targetType === "BY_BLOCK" && !selectedBlockId) {
+      setError("Please select a block / tower.");
+      return;
+    }
+
     if (targetType === "CUSTOM_FLATS" && selectedFlatIds.length === 0) {
       setError("Please select at least one unit to bill.");
       return;
     }
 
     if (targetCount === 0) {
-      setError("No occupied flats found to bill. Please check society units.");
+      setError("No units found to bill for the selected criteria.");
       return;
     }
 
@@ -288,7 +326,13 @@ export default function CreateCommonBillModal({
       lateFeePerDay: Number(lateFeePerDay) || 0,
       dueDate,
       targetType,
-      targetFlatIds: targetType === "CUSTOM_FLATS" ? selectedFlatIds : undefined,
+      targetBlockIds: targetType === "BY_BLOCK" && selectedBlockId ? [selectedBlockId] : undefined,
+      targetFlatIds:
+        targetType === "CUSTOM_FLATS"
+          ? selectedFlatIds
+          : targetType === "BY_BLOCK" && selectedBlockId
+            ? recipients.filter((r) => r.blockId === selectedBlockId).map((r) => r.unitId)
+            : undefined,
     };
 
     try {
@@ -607,7 +651,7 @@ export default function CreateCommonBillModal({
             <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
               5. Select Target Audience
             </label>
-            <div className="mt-2.5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="mt-2.5 grid grid-cols-1 gap-3 sm:grid-cols-3">
               <label
                 className={`flex cursor-pointer items-center justify-between rounded-xl border p-3.5 transition ${
                   targetType === "ALL_FLATS"
@@ -625,14 +669,41 @@ export default function CreateCommonBillModal({
                   />
                   <div>
                     <span className="text-xs font-bold text-slate-900">
-                      All Occupied Flats ({occupiedRecipients.length} Units)
+                      All Society Flats ({recipients.length})
                     </span>
                     <p className="text-[11px] text-slate-500">
-                      Broadcast to every active resident in the apartment society
+                      Entire complex
                     </p>
                   </div>
                 </div>
                 <Users className="h-4 w-4 text-slate-400" />
+              </label>
+
+              <label
+                className={`flex cursor-pointer items-center justify-between rounded-xl border p-3.5 transition ${
+                  targetType === "BY_BLOCK"
+                    ? "border-slate-900 bg-slate-50/80 ring-1 ring-slate-900"
+                    : "border-slate-200 bg-white hover:border-slate-300"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <input
+                    type="radio"
+                    name="targetType"
+                    checked={targetType === "BY_BLOCK"}
+                    onChange={() => setTargetType("BY_BLOCK")}
+                    className="h-4 w-4 text-slate-900"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-slate-900">
+                      By Block / Tower
+                    </span>
+                    <p className="text-[11px] text-slate-500">
+                      {availableBlocks.length} block(s) found
+                    </p>
+                  </div>
+                </div>
+                <Building2 className="h-4 w-4 text-slate-400" />
               </label>
 
               <label
@@ -652,10 +723,10 @@ export default function CreateCommonBillModal({
                   />
                   <div>
                     <span className="text-xs font-bold text-slate-900">
-                      Custom Selected Flats ({selectedFlatIds.length} Selected)
+                      Custom Flats ({selectedFlatIds.length})
                     </span>
                     <p className="text-[11px] text-slate-500">
-                      Pick individual flats manually from the unit checklist
+                      Manual checklist
                     </p>
                   </div>
                 </div>
@@ -663,32 +734,90 @@ export default function CreateCommonBillModal({
               </label>
             </div>
 
+            {targetType === "BY_BLOCK" && (
+              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                <span className="text-xs font-semibold text-slate-700">Choose Block / Tower to Bill:</span>
+                {availableBlocks.length === 0 ? (
+                  <p className="mt-2 text-xs text-amber-700">No distinct blocks configured for flats in this society.</p>
+                ) : (
+                  <div className="mt-2.5 flex flex-wrap gap-2">
+                    {availableBlocks.map((blk) => {
+                      const isSelected = selectedBlockId === blk.id;
+                      const count = recipients.filter((r) => r.blockId === blk.id).length;
+                      return (
+                        <button
+                          key={blk.id}
+                          type="button"
+                          onClick={() => setSelectedBlockId(blk.id)}
+                          className={`rounded-lg border px-3.5 py-2 text-xs font-semibold transition cursor-pointer ${
+                            isSelected
+                              ? "border-slate-900 bg-slate-900 text-white shadow-xs"
+                              : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-100"
+                          }`}
+                        >
+                          {blk.name} ({count} flats)
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             {targetType === "CUSTOM_FLATS" && (
-              <div className="mt-3 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/50 p-3">
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {recipients.map((rec) => {
-                    const isChecked = selectedFlatIds.includes(rec.unitId);
-                    return (
-                      <button
-                        key={rec.unitId}
-                        type="button"
-                        onClick={() => handleToggleFlat(rec.unitId)}
-                        className={`flex items-center justify-between rounded-lg border p-2 text-left text-xs transition ${
-                          isChecked
-                            ? "border-slate-900 bg-slate-900 text-white font-medium"
-                            : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-                        }`}
-                      >
-                        <div>
-                          <div className="font-semibold">{rec.unitName}</div>
-                          <div className="text-[10px] opacity-80 truncate max-w-[100px]">
-                            {rec.residentName}
+              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/50 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-200">
+                  <input
+                    type="text"
+                    placeholder="Filter units..."
+                    value={flatSearch}
+                    onChange={(e) => setFlatSearch(e.target.value)}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 outline-none w-48"
+                  />
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSelectAllFlats}
+                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                    >
+                      Select All
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button
+                      type="button"
+                      onClick={handleDeselectAllFlats}
+                      className="text-xs font-semibold text-slate-500 hover:text-slate-700 cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-2.5 max-h-48 overflow-y-auto">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {filteredRecipients.map((rec) => {
+                      const isChecked = selectedFlatIds.includes(rec.unitId);
+                      return (
+                        <button
+                          key={rec.unitId}
+                          type="button"
+                          onClick={() => handleToggleFlat(rec.unitId)}
+                          className={`flex items-center justify-between rounded-lg border p-2 text-left text-xs transition cursor-pointer ${
+                            isChecked
+                              ? "border-slate-900 bg-slate-900 text-white font-medium"
+                              : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                          }`}
+                        >
+                          <div>
+                            <div className="font-semibold">{rec.unitName}</div>
+                            <div className="text-[10px] opacity-80 truncate max-w-[100px]">
+                              {rec.residentName}
+                            </div>
                           </div>
-                        </div>
-                        {isChecked && <CheckCircle2 className="h-4 w-4 shrink-0" />}
-                      </button>
-                    );
-                  })}
+                          {isChecked && <CheckCircle2 className="h-4 w-4 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             )}
