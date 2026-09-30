@@ -92,10 +92,20 @@ export function VisitorRecordsTable({
                   {formatDateTime(record.checkedOutAt)}
                 </td>
                 <td className={tdClassName}>
-                  {record.vehicleNumber || "-"}
+                  {record.vehicleNumber &&
+                  record.vehicleNumber.trim() &&
+                  record.vehicleNumber.trim().toLowerCase() !== "no vehicle" &&
+                  record.vehicleNumber.trim().toLowerCase() !== "none"
+                    ? record.vehicleNumber
+                    : "No vehicle"}
                 </td>
                 <td className={tdClassName}>
-                  {getParkingVehicleTypeLabel(record.vehicleType)}
+                  {record.vehicleNumber &&
+                  record.vehicleNumber.trim() &&
+                  record.vehicleNumber.trim().toLowerCase() !== "no vehicle" &&
+                  record.vehicleNumber.trim().toLowerCase() !== "none"
+                    ? getParkingVehicleTypeLabel(record.vehicleType)
+                    : "-"}
                 </td>
                 <td className={tdClassName}>
                   {record.parkingSlotNumber ? (
@@ -113,7 +123,18 @@ export function VisitorRecordsTable({
                   )}
                 </td>
                 <td className={tdClassName}>
-                  <StatusBadge status={record.status} />
+                  <div className="flex flex-col gap-1 items-start">
+                    <StatusBadge status={record.status} />
+                    {record.status === "ACTIVE" && record.departedFromFlatAt && (
+                      <span
+                        title={`Resident confirmed visitor exited flat at ${new Date(record.departedFromFlatAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`}
+                        className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-300 animate-pulse whitespace-nowrap"
+                      >
+                        <span>🚶</span>
+                        <span>Left Flat (Headed to Gate)</span>
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className={tdClassName}>
                   <VisitorParkingActions

@@ -93,15 +93,6 @@ const securityDeliverySchema =
         required: true,
       },
 
-      notifiedBy: {
-        type: String,
-        default: null,
-      },
-
-      notifiedAt: {
-        type: Date,
-        default: null,
-      },
 
       collectedBy: {
         type: String,

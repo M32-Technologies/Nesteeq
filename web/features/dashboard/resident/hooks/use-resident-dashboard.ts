@@ -9,10 +9,13 @@ import {
   fetchResidentDashboardAnnouncements,
   fetchCurrentApartment,
   fetchCurrentResidentProfile,
+  fetchResidentDashboardFeed,
   type GuestPassItem,
   type CurrentApartment,
   type ResidentProfileItem,
 } from "../api/resident-dashboard.api";
+import { fetchResidentBills } from "@/features/dashboard/treasurer/billing/services/billing.service";
+import type { ResidentBillsSummary, ResidentBillItem } from "@/features/dashboard/treasurer/billing/types/billing.types";
 
 export interface UnifiedFeedItem {
   id: string;
@@ -119,6 +122,37 @@ export function useResidentDashboard() {
     staleTime: 30 * 1000,
   });
 
+  // 8. Backend Consolidated Dashboard Feed Query
+  const {
+    data: dashboardFeed,
+    isLoading: isFeedLoading,
+    refetch: refetchFeed,
+  } = useQuery({
+    queryKey: ["resident", "dashboard", "feed"],
+    queryFn: fetchResidentDashboardFeed,
+    staleTime: 30 * 1000,
+  });
+
+  // 9. Bills & Dues Query
+  const {
+    data: billsData,
+    isLoading: isBillsLoading,
+    refetch: refetchBills,
+  } = useQuery({
+    queryKey: ["resident", "bills"],
+    queryFn: fetchResidentBills,
+    staleTime: 30 * 1000,
+  });
+
+  const billsSummary: ResidentBillsSummary = billsData?.summary || {
+    totalOutstanding: 0,
+    totalPaid: 0,
+    pendingCount: 0,
+    overdueCount: 0,
+    lateFees: 0,
+  };
+  const billsList: ResidentBillItem[] = billsData?.bills || [];
+
   // Resolve clean human-readable flat unit without any raw IDs or dummy fallbacks
   const flatUnitName = useMemo(() => {
     if (residentProfile?.flat?.flatNumber) {
@@ -144,9 +178,17 @@ export function useResidentDashboard() {
   }, [residentProfile, user]);
 
   const complaintsList = complaintsData?.complaints || [];
-  const activeComplaintsCount = complaintsList.filter(
-    (c) => c.status !== "RESOLVED" && c.status !== "CLOSED" && c.status !== "REJECTED"
-  ).length;
+  const activeComplaintsCount =
+    dashboardFeed?.counts?.activeComplaints ??
+    complaintsList.filter(
+      (c) =>
+        c.status !== "RESOLVED" &&
+        c.status !== "CLOSED" &&
+        c.status !== "APPROVED" &&
+        c.status !== "WORK_COMPLETED" &&
+        c.status !== "REJECTED" &&
+        c.status !== "CANCELLED"
+    ).length;
 
   const criticalAlert = useMemo(() => {
     return announcements.find(
@@ -154,12 +196,19 @@ export function useResidentDashboard() {
     );
   }, [announcements]);
 
-  const activeVisitorsCount = guestPasses.filter(
-    (p) => p.status === "ACTIVE"
-  ).length;
+  const activeVisitorsCount =
+    dashboardFeed?.counts?.activePasses ??
+    guestPasses.filter((p) => p.status === "ACTIVE").length;
 
-  // Build Unified Feed Items for Center Column
+  // Build Unified Feed Items for Center Column (from backend feed if available, or fallback)
   const unifiedFeedItems = useMemo<UnifiedFeedItem[]>(() => {
+    if (dashboardFeed?.feed && dashboardFeed.feed.length > 0) {
+      return dashboardFeed.feed.map((item) => ({
+        ...item,
+        rawDate: new Date(item.rawDate),
+      }));
+    }
+
     const items: UnifiedFeedItem[] = [];
 
     // Map Announcements
@@ -250,15 +299,19 @@ export function useResidentDashboard() {
 
     // Sort newest first
     return items.sort((a, b) => b.rawDate.getTime() - a.rawDate.getTime());
-  }, [announcements, complaintsList, guestPasses, apartmentName]);
+  }, [dashboardFeed, announcements, complaintsList, guestPasses, apartmentName]);
 
   // Refetch all queries
-  const refetchAll = () => {
-    refetchApartment();
-    refetchProfile();
-    refetchVisitors();
-    refetchComplaints();
-    refetchAnnouncements();
+  const refetchAll = async () => {
+    await Promise.all([
+      refetchApartment(),
+      refetchProfile(),
+      refetchVisitors(),
+      refetchComplaints(),
+      refetchAnnouncements(),
+      refetchFeed(),
+      refetchBills(),
+    ]);
   };
 
   return {
@@ -293,6 +346,11 @@ export function useResidentDashboard() {
     announcements,
     criticalAlert,
     isAnnouncementsLoading,
+
+    // Bills & Society Finance
+    billsSummary,
+    billsList,
+    isBillsLoading,
 
     refetchAll,
   };

@@ -40,7 +40,8 @@ export const getParkingSlots = async (
     if (params.usageType) cleanParams.usageType = params.usageType
     if (params.status) cleanParams.status = params.status
     if (params.level?.trim()) cleanParams.level = params.level.trim()
-    if (params.zoneCode?.trim()) cleanParams.zoneCode = params.zoneCode.trim().toUpperCase()
+    if (params.zoneCode?.trim()) cleanParams.zoneCode = params.zoneCode.trim()
+    if (params.zoneName?.trim()) cleanParams.zoneName = params.zoneName.trim()
     if (params.page) cleanParams.page = params.page
     if (params.limit) cleanParams.limit = params.limit
     if (params.sortBy) cleanParams.sortBy = params.sortBy
@@ -145,13 +146,17 @@ export const assignResidentParking = async (
   input: AssignResidentParkingInput
 ): Promise<ParkingSlot> => {
   try {
+    const payload: Record<string, unknown> = {
+      flatId: input.flatId,
+    }
+    if (input.residentId) payload.residentId = input.residentId
+    if (input.vehicleNumber?.trim()) {
+      payload.vehicleNumber = input.vehicleNumber.trim().toUpperCase()
+    }
+
     const response = await api.post<ApiResponse<ParkingSlot>>(
       `/api/v1/parking/${parkingId}/assign-resident`,
-      {
-        flatId: input.flatId,
-        residentId: input.residentId || undefined,
-        vehicleNumber: input.vehicleNumber.trim().toUpperCase(),
-      }
+      payload
     )
 
     if (!response.data.success) {

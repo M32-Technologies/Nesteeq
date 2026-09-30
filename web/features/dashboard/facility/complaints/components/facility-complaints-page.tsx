@@ -56,7 +56,20 @@ export const standardComplaintLifecycleStatuses: ComplaintStatus[] = [
   "RESOLVED",
   "CLOSED",
   "REJECTED",
-]
+];
+
+const complaintManagerTransitions: Partial<
+  Record<ComplaintStatus, ComplaintStatus[]>
+> = {
+  PENDING: ["UNDER_REVIEW", "IN_PROGRESS"],
+  UNDER_REVIEW: ["ASSIGNED", "IN_PROGRESS"],
+  ASSIGNED: ["IN_PROGRESS"],
+  IN_PROGRESS: ["WORK_COMPLETED"],
+  WORK_COMPLETED: ["APPROVED", "CLOSED"],
+  AWAITING_APPROVAL: ["APPROVED", "CLOSED"],
+  APPROVED: ["CLOSED"],
+  REJECTED: ["ASSIGNED", "IN_PROGRESS"],
+};
 
 export const cancellableComplaintStatuses = new Set<ComplaintStatus>([
   "PENDING",
@@ -163,6 +176,8 @@ export function FacilityComplaintsPage() {
   const handleSuccess = async (message?: string) => {
     toast.success(message || "Complaint updated")
     await queryClient.invalidateQueries({ queryKey: ["facility-complaints"] })
+    await queryClient.invalidateQueries({ queryKey: ["resident", "complaints"] })
+    await queryClient.invalidateQueries({ queryKey: ["resident", "dashboard", "complaints"] })
   }
 
   const assignMutation = useMutation({

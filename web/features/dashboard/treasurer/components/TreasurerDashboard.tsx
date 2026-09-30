@@ -1,44 +1,76 @@
 "use client";
 
-import CollectionOverviewChart from "./CollectionOverviewChart";
+import React, { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+
+import { TreasurerHeader } from "./TreasurerHeader";
+import TreasurerSummaryCards from "./TreasurerSummaryCards";
+import { TreasurerFinancialChart } from "./TreasurerFinancialChart";
 import PendingPayments from "./PendingPayments";
 import RecentPayments from "./RecentPayments";
-import TreasurerSummaryCards from "./TreasurerSummaryCards";
+import { getTreasurerDashboard } from "../services/treasurer.service";
 
 export default function TreasurerDashboard() {
+  const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Single unified dashboard query powered by the backend treasurer module
+  const dashboardQuery = useQuery({
+    queryKey: ["treasurer", "dashboard"],
+    queryFn: getTreasurerDashboard,
+  });
+
+  const handleRefresh = async () => {
+    try {
+      setIsRefreshing(true);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["treasurer"] }),
+      ]);
+      toast.success("Treasury data refreshed.");
+    } catch {
+      toast.error("Failed to refresh treasury data.");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const dashboard = dashboardQuery.data;
+  const isLoading = dashboardQuery.isLoading;
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">
-          Treasurer Dashboard
-        </h1>
+      {/* 1. Header with greeting, role beacon, and quick actions */}
+      <TreasurerHeader onRefresh={handleRefresh} isRefreshing={isRefreshing} />
 
-        <p className="mt-1 text-sm text-slate-500">
-          Manage collections, dues, expenses and apartment finances.
-        </p>
-      </div>
+      {/* 2. Top Summary KPI Cards */}
+      <TreasurerSummaryCards
+        summary={dashboard?.summary}
+        isLoading={isLoading}
+      />
 
-      <TreasurerSummaryCards />
-
-      <div className="grid gap-6 xl:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-6 xl:col-span-2">
-          <h2 className="text-lg font-semibold text-slate-900">
-            Collection Overview
-          </h2>
-
-          <p className="mt-1 text-sm text-slate-500">
-            Monthly collection and expense trends.
-          </p>
-
-          <div className="mt-6">
-            <CollectionOverviewChart />
-          </div>
+      {/* 3. Main Analytics Grid: Financial Chart (2 cols) & Pending Dues (1 col) */}
+      <div className="grid gap-6 xl:grid-cols-3 items-stretch">
+        <div className="xl:col-span-2 flex flex-col">
+          <TreasurerFinancialChart
+            initialChart={dashboard?.chart}
+            isLoading={isLoading}
+          />
         </div>
 
-        <PendingPayments />
+        <div className="xl:col-span-1 flex flex-col">
+          <PendingPayments
+            pendingDues={dashboard?.pendingDues}
+            isLoading={isLoading}
+          />
+        </div>
       </div>
 
-      <RecentPayments />
+      {/* 4. Recent Transactions Ledger */}
+      <RecentPayments
+        recentPayments={dashboard?.recentPayments}
+        isLoading={isLoading}
+      />
     </div>
   );
 }

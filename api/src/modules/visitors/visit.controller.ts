@@ -14,11 +14,17 @@ import {
   getGuestPassesService,
   getVisitorRecordsService,
   getVisitorHistoryService,
+  createResidentGuestPassService,
+  getResidentGuestPassesService,
+  cancelResidentGuestPassService,
+  markVisitorDepartedFromFlatService,
 } from "./visit.service.js"
 
 const getSecurityContext = (req: Request) => {
   const userId = req.user?.id
-  const apartmentId = req.user?.apartmentId
+  const apartmentId =
+    req.user?.apartmentId ||
+    (typeof req.query.apartmentId === "string" ? req.query.apartmentId : undefined)
 
   if (!userId) throw new AppError("Unauthorized", 401)
   if (!apartmentId) throw new AppError("Apartment context not found", 403)
@@ -279,3 +285,45 @@ export const getVisitorRecords = catchAsync(
     })
   }
 )
+
+export const createResidentGuestPassHandler = catchAsync(async (req: Request, res: Response) => {
+  const apartmentId = req.user?.apartmentId || undefined
+  const result = await createResidentGuestPassService(req.user, req.body, apartmentId)
+
+  res.status(201).json({
+    success: true,
+    data: result,
+    message: "Visitor pass created successfully",
+  })
+})
+
+export const getResidentGuestPassesHandler = catchAsync(async (req: Request, res: Response) => {
+  const apartmentId = req.user?.apartmentId || undefined
+  const result = await getResidentGuestPassesService(req.user, req.query as any, apartmentId)
+
+  res.status(200).json({
+    success: true,
+    data: result,
+  })
+})
+
+export const cancelResidentGuestPassHandler = catchAsync(async (req: Request, res: Response) => {
+  const apartmentId = req.user?.apartmentId || undefined
+  const passId = String(req.params.passId || req.params.guestPassId)
+  const result = await cancelResidentGuestPassService(req.user, passId, apartmentId)
+
+  res.status(200).json({
+    success: true,
+    data: result,
+  })
+})
+
+export const markVisitorDepartedHandler = catchAsync(async (req: Request, res: Response) => {
+  const apartmentId = req.user?.apartmentId || undefined
+  const id = String(req.params.visitId || req.params.passId || req.params.id)
+  const result = await markVisitorDepartedFromFlatService(req.user, id, apartmentId)
+
+  res.status(200).json(result)
+})
+
+

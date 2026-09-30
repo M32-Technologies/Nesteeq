@@ -31,8 +31,6 @@ export interface SecurityDelivery {
   status: Exclude<DeliveryStatus, "ALL">
   receivedBy: string
   receivedAt: string
-  notifiedBy?: string | null
-  notifiedAt?: string | null
   collectedBy?: string | null
   collectedAt?: string | null
   returnedBy?: string | null

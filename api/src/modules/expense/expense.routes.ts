@@ -7,6 +7,7 @@ import {
 import {
   createExpense,
   getExpenseById,
+  getExpenseSummary,
   getExpenses,
   updateExpense,
 } from "./expense.controller.js";
@@ -101,6 +102,8 @@ router.use(protect, requireRole("treasurer"));
 router.post("/", requireBodyApartmentAccess, zodValidate(createExpenseSchema), createExpense);
 
 router.get("/", zodValidate(getExpensesSchema), requireQueryApartmentAccess, getExpenses);
+
+router.get("/summary", requireQueryApartmentAccess, getExpenseSummary);
 
 router.get("/:id", zodValidate(getExpenseByIdSchema), requireExpenseApartmentAccess, getExpenseById);
 

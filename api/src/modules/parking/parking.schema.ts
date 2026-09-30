@@ -79,7 +79,8 @@ export const listParkingSlotsSchema = z.object({
       z.enum(usageTypes).optional()
     ),
     level: optionalString(z.string().max(100)),
-    zoneCode: optionalString(z.string().max(100).toUpperCase()),
+    zoneCode: optionalString(z.string().max(100)),
+    zoneName: optionalString(z.string().max(100)),
     page: z
       .preprocess(
         emptyToUndefined,
@@ -273,11 +274,11 @@ export const assignResidentParkingSchema =
       .object({
         flatId: objectIdSchema("Flat id"),
         residentId: objectIdSchema("Resident id").optional(),
-        vehicleNumber: z
-          .string()
-          .trim()
-          .min(1, "Vehicle number is required")
-          .max(20, "Vehicle number cannot exceed 20 characters"),
+        vehicleNumber: optionalString(
+          z.string()
+            .trim()
+            .max(20, "Vehicle number cannot exceed 20 characters")
+        ),
       })
       .strict(),
   })

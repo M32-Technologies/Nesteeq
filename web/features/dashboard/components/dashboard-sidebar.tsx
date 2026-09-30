@@ -8,7 +8,7 @@ import {
   Bell,
   ChevronRight,
   LogOut,
-  Settings,
+  UserRound,
   X,
 } from "lucide-react"
 
@@ -46,9 +46,9 @@ export default function DashboardSidebar({
   const navigation = sidebarNavigation[role]
   const roleLabel = dashboardRoleLabels[role]
   const roleHomePath = `/${getDashboardRoleRouteSegment(role)}`
-  const settingsHref = getDashboardItemHref(role, "/dashboard/settings")
-  const isSettingsActive =
-    pathname === settingsHref || pathname.endsWith("/settings")
+  const profileHref = "/profile"
+  const isProfileActive =
+    pathname === profileHref || pathname.endsWith("/profile")
 
   const handleSignOut = async () => {
     await signOut()
@@ -296,12 +296,11 @@ export default function DashboardSidebar({
                         rounded-xl
 
                         transition-all
-                        duration-200
-
-                        ${isActive
+                        ${
+                          isActive
                             ? "bg-[#16477C] text-white"
                             : "text-[#C3D2E3] hover:bg-white/[0.07] hover:text-white"
-                          }
+                        }
                       `}
                       >
                         {/* ACTIVE INDICATOR */}
@@ -479,12 +478,12 @@ export default function DashboardSidebar({
               </span>
             </button>
 
-            {/* SETTINGS */}
+            {/* MY PROFILE */}
 
             <Link
-              href={settingsHref}
+              href={profileHref}
               onClick={onMobileClose}
-              title="Settings"
+              title="My Profile"
               className={`
               relative
               flex
@@ -497,13 +496,13 @@ export default function DashboardSidebar({
               transition-colors
               duration-150
               ${
-                isSettingsActive
+                isProfileActive
                   ? "bg-[#16477C] text-white"
                   : "text-[#C3D2E3] hover:bg-white/[0.07] hover:text-white"
               }
             `}
             >
-              {isSettingsActive && (
+              {isProfileActive && (
                 <span
                   className="
                   absolute
@@ -527,7 +526,7 @@ export default function DashboardSidebar({
                 justify-center
               "
               >
-                <Settings className="size-[18px] stroke-[1.8]" />
+                <UserRound className="size-[18px] stroke-[1.8]" />
               </div>
 
               <span
@@ -542,7 +541,7 @@ export default function DashboardSidebar({
                 lg:group-hover/sidebar:opacity-100
               "
               >
-                Settings
+                My Profile
               </span>
             </Link>
 

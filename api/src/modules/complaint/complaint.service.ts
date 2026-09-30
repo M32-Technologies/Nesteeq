@@ -556,7 +556,7 @@ const updateComplaintDocument = async (
   }
 
   const updatedComplaint = await Complaint.findByIdAndUpdate(complaintId, update, {
-    new: true,
+    returnDocument: "after",
     runValidators: true,
   });
 
@@ -585,7 +585,9 @@ const createRemark = (message: string | undefined, user: AuthenticatedComplaintU
 };
 
 const escapeRegex = (value: string): string =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  value.replace(/[.*+?^${}()|[\]\\]/g, (char) => "\\" + char);
+
+const escapeComplaintRegex = escapeRegex;
 
 export const buildApartmentQuery = (
   apartmentId: string | Types.ObjectId
@@ -771,14 +773,16 @@ const applySharedFilters = (
     }
   }
 
-  const querySearch = (query as any).search;
+  const querySearch = (query as any).search || query.search;
   if (querySearch && typeof querySearch === "string" && querySearch.trim()) {
     const searchRegex = new RegExp(escapeRegex(querySearch.trim()), "i");
     addOrCondition(filter, [
       { title: searchRegex },
       { description: searchRegex },
+      { ticketNumber: searchRegex },
     ]);
   }
+
 };
 
 const applyManagerFilters = async (
@@ -999,9 +1003,14 @@ export const getComplaints = async (
   const limit = Number(query.limit) > 0 ? Number(query.limit) : 20;
   const skip = (page - 1) * limit;
 
+  const countFilter = { ...filter };
+
   const [complaints, total] = await Promise.all([
     Complaint.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
     Complaint.countDocuments(filter),
+    Complaint.countDocuments({ ...countFilter, status: "PENDING" } as any),
+    Complaint.countDocuments({ ...countFilter, status: { $in: ["UNDER_REVIEW", "ASSIGNED", "IN_PROGRESS", "AWAITING_APPROVAL"] } } as any),
+    Complaint.countDocuments({ ...countFilter, status: { $in: ["WORK_COMPLETED", "APPROVED", "CLOSED"] } } as any),
   ]);
 
   const enrichedComplaints = await enrichComplaints(complaints);
@@ -1199,13 +1208,6 @@ export const updateComplaintStatus = async (
 
     if (nextStatus === "ASSIGNED" && !complaint.assignedStaff) {
       throw new AppError("Assign staff before moving complaint to ASSIGNED", 400);
-    }
-
-    if (
-      nextStatus === "CLOSED" &&
-      complaint.residentConfirmation?.status !== "CONFIRMED"
-    ) {
-      throw new AppError("Resident confirmation is required before closing this complaint", 400);
     }
   } else {
     throw new AppError("You do not have permission to update complaint status", 403);
@@ -1412,8 +1414,8 @@ export const confirmComplaintResolution = async (
     return complaint;
   }
 
-  if (currentStatus !== "APPROVED") {
-    throw new AppError("Only approved complaints can be confirmed", 400);
+  if (!["APPROVED", "WORK_COMPLETED"].includes(currentStatus)) {
+    throw new AppError("Only approved or completed complaints can be confirmed", 400);
   }
 
   const now = new Date();

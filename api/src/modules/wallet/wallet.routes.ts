@@ -10,6 +10,7 @@ import {
   deductWalletFunds,
   getWallet,
   getWallets,
+  getWalletSummary,
 } from "./wallet.controller.js";
 
 import {
@@ -123,6 +124,8 @@ router.use(protect, requireRole("treasurer"));
 router.post("/", requireBodyApartmentAccess, zodValidate(createWalletSchema), createWallet);
 
 router.get("/", requireQueryApartmentAccess, zodValidate(getWalletsSchema), getWallets);
+
+router.get("/summary", requireQueryApartmentAccess, getWalletSummary);
 
 router.get("/:residentId", requireQueryApartmentAccess, zodValidate(getWalletSchema), requireWalletApartmentAccess, getWallet);
 

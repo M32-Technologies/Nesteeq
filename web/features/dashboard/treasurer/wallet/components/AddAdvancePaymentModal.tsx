@@ -1,7 +1,10 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { X } from "lucide-react";
+
+import { getBillRecipients } from "../../services/treasurer.service";
 
 export interface NewAdvancePaymentData {
   residentId: string;
@@ -15,8 +18,6 @@ interface AddAdvancePaymentModalProps {
   onAdd: (payment: NewAdvancePaymentData) => void | Promise<void>;
   isSubmitting?: boolean;
 }
-
-const objectIdPattern = /^[0-9a-fA-F]{24}$/;
 
 const getSafeErrorMessage = (error: unknown) =>
   error instanceof Error
@@ -34,9 +35,11 @@ export default function AddAdvancePaymentModal({
   const [description, setDescription] = useState("Advance payment");
   const [error, setError] = useState("");
 
-  if (!isOpen) {
-    return null;
-  }
+  const recipientsQuery = useQuery({
+    queryKey: ["treasurer", "bill-recipients"],
+    queryFn: () => getBillRecipients(),
+    enabled: isOpen,
+  });
 
   const resetForm = () => {
     setResidentId("");
@@ -46,23 +49,45 @@ export default function AddAdvancePaymentModal({
   };
 
   const handleClose = () => {
+    if (isSubmitting) return;
     resetForm();
     onClose();
   };
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && isOpen && !isSubmitting) {
+        handleClose();
+      }
+    };
+
+    if (isOpen) {
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }
+  }, [isOpen, isSubmitting]);
+
+  if (!isOpen) {
+    return null;
+  }
+
+  const recipients = recipientsQuery.data ?? [];
+  const activeResidents = recipients.filter(
+    (r) => r.hasResident && Boolean(r.residentId)
+  );
 
   const handleSubmit = async (
     event: FormEvent<HTMLFormElement>,
   ) => {
     event.preventDefault();
 
-    const trimmedResidentId = residentId.trim();
-    const parsedAmount = Number(amount);
-    const trimmedDescription = description.trim();
-
-    if (!objectIdPattern.test(trimmedResidentId)) {
-      setError("Resident ID must be a valid MongoDB ObjectId.");
+    if (!residentId) {
+      setError("Please select a resident.");
       return;
     }
+
+    const parsedAmount = Number(amount);
+    const trimmedDescription = description.trim();
 
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
       setError("Amount must be greater than 0.");
@@ -78,7 +103,7 @@ export default function AddAdvancePaymentModal({
 
     try {
       await onAdd({
-        residentId: trimmedResidentId,
+        residentId,
         amount: parsedAmount,
         description: trimmedDescription,
       });
@@ -91,11 +116,21 @@ export default function AddAdvancePaymentModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="advance-payment-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !isSubmitting) {
+          handleClose();
+        }
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    >
       <div className="w-full max-w-xl rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">
+            <h2 id="advance-payment-title" className="text-lg font-semibold text-slate-900">
               Credit Wallet
             </h2>
             <p className="mt-1 text-sm text-slate-500">
@@ -105,7 +140,8 @@ export default function AddAdvancePaymentModal({
           <button
             type="button"
             onClick={handleClose}
-            className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100"
+            disabled={isSubmitting}
+            className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -121,27 +157,45 @@ export default function AddAdvancePaymentModal({
             ) : null}
 
             <label className="text-sm font-medium text-slate-700">
-              Resident ID
-              <input
-                type="text"
-                value={residentId}
-                onChange={(event) => setResidentId(event.target.value)}
-                pattern="[0-9a-fA-F]{24}"
-                required
-                className="mt-2 w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
-              />
+              Resident / Flat
+              {recipientsQuery.isLoading ? (
+                <div className="mt-2 text-xs text-slate-500">
+                  Loading residents...
+                </div>
+              ) : activeResidents.length === 0 ? (
+                <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                  No active residents found in this apartment. Please add or link residents to flats before crediting wallet.
+                </div>
+              ) : (
+                <select
+                  value={residentId}
+                  onChange={(event) => setResidentId(event.target.value)}
+                  required
+                  disabled={isSubmitting}
+                  className="mt-2 w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 disabled:bg-slate-100"
+                >
+                  <option value="">Select Resident / Flat</option>
+                  {activeResidents.map((r) => (
+                    <option key={r.residentId} value={r.residentId!}>
+                      {r.flatNumber ? `Flat ${r.flatNumber}` : r.unitName} — {r.residentName} ({r.residentType || "resident"})
+                    </option>
+                  ))}
+                </select>
+              )}
             </label>
 
             <label className="text-sm font-medium text-slate-700">
-              Amount
+              Amount (₹)
               <input
                 type="number"
                 min="0.01"
                 step="0.01"
                 value={amount}
+                placeholder="e.g. 5000"
                 onChange={(event) => setAmount(event.target.value)}
                 required
-                className="mt-2 w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                disabled={isSubmitting}
+                className="mt-2 w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 disabled:bg-slate-100"
               />
             </label>
 
@@ -154,7 +208,8 @@ export default function AddAdvancePaymentModal({
                   setDescription(event.target.value)
                 }
                 required
-                className="mt-2 w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                disabled={isSubmitting}
+                className="mt-2 w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 disabled:bg-slate-100"
               />
             </label>
           </div>
@@ -163,13 +218,14 @@ export default function AddAdvancePaymentModal({
             <button
               type="button"
               onClick={handleClose}
-              className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              disabled={isSubmitting}
+              className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || activeResidents.length === 0}
               className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
               {isSubmitting ? "Crediting..." : "Credit Wallet"}

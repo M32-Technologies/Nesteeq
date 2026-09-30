@@ -39,6 +39,8 @@ export const createApartmentBodySchema = z.object({
     .trim()
     .min(1, "Total units is required"),
 
+  totalFloors: z.string().trim().optional(),
+
   totalBlocks: z
     .string()
     .trim()
@@ -62,6 +64,16 @@ export const createApartmentSchema = z.object({
   body: createApartmentBodySchema,
 });
 
+export const updateApartmentBodySchema = createApartmentBodySchema.partial();
+
+export const updateApartmentSchema = z.object({
+  body: updateApartmentBodySchema,
+});
+
 export type CreateApartmentInput = z.infer<
   typeof createApartmentBodySchema
+>;
+
+export type UpdateApartmentInput = z.infer<
+  typeof updateApartmentBodySchema
 >;

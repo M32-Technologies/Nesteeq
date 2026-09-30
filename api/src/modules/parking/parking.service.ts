@@ -37,7 +37,11 @@ import type {
 export const toId = (val: ObjectIdLike | string | null | undefined) => val?.toString() ?? ""
 export const toMongoId = (val: string) => (Types.ObjectId.isValid(val) ? new Types.ObjectId(val) : val)
 export const normalizeText = (val?: string | null) => val?.trim() || null
-export const normalizeVehicleNumber = (val: string) => val.replace(/[\s-]/g, "").toUpperCase()
+export function normalizeVehicleNumber(val: string): string
+export function normalizeVehicleNumber(val?: string | null): string | null
+export function normalizeVehicleNumber(val?: string | null): string | null {
+  return val && val.trim() ? val.replace(/[\s-]/g, "").toUpperCase() : null
+}
 export const isDuplicateKeyError = (err: unknown): err is DuplicateKeyError =>
   typeof err === "object" && err !== null && "code" in err && (err as { code: number }).code === 11000
 
@@ -149,14 +153,32 @@ export const listParkingSlotsService = async ({
     usageType: ParkingUsageType.VISITOR,
   }
 
-  if (status === "AVAILABLE") filter.status = ParkingSlotStatus.AVAILABLE
-  else if (status === "OCCUPIED") filter.status = { $in: [ParkingSlotStatus.OCCUPIED, ParkingSlotStatus.ASSIGNED] }
-  else if (status === "UNAVAILABLE") filter.status = ParkingSlotStatus.INACTIVE
+  if (status === "AVAILABLE") {
+    filter.status = ParkingSlotStatus.AVAILABLE
+    filter.vehicleNumber = { $in: [null, ""] }
+    filter.visitorVisitId = null
+  } else if (status === "OCCUPIED") {
+    filter.status = { $in: [ParkingSlotStatus.OCCUPIED, ParkingSlotStatus.ASSIGNED] }
+  } else if (status === "UNAVAILABLE") {
+    filter.status = ParkingSlotStatus.INACTIVE
+  }
 
-  if (vehicleType) filter.vehicleType = vehicleType
+  if (vehicleType) {
+    if (vehicleType === "OTHER") {
+      filter.$or = [{ vehicleType: "OTHER" }, { vehicleType: null }, { vehicleType: { $exists: false } }]
+    } else {
+      filter.vehicleType = vehicleType
+    }
+  }
   if (search) {
     const reg = new RegExp(escapeRegExp(search.trim()), "i")
-    filter.$or = [{ slotNumber: reg }, { vehicleNumber: reg }, { visitorName: reg }]
+    const searchCondition = [{ slotNumber: reg }, { vehicleNumber: reg }, { visitorName: reg }]
+    if (filter.$or) {
+      filter.$and = [{ $or: filter.$or }, { $or: searchCondition }]
+      delete filter.$or
+    } else {
+      filter.$or = searchCondition
+    }
   }
 
   const skip = (page - 1) * limit
@@ -237,7 +259,7 @@ export const updateParkingSlotStatusService = async ({
         flatId: null,
       },
     },
-    { new: true }
+    { returnDocument: "after" }
   ).lean<IParkingSlot | null>()
 
   if (!slot) throw new AppError("Parking slot not found", 404)
@@ -464,10 +486,14 @@ export const releaseParkingSlotService = async ({
 
   if (visitId) {
     await VisitorVisitModel.updateOne(
-      { _id: visitId, apartmentId: aptObjectId, status: VisitorVisitStatus.ACTIVE },
-      { $set: { checkedOutAt: releasedAt, checkedOutBy: userId, status: VisitorVisitStatus.CHECKED_OUT } }
+      { _id: visitId, apartmentId: aptObjectId },
+      { $set: { parkingSlotId: null } }
     )
   }
+  await VisitorVisitModel.updateMany(
+    { apartmentId: aptObjectId, parkingSlotId: sObjectId },
+    { $set: { parkingSlotId: null } }
+  )
 
   return { slotId: toId(slot._id), releasedAt, releasedBy: userId }
 }
@@ -551,16 +577,35 @@ export const generateParkingSlots = async (
 
 export const getParkingSlots = async (query: GetParkingSlotsQuery, apartmentId: string) => {
   const aptObjectId = parkingObjectId(apartmentId, "apartment id")
-  const filter: Record<string, unknown> = { apartmentId: aptObjectId }
-  if (query.vehicleType) filter.vehicleType = query.vehicleType
-  if (query.usageType) filter.usageType = query.usageType
-  if (query.status && query.status !== "ALL" && managerStatusSet.has(query.status)) filter.status = query.status
-  if (query.level) filter.level = query.level
-  if (query.zoneCode) filter.zoneCode = query.zoneCode
+  const conditions: Record<string, unknown>[] = [{ apartmentId: aptObjectId }]
+  if (query.vehicleType) conditions.push({ vehicleType: query.vehicleType })
+  if (query.usageType) conditions.push({ usageType: query.usageType })
+  if (query.status && query.status !== "ALL" && managerStatusSet.has(query.status)) {
+    conditions.push({ status: query.status })
+  }
+  if (query.level) conditions.push({ level: query.level.trim() })
+
+  const rawZone = query.zoneCode || (query as Record<string, unknown>).zoneName
+  if (rawZone && typeof rawZone === "string" && rawZone.trim()) {
+    const zTrim = rawZone.trim()
+    const generatedCode = generateParkingZoneCode(zTrim)
+    const orZoneList: Record<string, unknown>[] = [
+      { zoneCode: zTrim },
+      { zoneCode: zTrim.toUpperCase() },
+      { zoneName: new RegExp(`^${escapeRegExp(zTrim)}$`, "i") },
+    ]
+    if (generatedCode && generatedCode !== zTrim && generatedCode !== zTrim.toUpperCase()) {
+      orZoneList.push({ zoneCode: generatedCode })
+    }
+    conditions.push({ $or: orZoneList })
+  }
+
   if (query.search) {
     const reg = new RegExp(escapeRegExp(query.search.trim()), "i")
-    filter.$or = [{ slotNumber: reg }, { vehicleNumber: reg }]
+    conditions.push({ $or: [{ slotNumber: reg }, { vehicleNumber: reg }] })
   }
+
+  const filter = conditions.length === 1 ? conditions[0] : { $and: conditions }
   const page = query.page ?? 1
   const limit = query.limit ?? 10
   const skip = (page - 1) * limit
@@ -642,7 +687,7 @@ export const assignResidentParking = async (
         status: ParkingSlotStatus.ASSIGNED,
         flatId: new Types.ObjectId(data.flatId),
         residentId: data.residentId ? new Types.ObjectId(data.residentId) : null,
-        vehicleNumber: normalizeVehicleNumber(data.vehicleNumber),
+        vehicleNumber: data.vehicleNumber ? normalizeVehicleNumber(data.vehicleNumber) : null,
         assignedAt: new Date(),
       },
     },
@@ -710,33 +755,38 @@ export const updateParkingSlotStatus = async (
 
 export const getParkingStats = async (apartmentId: string) => {
   const aptObjectId = parkingObjectId(apartmentId, "apartment id")
-  const [stats] = await ParkingSlotModel.aggregate([
-    { $match: { apartmentId: aptObjectId } },
-    {
-      $group: {
-        _id: null,
-        total: { $sum: 1 },
-        available: {
-          $sum: { $cond: [{ $eq: ["$status", ParkingSlotStatus.AVAILABLE] }, 1, 0] },
-        },
-        assigned: {
-          $sum: { $cond: [{ $eq: ["$status", ParkingSlotStatus.ASSIGNED] }, 1, 0] },
-        },
-        occupied: {
-          $sum: { $cond: [{ $eq: ["$status", ParkingSlotStatus.OCCUPIED] }, 1, 0] },
-        },
-        inactive: {
-          $sum: { $cond: [{ $eq: ["$status", ParkingSlotStatus.INACTIVE] }, 1, 0] },
-        },
-        residentSlots: {
-          $sum: { $cond: [{ $eq: ["$usageType", ParkingUsageType.RESIDENT] }, 1, 0] },
-        },
-        visitorSlots: {
-          $sum: { $cond: [{ $eq: ["$usageType", ParkingUsageType.VISITOR] }, 1, 0] },
+  const [stats, levels, zoneNames] = await Promise.all([
+    ParkingSlotModel.aggregate([
+      { $match: { apartmentId: aptObjectId } },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          available: {
+            $sum: { $cond: [{ $eq: ["$status", ParkingSlotStatus.AVAILABLE] }, 1, 0] },
+          },
+          assigned: {
+            $sum: { $cond: [{ $eq: ["$status", ParkingSlotStatus.ASSIGNED] }, 1, 0] },
+          },
+          occupied: {
+            $sum: { $cond: [{ $eq: ["$status", ParkingSlotStatus.OCCUPIED] }, 1, 0] },
+          },
+          inactive: {
+            $sum: { $cond: [{ $eq: ["$status", ParkingSlotStatus.INACTIVE] }, 1, 0] },
+          },
+          residentSlots: {
+            $sum: { $cond: [{ $eq: ["$usageType", ParkingUsageType.RESIDENT] }, 1, 0] },
+          },
+          visitorSlots: {
+            $sum: { $cond: [{ $eq: ["$usageType", ParkingUsageType.VISITOR] }, 1, 0] },
+          },
         },
       },
-    },
+    ]).then(([res]) => res),
+    ParkingSlotModel.distinct("level", { apartmentId: aptObjectId }),
+    ParkingSlotModel.distinct("zoneName", { apartmentId: aptObjectId }),
   ])
+
   return {
     total: stats?.total ?? 0,
     available: stats?.available ?? 0,
@@ -745,5 +795,13 @@ export const getParkingStats = async (apartmentId: string) => {
     inactive: stats?.inactive ?? 0,
     residentSlots: stats?.residentSlots ?? 0,
     visitorSlots: stats?.visitorSlots ?? 0,
+    levels: (levels as string[])
+      .filter((lvl): lvl is string => typeof lvl === "string" && Boolean(lvl.trim()))
+      .map((lvl) => lvl.trim())
+      .sort(),
+    zones: (zoneNames as string[])
+      .filter((z): z is string => typeof z === "string" && Boolean(z.trim()))
+      .map((z) => z.trim())
+      .sort(),
   }
 }

@@ -25,6 +25,11 @@ const expenseSchema = new Schema<IExpense>(
       trim: true,
     },
 
+    invoiceRef: {
+      type: String,
+      trim: true,
+    },
+
     category: {
       type: String,
       enum: Object.values(ExpenseCategory),
@@ -54,6 +59,25 @@ const expenseSchema = new Schema<IExpense>(
       enum: Object.values(ExpenseStatus),
       default: ExpenseStatus.PENDING,
       index: true,
+    },
+
+    rejectionReason: {
+      type: String,
+      trim: true,
+    },
+
+    paymentMethod: {
+      type: String,
+      trim: true,
+    },
+
+    paymentReference: {
+      type: String,
+      trim: true,
+    },
+
+    paidAt: {
+      type: Date,
     },
 
     createdBy: {

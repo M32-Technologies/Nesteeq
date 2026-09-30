@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -21,8 +21,12 @@ import {
   Home,
   AlertTriangle,
   UserCheck,
+  ArrowRight,
+  X,
 } from "lucide-react";
 import { useResidentDashboard, type UnifiedFeedItem } from "../../hooks/use-resident-dashboard";
+import { CreateComplaintModal } from "../create-complaint-modal";
+import { CreateVisitorPassModal } from "../create-visitor-pass-modal";
 
 export function ResidentDashboardView() {
   const router = useRouter();
@@ -45,11 +49,21 @@ export function ResidentDashboardView() {
     isVisitorsLoading,
     isComplaintsLoading,
     isAnnouncementsLoading,
+    billsSummary,
+    billsList,
+    isBillsLoading,
     refetchAll,
   } = useResidentDashboard();
 
   const [activeTab, setActiveTab] = useState<"ALL" | "ANNOUNCEMENTS" | "COMPLAINTS" | "PASSES">("ALL");
   const [isRefetching, setIsRefetching] = useState(false);
+  const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
+  const [isVisitorModalOpen, setIsVisitorModalOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const handleRefresh = async () => {
     setIsRefetching(true);
@@ -71,21 +85,27 @@ export function ResidentDashboardView() {
     return unifiedFeedItems;
   }, [unifiedFeedItems, activeTab]);
 
-  const quickActions = [
+  const quickActions: Array<{
+    title: string;
+    description: string;
+    href?: string;
+    onClick?: () => void;
+    icon: React.ComponentType<{ className?: string }>;
+  }> = [
     {
       title: "Pre-Approve Visitor",
       description: "Generate an instant gate pass QR code",
-      href: "/resident/visitors",
+      onClick: () => setIsVisitorModalOpen(true),
       icon: QrCode,
     },
     {
       title: "Raise Complaint",
       description: "Request maintenance or report an issue",
-      href: "/resident/complaints",
+      onClick: () => setIsComplaintModalOpen(true),
       icon: Wrench,
     },
     {
-      title: "Maintenance Bills",
+      title: "Bills & Society Finance",
       description: "Review society dues and payment history",
       href: "/resident/bills",
       icon: ReceiptText,
@@ -106,61 +126,55 @@ export function ResidentDashboardView() {
           <h1 className="text-2xl font-semibold tracking-tight text-[#111111]">
             Resident Dashboard
           </h1>
-          <p className="mt-1 text-sm text-[#637083]">
-            Welcome back, <span className="font-medium text-[#111111]">{userName}</span> • {flatUnitName} at {apartmentName}
+          <p className="mt-1 text-sm text-[#637083]" suppressHydrationWarning>
+            Welcome back,{" "}
+            <span className="font-medium text-[#111111]" suppressHydrationWarning>
+              {isMounted ? userName : "Resident"}
+            </span>{" "}
+            •{" "}
+            <span suppressHydrationWarning>
+              {isMounted ? flatUnitName : "Unit"}
+            </span>{" "}
+            at{" "}
+            <span suppressHydrationWarning>
+              {isMounted ? apartmentName : "Apartment"}
+            </span>
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
           <button
             type="button"
             onClick={handleRefresh}
             disabled={isRefetching}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#DDE3DF] bg-white px-3.5 text-xs sm:text-sm font-medium text-[#111111] transition-colors hover:bg-[#F7F8F5] disabled:opacity-50 cursor-pointer"
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#DDE3DF] bg-white px-3.5 text-xs sm:text-sm font-medium text-[#111111] transition-colors hover:bg-[#F7F8F5] disabled:opacity-50 cursor-pointer w-full sm:w-auto"
           >
             <RefreshCw className={`size-3.5 ${isRefetching ? "animate-spin text-[#07584F]" : "text-[#637083]"}`} />
             <span>Refresh</span>
           </button>
 
-          <Link
-            href="/resident/complaints"
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#DDE3DF] bg-white px-3.5 text-xs sm:text-sm font-medium text-[#111111] transition-colors hover:bg-[#F7F8F5]"
+          <button
+            type="button"
+            onClick={() => setIsComplaintModalOpen(true)}
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#DDE3DF] bg-white px-3.5 text-xs sm:text-sm font-medium text-[#111111] transition-colors hover:bg-[#F7F8F5] cursor-pointer w-full sm:w-auto"
           >
             <Plus className="size-3.5 text-[#637083]" />
             <span>Raise Complaint</span>
-          </Link>
+          </button>
 
-          <Link
-            href="/resident/visitors"
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#07584F] px-4 text-xs sm:text-sm font-medium text-white shadow-xs transition-colors hover:bg-[#064C44]"
+          <button
+            type="button"
+            onClick={() => setIsVisitorModalOpen(true)}
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#07584F] px-4 text-xs sm:text-sm font-medium text-white shadow-xs transition-colors hover:bg-[#064C44] cursor-pointer w-full sm:w-auto"
           >
             <QrCode className="size-3.5" />
             <span>Pre-approve Visitor</span>
-          </Link>
+          </button>
         </div>
       </div>
 
-      {/* Critical Alert Banner (if any) */}
-      {criticalAlert && (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-red-900">
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="size-5 shrink-0 text-red-600" />
-            <div>
-              <p className="text-sm font-semibold">{criticalAlert.title}</p>
-              <p className="text-xs text-red-700 mt-0.5">{criticalAlert.message}</p>
-            </div>
-          </div>
-          <Link
-            href="/resident/announcements"
-            className="shrink-0 rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition"
-          >
-            View Alert
-          </Link>
-        </div>
-      )}
-
       {/* 2. SUMMARY KPI STAT CARDS (5-column grid matching SecuritySummaryCards) */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <SummaryCard
           label="Active Guest Passes"
           value={activeVisitorsCount}
@@ -170,7 +184,7 @@ export function ResidentDashboardView() {
         />
 
         <SummaryCard
-          label="Open Tickets"
+          label="Complaints"
           value={activeComplaintsCount}
           icon={<Wrench className="size-5" />}
           href="/resident/complaints"
@@ -180,11 +194,31 @@ export function ResidentDashboardView() {
 
         <SummaryCard
           label="Outstanding Dues"
-          value="₹0.00"
+          value={
+            isBillsLoading
+              ? "..."
+              : `₹${(billsSummary?.totalOutstanding ?? 0).toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}`
+          }
           icon={<ReceiptText className="size-5" />}
           href="/resident/bills"
-          statusBadge="CLEARED"
-          subtext="All dues settled"
+          urgent={(billsSummary?.overdueCount ?? 0) > 0}
+          statusBadge={
+            (billsSummary?.overdueCount ?? 0) > 0
+              ? "OVERDUE"
+              : (billsSummary?.totalOutstanding ?? 0) > 0
+              ? "PENDING"
+              : "CLEARED"
+          }
+          subtext={
+            (billsSummary?.overdueCount ?? 0) > 0
+              ? `${billsSummary.overdueCount} bill(s) overdue`
+              : (billsSummary?.totalOutstanding ?? 0) > 0
+              ? `${billsSummary.pendingCount} pending bill(s)`
+              : "All dues settled"
+          }
         />
 
         <SummaryCard
@@ -195,12 +229,9 @@ export function ResidentDashboardView() {
           subtext="Boom barrier RFID linked"
         />
 
-        <SummaryCard
-          label="Society Notices"
-          value={announcements.length}
-          icon={<Bell className="size-5" />}
-          href="/resident/announcements"
-          subtext="Published updates"
+        <SocietyNoticesCard
+          count={announcements.length}
+          criticalAlert={criticalAlert}
         />
       </div>
 
@@ -210,9 +241,15 @@ export function ResidentDashboardView() {
           const Icon = action.icon;
           return (
             <button
-              key={action.href}
+              key={action.title}
               type="button"
-              onClick={() => router.push(action.href)}
+              onClick={() => {
+                if (action.onClick) {
+                  action.onClick();
+                } else if (action.href) {
+                  router.push(action.href);
+                }
+              }}
               className="flex items-center gap-4 rounded-lg border border-[#DDE3DF] bg-white p-4 text-left transition-colors hover:bg-[#F7F8F5] cursor-pointer"
             >
               <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#07584F]/10 text-[#07584F]">
@@ -287,13 +324,14 @@ export function ResidentDashboardView() {
                   There are currently no active announcements, open complaints, or pending visitor passes for this filter.
                 </p>
                 <div className="pt-2">
-                  <Link
-                    href="/resident/visitors"
-                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#07584F] px-3 text-xs font-medium text-white hover:bg-[#064C44] transition"
+                  <button
+                    type="button"
+                    onClick={() => setIsVisitorModalOpen(true)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#07584F] px-3 text-xs font-medium text-white hover:bg-[#064C44] transition cursor-pointer"
                   >
                     <Plus className="size-3.5" />
                     <span>Generate Visitor Pass</span>
-                  </Link>
+                  </button>
                 </div>
               </div>
             ) : (
@@ -326,22 +364,26 @@ export function ResidentDashboardView() {
             <div className="space-y-2.5 text-sm">
               <div className="flex justify-between py-1 border-b border-[#EEF1F4]">
                 <span className="text-xs text-[#637083]">Resident Name</span>
-                <span className="font-semibold text-[#111111]">{userName}</span>
+                <span className="font-semibold text-[#111111]" suppressHydrationWarning>
+                  {isMounted ? userName : "Resident"}
+                </span>
               </div>
               <div className="flex justify-between py-1 border-b border-[#EEF1F4]">
                 <span className="text-xs text-[#637083]">Resident Role</span>
-                <span className="inline-flex items-center rounded-md bg-[#F7F8F5] px-2 py-0.5 text-xs font-semibold text-[#07584F]">
-                  {residentRole}
+                <span className="inline-flex items-center rounded-md bg-[#F7F8F5] px-2 py-0.5 text-xs font-semibold text-[#07584F]" suppressHydrationWarning>
+                  {isMounted ? residentRole : "Resident"}
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-[#EEF1F4]">
                 <span className="text-xs text-[#637083]">Flat / Unit</span>
-                <span className="font-semibold text-[#111111]">{flatUnitName}</span>
+                <span className="font-semibold text-[#111111]" suppressHydrationWarning>
+                  {isMounted ? flatUnitName : "Unit"}
+                </span>
               </div>
               <div className="flex justify-between py-1 border-b border-[#EEF1F4]">
                 <span className="text-xs text-[#637083]">Society</span>
-                <span className="font-semibold text-[#111111] truncate max-w-[170px]">
-                  {apartmentName}
+                <span className="font-semibold text-[#111111] truncate max-w-[170px]" suppressHydrationWarning>
+                  {isMounted ? apartmentName : "Apartment"}
                 </span>
               </div>
               <div className="flex justify-between py-1">
@@ -364,23 +406,39 @@ export function ResidentDashboardView() {
                   Monthly maintenance & utility billing
                 </p>
               </div>
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
-                <CheckCircle2 className="size-3" />
-                <span>Cleared</span>
-              </span>
+              {(billsSummary?.totalOutstanding ?? 0) > 0 ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">
+                  <AlertTriangle className="size-3 text-amber-600" />
+                  <span>{(billsSummary?.overdueCount ?? 0) > 0 ? "Overdue" : "Pending"}</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                  <CheckCircle2 className="size-3" />
+                  <span>Cleared</span>
+                </span>
+              )}
             </div>
 
             <div className="rounded-lg bg-[#F7F8F5] p-3.5 border border-[#EEF1F4]">
               <p className="text-xs font-medium text-[#637083]">Current Outstanding Balance</p>
-              <p className="text-2xl font-bold text-[#111111] mt-1">₹0.00</p>
-              <p className="text-xs text-[#637083] mt-1">
-                All maintenance dues and utility charges are completely settled for {flatUnitName}.
+              <p className="text-2xl font-bold text-[#111111] mt-1">
+                {isBillsLoading
+                  ? "..."
+                  : `₹${(billsSummary?.totalOutstanding ?? 0).toLocaleString("en-IN", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}`}
+              </p>
+              <p className="text-xs text-[#637083] mt-1" suppressHydrationWarning>
+                {(billsSummary?.totalOutstanding ?? 0) > 0
+                  ? `You have ${billsSummary?.pendingCount ?? 1} unpaid invoice(s) for ${isMounted ? flatUnitName : "your unit"}.`
+                  : `All maintenance dues and utility charges are completely settled for ${isMounted ? flatUnitName : "your unit"}.`}
               </p>
             </div>
 
             <Link
               href="/resident/bills"
-              className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-[#DDE3DF] bg-white px-3 text-xs font-medium text-[#111111] hover:bg-[#F7F8F5] transition-colors"
+              className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-[#DDE3DF] bg-white px-3 text-xs font-semibold text-[#111111] hover:bg-[#F7F8F5] transition-colors shadow-2xs"
             >
               <span>View Statements & Receipts</span>
               <ChevronRight className="size-3.5 text-[#637083]" />
@@ -419,6 +477,21 @@ export function ResidentDashboardView() {
           </section>
         </div>
       </div>
+
+      {/* Create Complaint Modal (Image 2) */}
+      <CreateComplaintModal
+        isOpen={isComplaintModalOpen}
+        onClose={() => setIsComplaintModalOpen(false)}
+        onSuccess={() => refetchAll()}
+      />
+
+      {/* Generate Visitor Pass Modal (Image 3) */}
+      <CreateVisitorPassModal
+        isOpen={isVisitorModalOpen}
+        onClose={() => setIsVisitorModalOpen(false)}
+        flatUnitName={flatUnitName}
+        onSuccess={() => refetchAll()}
+      />
     </div>
   );
 }
@@ -441,6 +514,16 @@ function SummaryCard({
   statusBadge?: string;
   href: string;
 }) {
+  const getBadgeStyle = () => {
+    if (statusBadge === "OVERDUE" || urgent) {
+      return "bg-red-50 text-red-700 ring-1 ring-red-200";
+    }
+    if (statusBadge === "PENDING") {
+      return "bg-amber-50 text-amber-700 ring-1 ring-amber-200";
+    }
+    return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200";
+  };
+
   return (
     <Link
       href={href}
@@ -462,7 +545,7 @@ function SummaryCard({
           {value}
         </p>
         {statusBadge && (
-          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-200">
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${getBadgeStyle()}`}>
             {statusBadge}
           </span>
         )}
@@ -474,6 +557,153 @@ function SummaryCard({
         </p>
       )}
     </Link>
+  );
+}
+
+// Society Notices Card with Hover Popover for Critical Alerts
+function SocietyNoticesCard({
+  count,
+  criticalAlert,
+}: {
+  count: number;
+  criticalAlert?: {
+    title: string;
+    message: string;
+    type?: string;
+    priority?: string;
+  } | null;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  const handleMouseEnter = () => {
+    if (!criticalAlert) return;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setIsOpen(true);
+  };
+
+  const handleMouseLeave = () => {
+    if (!criticalAlert) return;
+    timeoutRef.current = setTimeout(() => {
+      setIsOpen(false);
+    }, 200);
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (!criticalAlert) return;
+    e.preventDefault();
+    setIsOpen((prev) => !prev);
+  };
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <Link
+        href="/resident/announcements"
+        onClick={criticalAlert ? handleClick : undefined}
+        className={`rounded-lg border bg-white p-4 transition-all hover:border-slate-300 hover:shadow-xs block ${
+          criticalAlert
+            ? "border-red-200/90 bg-gradient-to-br from-red-50/20 via-white to-white ring-1 ring-red-100 hover:border-red-300"
+            : "border-[#DDE3DF]"
+        }`}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold uppercase text-[#637083] truncate">
+            Society Notices
+          </p>
+          <div className="flex items-center gap-1.5">
+            {criticalAlert && (
+              <span className="relative flex size-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex size-2 rounded-full bg-red-500"></span>
+              </span>
+            )}
+            <span className={criticalAlert ? "text-red-600" : "text-[#07584F]"}>
+              <Bell className="size-5" />
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-3 flex items-baseline justify-between gap-2">
+          <p className="text-2xl font-semibold text-[#111111]">{count}</p>
+          {criticalAlert ? (
+            <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700 ring-1 ring-red-200 flex items-center gap-1">
+              <span className="size-1.5 rounded-full bg-red-600"></span>
+              1 URGENT
+            </span>
+          ) : (
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+              Notices
+            </span>
+          )}
+        </div>
+
+        <p className="mt-1 text-xs text-[#637083] truncate flex items-center justify-between">
+          <span>{criticalAlert ? "⚠️ Hover to view alert" : "Published updates"}</span>
+          {criticalAlert && (
+            <ChevronRight className={`size-3 text-red-500 shrink-0 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+          )}
+        </p>
+      </Link>
+
+      {/* Floating Hover / Click Popover for Critical Alert */}
+      {criticalAlert && isOpen && (
+        <div
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          className="absolute right-0 top-full mt-2 z-40 w-[300px] sm:w-[340px] rounded-xl border border-red-200 bg-white p-4 shadow-xl ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-150"
+        >
+          {/* Popover Header */}
+          <div className="flex items-start justify-between gap-2 border-b border-red-100 pb-2.5">
+            <div className="flex items-center gap-2">
+              <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
+                <AlertTriangle className="size-4" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 block">
+                  Critical Alert
+                </span>
+                <p className="text-xs font-semibold text-[#111111] truncate">
+                  {criticalAlert.title}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+              }}
+              className="rounded-md p-1 text-[#637083] hover:bg-slate-100 hover:text-[#111111] transition cursor-pointer shrink-0"
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
+
+          {/* Popover Body */}
+          <div className="py-2.5">
+            <p className="text-xs text-[#475467] line-clamp-3 leading-relaxed">
+              {criticalAlert.message}
+            </p>
+          </div>
+
+          {/* Popover Footer Action */}
+          <div className="pt-2 border-t border-[#EEF1F4] flex items-center justify-between">
+            <span className="text-[11px] text-[#637083]">High Priority Notice</span>
+            <Link
+              href="/resident/announcements"
+              className="inline-flex items-center gap-1 rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition shadow-xs"
+            >
+              <span>View Alert</span>
+              <ArrowRight className="size-3" />
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

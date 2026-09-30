@@ -342,7 +342,7 @@ const syncTechnicianWorkloadStatus = async (userId: string) => {
   return Technician.findByIdAndUpdate(
     technician._id,
     { $set: { status: nextStatus } },
-    { new: true, runValidators: true }
+    { returnDocument: "after", runValidators: true }
   );
 };
 

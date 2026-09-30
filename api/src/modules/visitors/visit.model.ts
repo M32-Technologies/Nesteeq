@@ -59,6 +59,20 @@ const guestPassSchema = new Schema(
       default: null,
       maxlength: 20,
     },
+    vehicleType: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: null,
+    },
+    rawToken: {
+      type: String,
+      default: null,
+    },
+    qrCodeDataUrl: {
+      type: String,
+      default: null,
+    },
     tokenHash: {
       type: String,
       required: true,
@@ -160,6 +174,9 @@ export interface IVisitorVisit {
   checkedOutBy?: string | null
   checkedOutAt?: Date | null
 
+  departedFromFlatAt?: Date | null
+  departedFromFlatBy?: string | null
+
   status: VisitorVisitStatus
 
   createdAt?: Date
@@ -251,6 +268,17 @@ const visitorVisitSchema = new Schema<IVisitorVisit>(
 
     checkedOutAt: {
       type: Date,
+      default: null,
+    },
+
+    departedFromFlatAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+
+    departedFromFlatBy: {
+      type: String,
       default: null,
     },
 

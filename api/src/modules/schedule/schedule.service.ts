@@ -218,7 +218,7 @@ const syncTechnicianStatus = async (technicianId: string) => {
   return Technician.findByIdAndUpdate(
     technician._id,
     { $set: { status: nextStatus } },
-    { new: true, runValidators: true }
+    { returnDocument: "after", runValidators: true }
   );
 };
 
@@ -639,7 +639,7 @@ export const updateSchedule = async (
   const updatedSchedule = await Schedule.findByIdAndUpdate(
     scheduleId,
     { $set: set },
-    { new: true, runValidators: true }
+    { returnDocument: "after", runValidators: true }
   );
 
   if (!updatedSchedule) {
@@ -713,7 +713,7 @@ export const rescheduleSchedule = async (
         statusHistory: createHistoryEntry("RESCHEDULED", user, data.notes),
       },
     },
-    { new: true, runValidators: true }
+    { returnDocument: "after", runValidators: true }
   );
 
   if (!updatedSchedule) {
@@ -774,7 +774,7 @@ export const cancelSchedule = async (
         statusHistory: createHistoryEntry("CANCELLED", user, data.reason),
       },
     },
-    { new: true, runValidators: true }
+    { returnDocument: "after", runValidators: true }
   );
 
   if (!updatedSchedule) {
@@ -851,7 +851,7 @@ export const updateScheduleStatus = async (
         statusHistory: createHistoryEntry(data.status, user, data.notes),
       },
     },
-    { new: true, runValidators: true }
+    { returnDocument: "after", runValidators: true }
   );
 
   if (!updatedSchedule) {

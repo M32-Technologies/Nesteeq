@@ -3,23 +3,12 @@ import { catchAsync } from "../../utils/catchAsync.js";
 import { AppError } from "../../utils/AppError.js";
 import {
   CreateSubscription,
-  CreateSubscriptionPlan,
   GetCurrentSubscription,
   GetSubscriptionPlans,
   VerifySubscriptionPayment,
 } from "./subscription.service.js";
 
-export const CreateSubscriptionPlanHandler = catchAsync(
-  async (req: Request, res: Response) => {
-    const result = await CreateSubscriptionPlan(req.body);
 
-    res.status(201).json({
-      success: true,
-      message: "Subscription plan created successfully",
-      data: result,
-    });
-  },
-);
 
 export const GetSubscriptionPlansHandler = catchAsync(
   async (_req: Request, res: Response) => {
@@ -96,6 +85,7 @@ export const VerifySubscriptionPaymentHandler = catchAsync(
       razorpay_payment_id,
       razorpay_subscription_id,
       razorpay_signature,
+      req.user?.id
     );
 
     res.status(200).json({

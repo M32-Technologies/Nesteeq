@@ -1,5 +1,5 @@
 import { createAuthClient } from "better-auth/react"
-import { emailOTPClient, inferAdditionalFields } from "better-auth/client/plugins"
+import { emailOTPClient, inferAdditionalFields , adminClient} from "better-auth/client/plugins"
 
 
 export const authClient = createAuthClient({
@@ -27,7 +27,14 @@ export const authClient = createAuthClient({
                 },
             },
         }),
+        adminClient()
     ],
 })
 
-export const {signIn , signUp , signOut , useSession} = authClient;
+export const { signIn, signUp, signOut, useSession } = authClient;
+
+export function isAdminRole(role?: string | null): boolean {
+  if (!role) return false;
+  return role.trim().toLowerCase() === "admin";
+}
+

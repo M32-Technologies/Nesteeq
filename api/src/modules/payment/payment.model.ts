@@ -38,6 +38,22 @@ const paymentSchema = new Schema<IPayment>(
       required: true,
       index: true,
     },
+    paymentMethod: {
+      type: String,
+      trim: true,
+      index: true,
+    },
+    referenceNo: {
+      type: String,
+      trim: true,
+      index: true,
+    },
+    receiptNumber: {
+      type: String,
+      trim: true,
+      index: true,
+      sparse: true,
+    },
     description: {
       type: String,
       trim: true,
@@ -50,6 +66,22 @@ const paymentSchema = new Schema<IPayment>(
       type: Date,
       default: Date.now,
       index: true,
+    },
+    reversed: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    reversedAt: {
+      type: Date,
+    },
+    reversedBy: {
+      type: String,
+      trim: true,
+    },
+    reversalReason: {
+      type: String,
+      trim: true,
     },
   },
   {

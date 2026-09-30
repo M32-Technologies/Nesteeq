@@ -98,10 +98,7 @@ export function ParkingSlots() {
   })
   const availableSlotsQuery = useParkingSlots({
     status: "AVAILABLE",
-    vehicleType: assignVehicleType,
     limit: ASSIGNMENT_SLOT_LIMIT,
-  }, {
-    enabled: Boolean(assignVehicleType),
   })
   const activeVisitorsQuery = useActiveVisitors(1, 100)
   const flatsQuery = useSecurityFlats()
@@ -224,9 +221,13 @@ export function ParkingSlots() {
 
       <ParkingForms
         assignForm={assignForm}
-        activeVisitors={
-          activeVisitorsQuery.data?.visitors ?? []
-        }
+        activeVisitors={(activeVisitorsQuery.data?.visitors ?? []).filter(
+          (visitor) =>
+            visitor.vehicleNumber &&
+            visitor.vehicleNumber.trim() &&
+            visitor.vehicleNumber.trim().toLowerCase() !== "no vehicle" &&
+            visitor.vehicleNumber.trim().toLowerCase() !== "none"
+        )}
         activeVisitorsLoading={activeVisitorsQuery.isLoading}
         availableSlots={availableSlots}
         availableSlotsLoading={availableSlotsQuery.isLoading}

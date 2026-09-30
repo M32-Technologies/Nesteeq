@@ -99,13 +99,9 @@ export function SecurityVisitors() {
     page,
     limit: PAGE_SIZE,
   })
-  const manualVehicleType = toParkingVehicleType(manualForm.vehicleType)
-  const manualAvailableSlotsQuery = useParkingSlots({
+  const availableSlotsQuery = useParkingSlots({
     status: "AVAILABLE",
-    vehicleType: manualVehicleType,
     limit: 100,
-  }, {
-    enabled: Boolean(manualVehicleType),
   })
   const verifyPassMutation = useVerifyVisitorPass()
   const checkInMutation = useCheckInVisitor()
@@ -115,8 +111,8 @@ export function SecurityVisitors() {
 
   const flats = flatsQuery.data?.flats ?? []
   const records = visitorRecordsQuery.data?.records ?? []
-  const manualAvailableSlots = (
-    manualAvailableSlotsQuery.data?.slots ?? []
+  const availableSlots = (
+    availableSlotsQuery.data?.slots ?? []
   ).filter(
     (slot) =>
       slot.status === "AVAILABLE" && !slot.currentAssignment
@@ -143,8 +139,16 @@ export function SecurityVisitors() {
         trimmedToken
       )
 
+      try {
+        await checkInMutation.mutateAsync({
+          token: trimmedToken,
+        })
+      } catch (checkInErr) {
+        console.warn("Check-in notice:", checkInErr)
+      }
+
       setVerifiedPass(result)
-      toast.success("Visitor pass verified")
+      toast.success("Visitor pass verified & checked in")
       return true
     } catch (error) {
       toast.error(
@@ -281,41 +285,18 @@ export function SecurityVisitors() {
     }
 
     try {
-      const visit = await manualEntryMutation.mutateAsync({
+      await manualEntryMutation.mutateAsync({
         flatId: manualForm.flatId,
         visitorName: manualForm.visitorName,
-        visitorPhone:
-          trimmedVisitorPhone || undefined,
+        visitorPhone: trimmedVisitorPhone || undefined,
         purpose: manualForm.purpose || undefined,
-        vehicleNumber:
-          normalizedVehicleNumber || undefined,
+        vehicleNumber: normalizedVehicleNumber || undefined,
         vehicleType: vehicleType || undefined,
+        parkingSlotId: manualForm.parkingSlotId || undefined,
       })
 
       if (manualForm.parkingSlotId) {
-        if (!vehicleType) {
-          toast.error("Vehicle type is required for parking")
-          return
-        }
-
-        try {
-          await assignParkingMutation.mutateAsync({
-            slotId: manualForm.parkingSlotId,
-            flatId: manualForm.flatId,
-            visitorVisitId: visit._id,
-            visitorName: manualForm.visitorName,
-            vehicleNumber: normalizedVehicleNumber,
-            vehicleType,
-          })
-          toast.success("Visitor registered and parking assigned")
-        } catch (error) {
-          toast.error(
-            getSecurityApiErrorMessage(
-              error,
-              "Visitor registered, but unable to assign parking"
-            )
-          )
-        }
+        toast.success("Visitor registered and parking assigned")
       } else {
         toast.success("Visitor registered and checked in")
       }
@@ -333,7 +314,7 @@ export function SecurityVisitors() {
       toast.error(
         getSecurityApiErrorMessage(
           error,
-          "Unable to register visitor"
+          "Failed to register visitor"
         )
       )
     }
@@ -389,8 +370,8 @@ export function SecurityVisitors() {
           flats={flats}
           flatsLoading={flatsQuery.isLoading}
           form={manualForm}
-          availableSlots={manualAvailableSlots}
-          availableSlotsLoading={manualAvailableSlotsQuery.isLoading}
+          availableSlots={availableSlots}
+          availableSlotsLoading={availableSlotsQuery.isLoading}
           isSubmitting={
             manualEntryMutation.isPending ||
             assignParkingMutation.isPending
@@ -422,8 +403,8 @@ export function SecurityVisitors() {
         <VisitorRecordsTable
           records={records}
           pagination={pagination}
-          availableSlots={[]}
-          availableSlotsLoading={false}
+          availableSlots={availableSlots}
+          availableSlotsLoading={availableSlotsQuery.isLoading}
           isCheckingIn={checkInMutation.isPending}
           isCheckingOut={checkoutMutation.isPending}
           onCheckIn={handleRecordCheckIn}

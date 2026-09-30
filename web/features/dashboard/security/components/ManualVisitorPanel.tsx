@@ -45,16 +45,19 @@ export function ManualVisitorPanel({
   onFormChange: (form: ManualVisitorFormState) => void
   onSubmit: () => void
 }) {
-  const filteredAvailableSlots = availableSlots.filter((slot) =>
-    matchesParkingVehicleType(slot.vehicleType, form.vehicleType)
-  )
+  const filteredAvailableSlots = form.vehicleType
+    ? availableSlots.filter((slot) =>
+        matchesParkingVehicleType(slot.vehicleType, form.vehicleType)
+      )
+    : availableSlots
   const parkingSlotPlaceholder = (() => {
     if (availableSlotsLoading) return "Loading slots..."
     if (form.vehicleType) {
       return `Select ${getParkingVehicleTypeLabel(form.vehicleType)} slot`
     }
+    if (availableSlots.length === 0) return "No available slots"
 
-    return "Select vehicle type first"
+    return "Select parking slot"
   })()
 
   return (
@@ -183,18 +186,27 @@ export function ManualVisitorPanel({
           <select
             className={selectClassName}
             value={form.parkingSlotId}
-            onChange={(event) =>
+            onChange={(event) => {
+              const selectedSlot = availableSlots.find(
+                (slot) => slot._id === event.target.value
+              )
               onFormChange({
                 ...form,
                 parkingSlotId: event.target.value,
+                ...(selectedSlot?.vehicleType && !form.vehicleType
+                  ? { vehicleType: selectedSlot.vehicleType }
+                  : {}),
               })
-            }
-            disabled={availableSlotsLoading || !form.vehicleType}
+            }}
+            disabled={availableSlotsLoading}
           >
             <option value="">{parkingSlotPlaceholder}</option>
             {filteredAvailableSlots.map((slot) => (
               <option key={slot._id} value={slot._id}>
                 {slot.slotNumber}
+                {slot.vehicleType
+                  ? ` (${getParkingVehicleTypeLabel(slot.vehicleType)})`
+                  : ""}
               </option>
             ))}
           </select>

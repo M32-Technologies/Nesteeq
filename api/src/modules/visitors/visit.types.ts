@@ -12,6 +12,7 @@ export type CreateGuestPassInput = {
   visitorPhone?: string
   purpose?: string
   vehicleNumber?: string
+  vehicleType?: string
   validFrom: Date
   validUntil: Date
 }
@@ -49,6 +50,7 @@ export type ManualVisitorEntryInput = {
   purpose?: string
   vehicleNumber?: string
   vehicleType?: string
+  parkingSlotId?: string
 }
 
 export type CheckoutVisitorInput = {
@@ -131,6 +133,8 @@ export type VisitorVisitListItem = {
   checkedInAt: Date
   checkedOutBy?: string | null
   checkedOutAt?: Date | null
+  departedFromFlatAt?: Date | null
+  departedFromFlatBy?: string | null
   status: string
   createdAt?: Date
   updatedAt?: Date
@@ -152,6 +156,8 @@ export type VisitorRecordItem = {
   apartmentId: string
   flatId: string | null
   flatNumber: string | null
+  residentName?: string | null
+  residentPhone?: string | null
   visitorName: string
   visitorPhone?: string | null
   purpose?: string | null
@@ -162,6 +168,8 @@ export type VisitorRecordItem = {
   validUntil?: Date | null
   checkedInAt?: Date | null
   checkedOutAt?: Date | null
+  departedFromFlatAt?: Date | null
+  departedFromFlatBy?: string | null
 } & VisitorRecordParkingFields
 
 export type VisitorRecordsFacetResult = {

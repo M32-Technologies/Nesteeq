@@ -52,16 +52,19 @@ export function ParkingForms({
   onAssign: () => void
   onAssignFormChange: (form: ParkingAssignFormState) => void
 }) {
-  const filteredAvailableSlots = availableSlots.filter((slot) =>
-    matchesParkingVehicleType(slot.vehicleType, assignForm.vehicleType)
-  )
+  const filteredAvailableSlots = assignForm.vehicleType
+    ? availableSlots.filter((slot) =>
+        matchesParkingVehicleType(slot.vehicleType, assignForm.vehicleType)
+      )
+    : availableSlots
   const parkingSlotPlaceholder = (() => {
     if (availableSlotsLoading) return "Loading available slots..."
     if (assignForm.vehicleType) {
       return `Select ${getParkingVehicleTypeLabel(assignForm.vehicleType)} slot`
     }
+    if (availableSlots.length === 0) return "No available slots"
 
-    return "Select vehicle type first"
+    return "Select parking slot"
   })()
 
   const handleVisitorVisitChange = (visitId: string) => {
@@ -128,18 +131,27 @@ export function ParkingForms({
           <select
             className={selectClassName}
             value={assignForm.slotId}
-            onChange={(event) =>
+            onChange={(event) => {
+              const selectedSlot = availableSlots.find(
+                (slot) => slot._id === event.target.value
+              )
               onAssignFormChange({
                 ...assignForm,
                 slotId: event.target.value,
+                ...(selectedSlot?.vehicleType && !assignForm.vehicleType
+                  ? { vehicleType: selectedSlot.vehicleType }
+                  : {}),
               })
-            }
-            disabled={availableSlotsLoading || !assignForm.vehicleType}
+            }}
+            disabled={availableSlotsLoading}
           >
             <option value="">{parkingSlotPlaceholder}</option>
             {filteredAvailableSlots.map((slot) => (
               <option key={slot._id} value={slot._id}>
                 {slot.slotNumber}
+                {slot.vehicleType
+                  ? ` (${getParkingVehicleTypeLabel(slot.vehicleType)})`
+                  : ""}
               </option>
             ))}
           </select>

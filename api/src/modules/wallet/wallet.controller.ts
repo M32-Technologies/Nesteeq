@@ -6,6 +6,7 @@ import {
   deductWalletFundsService,
   getWalletService,
   getWalletsService,
+  getWalletSummaryService,
 } from "./wallet.service.js";
 
 import { catchAsync } from "../../utils/catchAsync.js";
@@ -99,15 +100,33 @@ export const deductWalletFunds = catchAsync(
 
 export const getWallets = catchAsync(
   async (req: Request, res: Response) => {
-    const { apartmentId } = req.query;
+    const { apartmentId, search, status, page, limit } = req.query;
 
     const wallets = await getWalletsService(
-      apartmentId as string
+      apartmentId as string,
+      {
+        search: search as string | undefined,
+        status: status as string | undefined,
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+      }
     );
 
     res.status(200).json({
       success: true,
       data: wallets,
+    });
+  }
+);
+
+export const getWalletSummary = catchAsync(
+  async (req: Request, res: Response) => {
+    const apartmentId = (req.query.apartmentId || req.user?.apartmentId) as string;
+    const summary = await getWalletSummaryService(apartmentId);
+
+    res.status(200).json({
+      success: true,
+      data: summary,
     });
   }
 );

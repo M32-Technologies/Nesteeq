@@ -6,9 +6,16 @@ import {
 
 import {
   createBill,
+  createCommonBill,
+  deleteBill,
   getBillById,
+  getBillRecipients,
   getBillingSummary,
   getBills,
+  getCommonBills,
+  getMyResidentBills,
+  payResidentBill,
+  payAllResidentBills,
   recordBillPayment,
   updateBill,
   waiveLateFee,
@@ -16,12 +23,16 @@ import {
 
 import {
   createBillSchema,
+  createCommonBillSchema,
   getBillByIdSchema,
   getBillingSummarySchema,
   getBillsSchema,
+  getCommonBillsSchema,
   recordBillPaymentSchema,
   updateBillSchema,
   waiveLateFeeSchema,
+  payResidentBillSchema,
+  payAllResidentBillsSchema,
 } from "./billing.schema.js";
 
 import { zodValidate } from "../../middlewares/zodValidate.js";
@@ -113,18 +124,29 @@ const requireBillApartmentAccess = catchAsync(
 
 router.use(protect);
 
+router.get("/my-bills", getMyResidentBills);
+router.post("/pay-all", zodValidate(payAllResidentBillsSchema), payAllResidentBills);
+router.post("/:id/pay", zodValidate(payResidentBillSchema), payResidentBill);
+
 router.get("/", requireRole("treasurer", "property_manager"), zodValidate(getBillsSchema), requireQueryApartmentAccess, getBills);
 
+router.get("/recipients", requireRole("treasurer", "property_manager"), requireQueryApartmentAccess, getBillRecipients);
+
+router.get("/summary", requireRole("treasurer", "property_manager"), requireQueryApartmentAccess, getBillingSummary);
 router.get("/summary/:apartmentId", requireRole("treasurer", "property_manager"), zodValidate(getBillingSummarySchema), requireParamApartmentAccess, getBillingSummary);
 
 router.get("/:id", requireRole("treasurer", "property_manager"), zodValidate(getBillByIdSchema), requireBillApartmentAccess, getBillById);
 
 router.post("/", requireRole("treasurer"), requireBodyApartmentAccess, zodValidate(createBillSchema), createBill);
+router.post("/common", requireRole("treasurer"), requireBodyApartmentAccess, zodValidate(createCommonBillSchema), createCommonBill);
+router.get("/common", requireRole("treasurer", "property_manager"), zodValidate(getCommonBillsSchema), requireQueryApartmentAccess, getCommonBills);
 
 router.patch("/:id", requireRole("treasurer"), zodValidate(updateBillSchema), requireBillApartmentAccess, updateBill);
 
 router.patch("/:id/payment", requireRole("treasurer"), zodValidate(recordBillPaymentSchema), requireBillApartmentAccess, recordBillPayment);
 
 router.patch("/:id/waive-late-fee", requireRole("treasurer"), zodValidate(waiveLateFeeSchema), requireBillApartmentAccess, waiveLateFee);
+
+router.delete("/:id", requireRole("treasurer"), requireBillApartmentAccess, deleteBill);
 
 export default router;

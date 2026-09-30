@@ -1,10 +1,12 @@
 "use client"
 
+import { useState, useRef, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { Bell, Menu, ShieldAlert, UserRound } from "lucide-react"
+import { usePathname, useRouter } from "next/navigation"
+import { Bell, LogOut, Menu, Settings, ShieldAlert, UserRound } from "lucide-react"
 
+import { signOut } from "@/lib/auth-client"
 import {
   dashboardRoleLabels,
   getDashboardItemHref,
@@ -52,6 +54,13 @@ function getBreadcrumb(role: DashboardRole, pathname: string) {
     }
   }
 
+  if (pathname === "/profile" || pathname.endsWith("/profile")) {
+    return {
+      parent: dashboardRoleLabels[role],
+      current: "My Profile",
+    }
+  }
+
   return {
     parent: dashboardRoleLabels[role],
     current: "Dashboard",
@@ -65,9 +74,35 @@ export default function DashboardNavbar({
   user,
 }: DashboardNavbarProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const breadcrumb = getBreadcrumb(role, pathname)
   const initials = getInitials(user.name)
-  const settingsHref = getDashboardItemHref(role, "/dashboard/settings")
+
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const profileDropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        profileDropdownRef.current &&
+        !profileDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsProfileOpen(false)
+      }
+    }
+    if (isProfileOpen) {
+      document.addEventListener("mousedown", handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [isProfileOpen])
+
+  const handleSignOut = async () => {
+    await signOut()
+    router.replace("/login")
+    router.refresh()
+  }
 
   return (
     <header
@@ -191,70 +226,112 @@ export default function DashboardNavbar({
         {/* Divider */}
         <div className="hidden h-7 w-px bg-[#E2E8F0] sm:block" />
 
-        {/* Profile button */}
-        <Link
-          href={settingsHref}
-          aria-label="Profile settings"
-          className="
-            flex
-            h-10
-            cursor-pointer
-            items-center
-            gap-2.5
-            rounded-lg
-            px-2
-            text-left
-            transition-colors
-            duration-150
-            hover:bg-[#F1F5F9]
-          "
-        >
-          {/* Avatar */}
-          <span
+        {/* Profile button & dropdown */}
+        <div ref={profileDropdownRef} className="relative">
+          <button
+            type="button"
+            aria-label="User Profile Menu"
+            aria-expanded={isProfileOpen}
+            onClick={() => setIsProfileOpen((prev) => !prev)}
             className="
               flex
-              size-8
-              shrink-0
+              h-10
+              cursor-pointer
               items-center
-              justify-center
-              overflow-hidden
-              rounded-full
-              bg-[#0F766E]
-              text-[11px]
-              font-bold
-              tracking-wide
-              text-white
-              ring-2
-              ring-white
+              gap-2.5
+              rounded-lg
+              px-2
+              text-left
+              transition-colors
+              duration-150
+              hover:bg-[#F1F5F9]
             "
-            style={{ boxShadow: '0 0 0 2px #E2E8F0' }}
           >
-            {user.image ? (
-              <Image
-                src={user.image}
-                alt={user.name}
-                width={32}
-                height={32}
-                unoptimized
-                className="size-full object-cover"
-              />
-            ) : initials ? (
-              initials
-            ) : (
-              <UserRound className="size-4" />
-            )}
-          </span>
+            {/* Avatar */}
+            <span
+              className="
+                flex
+                size-8
+                shrink-0
+                items-center
+                justify-center
+                overflow-hidden
+                rounded-full
+                bg-[#0F766E]
+                text-[11px]
+                font-bold
+                tracking-wide
+                text-white
+                ring-2
+                ring-white
+              "
+              style={{ boxShadow: '0 0 0 2px #E2E8F0' }}
+            >
+              {user.image ? (
+                <Image
+                  src={user.image}
+                  alt={user.name}
+                  width={32}
+                  height={32}
+                  unoptimized
+                  className="size-full object-cover"
+                />
+              ) : initials ? (
+                initials
+              ) : (
+                <UserRound className="size-4" />
+              )}
+            </span>
 
-          {/* Name + role — hidden on small screens */}
-          <span className="hidden min-w-0 sm:block">
-            <span className="block max-w-32 truncate text-[13px] font-semibold leading-[1.3] text-[#0F172A]">
-              {user.name}
+            {/* Name + role — hidden on small screens */}
+            <span className="hidden min-w-0 sm:block">
+              <span className="block max-w-32 truncate text-[13px] font-semibold leading-[1.3] text-[#0F172A]">
+                {user.name}
+              </span>
+              <span className="block max-w-32 truncate text-[11px] font-medium leading-[1.3] text-[#94A3B8]">
+                {dashboardRoleLabels[role]}
+              </span>
             </span>
-            <span className="block max-w-32 truncate text-[11px] font-medium leading-[1.3] text-[#94A3B8]">
-              {dashboardRoleLabels[role]}
-            </span>
-          </span>
-        </Link>
+          </button>
+
+          {/* Profile Menu Dropdown */}
+          {isProfileOpen && (
+            <div className="absolute right-0 mt-2 w-56 rounded-lg border border-[#DDE3DF] bg-white p-2 shadow-lg z-50 animate-in fade-in duration-150">
+              <div className="px-3 py-2 border-b border-[#EEF1F4] mb-1">
+                <p className="text-xs font-semibold text-[#111111] truncate">
+                  {user.name}
+                </p>
+                <p className="text-[11px] text-[#637083] truncate">
+                  {user.email}
+                </p>
+                <p className="text-[11px] text-[#0F766E] font-semibold mt-0.5">
+                  {dashboardRoleLabels[role]}
+                </p>
+              </div>
+
+              <Link
+                href="/profile"
+                onClick={() => setIsProfileOpen(false)}
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium text-[#111111] hover:bg-[#F7F8F5] transition-colors"
+              >
+                <Settings className="size-3.5 text-[#637083]" />
+                <span>Account Settings</span>
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsProfileOpen(false)
+                  void handleSignOut()
+                }}
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50 transition-colors cursor-pointer"
+              >
+                <LogOut className="size-3.5 text-red-600" />
+                <span>Sign Out</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   )

@@ -1,10 +1,5 @@
-import SettingsPage from "@/features/dashboard/settings/components/settings-page"
+import { redirect } from "next/navigation"
 
-export const metadata = {
-  title: "Account Settings | Nesteeq",
-  description: "Manage your profile and account settings.",
-}
-
-export default function DashboardSettingsPage() {
-  return <SettingsPage />
+export default function SettingsRedirectPage() {
+  redirect("/profile")
 }

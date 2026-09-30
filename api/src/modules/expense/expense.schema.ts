@@ -23,6 +23,11 @@ export const createExpenseSchema = z.object({
       .trim()
       .optional(),
 
+    invoiceRef: z
+      .string()
+      .trim()
+      .optional(),
+
     category: z.nativeEnum(ExpenseCategory),
 
     amount: z
@@ -45,6 +50,9 @@ export const getExpensesSchema = z.object({
     apartmentId: objectIdSchema.optional(),
     category: z.nativeEnum(ExpenseCategory).optional(),
     status: z.nativeEnum(ExpenseStatus).optional(),
+    search: z.string().trim().optional(),
+    startDate: z.coerce.date().optional(),
+    endDate: z.coerce.date().optional(),
   }),
 });
 
@@ -62,10 +70,15 @@ export const updateExpenseSchema = z.object({
   body: z.object({
     title: z.string().trim().min(1).optional(),
     description: z.string().trim().optional(),
+    invoiceRef: z.string().trim().optional(),
     category: z.nativeEnum(ExpenseCategory).optional(),
     amount: z.number().positive().optional(),
     vendorName: z.string().trim().optional(),
     expenseDate: z.coerce.date().optional(),
     status: z.nativeEnum(ExpenseStatus).optional(),
+    rejectionReason: z.string().trim().optional(),
+    paymentMethod: z.string().trim().optional(),
+    paymentReference: z.string().trim().optional(),
+    paidAt: z.coerce.date().optional(),
   }),
 });

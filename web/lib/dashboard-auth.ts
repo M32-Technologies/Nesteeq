@@ -7,6 +7,8 @@ import {
   type DashboardRole,
 } from "@/features/dashboard/config/sidebar-navigation"
 
+import { isAdminRole } from "@/lib/auth-client"
+
 type AuthSessionUser = {
   name?: string | null
   email?: string | null
@@ -28,6 +30,15 @@ export type DashboardSession = {
   }
 }
 
+export type AdminSession = {
+  role: "admin"
+  user: {
+    name: string
+    email: string
+    image?: string | null
+  }
+}
+
 function getAuthBaseUrl() {
   const baseUrl = process.env.NEXT_PUBLIC_API_URL
 
@@ -42,31 +53,33 @@ export function getDashboardHomePath(role: DashboardRole) {
   return `/${getDashboardRoleRouteSegment(role)}`
 }
 
-export async function getCurrentDashboardSession() {
+export async function getRawAuthSession(): Promise<AuthSessionResponse> {
   const cookieHeader = (await cookies()).toString()
 
   if (!cookieHeader) {
     return null
   }
 
-  let response: Response
-
   try {
-    response = await fetch(`${getAuthBaseUrl()}/api/auth/get-session`, {
+    const response = await fetch(`${getAuthBaseUrl()}/api/auth/get-session`, {
       headers: {
         cookie: cookieHeader,
       },
       cache: "no-store",
     })
+
+    if (!response.ok) {
+      return null
+    }
+
+    return (await response.json()) as AuthSessionResponse
   } catch {
     return null
   }
+}
 
-  if (!response.ok) {
-    return null
-  }
-
-  const data = (await response.json()) as AuthSessionResponse
+export async function getCurrentDashboardSession() {
+  const data = await getRawAuthSession()
 
   if (!data?.user) {
     return null
@@ -94,4 +107,28 @@ export async function requireCurrentDashboardSession() {
   }
 
   return dashboardSession
+}
+
+export async function requireAdminSession(): Promise<AdminSession> {
+  const data = await getRawAuthSession()
+
+  if (!data?.user) {
+    redirect("/admin/login")
+  }
+
+  if (!isAdminRole(data.user.role)) {
+    redirect("/")
+  }
+
+  const name =
+    data.user.name || data.user.email?.split("@")[0] || "Administrator"
+
+  return {
+    role: "admin",
+    user: {
+      name,
+      email: data.user.email || "",
+      image: data.user.image || undefined,
+    },
+  }
 }

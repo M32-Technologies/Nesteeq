@@ -18,6 +18,14 @@ const authUserIdSchema = z
 const nonEmptyText = (fieldName: string, maxLength: number) =>
   z.string().trim().min(1, `${fieldName} is required`).max(maxLength, `${fieldName} is too long`);
 
+const optionalText = (maxLength: number) =>
+  z
+    .string()
+    .trim()
+    .max(maxLength, `Text cannot exceed ${maxLength} characters`)
+    .optional()
+    .transform((val) => (val && val.length > 0 ? val : undefined));
+
 const costSchema = z.number().min(0, "Cost cannot be negative");
 
 const requireAtLeastOneField = (data: Record<string, unknown>) => Object.keys(data).length > 0;
@@ -69,10 +77,28 @@ export const updateComplaintBodySchema = z
     images: z.array(z.string().trim()).optional(),
     attachments: z.array(z.string().trim()).optional(),
     remarks: nonEmptyText("Remarks", 1000).optional(),
+    notes: nonEmptyText("Notes", 1000).optional(),
   })
-  .strict()
   .refine(requireAtLeastOneField, {
     message: "At least one field is required",
+  })
+  .transform((data) => {
+    const res: {
+      title?: string;
+      description?: string;
+      category?: (typeof complaintCategories)[number];
+      priority?: (typeof complaintPriorities)[number];
+      estimatedCost?: number;
+      remarks?: string;
+    } = {};
+    if (data.title !== undefined) res.title = data.title;
+    if (data.description !== undefined) res.description = data.description;
+    if (data.category !== undefined) res.category = data.category;
+    if (data.priority !== undefined) res.priority = data.priority;
+    if (data.estimatedCost !== undefined) res.estimatedCost = data.estimatedCost;
+    const rem = data.remarks || (data as { notes?: string })?.notes;
+    if (rem !== undefined) res.remarks = rem;
+    return res;
   });
 
 export const assignComplaintBodySchema = z
@@ -110,9 +136,22 @@ export const completeComplaintWorkBodySchema = z
       .min(10, "Completion details must be at least 10 characters")
       .max(3000, "Completion details cannot exceed 3000 characters"),
     finalCost: costSchema.optional(),
-    remarks: nonEmptyText("Remarks", 1000).optional(),
+    remarks: optionalText(1000),
+    notes: optionalText(1000),
   })
-  .strict();
+  .transform((data) => {
+    const res: {
+      completionDetails: string;
+      finalCost?: number;
+      remarks?: string;
+    } = {
+      completionDetails: data.completionDetails,
+    };
+    if (data.finalCost !== undefined) res.finalCost = data.finalCost;
+    const rem = data.remarks || data.notes;
+    if (rem !== undefined) res.remarks = rem;
+    return res;
+  });
 
 export const approveComplaintBodySchema = z
   .object({

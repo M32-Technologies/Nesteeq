@@ -63,10 +63,6 @@ export function DeliveryDetails({
             value: formatDateTime(delivery.receivedAt),
           },
           {
-            label: "Notified",
-            value: formatDateTime(delivery.notifiedAt),
-          },
-          {
             label: "Collected",
             value: formatDateTime(delivery.collectedAt),
           },

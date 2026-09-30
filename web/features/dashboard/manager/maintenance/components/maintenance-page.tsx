@@ -24,7 +24,7 @@ export default function MaintenancePage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       <MaintenanceHeader stats={stats} />
 
       <MaintenanceWorkTable

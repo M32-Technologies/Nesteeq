@@ -4,6 +4,7 @@ import {
     createApartment,
     getCurrentApartment,
     getPendingApartment,
+    updateCurrentApartment,
 } from "./apartment.service.js"
 
 
@@ -36,6 +37,18 @@ export const getCurrentApartmentHandler = catchAsync(
     async (req : Request , res : Response) =>{
         const apartmentId = req.user?.apartmentId ?? undefined;
         const result = await getCurrentApartment(apartmentId)
+
+        res.status(200).json({
+            success : true,
+            data : result
+        })
+    }
+)
+
+export const updateCurrentApartmentHandler = catchAsync(
+    async (req : Request , res : Response) =>{
+        const apartmentId = req.user?.apartmentId ?? undefined;
+        const result = await updateCurrentApartment(apartmentId, req.body);
 
         res.status(200).json({
             success : true,

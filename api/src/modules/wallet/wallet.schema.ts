@@ -14,6 +14,10 @@ export const createWalletSchema = z.object({
 export const getWalletsSchema = z.object({
   query: z.object({
     apartmentId: objectIdSchema,
+    status: z.enum(["ALL", "ACTIVE", "ZERO"]).optional(),
+    search: z.string().trim().optional(),
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().max(100).optional(),
   }),
 });
 

@@ -13,6 +13,7 @@ export const formatDate = (date: string | undefined) => {
     return "Not recorded";
   }
 
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}(T00:00:00(\.000)?Z?)?$/.test(date);
   const parsedDate = new Date(
     date.includes("T") ? date : `${date}T00:00:00`,
   );
@@ -25,6 +26,27 @@ export const formatDate = (date: string | undefined) => {
     day: "2-digit",
     month: "short",
     year: "numeric",
+    ...(isDateOnly ? { timeZone: "UTC" } : {}),
+  }).format(parsedDate);
+};
+
+export const formatDateTime = (date: string | undefined) => {
+  if (!date) {
+    return "Not recorded";
+  }
+
+  const parsedDate = new Date(date);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return date;
+  }
+
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
   }).format(parsedDate);
 };
 
