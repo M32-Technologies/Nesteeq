@@ -372,7 +372,17 @@ export const getFacilityDashboard = async (user: AuthenticatedFacilityUser) => {
     Maintenance.countDocuments(mergeFilter(maintenanceFilter, { status: { $in: ["IN_PROGRESS", "ON_HOLD"] } })),
     Maintenance.countDocuments(mergeFilter(maintenanceFilter, { status: { $in: completedStatuses } })),
     Maintenance.countDocuments(mergeFilter(maintenanceFilter, { status: { $in: workReviewStatuses } })),
-    Maintenance.countDocuments(mergeFilter(maintenanceFilter, { "costReview.status": "SUBMITTED" })),
+    Maintenance.countDocuments(
+      mergeFilter(maintenanceFilter, {
+        $or: [
+          { "costReview.status": "SUBMITTED" },
+          { expenseStatus: "PENDING_FACILITY_APPROVAL" },
+          { costStatus: "SUBMITTED" },
+          { expenseApproved: false, finalCost: { $gt: 0 } },
+          { status: "AWAITING_APPROVAL", finalCost: { $gt: 0 } },
+        ],
+      })
+    ),
 
     // Technician stats
     Technician.countDocuments(technicianFilter),
@@ -428,8 +438,18 @@ export const getFacilityDashboard = async (user: AuthenticatedFacilityUser) => {
       .sort({ updatedAt: -1 })
       .limit(6)
       .lean(),
-    Maintenance.find(mergeFilter(maintenanceFilter, { "costReview.status": "SUBMITTED" }))
-      .sort({ "costReview.submittedAt": -1 })
+    Maintenance.find(
+      mergeFilter(maintenanceFilter, {
+        $or: [
+          { "costReview.status": "SUBMITTED" },
+          { expenseStatus: "PENDING_FACILITY_APPROVAL" },
+          { costStatus: "SUBMITTED" },
+          { expenseApproved: false, finalCost: { $gt: 0 } },
+          { status: "AWAITING_APPROVAL", finalCost: { $gt: 0 } },
+        ],
+      })
+    )
+      .sort({ updatedAt: -1, createdAt: -1 })
       .limit(6)
       .lean(),
     Complaint.find(mergeFilter(complaintFilter, {
@@ -556,7 +576,18 @@ export const getFacilityDashboard = async (user: AuthenticatedFacilityUser) => {
       maintenanceCostToReview: costsRequiringApproval.map((item: any) => ({
         ...makeWorkItem(item),
         type: "maintenance",
-        submittedAmount: item.costReview?.submittedAmount ?? item.finalCost ?? null,
+        submittedAmount:
+          item.costReview?.submittedAmount ??
+          item.expenseAmount ??
+          item.finalCost ??
+          null,
+        materialDescription:
+          item.expenseDescription ??
+          item.costReview?.remarks ??
+          item.completionDetails?.workNotes ??
+          item.completionDetails?.details ??
+          item.description ??
+          "",
       })),
       unassignedComplaints: {
         count: unassignedComplaintCount,
