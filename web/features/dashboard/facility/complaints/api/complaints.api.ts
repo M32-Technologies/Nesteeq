@@ -131,16 +131,26 @@ export async function approveComplaint(id: string, payload: ReasonPayload = {}) 
 
 export async function createMaintenance(payload: {
   title: string
+  category?: string
   description?: string
   priority?: string
   assignedTo?: string
+  assignedStaff?: string
   complaintId?: string
+  complaint?: string
+  estimatedCost?: number
+  remarks?: string
   scheduledDate?: string
   estimatedDurationHours?: number
 }) {
+  const body = {
+    ...payload,
+    complaint: payload.complaint || payload.complaintId,
+    assignedStaff: payload.assignedStaff || payload.assignedTo,
+  }
   const response = await api.post<ApiResponse<unknown>>(
     MAINTENANCE_PATH,
-    payload
+    body
   )
 
   if (!response.data.success) {

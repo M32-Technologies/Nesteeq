@@ -11,6 +11,7 @@ import {
   createMaintenance,
   getMaintenance,
   getMaintenanceById,
+  getMaintenanceTypes,
   rejectMaintenance,
   rejectMaintenanceCost,
   startMaintenance,
@@ -60,6 +61,15 @@ export const createMaintenanceHandler = catchAsync(async (req: Request, res: Res
   res.status(201).json({
     success: true,
     message: "Maintenance created successfully",
+    data: result,
+  });
+});
+
+export const getMaintenanceTypesHandler = catchAsync(async (req: Request, res: Response) => {
+  const result = await getMaintenanceTypes(getAuthenticatedUser(req));
+
+  res.status(200).json({
+    success: true,
     data: result,
   });
 });

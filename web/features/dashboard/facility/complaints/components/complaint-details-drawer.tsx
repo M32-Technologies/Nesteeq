@@ -160,6 +160,7 @@ export function ComplaintDetailsDrawer({
           </section>
 
           <ComplaintMaintenanceSection
+            complaint={complaint}
             relatedMaintenance={relatedMaintenance}
             isLoading={isRelatedMaintenanceLoading}
             canCreateMaintenance={canCreateMaintenance}

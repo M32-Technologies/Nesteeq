@@ -11,6 +11,7 @@ import { AppError } from "../../utils/AppError.js";
 
 
 
+import { Types } from "mongoose";
 import type { GetMaintenanceQuery } from "./maintenance.schema.js";
 import type { AuthenticatedMaintenanceUser } from "./maintenance.service.js";
 import type { MaintenanceDocument } from "./maintenance.model.js";
@@ -156,8 +157,11 @@ const applySharedFilters = (
     filter.priority = query.priority;
   }
 
-  if (query.complaint) {
-    filter.complaint = query.complaint;
+  const complaintId = query.complaint || (query as any).complaintId;
+  if (complaintId) {
+    filter.complaint = Types.ObjectId.isValid(complaintId)
+      ? new Types.ObjectId(complaintId)
+      : complaintId;
   }
 
   if (query.costStatus) {

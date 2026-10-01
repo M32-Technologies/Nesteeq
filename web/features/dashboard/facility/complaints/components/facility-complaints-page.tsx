@@ -18,6 +18,7 @@ import {
   useComplaints,
   useComplaintStats,
 } from "@/features/dashboard/facility/complaints/hooks/use-complaints-queries"
+import { useMaintenanceQuery } from "@/features/dashboard/facility/maintenance/hooks/use-maintenance-queries"
 import type {
   Complaint,
   ComplaintCategory,
@@ -145,6 +146,14 @@ export function FacilityComplaintsPage() {
   const complaintsQuery = useComplaints(complaintQuery)
   const statsQuery = useComplaintStats()
   const detailQuery = useComplaint(selectedComplaintId)
+  const relatedMaintenanceQuery = useMaintenanceQuery(
+    selectedComplaintId ? { complaint: selectedComplaintId } : undefined
+  )
+
+  const relatedMaintenance = useMemo(
+    () => relatedMaintenanceQuery.data?.maintenance ?? [],
+    [relatedMaintenanceQuery.data?.maintenance]
+  )
 
   const complaints = useMemo(
     () => complaintsQuery.data?.complaints ?? [],
@@ -245,12 +254,19 @@ export function FacilityComplaintsPage() {
   const createMaintenanceMutation = useMutation({
     mutationFn: (payload: {
       title: string
+      category?: string
       description?: string
       priority?: string
       assignedTo?: string
+      assignedStaff?: string
       complaintId?: string
+      estimatedCost?: number
+      remarks?: string
     }) => createMaintenance(payload),
-    onSuccess: () => void handleSuccess("Maintenance task created"),
+    onSuccess: async () => {
+      await handleSuccess("Maintenance task created")
+      await queryClient.invalidateQueries({ queryKey: ["facility-maintenance"] })
+    },
     onError: (error) =>
       toast.error(getApiErrorMessage(error, "Unable to create maintenance")),
   })
@@ -365,13 +381,31 @@ export function FacilityComplaintsPage() {
     if (!selectedComplaint) return
 
     const formData = new FormData(event.currentTarget)
+    const taskTitle =
+      readFormString(formData, "maintenanceTitle") ||
+      readFormString(formData, "title") ||
+      selectedComplaint.title
+    const taskCategory =
+      readFormString(formData, "category") ||
+      selectedComplaint.category
+    const assignedStaff =
+      readFormString(formData, "assignedStaff") ||
+      readFormString(formData, "technicianId") ||
+      readFormString(formData, "assignedTo") ||
+      undefined
+    const estimatedCost = readOptionalNumber(formData, "estimatedCost")
+    const remarks = readFormString(formData, "remarks")
 
     createMaintenanceMutation.mutate({
-      title: selectedComplaint.title,
+      title: taskTitle,
+      category: taskCategory,
       description: selectedComplaint.description,
       priority: selectedComplaint.priority,
       complaintId: selectedComplaint._id,
-      assignedTo: readFormString(formData, "assignedStaff"),
+      assignedTo: assignedStaff,
+      assignedStaff,
+      estimatedCost,
+      remarks,
     })
   }
 
@@ -447,8 +481,8 @@ export function FacilityComplaintsPage() {
         isRetrying={detailQuery.isFetching}
         onRetry={() => void detailQuery.refetch()}
         onClose={() => setSelectedComplaintId(null)}
-        relatedMaintenance={[]}
-        isRelatedMaintenanceLoading={false}
+        relatedMaintenance={relatedMaintenance}
+        isRelatedMaintenanceLoading={relatedMaintenanceQuery.isPending}
         canCreateMaintenance={Boolean(canCreateMaintenance)}
         statusOptions={statusOptions}
         canApprove={canApprove}

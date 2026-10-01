@@ -225,6 +225,11 @@ const complaintSchema = new Schema(
       default: null,
       index: true,
     },
+    maintenanceId: {
+      type: Schema.Types.Mixed,
+      default: null,
+      index: true,
+    },
     assignedBy: {
       type: String,
       trim: true,

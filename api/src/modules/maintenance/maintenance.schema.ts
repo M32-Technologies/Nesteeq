@@ -50,8 +50,10 @@ export const maintenanceIdParamsSchema = z.object({
 
 export const createMaintenanceBodySchema = z
   .object({
-    complaint: complaintIdSchema,
+    complaint: complaintIdSchema.optional(),
+    complaintId: complaintIdSchema.optional(),
     assignedStaff: userIdSchema.optional(),
+    assignedTo: userIdSchema.optional(),
     category: z.enum(complaintCategories).optional(),
     title: titleSchema.optional(),
     description: descriptionSchema.optional(),
@@ -59,7 +61,10 @@ export const createMaintenanceBodySchema = z
     estimatedCost: costSchema.optional(),
     remarks: nonEmptyText("Remarks", 1000).optional(),
   })
-  .strict();
+  .refine((data) => Boolean(data.complaint || data.complaintId), {
+    message: "Complaint ID is required",
+    path: ["complaint"],
+  });
 
 export const updateMaintenanceBodySchema = z
   .object({
@@ -167,6 +172,7 @@ export const getMaintenanceQuerySchema = z
     category: z.enum(complaintCategories).optional(),
     priority: z.enum(complaintPriorities).optional(),
     complaint: complaintIdSchema.optional(),
+    complaintId: complaintIdSchema.optional(),
     apartment: z.string().trim().min(1, "Apartment ID cannot be empty").optional(),
     flat: z.string().trim().min(1, "Flat ID cannot be empty").optional(),
     resident: userIdSchema.optional(),

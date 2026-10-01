@@ -9,6 +9,7 @@ import { isManagementRole, isMaintenanceRole, normalizeRole } from "../../utils/
 
 import { createNotification } from "../notification/notification.service.js";
 import { Complaint, type ComplaintDocument } from "../complaint/complaint.model.js";
+import { Schedule } from "../schedule/schedule.model.js";
 import {
   Maintenance,
   type MaintenanceDocument,
@@ -246,7 +247,13 @@ export const createMaintenance = async (
     throw new AppError("Only management users can create maintenance work", 403);
   }
 
-  const complaint = await getComplaintOrThrow(data.complaint);
+  const rawComplaintId = data.complaint || (data as any).complaintId;
+  if (!rawComplaintId) {
+    throw new AppError("Complaint ID is required", 400);
+  }
+  const complaintId = String(rawComplaintId);
+
+  const complaint = await getComplaintOrThrow(complaintId);
   const complaintStatus = getComplaintStatus(complaint);
 
   if (complaintTerminalStatuses.has(complaintStatus) || !complaintMaintenanceSourceStatuses.has(complaintStatus)) {
@@ -256,7 +263,7 @@ export const createMaintenance = async (
   assertManagerCanManageApartment(user, complaint.apartment);
 
   const existingActiveMaintenance = await Maintenance.findOne({
-    complaint: data.complaint,
+    complaint: complaintId,
     status: { $in: activeMaintenanceStatuses },
   }).lean();
 
@@ -267,9 +274,10 @@ export const createMaintenance = async (
   let assignedStaff: string | null = null;
   const now = new Date();
 
-  if (data.assignedStaff) {
-    const staff = await ensureStaffUser(data.assignedStaff);
-    assignedStaff = ensureStaffCanWorkOnApartment(staff, data.assignedStaff, complaint.apartment, user);
+  const rawStaffId = data.assignedStaff || (data as any).assignedTo;
+  if (rawStaffId) {
+    const staff = await ensureStaffUser(rawStaffId);
+    assignedStaff = ensureStaffCanWorkOnApartment(staff, rawStaffId, complaint.apartment, user);
   }
 
   const maintenance = await Maintenance.create({
@@ -294,16 +302,19 @@ export const createMaintenance = async (
     ? {
         status: "ASSIGNED",
         assignedStaff,
+        assignedTo: assignedStaff,
         assignedBy: user.id,
         assignedAt: now,
         estimatedCost: data.estimatedCost ?? complaint.estimatedCost ?? null,
+        maintenanceId: maintenance._id,
       }
-    : complaintStatus === "PENDING"
-      ? { status: "UNDER_REVIEW" }
-      : {};
+    : {
+        ...(complaintStatus === "PENDING" ? { status: "UNDER_REVIEW" } : {}),
+        maintenanceId: maintenance._id,
+      };
 
   await syncComplaint(
-    data.complaint,
+    complaintId,
     complaintSet,
     createComplaintRemark(data.remarks, user)
   );
@@ -323,6 +334,94 @@ export const createMaintenance = async (
   }
 
   return maintenance;
+};
+
+export const getMaintenanceTypes = async (user: AuthenticatedMaintenanceUser) => {
+  await ensureCurrentUserExists(user);
+
+  const predefinedTypes = [
+    {
+      id: "ELECTRICAL_REPAIR",
+      title: "Electrical Repair",
+      category: "ELECTRICAL",
+      description: "Wiring, switchboard, fuse, circuit breaker, or electrical fixture repairs",
+    },
+    {
+      id: "PLUMBING_WORK",
+      title: "Plumbing Work",
+      category: "PLUMBING",
+      description: "Pipe leakage, faucet repair, drain blockage, or sanitary fittings",
+    },
+    {
+      id: "HVAC_MAINTENANCE",
+      title: "HVAC Maintenance",
+      category: "MAINTENANCE",
+      description: "Air conditioning, cooling systems, ventilation, and filter servicing",
+    },
+    {
+      id: "CARPENTRY_WORK",
+      title: "Carpentry & Woodwork",
+      category: "MAINTENANCE",
+      description: "Door, window, lock, cabinet, furniture, or wooden fixture repairs",
+    },
+    {
+      id: "GENERAL_SERVICING",
+      title: "General Servicing",
+      category: "MAINTENANCE",
+      description: "Periodic facility servicing, preventive maintenance, and handyman tasks",
+    },
+    {
+      id: "CLEANING_SANITIZATION",
+      title: "Cleaning & Sanitization",
+      category: "CLEANING",
+      description: "Deep cleaning, corridor sanitization, common area upkeep, and waste disposal",
+    },
+    {
+      id: "SECURITY_CHECK",
+      title: "Security System Check",
+      category: "SECURITY",
+      description: "CCTV, intercom, access control gates, and perimeter sensor maintenance",
+    },
+    {
+      id: "LIFT_SERVICING",
+      title: "Elevator / Lift Servicing",
+      category: "LIFT",
+      description: "Elevator routine maintenance, sensor calibration, and emergency repairs",
+    },
+    {
+      id: "WATER_SUPPLY",
+      title: "Water Supply & Tank Inspection",
+      category: "WATER",
+      description: "Overhead tank inspection, pump maintenance, and water filtration system",
+    },
+    {
+      id: "OTHER_MAINTENANCE",
+      title: "Other Maintenance Task",
+      category: "OTHER",
+      description: "Miscellaneous repair or maintenance request",
+    },
+  ];
+
+  try {
+    const activeSchedules = await Schedule.find({
+      status: { $in: ["SCHEDULED", "IN_PROGRESS"] },
+    })
+      .select("_id title description workType")
+      .limit(20)
+      .lean();
+
+    const scheduleTypes = activeSchedules.map((s) => ({
+      id: s._id.toString(),
+      title: s.title,
+      category: s.workType === "maintenance" ? "MAINTENANCE" : "OTHER",
+      description: s.description || undefined,
+      isSchedule: true,
+    }));
+
+    return [...predefinedTypes, ...scheduleTypes];
+  } catch {
+    return predefinedTypes;
+  }
 };
 
 export const getMaintenance = async (
