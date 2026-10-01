@@ -1,4 +1,7 @@
-import { Eye } from "lucide-react"
+"use client"
+
+import { useEffect, useState } from "react"
+import { Eye, MoreVertical, UserCheck } from "lucide-react"
 
 import type { Complaint } from "@/features/dashboard/facility/complaints/types/complaints.types"
 import {
@@ -16,9 +19,23 @@ export function ComplaintsTable({
   complaints: Complaint[]
   onSelectComplaint: (id: string) => void
 }) {
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null)
+
+  const handleOpenDrawer = (complaint: Complaint) => {
+    onSelectComplaint(complaint._id)
+  }
+
+  useEffect(() => {
+    const handleOutsideClick = () => setActiveMenuId(null)
+    if (activeMenuId) {
+      document.addEventListener("click", handleOutsideClick)
+      return () => document.removeEventListener("click", handleOutsideClick)
+    }
+  }, [activeMenuId])
+
   return (
     <>
-      <div className="hidden overflow-x-auto lg:block">
+      <div className="hidden min-h-[300px] overflow-x-auto pb-28 lg:block">
         <table className="w-full min-w-[1120px] text-left">
           <thead className="bg-[#FBFCFD] text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8793A0]">
             <tr>
@@ -37,7 +54,8 @@ export function ComplaintsTable({
             {complaints.map((complaint) => (
               <tr
                 key={complaint._id}
-                className="text-[13px] text-[#26313D] transition hover:bg-[#FBFCFD]"
+                onClick={() => handleOpenDrawer(complaint)}
+                className="cursor-pointer text-[13px] text-[#26313D] transition hover:bg-[#FBFCFD]"
               >
                 <td className="px-4 py-4 font-semibold text-[#111111]">
                   {formatId(complaint._id)}
@@ -66,16 +84,42 @@ export function ComplaintsTable({
                     ? complaint.assignedStaff.name
                     : complaint.assignedTechnicianName || (typeof complaint.assignedStaff === 'string' ? '-' : 'Not assigned')}
                 </td>
-                <td className="px-4 py-4">
-                  <div className="flex justify-end">
+                <td className="px-4 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                  <div className="relative inline-block text-left" onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
-                      onClick={() => onSelectComplaint(complaint._id)}
-                      className="inline-flex size-9 items-center justify-center rounded-lg border border-[#DDE5EC] text-[#5B6875] transition hover:border-[#07584F] hover:text-[#07584F]"
-                      aria-label="View complaint"
+                      onClick={() => setActiveMenuId(activeMenuId === complaint._id ? null : complaint._id)}
+                      className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
                     >
-                      <Eye className="size-4" />
+                      <MoreVertical className="h-4 w-4" />
                     </button>
+
+                    {activeMenuId === complaint._id && (
+                      <div className="absolute right-0 z-50 mt-1 w-48 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveMenuId(null);
+                            handleOpenDrawer(complaint);
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                          <Eye className="h-4 w-4 text-slate-500" />
+                          <span>View Details</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveMenuId(null);
+                            handleOpenDrawer(complaint);
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#5542F6] hover:bg-[#F5F3FF]"
+                        >
+                          <UserCheck className="h-4 w-4" />
+                          <span>Assign Technician</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -84,9 +128,13 @@ export function ComplaintsTable({
         </table>
       </div>
 
-      <div className="divide-y divide-[#EEF2F5] lg:hidden">
+      <div className="divide-y divide-[#EEF2F5] pb-28 lg:hidden">
         {complaints.map((complaint) => (
-          <article key={complaint._id} className="p-4">
+          <article
+            key={complaint._id}
+            onClick={() => handleOpenDrawer(complaint)}
+            className="cursor-pointer p-4 transition hover:bg-[#FBFCFD]"
+          >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[12px] font-semibold text-[#07584F]">
@@ -96,14 +144,44 @@ export function ComplaintsTable({
                   {complaint.title}
                 </h2>
               </div>
-              <button
-                type="button"
-                onClick={() => onSelectComplaint(complaint._id)}
-                className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-[#DDE5EC] text-[#5B6875]"
-                aria-label="View complaint"
-              >
-                <Eye className="size-4" />
-              </button>
+              <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
+                <div className="relative inline-block text-left" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveMenuId(activeMenuId === complaint._id ? null : complaint._id)}
+                    className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </button>
+
+                  {activeMenuId === complaint._id && (
+                    <div className="absolute right-0 z-50 mt-1 w-48 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveMenuId(null);
+                          handleOpenDrawer(complaint);
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        <Eye className="h-4 w-4 text-slate-500" />
+                        <span>View Details</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveMenuId(null);
+                          handleOpenDrawer(complaint);
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#5542F6] hover:bg-[#F5F3FF]"
+                      >
+                        <UserCheck className="h-4 w-4" />
+                        <span>Assign Technician</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               <StatusBadge status={complaint.status} />
