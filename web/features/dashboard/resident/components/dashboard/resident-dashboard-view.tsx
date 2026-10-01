@@ -107,7 +107,7 @@ export function ResidentDashboardView() {
             Resident Dashboard
           </h1>
           <p className="mt-1 text-sm text-[#637083]">
-            Welcome back, <span className="font-medium text-[#111111]" suppressHydrationWarning>{userName}</span> • <span suppressHydrationWarning>{flatUnitName}</span> at <span suppressHydrationWarning>{apartmentName}</span>
+            Welcome back, <span className="font-medium text-[#111111]">{userName}</span> • {flatUnitName} at {apartmentName}
           </p>
         </div>
 

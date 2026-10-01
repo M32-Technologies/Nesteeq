@@ -306,8 +306,14 @@ const syncComplaintFromMaintenance = async (
   user: AuthenticatedMaintenanceUser,
   remark?: string
 ): Promise<void> => {
-  const complaintId = getMongoId(maintenance.complaint);
-  assertValidComplaintId(complaintId);
+  const rawComplaint = (maintenance as any).complaint || (maintenance as any).complaintId;
+  if (!rawComplaint) {
+    return;
+  }
+  const complaintId = getMongoId(rawComplaint);
+  if (!complaintId || !Types.ObjectId.isValid(complaintId)) {
+    return;
+  }
 
   await syncComplaint(complaintId, set, createComplaintRemark(remark, user));
 };
@@ -646,19 +652,25 @@ export const assignMaintenance = async (
     throw new AppError(`Maintenance cannot be assigned while it is ${currentStatus}`, 400);
   }
 
-  const staff = await ensureStaffUser(data.assignedStaff, maintenance.apartment);
-  const staffId = ensureStaffCanWorkOnApartment(staff, data.assignedStaff, maintenance.apartment, user);
+  const staffIdentifier = data.assignedStaff || (data as any).assignedTo || (data as any).technicianId;
+  if (!staffIdentifier) {
+    throw new AppError("Assigned staff or technician is required", 400);
+  }
+
+  const staff = await ensureStaffUser(staffIdentifier, maintenance.apartment);
+  const staffId = ensureStaffCanWorkOnApartment(staff, staffIdentifier, maintenance.apartment, user);
 
   if (currentStatus === "ASSIGNED" && sameId(maintenance.assignedStaff, staffId)) {
     throw new AppError("Maintenance is already assigned to this staff member", 409);
   }
 
+  const targetStatus = (data as any).status || "ASSIGNED";
   const now = new Date();
   const set: Record<string, unknown> = {
     assignedStaff: staffId,
     assignedBy: user.id,
     assignedAt: now,
-    status: "ASSIGNED",
+    status: targetStatus,
     updatedBy: user.id,
   };
 
@@ -666,7 +678,8 @@ export const assignMaintenance = async (
     set.estimatedCost = data.estimatedCost;
   }
 
-  const managerRemark = createNote(data.remarks, user);
+  const remarkText = data.remarks || (data as any).notes;
+  const managerRemark = createNote(remarkText, user);
   const updatedMaintenance = await updateMaintenanceDocument(
     maintenanceId,
     set,
@@ -674,7 +687,7 @@ export const assignMaintenance = async (
   );
 
   const complaintSet: Record<string, unknown> = {
-    status: "ASSIGNED",
+    status: targetStatus,
     assignedStaff: staffId,
     assignedBy: user.id,
     assignedAt: now,
@@ -684,7 +697,7 @@ export const assignMaintenance = async (
     complaintSet.estimatedCost = data.estimatedCost;
   }
 
-  await syncComplaintFromMaintenance(updatedMaintenance, complaintSet, user, data.remarks);
+  await syncComplaintFromMaintenance(updatedMaintenance, complaintSet, user, remarkText);
 
   await createNotification({
     apartment: updatedMaintenance.apartment,

@@ -288,40 +288,40 @@ export function FacilityMaintenancePage() {
     if (!selectedItem) return
 
     const formData = new FormData(event.currentTarget)
-    const assignedTo =
+    const selectedTechnicianId =
       readFormString(formData, "assignedStaff") ||
+      readFormString(formData, "assignedStaffId") ||
       readFormString(formData, "technicianUserId") ||
       readFormString(formData, "assignedTo") ||
       readFormString(formData, "technicianId")
     const nextStatus = readFormString(formData, "status") as MaintenanceStatus | undefined
     const remarks = readFormString(formData, "remarks")
 
-    let assignedPromise: Promise<unknown> | null = null
-    let statusPromise: Promise<unknown> | null = null
-
-    if (assignedTo) {
-      assignedPromise = assignMaintenance(selectedItem._id, {
-        assignedTo,
-        notes: remarks,
-      })
-    }
-
-    if (nextStatus && nextStatus !== selectedItem.status) {
-      statusPromise = updateMaintenanceStatus(selectedItem._id, {
-        status: nextStatus,
-        notes: remarks,
-      })
-    }
-
-    if (!assignedTo && (!nextStatus || nextStatus === selectedItem.status)) {
+    if (!selectedTechnicianId && (!nextStatus || nextStatus === selectedItem.status)) {
       toast.info("No changes to save")
       return
     }
 
     try {
       setIsSavingAssignAndStatus(true)
-      if (assignedPromise) await assignedPromise
-      if (statusPromise) await statusPromise
+
+      if (selectedTechnicianId) {
+        await assignMaintenance(selectedItem._id, {
+          assignedStaff: selectedTechnicianId,
+          assignedTo: selectedTechnicianId,
+          technicianId: selectedTechnicianId,
+          status: nextStatus,
+          remarks: remarks || undefined,
+          notes: remarks || undefined,
+        } as any)
+      } else if (nextStatus && nextStatus !== selectedItem.status) {
+        await updateMaintenanceStatus(selectedItem._id, {
+          status: nextStatus,
+          remarks: remarks || undefined,
+          notes: remarks || undefined,
+        })
+      }
+
       toast.success("Assignment & Status updated")
       await queryClient.invalidateQueries({ queryKey: ["facility-maintenance"] })
       await detailQuery.refetch()
@@ -338,9 +338,13 @@ export function FacilityMaintenancePage() {
     if (!selectedItem) return
 
     const formData = new FormData(event.currentTarget)
-    const assignedTo = readRequiredFormString(formData, "assignedStaff")
+    const assignedStaff =
+      readRequiredFormString(formData, "assignedStaff") ||
+      readRequiredFormString(formData, "assignedStaffId") ||
+      readRequiredFormString(formData, "assignedTo") ||
+      readRequiredFormString(formData, "technicianId")
 
-    if (!assignedTo) {
+    if (!assignedStaff) {
       toast.error("Technician user ID is required")
       return
     }
@@ -348,8 +352,11 @@ export function FacilityMaintenancePage() {
     assignMutation.mutate({
       id: selectedItem._id,
       payload: {
-        assignedTo,
+        assignedStaff,
+        assignedTo: assignedStaff,
+        technicianId: assignedStaff,
         notes: readFormString(formData, "remarks"),
+        remarks: readFormString(formData, "remarks"),
       },
     })
   }

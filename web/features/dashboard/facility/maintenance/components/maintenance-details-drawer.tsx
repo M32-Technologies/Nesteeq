@@ -245,10 +245,14 @@ export function MaintenanceDetailsDrawer({
                 </div>
                 <FormLabel label="Select Technician">
                   <TechnicianSelect
+                    name="assignedStaff"
                     defaultValue={
-                      typeof maintenance.assignedTo === "object"
-                        ? maintenance.assignedTo?._id
-                        : maintenance.assignedTo || ""
+                      typeof (maintenance as any).assignedStaff === "object"
+                        ? (maintenance as any).assignedStaff?._id || (maintenance as any).assignedStaff?.id
+                        : (maintenance as any).assignedStaff ||
+                          (typeof maintenance.assignedTo === "object"
+                            ? maintenance.assignedTo?._id
+                            : maintenance.assignedTo || "")
                     }
                     placeholder="Choose a technician..."
                   />

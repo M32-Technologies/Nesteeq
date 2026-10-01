@@ -64,34 +64,42 @@ export const createMaintenanceBodySchema = z
 
 export const updateMaintenanceBodySchema = z
   .object({
+    complaint: z.string().trim().optional().nullable(),
+    complaintId: z.string().trim().optional().nullable(),
     category: z.enum(complaintCategories).optional(),
     title: titleSchema.optional(),
     description: descriptionSchema.optional(),
     priority: z.enum(complaintPriorities).optional(),
     estimatedCost: costSchema.optional(),
-    managerRemarks: nonEmptyText("Manager remarks", 1000).optional(),
+    managerRemarks: z.string().trim().max(1000).optional(),
+    remarks: z.string().trim().max(1000).optional(),
   })
-  .strict()
   .refine(requireAtLeastOneField, {
     message: "At least one field is required",
   });
 
 export const assignMaintenanceBodySchema = z
   .object({
-    assignedStaff: userIdSchema,
+    assignedStaff: userIdSchema.optional(),
+    assignedTo: userIdSchema.optional(),
+    technicianId: userIdSchema.optional(),
+    status: z.enum(maintenanceStatuses).optional(),
     estimatedCost: costSchema.optional(),
-    remarks: nonEmptyText("Remarks", 1000).optional(),
+    remarks: z.string().trim().max(1000).optional(),
+    notes: z.string().trim().max(1000).optional(),
   })
-  .strict();
+  .refine((data) => Boolean(data.assignedStaff || data.assignedTo || data.technicianId), {
+    message: "Assigned staff or technician is required",
+  });
 
 export const updateMaintenanceStatusBodySchema = z
   .object({
     status: z.enum(maintenanceStatuses, {
       error: "Maintenance status is required",
     }),
-    remarks: nonEmptyText("Remarks", 1000).optional(),
-  })
-  .strict();
+    remarks: z.string().trim().max(1000).optional(),
+    notes: z.string().trim().max(1000).optional(),
+  });
 
 export const startMaintenanceBodySchema = z
   .object({
