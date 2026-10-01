@@ -18,7 +18,7 @@ const navItems = [
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { data: session, isPending } = useSession();
+  const { data: session, isPending, isRefetching } = useSession();
 
   const [isMounted, setIsMounted] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -31,7 +31,7 @@ export default function Navbar() {
   const user = isMounted ? session?.user : null;
   const userName = user?.name || user?.email || "Profile";
   const userInitial = userName.charAt(0).toUpperCase();
-  const isAuthLoading = !isMounted || isPending;
+  const isAuthLoading = !isMounted || isPending || (!session && isRefetching);
 
   const handleSignOut = async () => {
     await signOut();
