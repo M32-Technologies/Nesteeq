@@ -43,6 +43,7 @@ import { Technician } from "../technician/technician.model.js";
 import { Apartment } from "../apartment/apartment.model.js";
 import { Resident } from "../resident/resident.model.js";
 import { Flat } from "../flat/flat.model.js";
+import { createNotification } from "../notification/notification.service.js";
 
 const getAuthUsersFilter = (userIds: string[]) => {
   const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
@@ -959,6 +960,19 @@ export const createComplaint = async (
     images,
     attachments,
   });
+
+  createNotification({
+    apartment,
+    recipientRole: "FACILITY_MANAGER",
+    type: "NEW_COMPLAINT",
+    severity: data.priority === "URGENT" || data.priority === "HIGH" ? "WARNING" : "INFO",
+    title: "New Complaint Filed",
+    message: `${data.title} (${data.category})`,
+    relatedResourceType: "COMPLAINT",
+    relatedResourceId: complaint._id.toString(),
+  }).catch((err) =>
+    console.error("Failed to notify facility manager of complaint:", err)
+  );
 
   const [enriched] = await enrichComplaints([complaint]);
   return enriched || complaint;

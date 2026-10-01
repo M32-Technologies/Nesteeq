@@ -18,6 +18,8 @@ const brevoSenderName = (
 const razorPayKeyId = (process.env.RAZORPAY_KEY_ID || "").trim();
 const razorPaySecret = (process.env.RAZORPAY_KEY_SECRET || "").trim();
 
+const redisUrl = (process.env.REDIS_URL || "").trim();
+
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? "development",
   port: Number((process.env.PORT ?? "6001").trim()),
@@ -29,5 +31,6 @@ export const env = {
   brevoSenderEmail,
   brevoSenderName,
   razorPayKeyId,
-  razorPaySecret
+  razorPaySecret ,
+  redisUrl
 };

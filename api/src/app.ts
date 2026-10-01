@@ -36,7 +36,7 @@ import scheduleRoutes from "./modules/schedule/schedule.routes.js";
 import uploadRoutes from "./modules/upload/upload.routes.js";
 import adminRoutes from "./modules/admin/admin.routes.js";
 import treasurerRoutes from "./modules/treasurer/treasurer.routes.js";
-
+import notificationRoutes from "./modules/notification/notification.routes.js";
 const app = express();
 
 app.use(
@@ -72,14 +72,6 @@ app.use("/api/v1/expenses", expenseRoutes);
 app.use("/api/v1/wallets", walletRoutes);
 app.use("/api/v1/audit", auditRoutes);
 app.use("/api/v1/treasurer", treasurerRoutes);
-
-app.use("/api/bills", billingRoutes);
-app.use("/api/payments", paymentRoutes);
-app.use("/api/finance", financeRoutes);
-app.use("/api/expenses", expenseRoutes);
-app.use("/api/wallets", walletRoutes);
-app.use("/api/audit", auditRoutes);
-app.use("/api/treasurer", treasurerRoutes);
 app.use("/api/residents", ResidentRoute);
 
 app.use("/api/v1/parking", parkingRoutes);
@@ -94,6 +86,8 @@ app.use("/api/v1/announcements", announcementRoutes);
 app.use("/api/announcements", announcementRoutes);
 app.use("/api/security", securityRoutes);
 
+app.use("/api/v1/notifications", notificationRoutes);
+
 app.use("/api/maintenance-technician", maintenanceTechnicianRoutes);
 
 app.use("/api/v1/upload", uploadRoutes);
@@ -106,12 +100,6 @@ app.use("/api/v1", facilityRoutes);
 app.use("/api/v1", reportRoutes);
 app.use("/api/v1", scheduleRoutes);
 
-app.use("/api", complaintRoutes);
-app.use("/api", maintenanceRoutes);
-app.use("/api", technicianRoutes);
-app.use("/api", facilityRoutes);
-app.use("/api", reportRoutes);
-app.use("/api", scheduleRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

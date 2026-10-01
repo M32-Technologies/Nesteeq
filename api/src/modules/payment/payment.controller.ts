@@ -49,7 +49,7 @@ export const reversePayment = catchAsync(
       apartmentId,
       {
         userId: req.user?.id,
-        role: req.user?.role || undefined,
+        role: req.user?.role ?? undefined,
       },
       reason
     );
