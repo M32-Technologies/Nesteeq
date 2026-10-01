@@ -11,6 +11,7 @@ import {
   ChevronUp,
   Clock,
   Megaphone,
+  Package,
   ShieldAlert,
   Trash2,
   UserCheck,
@@ -111,6 +112,19 @@ function getNotificationCategory(type?: string, severity?: string) {
       unreadDotBg: "bg-purple-500 ring-2 ring-purple-100",
       accentBorder: "border-l-4 border-l-purple-500",
       cardBgUnread: "bg-purple-50/20 hover:bg-purple-50/40",
+    };
+  }
+
+  if (normType.includes("DELIVERY")) {
+    return {
+      label: "Delivery",
+      variant: "delivery" as const,
+      icon: <Package className="size-4.5 text-[#07584F]" />,
+      iconBg: "bg-emerald-50 text-[#07584F] ring-1 ring-emerald-200 shadow-2xs",
+      badgeBg: "bg-emerald-50 text-[#07584F] ring-1 ring-emerald-200 font-medium",
+      unreadDotBg: "bg-[#07584F] ring-2 ring-emerald-100",
+      accentBorder: "border-l-4 border-l-[#07584F]",
+      cardBgUnread: "bg-emerald-50/20 hover:bg-emerald-50/40",
     };
   }
 

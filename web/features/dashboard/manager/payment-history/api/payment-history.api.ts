@@ -57,7 +57,10 @@ const request = async <T>(
   path: string,
   options: RequestInit = {},
 ) => {
-  const response = await fetch(`${getApiBaseUrl()}${path}`, {
+  const normalizedPath = path.startsWith("/api/v1/")
+    ? path
+    : path.replace(/^\/api\//, "/api/v1/");
+  const response = await fetch(`${getApiBaseUrl()}${normalizedPath}`, {
     ...options,
     credentials: "include",
     headers: {
@@ -103,10 +106,10 @@ const toQuery = (params: object) => {
 };
 
 export const getFinanceSummary = () =>
-  request<FinanceSummary>("/api/finance/summary");
+  request<FinanceSummary>("/api/v1/finance/summary");
 
 export const getManagerBills = (params: GetManagerBillsParams = {}) =>
-  request<Bill[]>(`/api/bills${toQuery(params)}`);
+  request<Bill[]>(`/api/v1/bills${toQuery(params)}`);
 
 export const getManagerPayments = (params: GetManagerPaymentsParams = {}) =>
-  request<Payment[]>(`/api/payments${toQuery(params)}`);
+  request<Payment[]>(`/api/v1/payments${toQuery(params)}`);

@@ -1,6 +1,11 @@
 import { AppError } from "../../utils/AppError.js"
 import { escapeRegExp } from "../../utils/regex.js"
 import { ResidentModel } from "../resident/resident.model.js"
+import { createNotification } from "../notification/notification.service.js"
+import {
+  sendRealtimeEmergencyAlert,
+  sendRealtimeAlertUpdate,
+} from "../../socket/socket.js"
 import {
   ensureFlatInApartment,
   ensureResidentInApartment,
@@ -291,7 +296,41 @@ export const createEmergencyAlertService = async ({
     alert.toObject() as LeanEmergencyAlert,
   ])
 
-  return enriched[0]
+  const createdAlert = enriched[0]
+
+  try {
+    const flatStr = createdAlert.flatNumber
+      ? `Flat ${createdAlert.flatNumber}`
+      : "Resident Flat"
+    const residentStr = createdAlert.residentName || "Resident"
+    const alertMsg = createdAlert.message ? ` - "${createdAlert.message}"` : ""
+
+    const title = `🚨 New Emergency: ${alertType} in ${flatStr}`
+    const notifMessage = `New emergency [${alertType}] in ${flatStr} (${residentStr})${alertMsg}`
+
+    // 1. Send persistent notification to security staff
+    await createNotification({
+      apartment: apartmentId,
+      recipientRole: "SECURITY_STAFF",
+      type: "EMERGENCY_ALERT",
+      severity: "ERROR",
+      title,
+      message: notifMessage,
+      relatedResourceType: "EMERGENCY_ALERT",
+      relatedResourceId: createdAlert._id,
+      createdBy: userId,
+    })
+
+    // 2. Emit real-time alert via socket to update security UI instantly
+    sendRealtimeEmergencyAlert({
+      apartmentId,
+      alert: createdAlert,
+    })
+  } catch (err) {
+    console.error("Emergency notification error:", err)
+  }
+
+  return createdAlert
 }
 
 export const listEmergencyAlertsService = async ({
@@ -463,6 +502,8 @@ export const updateEmergencyAlertStatusService = async ({
   const enriched = await enrichAlerts(apartmentId, [
     updatedAlert.toObject() as LeanEmergencyAlert,
   ])
+
+  sendRealtimeAlertUpdate(apartmentId, enriched[0])
 
   return enriched[0]
 }

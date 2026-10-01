@@ -38,7 +38,7 @@ function getInitials(name: string) {
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { data: session, isPending } = useSession();
+  const { data: session, isPending, isRefetching } = useSession();
 
   const [isMounted, setIsMounted] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -52,8 +52,13 @@ export default function Navbar() {
 
   const user = isMounted ? session?.user : null;
   const userName = user?.name || user?.email || "Profile";
+<<<<<<< HEAD
   const userInitials = user?.name ? getInitials(user.name) : userName.charAt(0).toUpperCase();
   const isAuthLoading = !isMounted || isPending;
+=======
+  const userInitial = userName.charAt(0).toUpperCase();
+  const isAuthLoading = !isMounted || isPending || (!session && isRefetching);
+>>>>>>> origin/feature/notification
 
   const userRole = normalizeDashboardRole(user?.role);
   const roleLabel =

@@ -5,7 +5,6 @@ import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
 
 import {
-  Bell,
   ChevronRight,
   LogOut,
   UserRound,
@@ -416,67 +415,6 @@ export default function DashboardSidebar({
             pt-2
           "
           >
-            {/* NOTIFICATIONS */}
-
-            <button
-              type="button"
-              aria-label="Notifications"
-              className="
-              flex
-              h-[44px]
-              w-full
-              cursor-pointer
-              items-center
-
-              overflow-hidden
-
-              rounded-xl
-
-              text-[#C3D2E3]
-
-              transition-colors
-              duration-150
-
-              hover:bg-white/[0.07]
-              hover:text-white
-            "
-            >
-              <div
-                className="
-                relative
-                flex
-                w-[56px]
-                shrink-0
-                items-center
-                justify-center
-              "
-              >
-                <Bell className="size-[18px] stroke-[1.8]" />
-                {/* notification badge — mirrors the navbar bell */}
-                <span
-                  className="absolute right-3 top-[3px] size-[7px] rounded-full bg-red-400 ring-[1.5px] ring-[#071D35]"
-                  aria-hidden="true"
-                />
-              </div>
-
-              <span
-                className="
-                whitespace-nowrap
-
-                text-[13px]
-                font-medium
-
-                transition-opacity
-                duration-200
-
-                opacity-100
-                lg:opacity-0
-                lg:group-hover/sidebar:opacity-100
-              "
-              >
-                Notifications
-              </span>
-            </button>
 
             {/* MY PROFILE */}
 

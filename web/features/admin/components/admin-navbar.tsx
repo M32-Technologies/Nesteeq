@@ -28,6 +28,19 @@ export default function AdminNavbar({ onMenuClick }: AdminNavbarProps) {
   const userInitial = userName ? userName.charAt(0).toUpperCase() : ""
   const userAvatar = user?.image || null
 
+  const [hasAvatarError, setHasAvatarError] = useState(false)
+
+  useEffect(() => {
+    setHasAvatarError(false)
+  }, [userAvatar])
+
+  const isValidAvatarUrl = Boolean(
+    userAvatar &&
+      (userAvatar.startsWith("http://") ||
+        userAvatar.startsWith("https://") ||
+        userAvatar.startsWith("/"))
+  )
+
   // Close profile dropdown on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -142,16 +155,22 @@ export default function AdminNavbar({ onMenuClick }: AdminNavbarProps) {
             className="flex items-center gap-2 rounded-2xl border border-slate-200/80 bg-white py-1 pl-1 pr-2.5 shadow-2xs hover:border-slate-300 transition-all cursor-pointer"
           >
             {/* Avatar */}
-            <span className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#07584F] text-xs font-semibold text-white">
+            <span className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#07584F] text-xs font-semibold text-white select-none">
               {isPending ? (
                 <span className="h-full w-full animate-pulse bg-slate-200" />
-              ) : userAvatar ? (
-                <Image
+              ) : userAvatar && isValidAvatarUrl && !hasAvatarError ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
                   src={userAvatar}
+<<<<<<< HEAD
                   alt={userName || "Super Admin"}
                   width={32}
                   height={32}
                   unoptimized
+=======
+                  alt=""
+                  onError={() => setHasAvatarError(true)}
+>>>>>>> origin/feature/notification
                   className="h-full w-full object-cover"
                 />
               ) : userInitial ? (
