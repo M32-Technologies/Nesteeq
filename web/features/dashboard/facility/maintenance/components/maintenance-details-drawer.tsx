@@ -273,7 +273,6 @@ export function MaintenanceDetailsDrawer({
                   <TextArea
                     name="remarks"
                     placeholder="Add assignment or status change remarks..."
-                    rows={3}
                   />
                 </FormLabel>
               </div>
@@ -315,7 +314,6 @@ export function MaintenanceDetailsDrawer({
                     required
                     minLength={10}
                     defaultValue={maintenance.description}
-                    rows={4}
                   />
                 </FormLabel>
 
@@ -369,7 +367,6 @@ export function MaintenanceDetailsDrawer({
                     name="reason"
                     required
                     placeholder="Cancellation reason..."
-                    rows={3}
                   />
                 </FormLabel>
                 <div>
