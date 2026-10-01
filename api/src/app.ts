@@ -66,12 +66,25 @@ app.use("/api/v1/blocks", BlockRoute);
 app.use("/api/v1/flats", FlatRoute);
 
 app.use("/api/v1/bills", billingRoutes);
+app.use("/api/bills", billingRoutes);
+
 app.use("/api/v1/payments", paymentRoutes);
+app.use("/api/payments", paymentRoutes);
+
 app.use("/api/v1/finance", financeRoutes);
+app.use("/api/finance", financeRoutes);
+
 app.use("/api/v1/expenses", expenseRoutes);
+app.use("/api/expenses", expenseRoutes);
+
 app.use("/api/v1/wallets", walletRoutes);
+app.use("/api/wallets", walletRoutes);
+
 app.use("/api/v1/audit", auditRoutes);
+app.use("/api/audit", auditRoutes);
+
 app.use("/api/v1/treasurer", treasurerRoutes);
+app.use("/api/treasurer", treasurerRoutes);
 app.use("/api/residents", ResidentRoute);
 
 app.use("/api/v1/parking", parkingRoutes);
