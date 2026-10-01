@@ -52,13 +52,8 @@ export default function Navbar() {
 
   const user = isMounted ? session?.user : null;
   const userName = user?.name || user?.email || "Profile";
-<<<<<<< HEAD
   const userInitials = user?.name ? getInitials(user.name) : userName.charAt(0).toUpperCase();
-  const isAuthLoading = !isMounted || isPending;
-=======
-  const userInitial = userName.charAt(0).toUpperCase();
   const isAuthLoading = !isMounted || isPending || (!session && isRefetching);
->>>>>>> origin/feature/notification
 
   const userRole = normalizeDashboardRole(user?.role);
   const roleLabel =

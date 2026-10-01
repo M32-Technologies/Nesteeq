@@ -459,14 +459,8 @@ export const submitCost = async (
           },
         },
       },
-<<<<<<< HEAD
       { new: true, session }
     )
-=======
-    },
-    { returnDocument: "after" }
-  )
->>>>>>> origin/feature/notification
 
     if (!job) {
       throw new AppError("Maintenance job not found", 404)
@@ -515,38 +509,6 @@ export const completeJob = async (
       {
         $set: {
           status: "COMPLETED",
-<<<<<<< HEAD
-=======
-          remarks: payload.notes || null,
-          by: technicianId || "Technician",
-          role: "maintenance_technician",
-          createdAt: now,
-        },
-        workNotes: {
-          message: `Work completed: ${payload.workSummary}${
-            payload.notes ? ` - Notes: ${payload.notes}` : ""
-          }`,
-          by: technicianId || "Technician",
-          role: "maintenance_technician",
-          createdAt: now,
-        },
-      },
-    },
-    { returnDocument: "after" }
-  )
-
-  if (!job) {
-    throw new AppError("Maintenance job not found", 404)
-  }
-
-  if (job.complaint) {
-    await Complaint.findByIdAndUpdate(job.complaint, {
-      $set: {
-        status: "WORK_COMPLETED",
-        completionDetails: {
-          details: payload.workSummary,
-          completedBy: technicianId || "Technician",
->>>>>>> origin/feature/notification
           completedAt: now,
           completionDetails: {
             details: payload.workSummary,

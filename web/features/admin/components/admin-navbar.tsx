@@ -162,15 +162,8 @@ export default function AdminNavbar({ onMenuClick }: AdminNavbarProps) {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={userAvatar}
-<<<<<<< HEAD
                   alt={userName || "Super Admin"}
-                  width={32}
-                  height={32}
-                  unoptimized
-=======
-                  alt=""
                   onError={() => setHasAvatarError(true)}
->>>>>>> origin/feature/notification
                   className="h-full w-full object-cover"
                 />
               ) : userInitial ? (
