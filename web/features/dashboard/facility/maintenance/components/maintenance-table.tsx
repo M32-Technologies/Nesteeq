@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Eye, MoreVertical, UserCheck } from "lucide-react"
+import { Eye, MoreVertical, Pencil, UserCheck } from "lucide-react"
 
 import type { Maintenance } from "@/features/dashboard/facility/maintenance/types/maintenance.types"
 import {
@@ -18,12 +18,15 @@ export function MaintenanceTable({
   onSelectMaintenance,
 }: {
   maintenance: Maintenance[]
-  onSelectMaintenance: (id: string) => void
+  onSelectMaintenance: (id: string, mode?: "details" | "assign" | "edit") => void
 }) {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null)
 
-  const handleOpenDrawer = (item: Maintenance) => {
-    onSelectMaintenance(item._id)
+  const handleOpenDrawer = (
+    item: Maintenance,
+    mode: "details" | "assign" | "edit" = "details"
+  ) => {
+    onSelectMaintenance(item._id, mode)
   }
 
   useEffect(() => {
@@ -55,7 +58,7 @@ export function MaintenanceTable({
             {maintenance.map((item) => (
               <tr
                 key={item._id}
-                onClick={() => handleOpenDrawer(item)}
+                onClick={() => handleOpenDrawer(item, "details")}
                 className="cursor-pointer text-[13px] text-[#26313D] transition hover:bg-[#FBFCFD]"
               >
                 <td className="px-4 py-4 font-semibold text-[#111111]">
@@ -98,6 +101,7 @@ export function MaintenanceTable({
                       type="button"
                       onClick={() => setActiveMenuId(activeMenuId === item._id ? null : item._id)}
                       className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+                      aria-label="Actions"
                     >
                       <MoreVertical className="h-4 w-4" />
                     </button>
@@ -108,7 +112,7 @@ export function MaintenanceTable({
                           type="button"
                           onClick={() => {
                             setActiveMenuId(null);
-                            handleOpenDrawer(item);
+                            handleOpenDrawer(item, "details");
                           }}
                           className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
                         >
@@ -119,12 +123,23 @@ export function MaintenanceTable({
                           type="button"
                           onClick={() => {
                             setActiveMenuId(null);
-                            handleOpenDrawer(item);
+                            handleOpenDrawer(item, "assign");
                           }}
                           className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#5542F6] hover:bg-[#F5F3FF]"
                         >
-                          <UserCheck className="h-4 w-4" />
-                          <span>Assign Technician</span>
+                          <UserCheck className="h-4 w-4 text-[#5542F6]" />
+                          <span>Assign Technision</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveMenuId(null);
+                            handleOpenDrawer(item, "edit");
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                          <Pencil className="h-4 w-4 text-slate-500" />
+                          <span>Edit</span>
                         </button>
                       </div>
                     )}
@@ -140,7 +155,7 @@ export function MaintenanceTable({
         {maintenance.map((item) => (
           <article
             key={item._id}
-            onClick={() => handleOpenDrawer(item)}
+            onClick={() => handleOpenDrawer(item, "details")}
             className="cursor-pointer p-4 transition hover:bg-[#FBFCFD]"
           >
             <div className="flex items-start justify-between gap-3">
@@ -158,6 +173,7 @@ export function MaintenanceTable({
                     type="button"
                     onClick={() => setActiveMenuId(activeMenuId === item._id ? null : item._id)}
                     className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+                    aria-label="Actions"
                   >
                     <MoreVertical className="h-4 w-4" />
                   </button>
@@ -168,7 +184,7 @@ export function MaintenanceTable({
                         type="button"
                         onClick={() => {
                           setActiveMenuId(null);
-                          handleOpenDrawer(item);
+                          handleOpenDrawer(item, "details");
                         }}
                         className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
                       >
@@ -179,12 +195,23 @@ export function MaintenanceTable({
                         type="button"
                         onClick={() => {
                           setActiveMenuId(null);
-                          handleOpenDrawer(item);
+                          handleOpenDrawer(item, "assign");
                         }}
                         className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#5542F6] hover:bg-[#F5F3FF]"
                       >
-                        <UserCheck className="h-4 w-4" />
-                        <span>Assign Technician</span>
+                        <UserCheck className="h-4 w-4 text-[#5542F6]" />
+                        <span>Assign Technision</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveMenuId(null);
+                          handleOpenDrawer(item, "edit");
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        <Pencil className="h-4 w-4 text-slate-500" />
+                        <span>Edit</span>
                       </button>
                     </div>
                   )}
