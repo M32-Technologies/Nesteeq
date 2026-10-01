@@ -667,7 +667,9 @@ export const assignMaintenance = async (
   }
 
   if (sameId(maintenance.assignedStaff, staffId) && targetStatus === currentStatus) {
-    throw new AppError("Maintenance is already assigned to this staff member with this status", 409);
+    if (!data.remarks && !(data as any).notes && data.estimatedCost === undefined) {
+      return maintenance;
+    }
   }
 
   const now = new Date();
