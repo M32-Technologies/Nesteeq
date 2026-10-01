@@ -57,6 +57,15 @@ export type Complaint = {
   activityNotes?: ActivityNote[]
   completionDetails?: CompletionDetails
   approvalDetails?: ApprovalDetails
+  expenseAmount?: number
+  expenseDescription?: string
+  expenseReceiptUrl?: string | null
+  expenseStatus?: "PENDING_FACILITY_APPROVAL" | "APPROVED" | "REJECTED" | string
+  expenseSubmittedAt?: string
+  expenseSubmittedBy?: string
+  expenseReviewedAt?: string
+  expenseReviewedBy?: string
+  expenseRejectionReason?: string
   createdAt: string
   updatedAt: string
 }

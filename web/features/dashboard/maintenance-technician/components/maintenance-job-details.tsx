@@ -338,8 +338,8 @@ export default function MaintenanceJobDetails({ jobId }: MaintenanceJobDetailsPr
         />
       </div>
 
-      {/* Active Work Operations: Evidence Upload & Cost Submission (only when IN_PROGRESS) */}
-      {currentStatus === "IN_PROGRESS" && (
+      {/* Active Work Operations: Evidence Upload & Cost Submission (when ASSIGNED or IN_PROGRESS) */}
+      {(currentStatus === "IN_PROGRESS" || currentStatus === "ASSIGNED" || job.expenseInfo) && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <CompletionEvidenceUpload
             jobId={job.jobId}
@@ -358,16 +358,20 @@ export default function MaintenanceJobDetails({ jobId }: MaintenanceJobDetailsPr
 
           <MaintenanceCostForm
             jobId={job.jobId}
+            initialExpense={job.expenseInfo}
             onCostSubmitted={(cost) => {
+              const displayAmt = cost.expenseAmount ?? cost.amount ?? 0
+              const displayDesc = cost.expenseDescription ?? cost.description ?? ""
               setProgressUpdates((prev) => [
                 {
                   id: `cost-${Date.now()}`,
-                  message: `Submitted maintenance cost: ₹${cost.amount.toFixed(2)} - ${cost.description}`,
+                  message: `Submitted maintenance cost: ₹${displayAmt.toFixed(2)}${displayDesc ? ` - ${displayDesc}` : ""}`,
                   createdAt: new Date().toISOString(),
                   author: "You (Technician)",
                 },
                 ...prev,
               ])
+              queryClient.invalidateQueries({ queryKey: jobDetailQueryKeys.detail(jobId) })
             }}
           />
         </div>

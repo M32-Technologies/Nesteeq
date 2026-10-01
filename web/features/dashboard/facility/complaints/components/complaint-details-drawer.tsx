@@ -19,6 +19,7 @@ import {
   StatusBadge,
 } from "@/features/dashboard/facility/shared/components/facility-ui"
 import { ComplaintActions } from "@/features/dashboard/facility/complaints/components/complaint-actions"
+import { ComplaintExpenseCard } from "@/features/dashboard/facility/complaints/components/complaint-expense-card"
 import { ComplaintMaintenanceSection } from "@/features/dashboard/facility/complaints/components/complaint-maintenance-section"
 
 export function ComplaintDetailsDrawer({
@@ -50,6 +51,10 @@ export function ComplaintDetailsDrawer({
   isRejecting,
   isCancelling,
   isCreatingMaintenance,
+  onApproveExpense,
+  onRejectExpense,
+  isApprovingExpense = false,
+  isRejectingExpense = false,
 }: {
   open: boolean
   complaint: Complaint | null
@@ -72,6 +77,10 @@ export function ComplaintDetailsDrawer({
   onReject: FormEventHandler<HTMLFormElement>
   onCancel: FormEventHandler<HTMLFormElement>
   onCreateMaintenance: FormEventHandler<HTMLFormElement>
+  onApproveExpense?: () => void
+  onRejectExpense?: (reason?: string) => void
+  isApprovingExpense?: boolean
+  isRejectingExpense?: boolean
   isAssigning: boolean
   isUpdatingStatus: boolean
   isUpdating: boolean
@@ -167,6 +176,16 @@ export function ComplaintDetailsDrawer({
             onCreateMaintenance={onCreateMaintenance}
             isCreatingMaintenance={isCreatingMaintenance}
           />
+
+          {complaint.expenseAmount != null && (
+            <ComplaintExpenseCard
+              complaint={complaint}
+              onApproveExpense={onApproveExpense}
+              onRejectExpense={onRejectExpense}
+              isApproving={isApprovingExpense}
+              isRejecting={isRejectingExpense}
+            />
+          )}
 
           <ComplaintActions
             complaint={complaint}

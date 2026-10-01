@@ -23,6 +23,11 @@ export type AssignedJob = {
   priority: "High" | "Medium" | "Low"
   status: "ASSIGNED" | "IN_PROGRESS" | "COMPLETED"
   assignedDate: string
+  location?: string
+  area?: string
+  flatNumber?: string
+  unitNumber?: string
+  blockName?: string
 }
 
 export type JobDetails = {
@@ -50,6 +55,14 @@ export type JobDetails = {
     assignedBy: string
     assignedDate: string
     currentStatus: string
+  }
+  expenseInfo?: {
+    expenseAmount?: number
+    expenseDescription?: string
+    expenseReceiptUrl?: string | null
+    expenseStatus?: "PENDING_FACILITY_APPROVAL" | "APPROVED" | "REJECTED" | string
+    expenseSubmittedAt?: string
+    expenseRejectionReason?: string
   }
 }
 
@@ -152,14 +165,23 @@ export type UploadEvidenceResponse = {
 }
 
 export type SubmitCostPayload = {
-  amount: number
-  description: string
+  amount?: number
+  expenseAmount?: number
+  description?: string
+  expenseDescription?: string
+  receiptUrl?: string | null
+  expenseReceiptUrl?: string | null
 }
 
 export type SubmitCostResponse = {
   success: boolean
-  amount: number
-  description: string
+  amount?: number
+  expenseAmount?: number
+  description?: string
+  expenseDescription?: string
+  receiptUrl?: string | null
+  expenseReceiptUrl?: string | null
+  expenseStatus?: string
   submittedAt: string
 }
 

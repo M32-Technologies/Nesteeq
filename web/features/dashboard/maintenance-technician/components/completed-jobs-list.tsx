@@ -15,7 +15,14 @@ import {
   Search,
 } from "lucide-react"
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLinkItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { type AssignedJob, getAssignedJobs } from "../services/jobs.service"
+import { formatJobLocation } from "./maintenance-jobs-table"
 
 export const completedJobsQueryKeys = {
   all: ["maintenance-technician", "jobs", "completed"] as const,
@@ -58,13 +65,16 @@ export default function CompletedJobsList() {
 
   const filteredJobs = useMemo(() => {
     return completedJobs.filter((job) => {
+      const q = search.trim().toLowerCase()
       const matchesSearch =
-        search.trim() === "" ||
-        job.jobId.toLowerCase().includes(search.toLowerCase()) ||
-        job.title.toLowerCase().includes(search.toLowerCase()) ||
-        job.category.toLowerCase().includes(search.toLowerCase()) ||
-        job.flat.toLowerCase().includes(search.toLowerCase()) ||
-        job.block.toLowerCase().includes(search.toLowerCase())
+        q === "" ||
+        job.jobId.toLowerCase().includes(q) ||
+        job.title.toLowerCase().includes(q) ||
+        job.category.toLowerCase().includes(q) ||
+        Boolean(job.flat && job.flat.toLowerCase().includes(q)) ||
+        Boolean(job.block && job.block.toLowerCase().includes(q)) ||
+        Boolean(job.flatNumber && job.flatNumber.toLowerCase().includes(q)) ||
+        Boolean(job.location && job.location.toLowerCase().includes(q))
 
       const matchesPriority =
         priorityFilter === "ALL" || job.priority === priorityFilter
@@ -182,15 +192,24 @@ export default function CompletedJobsList() {
 
         {/* Completed Jobs Table */}
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left">
+          <table className="w-full min-w-[950px] table-fixed border-collapse text-left">
+            <colgroup>
+              <col className="w-16" />
+              <col className="w-[30%]" />
+              <col className="w-[18%]" />
+              <col className="w-[12%]" />
+              <col className="w-[14%]" />
+              <col className="w-[12%]" />
+              <col className="w-16" />
+            </colgroup>
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50/75 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                <th className="px-5 py-3.5">Job ID</th>
-                <th className="px-4 py-3.5">Issue Details</th>
-                <th className="px-4 py-3.5">Location</th>
-                <th className="px-4 py-3.5">Priority</th>
-                <th className="px-4 py-3.5">Assigned Date</th>
-                <th className="px-4 py-3.5">Status</th>
+              <tr className="border-b border-slate-200 bg-slate-50/75 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                <th className="w-16 px-3 py-3.5 text-center">SL NO</th>
+                <th className="px-4 py-3.5 text-left">Issue Details</th>
+                <th className="px-4 py-3.5 text-left">Location</th>
+                <th className="px-4 py-3.5 text-left">Priority</th>
+                <th className="px-4 py-3.5 text-left">Assigned Date</th>
+                <th className="px-4 py-3.5 text-left">Status</th>
                 <th className="px-5 py-3.5 text-right">Action</th>
               </tr>
             </thead>
@@ -198,8 +217,8 @@ export default function CompletedJobsList() {
               {isLoading ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
-                    <td className="px-5 py-4">
-                      <div className="h-4 w-16 rounded bg-slate-100" />
+                    <td className="w-16 px-3 py-4 text-center">
+                      <div className="mx-auto h-4 w-6 rounded bg-slate-100" />
                     </td>
                     <td className="px-4 py-4">
                       <div className="space-y-1.5">
@@ -254,121 +273,112 @@ export default function CompletedJobsList() {
                   </td>
                 </tr>
               ) : (
-                filteredJobs.map((job) => (
-                  <tr
-                    key={job.jobId}
-                    className="transition-colors hover:bg-slate-50/60"
-                  >
-                    {/* Job ID */}
-                    <td className="px-5 py-4 font-mono text-xs font-bold text-[#0F5F45] align-middle">
-                      <Link
-                        href={`/maintenance-technician/jobs/${job.jobId}`}
-                        className="hover:underline"
-                      >
-                        {job.jobId}
-                      </Link>
-                    </td>
+                filteredJobs.map((job, index) => {
+                  const serialNumber = index + 1
+                  const loc = formatJobLocation(job)
 
-                    {/* Issue Title & Category */}
-                    <td className="px-4 py-4 align-middle">
-                      <div className="space-y-1">
-                        <Link
-                          href={`/maintenance-technician/jobs/${job.jobId}`}
-                          className="font-medium text-slate-900 transition hover:text-[#0F5F45] hover:underline"
-                        >
-                          {job.title}
-                        </Link>
-                        <div>
-                          <span className="inline-flex rounded bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                            {job.category}
-                          </span>
+                  return (
+                    <tr
+                      key={job.jobId}
+                      className="transition-colors hover:bg-slate-50/60"
+                    >
+                      {/* SL NO */}
+                      <td className="w-16 px-3 py-4 text-center align-middle">
+                        <span className="font-mono text-xs font-semibold text-slate-500">
+                          {serialNumber}
+                        </span>
+                      </td>
+
+                      {/* Issue Title & Category */}
+                      <td className="px-4 py-4 align-middle">
+                        <div className="space-y-1">
+                          <Link
+                            href={`/maintenance-technician/jobs/${job.jobId}`}
+                            className="font-medium text-slate-900 transition hover:text-[#0F5F45] hover:underline"
+                          >
+                            {job.title}
+                          </Link>
+                          <div>
+                            <span className="inline-flex rounded bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                              {job.category}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Location */}
-                    <td className="px-4 py-4 align-middle">
-                      <div className="flex items-center gap-1.5 text-sm text-slate-700">
-                        <MapPin size={14} className="shrink-0 text-slate-400" />
-                        <span className="font-semibold text-slate-900">
-                          {job.flat}
-                        </span>
-                        <span className="text-xs text-slate-400">
-                          ({job.block})
-                        </span>
-                      </div>
-                    </td>
+                      {/* Location */}
+                      <td className="px-4 py-4 align-middle">
+                        <div className="flex items-center gap-1.5 text-sm text-slate-700">
+                          <MapPin size={14} className="shrink-0 text-slate-400" />
+                          <span className="font-semibold text-slate-900">
+                            {loc.main}
+                          </span>
+                          {loc.sub ? (
+                            <span className="text-xs text-slate-400">
+                              {loc.sub}
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
 
-                    {/* Priority */}
-                    <td className="px-4 py-4 align-middle">
-                      <span
-                        className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
-                          priorityStyles[job.priority] ??
-                          "bg-slate-100 text-slate-700"
-                        }`}
-                      >
-                        {job.priority}
-                      </span>
-                    </td>
-
-                    {/* Date */}
-                    <td className="px-4 py-4 align-middle">
-                      <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
-                        <Calendar
-                          size={13}
-                          className="shrink-0 text-slate-400"
-                        />
-                        <span>{formatDate(job.assignedDate)}</span>
-                      </div>
-                    </td>
-
-                    {/* Status Badge */}
-                    <td className="px-4 py-4 align-middle">
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-                        <CheckCircle2 size={12} />
-                        <span>Completed</span>
-                      </span>
-                    </td>
-
-                    {/* Action 3-Dot Dropdown Menu (Read-only View Details) */}
-                    <td className="px-5 py-4 text-right align-middle">
-                      <div className="relative inline-block text-left">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setOpenActionJobId((current) =>
-                              current === job.jobId ? null : job.jobId
-                            )
-                          }
-                          aria-expanded={openActionJobId === job.jobId}
-                          className="ml-auto flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 focus:outline-none"
-                          title="Actions"
+                      {/* Priority */}
+                      <td className="px-4 py-4 align-middle">
+                        <span
+                          className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                            priorityStyles[job.priority] ??
+                            "bg-slate-100 text-slate-700"
+                          }`}
                         >
-                          <MoreVertical size={18} />
-                        </button>
+                          {job.priority}
+                        </span>
+                      </td>
 
-                        {openActionJobId === job.jobId && (
-                          <>
-                            <div
-                              className="fixed inset-0 z-10"
-                              onClick={() => setOpenActionJobId(null)}
-                            />
-                            <div className="absolute right-0 top-9 z-20 w-44 rounded-lg border border-slate-200 bg-white p-1 text-left shadow-lg">
-                              <Link
-                                href={`/maintenance-technician/jobs/${job.jobId}`}
-                                onClick={() => setOpenActionJobId(null)}
-                                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
+                      {/* Date */}
+                      <td className="px-4 py-4 align-middle">
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+                          <Calendar
+                            size={13}
+                            className="shrink-0 text-slate-400"
+                          />
+                          <span>{formatDate(job.assignedDate)}</span>
+                        </div>
+                      </td>
+
+                      {/* Status Badge */}
+                      <td className="px-4 py-4 align-middle">
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                          <CheckCircle2 size={12} />
+                          <span>Completed</span>
+                        </span>
+                      </td>
+
+                      {/* Action 3-Dot Dropdown Menu (Read-only View Details) */}
+                      <td className="px-5 py-4 text-right align-middle">
+                        <div className="inline-block text-left">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              className="ml-auto flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 focus:outline-none"
+                              title="Actions"
+                              aria-label="Actions"
+                            >
+                              <MoreVertical size={18} />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" side="bottom" sideOffset={4}>
+                              <DropdownMenuLinkItem
+                                render={
+                                  <Link href={`/maintenance-technician/jobs/${job.jobId}`} />
+                                }
                               >
                                 <Eye size={15} className="text-slate-500" />
                                 View Details
-                              </Link>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                              </DropdownMenuLinkItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
