@@ -215,13 +215,15 @@ const maintenanceSchema = new Schema(
     complaint: {
       type: Schema.Types.ObjectId,
       ref: "Complaint",
-      required: true,
+      required: false,
+      default: null,
       index: true,
     },
     resident: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
+      default: null,
       index: true,
     },
     apartment: {
@@ -232,8 +234,9 @@ const maintenanceSchema = new Schema(
     },
     flat: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
+      default: "COMMON_AREA",
       index: true,
     },
     assignedStaff: {

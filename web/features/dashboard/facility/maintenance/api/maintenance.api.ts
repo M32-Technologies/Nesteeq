@@ -222,3 +222,6 @@ export async function fetchMaintenanceTypes(): Promise<MaintenanceTaskTemplate[]
 
   return response.data.data
 }
+
+export { createMaintenance } from "@/features/dashboard/facility/complaints/api/complaints.api"
+

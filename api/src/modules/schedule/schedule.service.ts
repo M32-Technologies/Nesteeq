@@ -312,10 +312,10 @@ const resolveMaintenanceWork = async (
 
   return {
     workType: "maintenance",
-    complaint: new Types.ObjectId(getMongoId(work.complaint)),
+    complaint: work.complaint ? new Types.ObjectId(getMongoId(work.complaint)) : null,
     maintenance: new Types.ObjectId(maintenanceId),
-    apartment: work.apartment,
-    flat: work.flat,
+    apartment: work.apartment ?? null,
+    flat: work.flat ?? null,
     title: work.title,
     description: work.description ?? null,
     priority: work.priority,

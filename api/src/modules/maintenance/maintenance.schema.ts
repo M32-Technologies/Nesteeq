@@ -56,14 +56,10 @@ export const createMaintenanceBodySchema = z
     assignedTo: userIdSchema.optional(),
     category: z.enum(complaintCategories).optional(),
     title: titleSchema.optional(),
-    description: descriptionSchema.optional(),
+    description: z.string().trim().max(3000, "Description is too long").optional(),
     priority: z.enum(complaintPriorities).optional(),
     estimatedCost: costSchema.optional(),
-    remarks: nonEmptyText("Remarks", 1000).optional(),
-  })
-  .refine((data) => Boolean(data.complaint || data.complaintId), {
-    message: "Complaint ID is required",
-    path: ["complaint"],
+    remarks: z.string().trim().max(1000, "Remarks is too long").optional(),
   });
 
 export const updateMaintenanceBodySchema = z
