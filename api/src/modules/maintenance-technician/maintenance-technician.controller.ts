@@ -1,5 +1,6 @@
 import type { Request, Response } from "express"
 
+import { AppError } from "../../utils/AppError.js"
 import { catchAsync } from "../../utils/catchAsync.js"
 import {
   addProgressUpdate,
@@ -12,9 +13,17 @@ import {
   uploadEvidence,
 } from "./maintenance-technician.service.js"
 
+const getAuthenticatedTechnicianId = (req: Request): string => {
+  const technicianId = req.user?.id
+  if (!technicianId) {
+    throw new AppError("Authentication required", 401)
+  }
+  return technicianId
+}
+
 export const getDashboardStatsController = catchAsync(
   async (req: Request, res: Response) => {
-    const technicianId = req.user?.id
+    const technicianId = getAuthenticatedTechnicianId(req)
     const data = await getDashboardStats(technicianId)
 
     res.status(200).json({
@@ -27,10 +36,8 @@ export const getDashboardStatsController = catchAsync(
 
 export const getAssignedJobsController = catchAsync(
   async (req: Request, res: Response) => {
+    const technicianId = getAuthenticatedTechnicianId(req)
     const status = req.query.status ? String(req.query.status) : undefined
-    const technicianId = req.query.technicianId
-      ? String(req.query.technicianId)
-      : req.user?.id
     const data = await getAssignedJobs(status, technicianId)
 
     res.status(200).json({
@@ -43,8 +50,9 @@ export const getAssignedJobsController = catchAsync(
 
 export const getJobByIdController = catchAsync(
   async (req: Request, res: Response) => {
+    const technicianId = getAuthenticatedTechnicianId(req)
     const jobId = String(req.params.jobId)
-    const data = await getJobById(jobId)
+    const data = await getJobById(jobId, technicianId)
 
     res.status(200).json({
       success: true,
@@ -56,8 +64,9 @@ export const getJobByIdController = catchAsync(
 
 export const startJobController = catchAsync(
   async (req: Request, res: Response) => {
+    const technicianId = getAuthenticatedTechnicianId(req)
     const jobId = String(req.params.jobId)
-    const data = await startJob(jobId, req.user?.id)
+    const data = await startJob(jobId, technicianId)
 
     res.status(200).json({
       success: true,
@@ -69,12 +78,13 @@ export const startJobController = catchAsync(
 
 export const addProgressUpdateController = catchAsync(
   async (req: Request, res: Response) => {
+    const technicianId = getAuthenticatedTechnicianId(req)
     const jobId = String(req.params.jobId)
     const { message } = req.body
     const data = await addProgressUpdate(
       jobId,
       String(message || ""),
-      req.user?.id
+      technicianId
     )
 
     res.status(201).json({
@@ -87,8 +97,9 @@ export const addProgressUpdateController = catchAsync(
 
 export const uploadEvidenceController = catchAsync(
   async (req: Request, res: Response) => {
+    const technicianId = getAuthenticatedTechnicianId(req)
     const jobId = String(req.params.jobId)
-    const data = await uploadEvidence(jobId, req.file, req.user?.id)
+    const data = await uploadEvidence(jobId, req.file, technicianId)
 
     res.status(200).json({
       success: true,
@@ -100,13 +111,14 @@ export const uploadEvidenceController = catchAsync(
 
 export const submitCostController = catchAsync(
   async (req: Request, res: Response) => {
+    const technicianId = getAuthenticatedTechnicianId(req)
     const jobId = String(req.params.jobId)
     const { amount, description } = req.body
     const data = await submitCost(
       jobId,
       Number(amount) || 0,
       String(description || ""),
-      req.user?.id
+      technicianId
     )
 
     res.status(201).json({
@@ -119,6 +131,7 @@ export const submitCostController = catchAsync(
 
 export const completeJobController = catchAsync(
   async (req: Request, res: Response) => {
+    const technicianId = getAuthenticatedTechnicianId(req)
     const jobId = String(req.params.jobId)
     const { workSummary, notes } = req.body
     const data = await completeJob(
@@ -127,7 +140,7 @@ export const completeJobController = catchAsync(
         workSummary: String(workSummary || ""),
         notes: notes ? String(notes) : undefined,
       },
-      req.user?.id
+      technicianId
     )
 
     res.status(200).json({
