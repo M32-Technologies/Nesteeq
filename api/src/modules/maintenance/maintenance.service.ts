@@ -660,11 +660,16 @@ export const assignMaintenance = async (
   const staff = await ensureStaffUser(staffIdentifier, maintenance.apartment);
   const staffId = ensureStaffCanWorkOnApartment(staff, staffIdentifier, maintenance.apartment, user);
 
-  if (currentStatus === "ASSIGNED" && sameId(maintenance.assignedStaff, staffId)) {
-    throw new AppError("Maintenance is already assigned to this staff member", 409);
+  const targetStatus = (data as any).status || (currentStatus === "PENDING" ? "ASSIGNED" : currentStatus);
+
+  if (targetStatus !== currentStatus) {
+    assertValidTransition(currentStatus, targetStatus);
   }
 
-  const targetStatus = (data as any).status || "ASSIGNED";
+  if (sameId(maintenance.assignedStaff, staffId) && targetStatus === currentStatus) {
+    throw new AppError("Maintenance is already assigned to this staff member with this status", 409);
+  }
+
   const now = new Date();
   const set: Record<string, unknown> = {
     assignedStaff: staffId,
@@ -673,6 +678,10 @@ export const assignMaintenance = async (
     status: targetStatus,
     updatedBy: user.id,
   };
+
+  if (targetStatus === "IN_PROGRESS" && !maintenance.startedAt) {
+    set.startedAt = now;
+  }
 
   if (data.estimatedCost !== undefined) {
     set.estimatedCost = data.estimatedCost;

@@ -297,7 +297,24 @@ export function FacilityMaintenancePage() {
     const nextStatus = readFormString(formData, "status") as MaintenanceStatus | undefined
     const remarks = readFormString(formData, "remarks")
 
-    if (!selectedTechnicianId && (!nextStatus || nextStatus === selectedItem.status)) {
+    const currentStaffId =
+      typeof (selectedItem as any).assignedStaff === "object"
+        ? (selectedItem as any).assignedStaff?._id || (selectedItem as any).assignedStaff?.id || (selectedItem as any).assignedStaff?.userId
+        : (selectedItem as any).assignedStaff ||
+          (typeof selectedItem.assignedTo === "object"
+            ? selectedItem.assignedTo?._id || (selectedItem.assignedTo as any)?.id || (selectedItem.assignedTo as any)?.userId
+            : selectedItem.assignedTo || "")
+
+    const isTechnicianChanged = Boolean(
+      selectedTechnicianId &&
+      currentStaffId &&
+      selectedTechnicianId !== currentStaffId &&
+      String(selectedTechnicianId) !== String(currentStaffId)
+    ) || Boolean(selectedTechnicianId && !currentStaffId)
+
+    const isStatusChanged = Boolean(nextStatus && nextStatus !== selectedItem.status)
+
+    if (!isTechnicianChanged && !isStatusChanged && (!remarks || !remarks.trim())) {
       toast.info("No changes to save")
       return
     }
@@ -305,7 +322,7 @@ export function FacilityMaintenancePage() {
     try {
       setIsSavingAssignAndStatus(true)
 
-      if (selectedTechnicianId) {
+      if (isTechnicianChanged) {
         await assignMaintenance(selectedItem._id, {
           assignedStaff: selectedTechnicianId,
           assignedTo: selectedTechnicianId,
@@ -314,12 +331,21 @@ export function FacilityMaintenancePage() {
           remarks: remarks || undefined,
           notes: remarks || undefined,
         } as any)
-      } else if (nextStatus && nextStatus !== selectedItem.status) {
+      } else if (isStatusChanged && nextStatus) {
         await updateMaintenanceStatus(selectedItem._id, {
           status: nextStatus,
           remarks: remarks || undefined,
           notes: remarks || undefined,
         })
+      } else if (selectedTechnicianId) {
+        await assignMaintenance(selectedItem._id, {
+          assignedStaff: selectedTechnicianId,
+          assignedTo: selectedTechnicianId,
+          technicianId: selectedTechnicianId,
+          status: nextStatus,
+          remarks: remarks || undefined,
+          notes: remarks || undefined,
+        } as any)
       }
 
       toast.success("Assignment & Status updated")
