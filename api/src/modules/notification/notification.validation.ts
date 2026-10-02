@@ -51,20 +51,5 @@ export const deleteNotificationSchema = z.object({
 
 export type NotificationIdParams = z.infer<typeof notificationIdParamsSchema>;
 
-export const pushSubscriptionSchema = z.object({
-  body: z.object({
-    endpoint: z.string().min(1, "Valid endpoint URL is required"),
-    keys: z.object({
-      p256dh: z.string().min(1, "p256dh key is required"),
-      auth: z.string().min(1, "auth key is required"),
-    }),
-  }),
-});
-
-export const pushUnsubscribeSchema = z.object({
-  body: z.object({
-    endpoint: z.string().min(1, "Valid endpoint URL is required"),
-  }),
-});
 
 

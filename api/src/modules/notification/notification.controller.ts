@@ -9,11 +9,6 @@ import {
   markNotificationAsRead,
 } from "./notification.service.js";
 import type { GetNotificationsQuery } from "./notification.validation.js";
-import {
-  savePushSubscription,
-  deletePushSubscription,
-} from "../../services/webPushService.js";
-import { env } from "../../config/env.js";
 
 export const getNotificationsHandler = catchAsync(
   async (req: Request, res: Response) => {
@@ -133,53 +128,3 @@ export const deleteNotificationHandler = catchAsync(
   }
 );
 
-export const subscribePushHandler = catchAsync(
-  async (req: Request, res: Response) => {
-    const user = req.user;
-
-    if (!user?.id) {
-      throw new AppError("Authentication required", 401);
-    }
-
-    const { endpoint, keys } = req.body;
-    const userAgent = req.headers["user-agent"];
-
-    await savePushSubscription(
-      user.id,
-      user.apartmentId,
-      { endpoint, keys },
-      userAgent
-    );
-
-    res.status(200).json({
-      success: true,
-      message: "Push notification subscription saved successfully",
-      data: null,
-    });
-  }
-);
-
-export const unsubscribePushHandler = catchAsync(
-  async (req: Request, res: Response) => {
-    const { endpoint } = req.body;
-
-    await deletePushSubscription(endpoint);
-
-    res.status(200).json({
-      success: true,
-      message: "Push notification subscription removed successfully",
-      data: null,
-    });
-  }
-);
-
-export const getVapidPublicKeyHandler = catchAsync(
-  async (_req: Request, res: Response) => {
-    res.status(200).json({
-      success: true,
-      data: {
-        publicKey: env.vapidPublicKey,
-      },
-    });
-  }
-);

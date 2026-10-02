@@ -12,44 +12,12 @@ import type {
 } from "./notification.types.js";
 import type { GetNotificationsQuery } from "./notification.validation.js";
 
-import {
-  sendWebPushToUser,
-  sendWebPushToUsers,
-  sendWebPushToRole,
-} from "../../services/webPushService.js";
-
 const normalizeOptionalString = (
   value: string | null | undefined
 ): string | undefined => {
   if (!value) return undefined;
   const trimmed = value.trim();
   return trimmed === "" ? undefined : trimmed;
-};
-
-const resolveNotificationUrl = (
-  type?: string | null,
-  role?: string | null,
-  relatedResourceType?: string | null
-): string => {
-  const t = (type || "").toUpperCase();
-  const res = (relatedResourceType || "").toUpperCase();
-
-  if (t === "EMERGENCY_ALERT" || res === "EMERGENCY_ALERT") {
-    return role?.toLowerCase() === "security_staff" ? "/security/alerts" : "/resident/alerts";
-  }
-  if (t === "DELIVERY" || res === "DELIVERY") {
-    return role?.toLowerCase() === "security_staff" ? "/security/deliveries" : "/resident";
-  }
-  if (t === "VISITOR" || t === "VISITOR_INVITATION" || res === "INVITATION") {
-    return role?.toLowerCase() === "security_staff" ? "/security/visitors" : "/resident/visitors";
-  }
-  if (t === "COMPLAINT" || res === "COMPLAINT") {
-    return "/resident/complaints";
-  }
-  if (t === "ANNOUNCEMENT" || res === "ANNOUNCEMENT") {
-    return "/resident/announcements";
-  }
-  return "/resident";
 };
 
 export const createNotification = async (
@@ -85,22 +53,8 @@ export const createNotification = async (
       createdAt: doc.createdAt,
     };
 
-    const pushPayload = {
-      title: doc.title,
-      body: doc.message,
-      url: resolveNotificationUrl(doc.type, doc.recipientRole, doc.relatedResourceType),
-      tag: doc.type,
-      requireInteraction: doc.severity === "ERROR" || doc.type === "EMERGENCY_ALERT",
-      data: {
-        notificationId: doc._id.toString(),
-        type: doc.type,
-        severity: doc.severity,
-      },
-    };
-
     if (doc.recipientUserId) {
       sendRealtimeNotification(doc.recipientUserId, payload);
-      void sendWebPushToUser(doc.recipientUserId, pushPayload);
     }
 
     if (doc.recipientRole) {
@@ -109,7 +63,6 @@ export const createNotification = async (
         payload,
         doc.apartment ?? undefined
       );
-      void sendWebPushToRole(doc.recipientRole as string, doc.apartment ?? undefined, pushPayload);
     }
   } catch (error) {
     console.error("Notification creation failed:", error);
@@ -162,20 +115,6 @@ export const createBulkNotifications = async (
         createdAt: now,
       });
     }
-
-    // Dispatch Web Push to all recipients in background
-    const bulkPushPayload = {
-      title: sharedFields.title,
-      body: sharedFields.message,
-      url: resolveNotificationUrl(sharedFields.type, null, sharedFields.relatedResourceType),
-      tag: sharedFields.type,
-      requireInteraction: sharedFields.severity === "ERROR",
-      data: {
-        type: sharedFields.type,
-        severity: sharedFields.severity,
-      },
-    };
-    void sendWebPushToUsers(uniqueIds, bulkPushPayload);
   } catch (error) {
     console.error(
       `Bulk notification creation failed (attempted ${docs.length}):`,

@@ -20,10 +20,6 @@ const razorPaySecret = (process.env.RAZORPAY_KEY_SECRET || "").trim();
 
 const redisUrl = (process.env.REDIS_URL || "").trim();
 
-const vapidPublicKey = (process.env.VAPID_PUBLIC_KEY || "").trim();
-const vapidPrivateKey = (process.env.VAPID_PRIVATE_KEY || "").trim();
-const vapidSubject = (process.env.VAPID_SUBJECT || "mailto:support@nesteeq.com").trim();
-
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? "development",
   port: Number((process.env.PORT ?? "6001").trim()),
@@ -37,7 +33,4 @@ export const env = {
   razorPayKeyId,
   razorPaySecret ,
   redisUrl,
-  vapidPublicKey,
-  vapidPrivateKey,
-  vapidSubject,
 };
