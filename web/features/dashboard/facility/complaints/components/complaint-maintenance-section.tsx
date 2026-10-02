@@ -1,20 +1,10 @@
-import type { FormEventHandler } from "react"
-import { Hammer } from "lucide-react"
-
 import type { Complaint } from "@/features/dashboard/facility/complaints/types/complaints.types"
 import type { Maintenance } from "@/features/dashboard/facility/maintenance/types/maintenance.types"
 import {
-  FormLabel,
   formatCurrency,
   formatDate,
   formatId,
-  formatLabel,
-  MaintenanceTypeSelect,
   StatusBadge,
-  SubmitButton,
-  TechnicianSelect,
-  TextArea,
-  TextInput,
 } from "@/features/dashboard/facility/shared/components"
 
 export function ComplaintMaintenanceSection({
@@ -28,9 +18,9 @@ export function ComplaintMaintenanceSection({
   complaint?: Complaint | null
   relatedMaintenance?: Maintenance[]
   isLoading: boolean
-  canCreateMaintenance: boolean
-  onCreateMaintenance: FormEventHandler<HTMLFormElement>
-  isCreatingMaintenance: boolean
+  canCreateMaintenance?: boolean
+  onCreateMaintenance?: (e?: any) => void
+  isCreatingMaintenance?: boolean
 }) {
   return (
     <section className="border-b border-[#E8EDF2] py-5">
@@ -80,57 +70,6 @@ export function ComplaintMaintenanceSection({
             No maintenance work is linked.
           </div>
         )}
-
-        {canCreateMaintenance ? (
-          <form
-            onSubmit={onCreateMaintenance}
-            className="mt-4 grid gap-3 rounded-lg border border-[#E2E8EE] bg-white p-4"
-          >
-            <div className="flex items-center gap-2 text-[13px] font-semibold text-[#111111]">
-              <Hammer className="size-4 text-[#07584F]" />
-              Create maintenance work
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FormLabel label="Maintenance Type / Task">
-                <MaintenanceTypeSelect
-                  name="maintenanceType"
-                  defaultCategory={complaint?.category}
-                  placeholder="Select maintenance type / task..."
-                  required
-                />
-              </FormLabel>
-              <FormLabel label="Assign Technician">
-                <TechnicianSelect
-                  name="assignedStaff"
-                  placeholder="Select technician (optional)..."
-                />
-              </FormLabel>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FormLabel label="Estimated cost (₹)">
-                <TextInput
-                  name="estimatedCost"
-                  type="number"
-                  placeholder="0"
-                />
-              </FormLabel>
-              <FormLabel label="Remarks / Work Notes">
-                <TextArea
-                  name="remarks"
-                  placeholder="Instructions or notes for maintenance work"
-                />
-              </FormLabel>
-            </div>
-
-            <div>
-              <SubmitButton isLoading={isCreatingMaintenance}>
-                Create Maintenance
-              </SubmitButton>
-            </div>
-          </form>
-        ) : null}
       </div>
     </section>
   )
