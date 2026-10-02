@@ -32,6 +32,7 @@ import {
 import { toast } from "sonner";
 
 import {
+  exportPaymentsCsv,
   getBills,
   getPayments,
   recordBillPayment,
@@ -351,53 +352,24 @@ export default function TreasurerPayments() {
   }, [filteredPayments, validCurrentPage]);
 
   // CSV Export Handler
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     if (filteredPayments.length === 0) {
       toast.error("No transactions to export.");
       return;
     }
 
-    const headers = [
-      "Receipt Number",
-      "Date",
-      "Flat",
-      "Resident Name",
-      "Payment Purpose / Bill",
-      "Payment Mode",
-      "Reference / UTR",
-      "Amount (INR)",
-      "Status",
-      "Reversal Reason",
-    ];
-
-    const rows = filteredPayments.map((p) => [
-      p.receiptNumber || `REC-${p._id.slice(-6).toUpperCase()}`,
-      new Date(p.paidAt).toLocaleString("en-IN"),
-      p.unitName || (p.flatNumber ? `Flat ${p.flatNumber}` : "Unit"),
-      `"${(p.residentName || "").replace(/"/g, '""')}"`,
-      `"${(p.billTitle || "Maintenance").replace(/"/g, '""')}"`,
-      p.paymentMethod || p.source,
-      `"${(p.referenceNo || "").replace(/"/g, '""')}"`,
-      p.amount,
-      p.reversed ? "REVERSED" : "COMPLETED",
-      `"${(p.reversalReason || "").replace(/"/g, '""')}"`,
-    ]);
-
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute(
-      "download",
-      `Nesteeq_Collection_Register_${new Date().toISOString().split("T")[0]}.csv`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Collection register successfully exported to CSV.");
+    try {
+      await exportPaymentsCsv({
+        paymentMethod: selectedMethod !== "ALL" ? selectedMethod : undefined,
+        includeReversed: statusFilter === "ALL" || statusFilter === "REVERSED",
+        startDate: dateRangeBounds ? dateRangeBounds.start.toISOString() : undefined,
+        endDate: dateRangeBounds ? dateRangeBounds.end.toISOString() : undefined,
+        search: searchQuery.trim() || undefined,
+      });
+      toast.success("Collection register successfully exported to CSV.");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to export CSV.");
+    }
   };
 
   // Helper badge for payment method

@@ -269,6 +269,43 @@ export const confirmComplaintResolutionSchema = z.object({
   body: confirmComplaintResolutionBodySchema,
 });
 
+export const reviewComplaintExpenseBodySchema = z
+  .object({
+    action: z.enum(["APPROVE", "REJECT", "APPROVED", "REJECTED"]).optional(),
+    reason: z.string().trim().max(1000).optional().nullable(),
+    remarks: z.string().trim().max(1000).optional().nullable(),
+  })
+  .passthrough();
+
+export const reviewComplaintExpenseSchema = z.object({
+  params: complaintIdParamsSchema,
+  body: reviewComplaintExpenseBodySchema,
+});
+
+export const approveComplaintExpenseBodySchema = z
+  .object({
+    remarks: z.string().trim().max(1000).optional().nullable(),
+  })
+  .passthrough()
+  .optional();
+
+export const approveComplaintExpenseSchema = z.object({
+  params: complaintIdParamsSchema,
+  body: approveComplaintExpenseBodySchema,
+});
+
+export const rejectComplaintExpenseBodySchema = z
+  .object({
+    reason: z.string().trim().max(1000).optional().nullable(),
+    remarks: z.string().trim().max(1000).optional().nullable(),
+  })
+  .passthrough();
+
+export const rejectComplaintExpenseSchema = z.object({
+  params: complaintIdParamsSchema,
+  body: rejectComplaintExpenseBodySchema,
+});
+
 export type ComplaintIdParams = z.infer<typeof complaintIdParamsSchema>;
 export type CreateComplaintInput = z.infer<typeof createComplaintBodySchema>;
 export type UpdateComplaintInput = z.infer<typeof updateComplaintBodySchema>;
@@ -279,4 +316,7 @@ export type ApproveComplaintInput = z.infer<typeof approveComplaintBodySchema>;
 export type RejectComplaintInput = z.infer<typeof rejectComplaintBodySchema>;
 export type CancelComplaintInput = z.infer<typeof cancelComplaintBodySchema>;
 export type ConfirmComplaintResolutionInput = z.infer<typeof confirmComplaintResolutionBodySchema>;
+export type ReviewComplaintExpenseInput = z.infer<typeof reviewComplaintExpenseBodySchema>;
+export type ApproveComplaintExpenseInput = z.infer<typeof approveComplaintExpenseBodySchema>;
+export type RejectComplaintExpenseInput = z.infer<typeof rejectComplaintExpenseBodySchema>;
 export type GetComplaintsQuery = z.infer<typeof getComplaintsQuerySchema>;

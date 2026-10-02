@@ -3,6 +3,7 @@ import { protect } from "../../middlewares/authMiddleware.js";
 import { zodValidate } from "../../middlewares/zodValidate.js";
 import {
   approveComplaintHandler,
+  approveComplaintExpenseHandler,
   assignComplaintHandler,
   cancelComplaintHandler,
   completeComplaintWorkHandler,
@@ -11,6 +12,8 @@ import {
   getComplaintByIdHandler,
   getComplaintsHandler,
   rejectComplaintHandler,
+  rejectComplaintExpenseHandler,
+  reviewComplaintExpenseHandler,
   updateComplaintHandler,
   updateComplaintStatusHandler,
 } from "./complaint.controller.js";
@@ -24,6 +27,7 @@ import {
   getComplaintByIdSchema,
   getComplaintsSchema,
   rejectComplaintSchema,
+  reviewComplaintExpenseSchema,
   updateComplaintSchema,
   updateComplaintStatusSchema,
 } from "./compliaint.schema.js";
@@ -96,6 +100,22 @@ router.patch(
   "/complaints/:id/confirm-resolution",
   zodValidate(confirmComplaintResolutionSchema),
   confirmComplaintResolutionHandler
+);
+
+router.patch(
+  "/complaints/:id/expense",
+  zodValidate(reviewComplaintExpenseSchema),
+  reviewComplaintExpenseHandler
+);
+
+router.patch(
+  "/complaints/:id/expense/approve",
+  approveComplaintExpenseHandler
+);
+
+router.patch(
+  "/complaints/:id/expense/reject",
+  rejectComplaintExpenseHandler
 );
 
 export default router;

@@ -14,7 +14,7 @@ import {
 } from "./maintenance-technician.service.js"
 
 const getAuthenticatedTechnicianId = (req: Request): string => {
-  const technicianId = req.user?.id
+  const technicianId = req.user?.id || (req.user as any)?._id?.toString()
   if (!technicianId) {
     throw new AppError("Authentication required", 401)
   }
@@ -113,15 +113,28 @@ export const submitCostController = catchAsync(
   async (req: Request, res: Response) => {
     const technicianId = getAuthenticatedTechnicianId(req)
     const jobId = String(req.params.jobId)
-    const { amount, description } = req.body
+    const {
+      amount,
+      expenseAmount,
+      description,
+      expenseDescription,
+      receiptUrl,
+      expenseReceiptUrl,
+    } = req.body
+
+    const finalAmount = Number(expenseAmount ?? amount) || 0
+    const finalDescription = String(expenseDescription ?? description ?? "")
+    const finalReceiptUrl = (expenseReceiptUrl ?? receiptUrl ?? null) as string | null
+
     const data = await submitCost(
       jobId,
-      Number(amount) || 0,
-      String(description || ""),
+      finalAmount,
+      finalDescription,
+      finalReceiptUrl,
       technicianId
     )
 
-    res.status(201).json({
+    res.status(200).json({
       success: true,
       message: "Maintenance cost submitted successfully",
       data,

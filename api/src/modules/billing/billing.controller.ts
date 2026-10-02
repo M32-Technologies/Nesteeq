@@ -15,6 +15,7 @@ import {
   recordBillPaymentService,
   updateBillService,
   waiveLateFeeService,
+  generateReceiptFileService,
 } from "./billing.service.js";
 
 import { BillStatus } from "./billing.interface.js";
@@ -297,5 +298,22 @@ export const deleteBill = catchAsync(
     });
   }
 );
+
+export const downloadReceiptFile = catchAsync(
+  async (req: Request, res: Response) => {
+    const receiptId = req.params.id as string;
+    const format = req.query.format === "txt" ? "txt" : "html";
+
+    const { content, filename, mimeType } = await generateReceiptFileService(
+      receiptId,
+      format
+    );
+
+    res.setHeader("Content-Type", mimeType);
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.status(200).send(content);
+  }
+);
+
 
 

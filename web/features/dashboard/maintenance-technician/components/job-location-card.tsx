@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { Building2, MapPin } from "lucide-react"
 
@@ -9,6 +9,21 @@ type JobLocationCardProps = {
 }
 
 export default function JobLocationCard({ locationInfo }: JobLocationCardProps) {
+  const isHex = (val?: string | null) =>
+    Boolean(val && /^[0-9a-fA-F]{24}$/.test(val.trim()))
+
+  const flatClean = isHex(locationInfo.flat) ? "Unit" : locationInfo.flat || "Unit"
+  const blockClean = isHex(locationInfo.block) ? "Apartment" : locationInfo.block || "Apartment"
+
+  const unitDisplay = flatClean.toLowerCase().startsWith("flat")
+    ? flatClean
+    : flatClean.toLowerCase().includes("kitchen") ||
+      flatClean.toLowerCase().includes("pipe") ||
+      flatClean.toLowerCase().includes("corridor") ||
+      flatClean.toLowerCase().includes("unit")
+    ? flatClean
+    : `Flat ${flatClean}`
+
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3.5">
@@ -30,9 +45,11 @@ export default function JobLocationCard({ locationInfo }: JobLocationCardProps) 
           </div>
           <p className="mt-2 text-xl font-bold text-slate-900">
             Flat {locationInfo.flat}
+            {unitDisplay}
           </p>
           <p className="mt-0.5 text-xs text-slate-500">
             {locationInfo.block} • {locationInfo.floor}
+            {blockClean} • {locationInfo.floor}
           </p>
         </div>
 
@@ -41,6 +58,7 @@ export default function JobLocationCard({ locationInfo }: JobLocationCardProps) 
             <p className="text-xs font-medium text-slate-400">Block</p>
             <p className="mt-1 font-semibold text-slate-800">
               {locationInfo.block}
+              {blockClean}
             </p>
           </div>
 

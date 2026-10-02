@@ -28,6 +28,7 @@ import { toast } from "sonner";
 
 import {
   createExpense,
+  exportExpensesCsv,
   getExpenseSummary,
   getExpenses,
   getMaintenancePayouts,
@@ -133,6 +134,16 @@ export default function TreasurerExpenses() {
   const [payoutNotes, setPayoutNotes] = useState("");
   const [maintenanceSearch, setMaintenanceSearch] = useState("");
   const [maintenancePage, setMaintenancePage] = useState(1);
+
+  // Sync tab with URL parameter if opened with ?tab=maintenance_payouts
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("tab") === "maintenance_payouts") {
+        setActiveTab("maintenance_payouts");
+      }
+    }
+  }, []);
 
   // Search, Filter & Pagination
   const [search, setSearch] = useState("");
@@ -375,59 +386,28 @@ export default function TreasurerExpenses() {
   }, [maintenancePage, totalMaintenancePages]);
 
   // CSV Export
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     if (expenses.length === 0) {
       toast.error("No expenses to export.");
       return;
     }
-    const headers = [
-      "Title",
-      "Invoice / Ref",
-      "Category",
-      "Vendor",
-      "Amount",
-      "Expense Date",
-      "Status",
-      "Payment Method",
-      "Payment Ref",
-      "Paid Date",
-      "Rejection Reason",
-      "Description",
-    ];
-    const formatCsvDate = (dateVal: string | undefined | null) => {
-      if (!dateVal) return "";
-      const d = new Date(dateVal);
-      return Number.isNaN(d.getTime()) ? "" : d.toISOString().split("T")[0];
-    };
 
-    const rows = expenses.map((e) => [
-      `"${(e.title || "").replace(/"/g, '""')}"`,
-      `"${(e.invoiceRef || "").replace(/"/g, '""')}"`,
-      `"${(e.category || "").replace(/"/g, '""')}"`,
-      `"${(e.vendorName || "Not recorded").replace(/"/g, '""')}"`,
-      e.amount,
-      formatCsvDate(e.expenseDate),
-      e.status,
-      `"${(e.paymentMethod || "").replace(/"/g, '""')}"`,
-      `"${(e.paymentReference || "").replace(/"/g, '""')}"`,
-      formatCsvDate(e.paidAt),
-      `"${(e.rejectionReason || "").replace(/"/g, '""')}"`,
-      `"${(e.description || "").replace(/"/g, '""')}"`,
-    ]);
-    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `nesteeq-expenses-${new Date().toISOString().split("T")[0]}.csv`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    toast.success("Expenses exported to CSV.");
+    try {
+      await exportExpensesCsv({
+        search: debouncedSearch.trim() || undefined,
+        status:
+          statusFilter === "ALL"
+            ? undefined
+            : (statusFilter as ExpenseStatus),
+        category:
+          categoryFilter === "ALL"
+            ? undefined
+            : (categoryFilter as ExpenseCategory),
+      });
+      toast.success("Expenses exported to CSV.");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to export CSV.");
+    }
   };
 
   // Confirm Actions

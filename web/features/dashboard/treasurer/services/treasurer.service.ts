@@ -743,3 +743,81 @@ export const getExpenseBreakdownReport = (
     `/api/treasurer/reports/expense-breakdown${toQuery(params)}`
   );
 
+const downloadFile = async (path: string, fallbackFilename: string) => {
+  const normalizedPath = path.startsWith("/api/v1/")
+    ? path
+    : path.replace(/^\/api\//, "/api/v1/");
+  const response = await fetch(`${getApiBaseUrl()}${normalizedPath}`, {
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response));
+  }
+
+  let filename = fallbackFilename;
+  const disposition = response.headers.get("Content-Disposition");
+  if (disposition) {
+    const filenameMatch = disposition.match(/filename="?([^";]+)"?/i);
+    if (filenameMatch?.[1]) {
+      filename = filenameMatch[1];
+    }
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+};
+
+export const exportPaymentsCsv = (
+  params: {
+    paymentMethod?: string;
+    startDate?: string;
+    endDate?: string;
+    search?: string;
+    includeReversed?: boolean;
+  } = {}
+) =>
+  downloadFile(
+    `/api/payments/export/csv${toQuery(params)}`,
+    `Nesteeq_Collection_Register_${new Date().toISOString().split("T")[0]}.csv`
+  );
+
+export const exportExpensesCsv = (
+  params: {
+    category?: ExpenseCategory;
+    status?: ExpenseStatus;
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+  } = {}
+) =>
+  downloadFile(
+    `/api/expenses/export/csv${toQuery(params)}`,
+    `nesteeq-expenses-${new Date().toISOString().split("T")[0]}.csv`
+  );
+
+export const exportTreasurerReportCsv = (
+  params: {
+    type: "summary" | "defaulters" | "expenses";
+    year?: number;
+    month?: number;
+    days?: number;
+    overdueDays?: number;
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+  }
+) =>
+  downloadFile(
+    `/api/treasurer/reports/export-csv${toQuery(params)}`,
+    `report-${params.type}.csv`
+  );
+
+

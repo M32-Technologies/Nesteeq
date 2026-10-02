@@ -82,7 +82,7 @@ export function TechnicianSelect({
     `${getTechName(tech)} - ${getTechSpec(tech)}`
 
   const getTechId = (tech: Technician) =>
-    tech._id || tech.id || tech.userId || ""
+    tech.userId || tech._id || tech.id || ""
 
   const filteredTechnicians = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -126,9 +126,11 @@ export function TechnicianSelect({
       {/* Hidden inputs to bind to form submission under any expected field name */}
       <input type="hidden" name={name} value={selectedId} required={required} />
       <input type="hidden" name="technician" value={selectedId} />
-      <input type="hidden" name="technicianId" value={selectedId} />
-      <input type="hidden" name="assignedStaff" value={selectedId} />
-      <input type="hidden" name="assignedTo" value={selectedId} />
+      <input type="hidden" name="technicianId" value={selectedTech?._id || selectedId} />
+      <input type="hidden" name="technicianUserId" value={selectedTech?.userId || selectedId} />
+      <input type="hidden" name="assignedStaff" value={selectedTech?.userId || selectedId} />
+      <input type="hidden" name="assignedStaffId" value={selectedTech?._id || selectedId} />
+      <input type="hidden" name="assignedTo" value={selectedTech?.userId || selectedId} />
 
       <button
         type="button"

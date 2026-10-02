@@ -11,6 +11,7 @@ import {
   createMaintenance,
   getMaintenance,
   getMaintenanceById,
+  getMaintenanceTypes,
   rejectMaintenance,
   rejectMaintenanceCost,
   startMaintenance,
@@ -38,11 +39,15 @@ import type {
 } from "./maintenance.schema.js";
 
 const getAuthenticatedUser = (req: Request): AuthenticatedMaintenanceUser => {
+  const user = req.user as Record<string, unknown> | undefined;
+  const rawApartmentId = user?.apartmentId ?? user?.apartment ?? null;
+  const rawFlatId = user?.flatId ?? user?.flat ?? null;
+
   return {
-    id: req.user?.id!,
-    role: req.user?.role!,
-    apartmentId: req.user?.apartmentId ?? null,
-    flatId: req.user?.flatId ?? null,
+    id: req.user?.id ? String(req.user.id).trim() : "",
+    role: req.user?.role ? String(req.user.role).trim() : "",
+    apartmentId: rawApartmentId ? String(rawApartmentId).trim() : null,
+    flatId: rawFlatId ? String(rawFlatId).trim() : null,
   };
 };
 
@@ -60,6 +65,15 @@ export const createMaintenanceHandler = catchAsync(async (req: Request, res: Res
   res.status(201).json({
     success: true,
     message: "Maintenance created successfully",
+    data: result,
+  });
+});
+
+export const getMaintenanceTypesHandler = catchAsync(async (req: Request, res: Response) => {
+  const result = await getMaintenanceTypes(getAuthenticatedUser(req));
+
+  res.status(200).json({
+    success: true,
     data: result,
   });
 });

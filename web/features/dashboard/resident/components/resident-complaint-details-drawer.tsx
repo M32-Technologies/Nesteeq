@@ -14,6 +14,7 @@ import {
   Layers,
   KeyRound,
   ExternalLink,
+  Image as ImageIcon,
 } from "lucide-react";
 
 export interface ResidentComplaintItem {
@@ -30,6 +31,9 @@ export interface ResidentComplaintItem {
     | "ASSIGNED"
     | "IN_PROGRESS"
     | "RESOLVED"
+    | "WORK_COMPLETED"
+    | "AWAITING_APPROVAL"
+    | "APPROVED"
     | "CLOSED"
     | "REJECTED"
     | "CANCELLED";
@@ -79,7 +83,12 @@ export interface ResidentComplaintDetailsDrawerProps {
 
 function getMediaUrl(url: string) {
   if (!url) return "";
-  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("blob:")) {
+  if (
+    url.startsWith("http://") ||
+    url.startsWith("https://") ||
+    url.startsWith("blob:") ||
+    url.startsWith("data:")
+  ) {
     return url;
   }
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:6001";
@@ -111,12 +120,17 @@ export function ResidentComplaintDetailsDrawer({
 
   if (!isDrawerOpen || !complaint) return null;
 
-  const locationMatch = complaint.description.match(/^\[Location:\s*([^\]]+)\]/i);
+  const locationMatch = complaint.description.match(/\[Location:\s*([^\]]+)\]/i);
   const parsedLocation = locationMatch ? locationMatch[1].trim() : null;
+
+  const photoRefMatch = complaint.description.match(
+    /\[Attached Photo Reference:\s*([^\]]+)\]/i
+  );
+  const parsedPhotoRef = photoRefMatch ? photoRefMatch[1].trim() : null;
+
   const cleanDescription = complaint.description
-    .replace(/^\[Location:\s*[^\static\]]+\]\s*/i, "")
-    .replace(/^\[Location:\s*[^\static\]]+\]\s*/i, "")
-    .replace(/^\[Location:\s*[^\]]+\]\s*/i, "")
+    .replace(/\[Location:\s*[^\]]+\]/gi, "")
+    .replace(/\[Attached Photo Reference:[^\]]+\]/gi, "")
     .trim();
 
   const rawImages: string[] = [
@@ -124,20 +138,30 @@ export function ResidentComplaintDetailsDrawer({
     ...(Array.isArray(complaint.attachments) ? complaint.attachments : []),
   ].filter(Boolean);
 
-  const status = complaint.status;
+  const status = (complaint.status || "PENDING").toUpperCase();
   const isTerminalNegative = status === "REJECTED" || status === "CANCELLED";
 
+  // Progress Tracker Steps: Complaint Raised -> Assigned -> Work in Progress -> Completed
   let currentStep = 1;
-  if (status === "ASSIGNED") currentStep = 2;
-  else if (status === "IN_PROGRESS") currentStep = 3;
-  else if (status === "RESOLVED" || status === "CLOSED") currentStep = 4;
-  else if (status === "UNDER_REVIEW") currentStep = 1;
+  if (status === "ASSIGNED") {
+    currentStep = 2;
+  } else if (["IN_PROGRESS", "UNDER_REPAIR", "IN-PROGRESS"].includes(status)) {
+    currentStep = 3;
+  } else if (
+    ["RESOLVED", "CLOSED", "WORK_COMPLETED", "APPROVED", "AWAITING_APPROVAL"].includes(
+      status
+    )
+  ) {
+    currentStep = 4;
+  } else {
+    currentStep = 1;
+  }
 
   const steps = [
-    { label: "Submitted", step: 1, desc: "Ticket logged" },
+    { label: "Complaint Raised", step: 1, desc: "Ticket logged" },
     { label: "Assigned", step: 2, desc: "Technician allocated" },
-    { label: "In Progress", step: 3, desc: "Work underway" },
-    { label: "Resolved", step: 4, desc: "Issue fixed" },
+    { label: "Work in Progress", step: 3, desc: "Work underway" },
+    { label: "Completed", step: 4, desc: "Issue resolved" },
   ];
 
   const staff =
@@ -146,18 +170,41 @@ export function ResidentComplaintDetailsDrawer({
     (typeof complaint.assignedTo === "object" && complaint.assignedTo !== null
       ? complaint.assignedTo
       : null);
+
   const technicianName =
     (staff && typeof staff === "object" ? staff.name || staff.fullName : null) ||
     complaint.assignedTechnicianName ||
     (typeof complaint.assignedTo === "string" ? complaint.assignedTo : null);
+
   const technicianRole =
     staff && typeof staff === "object" && staff.role ? staff.role : "Maintenance Staff";
-  const technicianPhone = staff && typeof staff === "object" && staff.phone ? staff.phone : null;
-  const technicianEmail = staff && typeof staff === "object" && staff.email ? staff.email : null;
 
-  const ticketNumber =
+  const technicianPhone =
+    (staff && typeof staff === "object"
+      ? (staff as any).phone ||
+        (staff as any).phoneNumber ||
+        (staff as any).mobile ||
+        (staff as any).contact
+      : null) ||
+    (complaint as any).technicianPhone ||
+    (complaint as any).technicianContact ||
+    null;
+
+  const technicianEmail =
+    staff && typeof staff === "object" && staff.email ? staff.email : null;
+
+  const completionOtp =
+    complaint.completionOtp ||
+    (complaint as any).otp ||
+    (complaint as any).verificationOtp ||
+    (complaint as any).maintenance?.verificationOtp ||
+    (complaint as any).maintenance?.completionOtp ||
+    null;
+
+  const rawId =
     complaint.ticketNumber ||
     (complaint._id ? complaint._id.slice(-6).toUpperCase() : "TKT");
+  const ticketReferenceId = `#${rawId.replace(/^#+/, "")}`;
 
   const formattedDate = new Date(complaint.createdAt).toLocaleDateString("en-US", {
     month: "short",
@@ -188,14 +235,17 @@ export function ResidentComplaintDetailsDrawer({
             <div className="space-y-1.5 min-w-0 pr-4">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center rounded-md bg-[#07584F]/10 px-2.5 py-0.5 font-mono text-xs font-bold text-[#07584F]">
-                  #{ticketNumber}
+                  {ticketReferenceId}
                 </span>
 
                 <span
                   className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ring-1 ${
-                    status === "RESOLVED" || status === "CLOSED"
+                    status === "RESOLVED" ||
+                    status === "CLOSED" ||
+                    status === "WORK_COMPLETED" ||
+                    status === "APPROVED"
                       ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                      : status === "IN_PROGRESS"
+                      : status === "IN_PROGRESS" || status === "UNDER_REPAIR"
                       ? "bg-blue-50 text-blue-700 ring-blue-200"
                       : status === "ASSIGNED"
                       ? "bg-indigo-50 text-indigo-700 ring-indigo-200"
@@ -217,14 +267,14 @@ export function ResidentComplaintDetailsDrawer({
                         : "bg-slate-100 text-slate-700"
                     }`}
                   >
-                    {complaint.priority} Priority
+                    {complaint.priority}
                   </span>
                 )}
               </div>
 
               <div className="flex items-center gap-1.5 text-xs text-[#7C8782] pt-0.5">
                 <Calendar className="size-3.5" />
-                <span>Raised on {formattedDate}</span>
+                <span>Created {formattedDate}</span>
               </div>
             </div>
 
@@ -240,11 +290,11 @@ export function ResidentComplaintDetailsDrawer({
 
           {/* Drawer Body Scrollable */}
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6 space-y-6">
-            {/* Status Stepper */}
+            {/* Progress Tracker / Timeline */}
             {!isTerminalNegative ? (
               <section className="rounded-xl border border-[#DDE3DF] bg-[#F7F8F5]/60 p-4.5">
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-[#637083] mb-4">
-                  Request Progress
+                  Progress Tracker
                 </h4>
 
                 <div className="grid grid-cols-4 relative">
@@ -261,7 +311,10 @@ export function ResidentComplaintDetailsDrawer({
                     const isCurrent = currentStep === s.step;
 
                     return (
-                      <div key={s.step} className="flex flex-col items-center text-center relative z-10">
+                      <div
+                        key={s.step}
+                        className="flex flex-col items-center text-center relative z-10"
+                      >
                         <div
                           className={`flex size-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${
                             isPassed
@@ -302,13 +355,14 @@ export function ResidentComplaintDetailsDrawer({
                     This complaint was {status.toLowerCase()}
                   </p>
                   <p className="text-rose-800 leading-relaxed">
-                    If you believe this was an error or the issue persists, please reach out to the society facility manager or raise a fresh request.
+                    If you believe this was an error or the issue persists, please reach out to
+                    the facility manager or raise a fresh request.
                   </p>
                 </div>
               </div>
             )}
 
-            {/* Issue Information */}
+            {/* Issue Description & Info */}
             <section className="space-y-3">
               <div>
                 <span className="text-xs font-semibold uppercase tracking-wider text-[#7C8782]">
@@ -335,7 +389,7 @@ export function ResidentComplaintDetailsDrawer({
                     <MapPin className="size-3.5" />
                   </div>
                   <div>
-                    <p className="text-[11px] text-[#7C8782]">Location inside Unit</p>
+                    <p className="text-[11px] text-[#7C8782]">Location</p>
                     <p className="font-semibold text-[#111111]">
                       {parsedLocation ||
                         (complaint.flat
@@ -360,32 +414,40 @@ export function ResidentComplaintDetailsDrawer({
               </div>
             </section>
 
-            {/* Completion Verification OTP Banner */}
-            {complaint.completionOtp && (
-              <section className="rounded-xl border border-amber-300 bg-amber-50/80 p-4 flex items-start gap-3.5">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white">
-                  <KeyRound className="size-4" />
+            {/* OTP / Verification Status */}
+            {completionOtp && (
+              <section className="rounded-xl border-2 border-amber-400 bg-amber-50 p-4.5 flex items-start gap-3.5 shadow-sm">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-xs">
+                  <KeyRound className="size-4.5" />
                 </div>
-                <div className="space-y-1 flex-1">
-                  <p className="text-xs font-semibold text-amber-950">
-                    Completion Verification Code (OTP)
-                  </p>
-                  <p className="font-mono text-base font-bold tracking-wider text-amber-950">
-                    {complaint.completionOtp}
-                  </p>
-                  <p className="text-[11px] text-amber-800 leading-normal">
-                    Please share this 4-digit code with the technician only after you have inspected and confirmed that the repair work is completed.
+                <div className="space-y-1.5 flex-1">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold uppercase tracking-wider text-amber-950">
+                      Completion Verification Code (OTP)
+                    </p>
+                    <span className="rounded bg-amber-200/80 px-2 py-0.5 text-[10px] font-bold text-amber-900">
+                      Awaiting Verification
+                    </span>
+                  </div>
+                  <div className="flex items-baseline gap-3">
+                    <span className="font-mono text-2xl font-black tracking-widest text-amber-950">
+                      {completionOtp}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-amber-900/90 leading-normal">
+                    Share this verification OTP with the technician only after you have inspected
+                    and confirmed that the repair work is completed.
                   </p>
                 </div>
               </section>
             )}
 
-            {/* Attached Photos */}
-            {rawImages.length > 0 && (
+            {/* Attached Photos / Proof */}
+            {rawImages.length > 0 ? (
               <section className="space-y-2.5 border-t border-[#EEF1F4] pt-5">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-[#7C8782]">
-                    Attached Photos ({rawImages.length})
+                    Attached Photos / Proof ({rawImages.length})
                   </h4>
                   <span className="text-[11px] text-[#7C8782]">Click photo to enlarge</span>
                 </div>
@@ -414,18 +476,43 @@ export function ResidentComplaintDetailsDrawer({
                   })}
                 </div>
               </section>
-            )}
+            ) : parsedPhotoRef ? (
+              <section className="space-y-2.5 border-t border-[#EEF1F4] pt-5">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-[#7C8782]">
+                  Attached Photos / Proof
+                </h4>
+                <div className="rounded-xl border border-[#DDE3DF] bg-[#F7F8F5] p-4 flex flex-col sm:flex-row items-center gap-4">
+                  <div className="relative aspect-video w-full sm:w-44 overflow-hidden rounded-lg border border-slate-200 bg-gradient-to-br from-slate-100 to-slate-200 flex flex-col items-center justify-center text-slate-500 shadow-2xs">
+                    <ImageIcon className="size-8 text-[#07584F]/70 mb-1" />
+                    <span className="text-[10px] font-medium text-slate-600">
+                      Attached Proof Image
+                    </span>
+                  </div>
+                  <div className="space-y-1.5 text-xs flex-1">
+                    <span className="rounded bg-teal-50 text-[#07584F] border border-teal-200 px-2 py-0.5 text-[10px] font-semibold">
+                      Screenshot Reference Attached
+                    </span>
+                    <p className="font-semibold text-slate-900 mt-1 break-all">
+                      {parsedPhotoRef}
+                    </p>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      Photo captured during ticket creation and accessible to the assigned technician.
+                    </p>
+                  </div>
+                </div>
+              </section>
+            ) : null}
 
-            {/* Assigned Technician Card */}
+            {/* Assigned Technician Details */}
             <section className="space-y-2.5 border-t border-[#EEF1F4] pt-5">
               <h4 className="text-xs font-semibold uppercase tracking-wider text-[#7C8782]">
-                Assigned Staff & Support
+                Assigned Technician Details
               </h4>
 
               {technicianName ? (
                 <div className="rounded-xl border border-[#DDE3DF] bg-[#F7F8F5] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex size-11 items-center justify-center rounded-full bg-[#07584F] text-white font-semibold text-sm">
+                    <div className="flex size-11 items-center justify-center rounded-full bg-[#07584F] text-white font-semibold text-sm shadow-2xs">
                       {technicianName.charAt(0).toUpperCase()}
                     </div>
                     <div>
@@ -444,14 +531,18 @@ export function ResidentComplaintDetailsDrawer({
                   </div>
 
                   <div className="flex items-center gap-2 self-start sm:self-auto pt-2 sm:pt-0">
-                    {technicianPhone && (
+                    {technicianPhone ? (
                       <a
                         href={`tel:${technicianPhone}`}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#07584F] bg-white px-3 py-1.5 text-xs font-medium text-[#07584F] hover:bg-[#07584F]/5 transition"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#07584F] bg-white px-3 py-1.5 text-xs font-semibold text-[#07584F] shadow-2xs hover:bg-[#07584F]/5 transition"
                       >
                         <Phone className="size-3.5" />
                         <span>Call {technicianPhone}</span>
                       </a>
+                    ) : (
+                      <span className="text-[11px] text-[#7C8782] italic">
+                        Phone available on dispatch
+                      </span>
                     )}
                     {technicianEmail && (
                       <a
@@ -468,7 +559,8 @@ export function ResidentComplaintDetailsDrawer({
                 <div className="rounded-xl border border-dashed border-[#DDE3DF] bg-[#F7F8F5]/60 p-4 text-xs text-[#637083] flex items-center gap-3">
                   <Clock className="size-4.5 text-[#7C8782] shrink-0" />
                   <p>
-                    Our facility manager is reviewing your complaint and will assign a dedicated technician shortly. You will be notified as soon as work begins.
+                    Our facility manager is reviewing your complaint and will assign a dedicated
+                    technician shortly. You will be notified as soon as work begins.
                   </p>
                 </div>
               )}
@@ -503,7 +595,7 @@ export function ResidentComplaintDetailsDrawer({
           >
             <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950 px-4 py-3 text-white">
               <span className="text-xs font-medium text-slate-300">
-                Ticket Attachment • #{ticketNumber}
+                Ticket Attachment • {ticketReferenceId}
               </span>
               <div className="flex items-center gap-3">
                 <a

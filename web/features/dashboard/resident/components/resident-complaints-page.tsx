@@ -14,6 +14,7 @@ import {
   CircleDollarSign,
   ShieldCheck,
   FileText,
+  Eye,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -355,9 +356,17 @@ export function ResidentComplaintsPage() {
                     )}
                   </div>
 
-                  <span className="text-xs font-medium text-[#07584F] group-hover:underline flex items-center gap-1">
-                    View Details &amp; Track &rarr;
-                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedComplaint(ticket);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 hover:border-slate-300"
+                  >
+                    <Eye className="h-4 w-4 text-slate-500" />
+                    <span>View Details</span>
+                  </button>
                 </div>
 
                 {completionOtp && (

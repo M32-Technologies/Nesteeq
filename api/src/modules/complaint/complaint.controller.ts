@@ -10,6 +10,7 @@ import {
   getComplaintById,
   getComplaints,
   rejectComplaint,
+  reviewComplaintExpense,
   updateComplaint,
   updateComplaintStatus,
   type AuthenticatedComplaintUser,
@@ -185,6 +186,56 @@ export const confirmComplaintResolutionHandler = catchAsync(async (req: Request,
   res.status(200).json({
     success: true,
     message: "Complaint resolution confirmed",
+    data: result,
+  });
+});
+
+export const reviewComplaintExpenseHandler = catchAsync(async (req: Request, res: Response) => {
+  const rawAction = String(req.body?.action || "").toUpperCase();
+  const action = rawAction.startsWith("APPROV") ? "APPROVE" : "REJECT";
+  const reason = req.body?.reason || req.body?.remarks || undefined;
+
+  const result = await reviewComplaintExpense(
+    getComplaintId(req),
+    action,
+    reason,
+    getAuthenticatedUser(req)
+  );
+
+  res.status(200).json({
+    success: true,
+    message: `Maintenance expense ${action === "APPROVE" ? "approved" : "rejected"} successfully`,
+    data: result,
+  });
+});
+
+export const approveComplaintExpenseHandler = catchAsync(async (req: Request, res: Response) => {
+  const result = await reviewComplaintExpense(
+    getComplaintId(req),
+    "APPROVE",
+    undefined,
+    getAuthenticatedUser(req)
+  );
+
+  res.status(200).json({
+    success: true,
+    message: "Maintenance expense approved successfully",
+    data: result,
+  });
+});
+
+export const rejectComplaintExpenseHandler = catchAsync(async (req: Request, res: Response) => {
+  const reason = req.body?.reason || req.body?.remarks || undefined;
+  const result = await reviewComplaintExpense(
+    getComplaintId(req),
+    "REJECT",
+    reason,
+    getAuthenticatedUser(req)
+  );
+
+  res.status(200).json({
+    success: true,
+    message: "Maintenance expense rejected successfully",
     data: result,
   });
 });

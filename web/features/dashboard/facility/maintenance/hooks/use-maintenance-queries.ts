@@ -1,5 +1,10 @@
 import { useQuery } from "@tanstack/react-query"
-import { fetchMaintenance, fetchMaintenanceById, fetchMaintenanceStats } from "../api/maintenance.api"
+import {
+  fetchMaintenance,
+  fetchMaintenanceById,
+  fetchMaintenanceStats,
+  fetchMaintenanceTypes,
+} from "../api/maintenance.api"
 import type { MaintenanceQuery } from "../types/maintenance.types"
 
 export const maintenanceQueryKeys = {
@@ -30,5 +35,13 @@ export function useMaintenanceDetailsQuery(id: string | null) {
     queryKey: maintenanceQueryKeys.details(id ?? ""),
     queryFn: () => fetchMaintenanceById(id!),
     enabled: Boolean(id),
+  })
+}
+
+export function useMaintenanceTypesQuery() {
+  return useQuery({
+    queryKey: [...maintenanceQueryKeys.all, "types"] as const,
+    queryFn: fetchMaintenanceTypes,
+    staleTime: 60 * 1000,
   })
 }

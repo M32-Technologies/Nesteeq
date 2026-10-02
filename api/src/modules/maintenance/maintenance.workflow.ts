@@ -61,9 +61,9 @@ export const complaintMaintenanceSourceStatuses = new Set<ComplaintStatus>([
 
 const allowedStatusTransitions: Record<MaintenanceStatus, readonly MaintenanceStatus[]> = {
   PENDING: ["ASSIGNED", "CANCELLED"],
-  ASSIGNED: ["IN_PROGRESS", "CANCELLED"],
-  IN_PROGRESS: ["ON_HOLD", "AWAITING_APPROVAL", "WORK_COMPLETED", "COMPLETED", "CANCELLED"],
-  ON_HOLD: ["IN_PROGRESS", "CANCELLED"],
+  ASSIGNED: ["IN_PROGRESS", "ON_HOLD", "CANCELLED"],
+  IN_PROGRESS: ["ASSIGNED", "ON_HOLD", "AWAITING_APPROVAL", "WORK_COMPLETED", "COMPLETED", "CANCELLED"],
+  ON_HOLD: ["ASSIGNED", "IN_PROGRESS", "CANCELLED"],
   WORK_COMPLETED: ["AWAITING_APPROVAL", "APPROVED", "REJECTED", "CANCELLED", "CLOSED"],
   COMPLETED: ["AWAITING_APPROVAL", "APPROVED", "REJECTED", "CANCELLED", "CLOSED"],
   AWAITING_APPROVAL: ["APPROVED", "REJECTED", "CANCELLED"],
@@ -76,6 +76,7 @@ const allowedStatusTransitions: Record<MaintenanceStatus, readonly MaintenanceSt
 export const assignableMaintenanceStatuses = new Set<MaintenanceStatus>([
   "PENDING",
   "ASSIGNED",
+  "IN_PROGRESS",
   "ON_HOLD",
   "REJECTED",
 ]);

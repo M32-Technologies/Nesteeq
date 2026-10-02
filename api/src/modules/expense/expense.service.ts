@@ -434,3 +434,53 @@ export const getExpenseSummaryService = async (
     totalCount: result?.totalCount ?? 0,
   };
 };
+
+export const exportExpensesCsvService = async (filters: ExpenseFilters) => {
+  const expenses = await getExpensesService(filters);
+
+  const headers = [
+    "Title",
+    "Invoice / Ref",
+    "Category",
+    "Vendor",
+    "Amount",
+    "Expense Date",
+    "Status",
+    "Payment Method",
+    "Payment Ref",
+    "Paid Date",
+    "Rejection Reason",
+    "Description",
+  ];
+
+  const escapeCsv = (val: unknown) => {
+    if (val === null || val === undefined) return '""';
+    return `"${String(val).replace(/"/g, '""')}"`;
+  };
+
+  const formatCsvDate = (dateVal?: Date | string | null) => {
+    if (!dateVal) return "";
+    const d = new Date(dateVal);
+    return Number.isNaN(d.getTime()) ? "" : d.toISOString().split("T")[0];
+  };
+
+  const rows = expenses.map((e) => [
+    escapeCsv(e.title || ""),
+    escapeCsv(e.invoiceRef || ""),
+    escapeCsv(e.category || ""),
+    escapeCsv(e.vendorName || "Not recorded"),
+    e.amount,
+    escapeCsv(formatCsvDate(e.expenseDate)),
+    e.status,
+    escapeCsv(e.paymentMethod || ""),
+    escapeCsv(e.paymentReference || ""),
+    escapeCsv(formatCsvDate(e.paidAt)),
+    escapeCsv(e.rejectionReason || ""),
+    escapeCsv(e.description || ""),
+  ]);
+
+  const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+  const filename = `nesteeq-expenses-${new Date().toISOString().split("T")[0]}.csv`;
+  return { csvContent, filename };
+};
+
