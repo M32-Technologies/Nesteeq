@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Eye, MoreVertical, UserCheck } from "lucide-react"
+import { Eye, MoreVertical, Pencil, UserCheck } from "lucide-react"
 
 import type { Complaint } from "@/features/dashboard/facility/complaints/types/complaints.types"
 import {
@@ -12,17 +12,22 @@ import {
   StatusBadge,
 } from "@/features/dashboard/facility/shared/components/facility-ui"
 
+export type ComplaintDrawerMode = "details" | "assign" | "edit" | "status"
+
 export function ComplaintsTable({
   complaints,
   onSelectComplaint,
 }: {
   complaints: Complaint[]
-  onSelectComplaint: (id: string) => void
+  onSelectComplaint: (id: string, mode?: ComplaintDrawerMode) => void
 }) {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null)
 
-  const handleOpenDrawer = (complaint: Complaint) => {
-    onSelectComplaint(complaint._id)
+  const handleOpenDrawer = (
+    complaint: Complaint,
+    mode: ComplaintDrawerMode = "details"
+  ) => {
+    onSelectComplaint(complaint._id, mode)
   }
 
   useEffect(() => {
@@ -100,7 +105,7 @@ export function ComplaintsTable({
                           type="button"
                           onClick={() => {
                             setActiveMenuId(null);
-                            handleOpenDrawer(complaint);
+                            handleOpenDrawer(complaint, "details");
                           }}
                           className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
                         >
@@ -111,12 +116,23 @@ export function ComplaintsTable({
                           type="button"
                           onClick={() => {
                             setActiveMenuId(null);
-                            handleOpenDrawer(complaint);
+                            handleOpenDrawer(complaint, "assign");
                           }}
                           className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#5542F6] hover:bg-[#F5F3FF]"
                         >
-                          <UserCheck className="h-4 w-4" />
+                          <UserCheck className="h-4 w-4 text-[#5542F6]" />
                           <span>Assign Technician</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveMenuId(null);
+                            handleOpenDrawer(complaint, "edit");
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                          <Pencil className="h-4 w-4 text-slate-500" />
+                          <span>Edit</span>
                         </button>
                       </div>
                     )}
@@ -132,7 +148,7 @@ export function ComplaintsTable({
         {complaints.map((complaint) => (
           <article
             key={complaint._id}
-            onClick={() => handleOpenDrawer(complaint)}
+            onClick={() => handleOpenDrawer(complaint, "details")}
             className="cursor-pointer p-4 transition hover:bg-[#FBFCFD]"
           >
             <div className="flex items-start justify-between gap-3">
@@ -160,7 +176,7 @@ export function ComplaintsTable({
                         type="button"
                         onClick={() => {
                           setActiveMenuId(null);
-                          handleOpenDrawer(complaint);
+                          handleOpenDrawer(complaint, "details");
                         }}
                         className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
                       >
@@ -171,12 +187,23 @@ export function ComplaintsTable({
                         type="button"
                         onClick={() => {
                           setActiveMenuId(null);
-                          handleOpenDrawer(complaint);
+                          handleOpenDrawer(complaint, "assign");
                         }}
                         className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#5542F6] hover:bg-[#F5F3FF]"
                       >
-                        <UserCheck className="h-4 w-4" />
+                        <UserCheck className="h-4 w-4 text-[#5542F6]" />
                         <span>Assign Technician</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveMenuId(null);
+                          handleOpenDrawer(complaint, "edit");
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        <Pencil className="h-4 w-4 text-slate-500" />
+                        <span>Edit</span>
                       </button>
                     </div>
                   )}

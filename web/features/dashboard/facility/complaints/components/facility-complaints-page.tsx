@@ -36,7 +36,10 @@ import {
   readOptionalNumber,
   readRequiredFormString,
 } from "@/features/dashboard/facility/shared/utils/form-helpers"
-import { ComplaintDetailsDrawer } from "@/features/dashboard/facility/complaints/components/complaint-details-drawer"
+import {
+  ComplaintDetailsDrawer,
+  type ComplaintDrawerMode,
+} from "@/features/dashboard/facility/complaints/components/complaint-details-drawer"
 import {
   ComplaintsFilters,
   type ComplaintSortKey,
@@ -133,6 +136,20 @@ export function FacilityComplaintsPage() {
   const [selectedComplaintId, setSelectedComplaintId] = useState<string | null>(
     null
   )
+  const [drawerMode, setDrawerMode] = useState<ComplaintDrawerMode>("details")
+
+  const handleOpenComplaint = (
+    id: string,
+    mode: ComplaintDrawerMode = "details"
+  ) => {
+    setSelectedComplaintId(id)
+    setDrawerMode(mode)
+  }
+
+  const handleCloseDrawer = () => {
+    setSelectedComplaintId(null)
+    setDrawerMode("details")
+  }
 
   const complaintQuery = useMemo(
     () => ({
@@ -174,6 +191,8 @@ export function FacilityComplaintsPage() {
   const handleSuccess = async (message?: string) => {
     toast.success(message || "Complaint updated")
     await queryClient.invalidateQueries({ queryKey: ["facility-complaints"] })
+    await detailQuery.refetch()
+    handleCloseDrawer()
   }
 
   const assignMutation = useMutation({
@@ -484,7 +503,7 @@ export function FacilityComplaintsPage() {
           ) : (
             <ComplaintsTable
               complaints={visibleComplaints}
-              onSelectComplaint={setSelectedComplaintId}
+              onSelectComplaint={handleOpenComplaint}
             />
           )}
         </div>
@@ -492,13 +511,15 @@ export function FacilityComplaintsPage() {
 
       <ComplaintDetailsDrawer
         open={Boolean(selectedComplaintId)}
+        mode={drawerMode}
+        onModeChange={setDrawerMode}
         complaint={selectedComplaint}
         isLoading={detailQuery.isPending}
         isError={detailQuery.isError}
         error={detailQuery.error}
         isRetrying={detailQuery.isFetching}
         onRetry={() => void detailQuery.refetch()}
-        onClose={() => setSelectedComplaintId(null)}
+        onClose={handleCloseDrawer}
         relatedMaintenance={relatedMaintenance}
         isRelatedMaintenanceLoading={relatedMaintenanceQuery.isPending}
         canCreateMaintenance={Boolean(canCreateMaintenance)}
