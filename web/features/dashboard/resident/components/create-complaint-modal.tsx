@@ -160,13 +160,15 @@ export function CreateComplaintModal({
         fullDescription += `\n\n[Attached Photo Reference: ${selectedFile.name} (${(selectedFile.size / 1024).toFixed(1)} KB)]`;
       }
 
+      const uploadedImages = uploadedImageUrl ? [uploadedImageUrl.trim()] : [];
+
       await createResidentComplaint({
         title: values.title.trim(),
         description: fullDescription,
         category: values.category as CreateResidentComplaintPayload["category"],
         priority: values.priority as CreateResidentComplaintPayload["priority"],
-        images: uploadedImageUrl ? [uploadedImageUrl] : [],
-        attachments: uploadedImageUrl ? [uploadedImageUrl] : [],
+        images: uploadedImages,
+        attachments: uploadedImages,
       });
 
       toast.success("Complaint registered successfully! The facility team will review it.");

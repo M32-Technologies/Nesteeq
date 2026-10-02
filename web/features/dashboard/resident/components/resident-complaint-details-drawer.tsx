@@ -133,10 +133,18 @@ export function ResidentComplaintDetailsDrawer({
     .replace(/\[Attached Photo Reference:[^\]]+\]/gi, "")
     .trim();
 
-  const rawImages: string[] = [
+  const rawPhotos: string[] = [
     ...(Array.isArray(complaint.images) ? complaint.images : []),
     ...(Array.isArray(complaint.attachments) ? complaint.attachments : []),
-  ].filter(Boolean);
+  ];
+  const uniquePhotos: string[] = Array.from(
+    new Set(
+      rawPhotos
+        .filter(Boolean)
+        .map((img) => String(img).trim())
+        .filter((img) => img.length > 0)
+    )
+  );
 
   const status = (complaint.status || "PENDING").toUpperCase();
   const isTerminalNegative = status === "REJECTED" || status === "CANCELLED";
@@ -443,17 +451,17 @@ export function ResidentComplaintDetailsDrawer({
             )}
 
             {/* Attached Photos / Proof */}
-            {rawImages.length > 0 ? (
+            {uniquePhotos.length > 0 ? (
               <section className="space-y-2.5 border-t border-[#EEF1F4] pt-5">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-[#7C8782]">
-                    Attached Photos / Proof ({rawImages.length})
+                    ATTACHED PHOTOS / PROOF ({uniquePhotos.length})
                   </h4>
                   <span className="text-[11px] text-[#7C8782]">Click photo to enlarge</span>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {rawImages.map((img, idx) => {
+                  {uniquePhotos.map((img, idx) => {
                     const resolved = getMediaUrl(img);
                     return (
                       <div
@@ -479,7 +487,7 @@ export function ResidentComplaintDetailsDrawer({
             ) : parsedPhotoRef ? (
               <section className="space-y-2.5 border-t border-[#EEF1F4] pt-5">
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-[#7C8782]">
-                  Attached Photos / Proof
+                  ATTACHED PHOTOS / PROOF (1)
                 </h4>
                 <div className="rounded-xl border border-[#DDE3DF] bg-[#F7F8F5] p-4 flex flex-col sm:flex-row items-center gap-4">
                   <div className="relative aspect-video w-full sm:w-44 overflow-hidden rounded-lg border border-slate-200 bg-gradient-to-br from-slate-100 to-slate-200 flex flex-col items-center justify-center text-slate-500 shadow-2xs">
