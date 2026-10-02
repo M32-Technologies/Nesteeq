@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   X,
   Clock,
@@ -133,18 +133,34 @@ export function ResidentComplaintDetailsDrawer({
     .replace(/\[Attached Photo Reference:[^\]]+\]/gi, "")
     .trim();
 
-  const rawPhotos: string[] = [
-    ...(Array.isArray(complaint.images) ? complaint.images : []),
-    ...(Array.isArray(complaint.attachments) ? complaint.attachments : []),
-  ];
-  const uniquePhotos: string[] = Array.from(
-    new Set(
-      rawPhotos
-        .filter(Boolean)
-        .map((img) => String(img).trim())
-        .filter((img) => img.length > 0)
-    )
-  );
+  const uniquePhotos: string[] = useMemo(() => {
+    const rawList: string[] = [
+      ...(Array.isArray(complaint.images) ? complaint.images : []),
+      ...(Array.isArray(complaint.attachments) ? complaint.attachments : []),
+    ]
+      .filter(Boolean)
+      .map((item) => String(item).trim())
+      .filter((item) => item.length > 0);
+
+    const seenUrls = new Set<string>();
+    const seenFilenames = new Set<string>();
+    const result: string[] = [];
+
+    for (const raw of rawList) {
+      const resolved = getMediaUrl(raw);
+      if (!resolved) continue;
+
+      const filename = resolved.split("/").pop()?.split("?")[0]?.toLowerCase() || resolved;
+
+      if (!seenUrls.has(resolved) && !seenFilenames.has(filename)) {
+        seenUrls.add(resolved);
+        seenFilenames.add(filename);
+        result.push(resolved);
+      }
+    }
+
+    return result;
+  }, [complaint.images, complaint.attachments]);
 
   const status = (complaint.status || "PENDING").toUpperCase();
   const isTerminalNegative = status === "REJECTED" || status === "CANCELLED";
