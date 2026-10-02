@@ -321,6 +321,19 @@ export const createEmergencyAlertService = async ({
       createdBy: userId,
     })
 
+    // Also notify property managers of emergency
+    await createNotification({
+      apartment: apartmentId,
+      recipientRole: "PROPERTY_MANAGER",
+      type: "EMERGENCY_ALERT",
+      severity: "ERROR",
+      title,
+      message: notifMessage,
+      relatedResourceType: "EMERGENCY_ALERT",
+      relatedResourceId: createdAlert._id,
+      createdBy: userId,
+    })
+
     // 2. Emit real-time alert via socket to update security UI instantly
     sendRealtimeEmergencyAlert({
       apartmentId,
