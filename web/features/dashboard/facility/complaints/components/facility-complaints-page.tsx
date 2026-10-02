@@ -271,6 +271,9 @@ export function FacilityComplaintsPage({
       description?: string
       priority?: string
       assignedTo?: string
+      assignedStaff?: string
+      technicianId?: string
+      technician?: string
       complaintId?: string
     }) => createMaintenance(payload),
     onSuccess: () => void handleSuccess("Maintenance task created"),
@@ -408,13 +411,22 @@ export function FacilityComplaintsPage({
     if (!selectedComplaint) return
 
     const formData = new FormData(event.currentTarget)
+    const assignedStaffId =
+      readFormString(formData, "assignedStaff") ||
+      readFormString(formData, "technicianId") ||
+      readFormString(formData, "assignedTo") ||
+      readFormString(formData, "technician") ||
+      readFormString(formData, "technicianUserId")
 
     createMaintenanceMutation.mutate({
       title: selectedComplaint.title,
       description: selectedComplaint.description,
       priority: selectedComplaint.priority,
       complaintId: selectedComplaint._id,
-      assignedTo: readFormString(formData, "assignedStaff"),
+      assignedTo: assignedStaffId,
+      assignedStaff: assignedStaffId,
+      technicianId: assignedStaffId,
+      technician: assignedStaffId,
     })
   }
 

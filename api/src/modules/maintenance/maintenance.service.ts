@@ -623,12 +623,25 @@ export const createMaintenance = async (
 
     let assignedStaff: string | null = null;
     let staffUser: AuthUserRecord | null = null;
+    let techProfileOrUserId: string | null = null;
     const now = new Date();
 
-    const rawStaffId = data.assignedStaff || (data as any).assignedTo;
+    const rawStaffId =
+      data.assignedStaff ||
+      (data as any).assignedTo ||
+      (data as any).technicianId ||
+      (data as any).technician;
     if (rawStaffId) {
       staffUser = await ensureStaffUser(rawStaffId, apartmentVal);
       assignedStaff = ensureStaffCanWorkOnApartment(staffUser, rawStaffId, apartmentVal, user);
+      const techDoc = await Technician.findOne({
+        $or: [
+          { userId: assignedStaff },
+          { id: assignedStaff },
+          ...(Types.ObjectId.isValid(rawStaffId) ? [{ _id: new Types.ObjectId(rawStaffId) }] : []),
+        ],
+      }).lean();
+      techProfileOrUserId = techDoc?._id?.toString() || assignedStaff;
     }
 
     const title = data.title ?? complaintDoc?.title ?? "Routine Maintenance";
@@ -639,6 +652,8 @@ export const createMaintenance = async (
       (data.remarks ? data.remarks : `${title} scheduled facility maintenance work.`);
     const priority = data.priority ?? complaintDoc?.priority ?? "MEDIUM";
     const estimatedCost = data.estimatedCost ?? complaintDoc?.estimatedCost ?? null;
+    const initialStatus =
+      (data as any).status || (assignedStaff ? "ASSIGNED" : "PENDING");
 
     const maintenance = await Maintenance.create({
       complaint: complaintDoc ? complaintDoc._id : null,
@@ -646,11 +661,13 @@ export const createMaintenance = async (
       apartment: apartmentVal,
       flat: flatVal,
       assignedStaff,
+      assignedTo: assignedStaff,
+      technician: techProfileOrUserId || assignedStaff,
       category,
       title,
       description,
       priority,
-      status: assignedStaff ? "ASSIGNED" : "PENDING",
+      status: initialStatus,
       assignedBy: assignedStaff ? user.id : null,
       assignedAt: assignedStaff ? now : null,
       estimatedCost,
@@ -665,6 +682,7 @@ export const createMaintenance = async (
             status: "ASSIGNED",
             assignedStaff,
             assignedTo: assignedStaff,
+            technician: techProfileOrUserId || assignedStaff,
             assignedBy: user.id,
             assignedAt: now,
             estimatedCost,
@@ -869,6 +887,36 @@ export const updateMaintenance = async (
     complaintSet.priority = data.priority;
   }
 
+  const rawAssignedStaff =
+    (data as any).assignedStaff ||
+    (data as any).assignedTo ||
+    (data as any).technicianId ||
+    (data as any).technician;
+  if (rawAssignedStaff !== undefined && rawAssignedStaff !== null) {
+    const staff = await ensureStaffUser(rawAssignedStaff, maintenance.apartment);
+    const staffId = ensureStaffCanWorkOnApartment(staff, rawAssignedStaff, maintenance.apartment, user);
+    set.assignedStaff = staffId;
+    set.assignedTo = staffId;
+    const techDoc = await Technician.findOne({
+      $or: [
+        { userId: staffId },
+        { id: staffId },
+        ...(Types.ObjectId.isValid(rawAssignedStaff) ? [{ _id: new Types.ObjectId(rawAssignedStaff) }] : []),
+      ],
+    }).lean();
+    const techProfileId = techDoc?._id?.toString() || staffId;
+    set.technician = techProfileId;
+    set.assignedAt = new Date();
+    set.assignedBy = user.id;
+    if (maintenance.status === "PENDING") {
+      set.status = "ASSIGNED";
+    }
+    complaintSet.assignedStaff = staffId;
+    complaintSet.assignedTo = staffId;
+    complaintSet.technician = techProfileId;
+    complaintSet.status = "ASSIGNED";
+  }
+
   if (data.estimatedCost !== undefined) {
     set.estimatedCost = data.estimatedCost;
     complaintSet.estimatedCost = data.estimatedCost;
@@ -903,13 +951,28 @@ export const assignMaintenance = async (
     throw new AppError(`Maintenance cannot be assigned while it is ${currentStatus}`, 400);
   }
 
-  const staffIdentifier = data.assignedStaff || (data as any).assignedTo || (data as any).technicianId;
+  const staffIdentifier =
+    data.assignedStaff ||
+    (data as any).assignedTo ||
+    (data as any).technicianId ||
+    (data as any).technician;
   if (!staffIdentifier) {
     throw new AppError("Assigned staff or technician is required", 400);
   }
 
   const staff = await ensureStaffUser(staffIdentifier, maintenance.apartment);
   const staffId = ensureStaffCanWorkOnApartment(staff, staffIdentifier, maintenance.apartment, user);
+
+  const techDoc = await Technician.findOne({
+    $or: [
+      { userId: staffId },
+      { id: staffId },
+      ...(Types.ObjectId.isValid(staffIdentifier)
+        ? [{ _id: new Types.ObjectId(staffIdentifier) }]
+        : []),
+    ],
+  }).lean();
+  const techProfileOrUserId = techDoc?._id?.toString() || staffId;
 
   const targetStatus = (data as any).status || (currentStatus === "PENDING" ? "ASSIGNED" : currentStatus);
 
@@ -924,6 +987,8 @@ export const assignMaintenance = async (
   const now = new Date();
   const set: Record<string, unknown> = {
     assignedStaff: staffId,
+    assignedTo: staffId,
+    technician: techProfileOrUserId,
     assignedBy: user.id,
     assignedAt: now,
     status: targetStatus,
@@ -949,6 +1014,8 @@ export const assignMaintenance = async (
   const complaintSet: Record<string, unknown> = {
     status: targetStatus,
     assignedStaff: staffId,
+    assignedTo: staffId,
+    technician: techProfileOrUserId,
     assignedBy: user.id,
     assignedAt: now,
   };

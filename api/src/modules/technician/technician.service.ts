@@ -322,13 +322,27 @@ const syncTechnicianWorkloadStatus = async (userId: string) => {
     return technician;
   }
 
+  const techIds = [
+    technician.userId,
+    technician._id?.toString(),
+    (technician as any).id?.toString(),
+  ].filter(Boolean) as string[];
+
   const [complaintsCount, maintenanceCount] = await Promise.all([
     Complaint.countDocuments({
-      assignedStaff: userId,
+      $or: [
+        { assignedStaff: { $in: techIds } },
+        { assignedTo: { $in: techIds } },
+        { technician: { $in: techIds } },
+      ],
       status: { $in: activeComplaintStatuses },
     }),
     Maintenance.countDocuments({
-      assignedStaff: userId,
+      $or: [
+        { assignedStaff: { $in: techIds } },
+        { assignedTo: { $in: techIds } },
+        { technician: { $in: techIds } },
+      ],
       status: { $in: activeMaintenanceStatuses },
     }),
   ]);
@@ -353,7 +367,12 @@ export const assertComplaintAssignedToTechnician = async (workId: string, userId
     throw new AppError("Complaint not found", 404);
   }
 
-  if (!complaint.assignedStaff || !sameId(complaint.assignedStaff, userId)) {
+  const isAssigned =
+    sameId(complaint.assignedStaff, userId) ||
+    sameId((complaint as any).assignedTo, userId) ||
+    sameId((complaint as any).technician, userId);
+
+  if (!isAssigned) {
     throw new AppError("Complaint is not assigned to this technician", 400);
   }
 
@@ -367,7 +386,12 @@ export const assertMaintenanceAssignedToTechnician = async (workId: string, user
     throw new AppError("Maintenance not found", 404);
   }
 
-  if (!maintenance.assignedStaff || !sameId(maintenance.assignedStaff, userId)) {
+  const isAssigned =
+    sameId(maintenance.assignedStaff, userId) ||
+    sameId((maintenance as any).assignedTo, userId) ||
+    sameId((maintenance as any).technician, userId);
+
+  if (!isAssigned) {
     throw new AppError("Maintenance is not assigned to this technician", 400);
   }
 
@@ -693,11 +717,26 @@ export const getTechnicianTasks = async (
   const skip = (query.page - 1) * query.limit;
   const shouldLoadComplaints = query.type === "all" || query.type === "complaint";
   const shouldLoadMaintenance = query.type === "all" || query.type === "maintenance";
+
+  const techIds = [
+    technician.userId,
+    technician._id?.toString(),
+    (technician as any).id?.toString(),
+  ].filter(Boolean) as string[];
+
   const complaintFilter: Record<string, unknown> = {
-    assignedStaff: technician.userId,
+    $or: [
+      { assignedStaff: { $in: techIds } },
+      { assignedTo: { $in: techIds } },
+      { technician: { $in: techIds } },
+    ],
   };
   const maintenanceFilter: Record<string, unknown> = {
-    assignedStaff: technician.userId,
+    $or: [
+      { assignedStaff: { $in: techIds } },
+      { assignedTo: { $in: techIds } },
+      { technician: { $in: techIds } },
+    ],
   };
 
   if (query.complaintStatus) {

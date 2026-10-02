@@ -94,7 +94,16 @@ export const assertStaffAssignedToMaintenance = (
     throw new AppError("Only maintenance staff can perform this action", 403);
   }
 
-  if (!maintenance.assignedStaff || !sameId(maintenance.assignedStaff, user.id)) {
+  const candidateIds = [user.id];
+  if ((user as any).technicianId) candidateIds.push((user as any).technicianId);
+  if ((user as any).staffRecordId) candidateIds.push((user as any).staffRecordId);
+
+  const isAssigned =
+    candidateIds.some((id) => sameId(maintenance.assignedStaff, id)) ||
+    candidateIds.some((id) => sameId((maintenance as any).assignedTo, id)) ||
+    candidateIds.some((id) => sameId((maintenance as any).technician, id));
+
+  if (!isAssigned) {
     throw new AppError("You can only access maintenance assigned to you", 403);
   }
 };
@@ -237,7 +246,14 @@ export const buildRoleScopedFilter = (
   if (managementRoles.has(role)) {
     applyManagerFilters(filter, query, user);
   } else if (maintenanceRoles.has(role)) {
-    filter.assignedStaff = user.id;
+    const candidateIds = [user.id];
+    if ((user as any).technicianId) candidateIds.push((user as any).technicianId);
+    if ((user as any).staffRecordId) candidateIds.push((user as any).staffRecordId);
+    filter.$or = [
+      { assignedStaff: { $in: candidateIds } },
+      { assignedTo: { $in: candidateIds } },
+      { technician: { $in: candidateIds } },
+    ];
   } else if (residentRoles.has(role)) {
     filter.resident = user.id;
   } else {

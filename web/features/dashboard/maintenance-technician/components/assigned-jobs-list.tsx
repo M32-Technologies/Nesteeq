@@ -4,16 +4,19 @@ import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { AlertCircle } from "lucide-react"
 
+import { useSession } from "@/lib/auth-client"
 import { getAssignedJobs } from "../services/jobs.service"
 import MaintenanceJobFilters from "./maintenance-job-filters"
 import MaintenanceJobsTable from "./maintenance-jobs-table"
 
 export const jobsQueryKeys = {
   all: ["maintenance-technician", "jobs"] as const,
-  list: (status?: string) => [...jobsQueryKeys.all, "list", status ?? "ACTIVE"] as const,
+  list: (status?: string, userId?: string) =>
+    [...jobsQueryKeys.all, "list", status ?? "ACTIVE", userId ?? "me"] as const,
 }
 
 export default function AssignedJobsList() {
+  const { data: session } = useSession()
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("ACTIVE")
   const [priorityFilter, setPriorityFilter] = useState<string>("ALL")
@@ -24,9 +27,11 @@ export default function AssignedJobsList() {
     isError,
     error,
   } = useQuery({
-    queryKey: jobsQueryKeys.list(statusFilter),
+    queryKey: jobsQueryKeys.list(statusFilter, session?.user?.id),
     queryFn: () => getAssignedJobs(statusFilter),
-    staleTime: 60 * 1000,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnMount: "always",
   })
 
   const filteredJobs = useMemo(() => {
