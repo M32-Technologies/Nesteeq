@@ -133,7 +133,11 @@ function sortComplaints(complaints: Complaint[], sort: ComplaintSortKey) {
   })
 }
 
-export function FacilityComplaintsPage() {
+export function FacilityComplaintsPage({
+  eyebrow = "Facility Manager",
+}: {
+  eyebrow?: string
+} = {}) {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState("")
   const [status, setStatus] = useState<"all" | ComplaintStatus>("all")
@@ -409,7 +413,7 @@ export function FacilityComplaintsPage() {
   return (
     <div className="min-h-screen min-w-0 bg-[#F6F8FA] px-4 py-6 sm:px-6 lg:px-7 xl:px-8">
       <div className="mx-auto w-full max-w-[1600px] min-w-0">
-        <PageHeader title="Complaints" eyebrow="Facility Manager" />
+        <PageHeader title="Complaints" eyebrow={eyebrow} />
 
         <ComplaintsStats stats={statsQuery.data} />
 

@@ -296,11 +296,15 @@ export const updateTreasurerSettingsService = async (
 
 export const getMaintenancePayoutsService = async (apartmentId: string) => {
   const id = getApartmentObjectId(apartmentId);
+  const aptValues: unknown[] = [apartmentId, String(apartmentId)];
+  if (Types.ObjectId.isValid(apartmentId)) {
+    aptValues.push(id);
+  }
 
   const query: Record<string, unknown> = {
-    apartment: id,
+    apartment: { $in: aptValues },
     "costReview.status": "APPROVED",
-    "costReview.forwardedToRole": "TREASURER",
+    "costReview.forwardedToRole": { $in: ["TREASURER", null] },
   };
 
   const jobs = await (Maintenance as any).find(query)
@@ -321,12 +325,17 @@ export const getMaintenancePayoutsService = async (apartmentId: string) => {
     if (job.flat) flatIds.add(job.flat.toString());
   }
 
-  const flats = flatIds.size > 0
-    ? await Flat.find(
-        { _id: { $in: Array.from(flatIds).map((fid) => new Types.ObjectId(fid)) } },
-        "flatNumber"
-      ).lean()
-    : [];
+  const validFlatObjectIds = Array.from(flatIds)
+    .filter((fid) => Types.ObjectId.isValid(fid))
+    .map((fid) => new Types.ObjectId(fid));
+
+  const flats =
+    validFlatObjectIds.length > 0
+      ? await Flat.find(
+          { _id: { $in: validFlatObjectIds } },
+          "flatNumber"
+        ).lean()
+      : [];
   const flatMap = new Map(flats.map((f) => [f._id.toString(), f.flatNumber]));
 
   const uniqueUserIds = Array.from(userIds);
@@ -350,7 +359,7 @@ export const getMaintenancePayoutsService = async (apartmentId: string) => {
   }
 
   return jobs.map((job: any) => {
-    const flatNum = job.flat ? flatMap.get(job.flat.toString()) : undefined;
+    const flatNum = job.flat ? (flatMap.get(job.flat.toString()) || job.flat) : undefined;
     const techName =
       (job.costReview?.submittedBy ? userMap.get(job.costReview.submittedBy.toString()) : undefined) ||
       (job.assignedStaff ? userMap.get(job.assignedStaff.toString()) : undefined) ||
@@ -392,7 +401,7 @@ export const processMaintenancePayoutService = async (
       _id: new Types.ObjectId(jobId),
       $or: [{ apartment: aptId }, { apartment: apartmentId }],
       "costReview.status": "APPROVED",
-      "costReview.forwardedToRole": "TREASURER",
+      "costReview.forwardedToRole": { $in: ["TREASURER", null] },
     },
     {
       $set: {

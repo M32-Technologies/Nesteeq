@@ -134,6 +134,16 @@ export default function TreasurerExpenses() {
   const [maintenanceSearch, setMaintenanceSearch] = useState("");
   const [maintenancePage, setMaintenancePage] = useState(1);
 
+  // Sync tab with URL parameter if opened with ?tab=maintenance_payouts
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("tab") === "maintenance_payouts") {
+        setActiveTab("maintenance_payouts");
+      }
+    }
+  }, []);
+
   // Search, Filter & Pagination
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
