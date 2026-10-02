@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   X,
   Clock,
@@ -69,6 +69,7 @@ export interface ResidentComplaintItem {
   } | null;
   completionOtp?: string | null;
   images?: string[];
+  photos?: string[];
   attachments?: string[];
   createdAt: string;
   updatedAt?: string;
@@ -118,6 +119,36 @@ export function ResidentComplaintDetailsDrawer({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isDrawerOpen, selectedPhoto, onClose]);
 
+  const uniquePhotos: string[] = useMemo(() => {
+    if (!complaint) return [];
+    const candidateList =
+      Array.isArray(complaint.images) && complaint.images.length > 0
+        ? complaint.images
+        : Array.isArray(complaint.photos) && complaint.photos.length > 0
+        ? complaint.photos
+        : Array.isArray(complaint.attachments)
+        ? complaint.attachments
+        : [];
+
+    const seen = new Set<string>();
+    const result: string[] = [];
+
+    for (const raw of candidateList) {
+      if (!raw) continue;
+      const resolved = getMediaUrl(String(raw).trim());
+      if (!resolved) continue;
+
+      const key = resolved.split("/").pop()?.split("?")[0]?.toLowerCase() || resolved;
+
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(resolved);
+      }
+    }
+
+    return result.length > 0 ? result : Array.from(new Set(candidateList.filter(Boolean)));
+  }, [complaint]);
+
   if (!isDrawerOpen || !complaint) return null;
 
   const locationMatch = complaint.description.match(/\[Location:\s*([^\]]+)\]/i);
@@ -132,30 +163,6 @@ export function ResidentComplaintDetailsDrawer({
     .replace(/\[Location:\s*[^\]]+\]/gi, "")
     .replace(/\[Attached Photo Reference:[^\]]+\]/gi, "")
     .trim();
-
-  // Prefer images array if present; otherwise fallback to attachments
-  const candidateList =
-    Array.isArray(complaint.images) && complaint.images.length > 0
-      ? complaint.images
-      : Array.isArray(complaint.attachments) && complaint.attachments.length > 0
-      ? complaint.attachments
-      : [];
-
-  const seen = new Set<string>();
-  const uniquePhotos: string[] = [];
-
-  for (const raw of candidateList) {
-    if (!raw) continue;
-    const resolved = getMediaUrl(String(raw).trim());
-    if (!resolved) continue;
-
-    const key = resolved.split("/").pop()?.split("?")[0]?.toLowerCase() || resolved;
-
-    if (!seen.has(key)) {
-      seen.add(key);
-      uniquePhotos.push(resolved);
-    }
-  }
 
   const status = (complaint.status || "PENDING").toUpperCase();
   const isTerminalNegative = status === "REJECTED" || status === "CANCELLED";
