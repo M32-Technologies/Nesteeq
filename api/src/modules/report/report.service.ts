@@ -792,12 +792,13 @@ export const getReportsOverview = async (
   }
 
   for (const item of maintenanceDocs) {
-    const staffId = typeof (item as any).assignedStaff === "object"
-      ? (item as any).assignedStaff?._id?.toString() || (item as any).assignedStaff?.id
-      : (item as any).assignedStaff ||
-        (typeof item.assignedTo === "object"
-          ? (item.assignedTo as any)?._id?.toString() || (item.assignedTo as any)?.id
-          : item.assignedTo);
+    const anyItem = item as any;
+    const staffId = typeof anyItem.assignedStaff === "object"
+      ? anyItem.assignedStaff?._id?.toString() || anyItem.assignedStaff?.id
+      : anyItem.assignedStaff ||
+        (typeof anyItem.assignedTo === "object"
+          ? anyItem.assignedTo?._id?.toString() || anyItem.assignedTo?.id
+          : anyItem.assignedTo);
 
     if (!staffId) continue;
 
