@@ -28,6 +28,8 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1145.0",
+    "@aws-sdk/s3-request-presigner": "^3.1145.0",
     "@better-auth/mongo-adapter": "^1.6.26",
     "@getbrevo/brevo": "^6.0.3",
     "bcryptjs": "^3.0.3",

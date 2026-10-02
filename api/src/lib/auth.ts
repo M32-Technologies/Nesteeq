@@ -8,6 +8,7 @@ import { emailService } from "../services/EmailService.js"
 import { Apartment } from "../modules/apartment/apartment.model.js"
 import { isValidObjectId } from "mongoose"
 import { emitUserForceLogout } from "../socket/socket.js"
+import { S3Service } from "../modules/upload/s3.service.js"
 
 export const auth = betterAuth({
   database: mongodbAdapter(getAuthDB(), {
@@ -172,9 +173,19 @@ export const auth = betterAuth({
         }
       }
 
+      let avatarUrl = user.image;
+      if (avatarUrl && !avatarUrl.startsWith("http") && !avatarUrl.startsWith("data:")) {
+        try {
+          avatarUrl = await S3Service.generatePresignedGetUrl(avatarUrl, 60 * 60 * 24);
+        } catch {
+          // Keep original avatar if S3 lookup fails
+        }
+      }
+
       return {
         user: {
           ...user,
+          image: avatarUrl,
           apartmentId: resolvedApartmentId ?? null,
           apartmentStatus,
           inactiveReason,
@@ -192,3 +203,4 @@ export const auth = betterAuth({
     },
   },
 })
+

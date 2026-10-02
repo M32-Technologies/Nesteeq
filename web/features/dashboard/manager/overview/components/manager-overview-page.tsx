@@ -99,8 +99,8 @@ export default function ManagerOverviewPage() {
     <div className="space-y-6">
       {/* 1. HERO OPERATIONAL HEADER */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-2.5">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2.5">
             {isApartmentLoading ? (
               <div className="h-8 w-48 animate-pulse rounded-lg bg-slate-200" />
             ) : (
@@ -109,30 +109,30 @@ export default function ManagerOverviewPage() {
               </h1>
             )}
           </div>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-slate-500 max-w-2xl">
             Real-time management console for unit occupancy, gate security, deliveries, and community services.
           </p>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
           <Link
             href="/property-manager/users/invite"
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#0F5F45] px-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0B4D38] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0F5F45] focus-visible:ring-offset-2"
+            className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-[#0F5F45] px-3 sm:px-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0B4D38] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0F5F45] focus-visible:ring-offset-2"
           >
             <UserPlus size={15} strokeWidth={2.2} />
             Invite Resident
           </Link>
           <Link
             href="/property-manager/property"
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 text-sm font-semibold text-slate-800 shadow-xs transition hover:bg-slate-50 focus:outline-none"
+            className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-slate-300 bg-white px-3 sm:px-3.5 text-sm font-semibold text-slate-800 shadow-xs transition hover:bg-slate-50 focus:outline-none"
           >
             <Building2 size={15} strokeWidth={2.2} />
             Manage Property
           </Link>
           <Link
             href="/property-manager/announcements"
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 text-sm font-semibold text-slate-800 shadow-xs transition hover:bg-slate-50 focus:outline-none"
+            className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-slate-300 bg-white px-3 sm:px-3.5 text-sm font-semibold text-slate-800 shadow-xs transition hover:bg-slate-50 focus:outline-none"
           >
             <Megaphone size={15} strokeWidth={2.2} />
             Post Notice

@@ -308,6 +308,14 @@ const maintenanceSchema = new Schema(
       type: Date,
       default: null,
     },
+    beforeImages: {
+      type: [String],
+      default: [],
+    },
+    afterImages: {
+      type: [String],
+      default: [],
+    },
     estimatedCost: {
       type: Number,
       min: 0,

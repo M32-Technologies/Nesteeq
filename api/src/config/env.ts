@@ -20,6 +20,12 @@ const razorPaySecret = (process.env.RAZORPAY_KEY_SECRET || "").trim();
 
 const redisUrl = (process.env.REDIS_URL || "").trim();
 
+
+const awsRegion = (process.env.AWS_REGION || "").trim();
+const awsAccessKeyId = (process.env.AWS_ACCESS_KEY_ID || "").trim();
+const awsSecretAccessKey = (process.env.AWS_SECRET_ACCESS_KEY || "").trim();
+const awsS3BucketName = (process.env.AWS_S3_BUCKET_NAME || "").trim();
+
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? "development",
   port: Number((process.env.PORT ?? "6001").trim()),
@@ -31,6 +37,10 @@ export const env = {
   brevoSenderEmail,
   brevoSenderName,
   razorPayKeyId,
-  razorPaySecret ,
+  razorPaySecret,
   redisUrl,
+  awsRegion,
+  awsAccessKeyId,
+  awsSecretAccessKey,
+  awsS3BucketName,
 };
