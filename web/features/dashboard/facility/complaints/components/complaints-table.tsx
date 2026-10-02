@@ -1,7 +1,9 @@
 "use client"
 
-import { Eye } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Eye, MoreVertical, Pencil, UserCheck } from "lucide-react"
 
+import type { ComplaintDrawerMode } from "@/features/dashboard/facility/complaints/components/complaint-details-drawer"
 import type {
   Complaint,
 } from "@/features/dashboard/facility/complaints/types/complaints.types"
@@ -13,7 +15,7 @@ import {
 
 interface ComplaintsTableProps {
   complaints: Complaint[]
-  onSelectComplaint: (id: string) => void
+  onSelectComplaint: (id: string, mode?: ComplaintDrawerMode) => void
 }
 
 const statusBadgeStyles: Record<string, string> = {
@@ -43,6 +45,14 @@ export function ComplaintsTable({
   complaints,
   onSelectComplaint,
 }: ComplaintsTableProps) {
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const handleClickOutside = () => setOpenDropdownId(null)
+    document.addEventListener("click", handleClickOutside)
+    return () => document.removeEventListener("click", handleClickOutside)
+  }, [])
+
   return (
     <>
       {/* Desktop Table View */}
@@ -87,7 +97,7 @@ export function ComplaintsTable({
               return (
                 <tr
                   key={complaint._id}
-                  onClick={() => onSelectComplaint(complaint._id)}
+                  onClick={() => onSelectComplaint(complaint._id, "details")}
                   className="group cursor-pointer transition hover:bg-slate-50/80"
                 >
                   {/* ID */}
@@ -158,17 +168,61 @@ export function ComplaintsTable({
 
                   {/* Action */}
                   <td className="py-3.5 pl-3 pr-5 text-center">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onSelectComplaint(complaint._id)
-                      }}
-                      className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs transition hover:border-[#0F5F45] hover:bg-[#0F5F45]/5 hover:text-[#0F5F45]"
-                      aria-label="View complaint details"
-                    >
-                      <Eye size={15} />
-                    </button>
+                    <div className="relative inline-block text-left" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpenDropdownId((prev) => (prev === complaint._id ? null : complaint._id))
+                        }
+                        className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs transition hover:border-[#0F5F45] hover:bg-[#0F5F45]/5 hover:text-[#0F5F45]"
+                        aria-label="Actions"
+                        aria-haspopup="true"
+                        aria-expanded={openDropdownId === complaint._id}
+                      >
+                        <MoreVertical size={16} />
+                      </button>
+
+                      {openDropdownId === complaint._id && (
+                        <div
+                          className="absolute right-0 z-30 mt-1 w-44 origin-top-right rounded-lg border border-slate-200 bg-white py-1 shadow-lg ring-1 ring-black/5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenDropdownId(null)
+                              onSelectComplaint(complaint._id, "details")
+                            }}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                          >
+                            <Eye size={14} className="text-slate-400" />
+                            View Details
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenDropdownId(null)
+                              onSelectComplaint(complaint._id, "assign")
+                            }}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                          >
+                            <UserCheck size={14} className="text-slate-400" />
+                            Assign Technician
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenDropdownId(null)
+                              onSelectComplaint(complaint._id, "status")
+                            }}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                          >
+                            <Pencil size={14} className="text-slate-400" />
+                            edit
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </td>
                 </tr>
               )
@@ -204,7 +258,7 @@ export function ComplaintsTable({
           return (
             <article
               key={complaint._id}
-              onClick={() => onSelectComplaint(complaint._id)}
+              onClick={() => onSelectComplaint(complaint._id, "details")}
               className="cursor-pointer p-4 transition hover:bg-slate-50/70"
             >
               <div className="flex items-start justify-between gap-3">
@@ -222,17 +276,61 @@ export function ComplaintsTable({
                   </h2>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onSelectComplaint(complaint._id)
-                  }}
-                  className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs"
-                  aria-label="View complaint details"
-                >
-                  <Eye size={15} />
-                </button>
+                <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOpenDropdownId((prev) => (prev === complaint._id ? null : complaint._id))
+                    }
+                    className="flex size-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs hover:border-[#0F5F45] hover:text-[#0F5F45]"
+                    aria-label="Actions"
+                    aria-haspopup="true"
+                    aria-expanded={openDropdownId === complaint._id}
+                  >
+                    <MoreVertical size={16} />
+                  </button>
+
+                  {openDropdownId === complaint._id && (
+                    <div
+                      className="absolute right-0 z-30 mt-1 w-44 origin-top-right rounded-lg border border-slate-200 bg-white py-1 shadow-lg ring-1 ring-black/5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenDropdownId(null)
+                          onSelectComplaint(complaint._id, "details")
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                      >
+                        <Eye size={14} className="text-slate-400" />
+                        View Details
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenDropdownId(null)
+                          onSelectComplaint(complaint._id, "assign")
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                      >
+                        <UserCheck size={14} className="text-slate-400" />
+                        Assign Technician
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenDropdownId(null)
+                          onSelectComplaint(complaint._id, "status")
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                      >
+                        <Pencil size={14} className="text-slate-400" />
+                        edit
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {complaint.description ? (

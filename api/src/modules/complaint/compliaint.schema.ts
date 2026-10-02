@@ -73,6 +73,10 @@ export const updateComplaintBodySchema = z
       .optional(),
     category: z.enum(complaintCategories).optional(),
     priority: z.enum(complaintPriorities).optional(),
+    assignedStaff: z.string().trim().optional().nullable(),
+    assignedTo: z.string().trim().optional().nullable(),
+    technicianId: z.string().trim().optional().nullable(),
+    status: z.enum(complaintStatuses).or(z.string()).optional().nullable(),
     estimatedCost: costSchema.optional(),
     images: z.array(z.string().trim()).optional(),
     attachments: z.array(z.string().trim()).optional(),
@@ -90,12 +94,20 @@ export const updateComplaintBodySchema = z
       priority?: (typeof complaintPriorities)[number];
       estimatedCost?: number;
       remarks?: string;
+      assignedStaff?: string;
+      assignedTo?: string;
+      technicianId?: string;
+      status?: string;
     } = {};
     if (data.title !== undefined) res.title = data.title;
     if (data.description !== undefined) res.description = data.description;
     if (data.category !== undefined) res.category = data.category;
     if (data.priority !== undefined) res.priority = data.priority;
     if (data.estimatedCost !== undefined) res.estimatedCost = data.estimatedCost;
+    if ((data as any).assignedStaff !== undefined) res.assignedStaff = (data as any).assignedStaff;
+    if ((data as any).assignedTo !== undefined) res.assignedTo = (data as any).assignedTo;
+    if ((data as any).technicianId !== undefined) res.technicianId = (data as any).technicianId;
+    if ((data as any).status !== undefined) res.status = (data as any).status;
     const rem = data.remarks || (data as { notes?: string })?.notes;
     if (rem !== undefined) res.remarks = rem;
     return res;
@@ -106,13 +118,25 @@ export const assignComplaintBodySchema = z
     assignedStaff: z.string().trim().min(1, "Assigned staff is required").optional().nullable(),
     assignedTo: z.string().trim().min(1, "Assigned staff is required").optional().nullable(),
     technicianId: z.string().trim().min(1).optional().nullable(),
+    technician: z.string().trim().min(1).optional().nullable(),
+    technicianUserId: z.string().trim().min(1).optional().nullable(),
+    assignedStaffId: z.string().trim().min(1).optional().nullable(),
+    status: z.string().trim().optional().nullable(),
     estimatedCost: costSchema.optional().nullable(),
     remarks: z.string().trim().max(1000).optional().nullable().or(z.literal("")),
     notes: z.string().trim().max(1000).optional().nullable().or(z.literal("")),
   })
   .passthrough()
   .refine(
-    (data) => Boolean(data.assignedStaff || data.assignedTo || data.technicianId),
+    (data) =>
+      Boolean(
+        data.assignedStaff ||
+          data.assignedTo ||
+          data.technicianId ||
+          (data as any).technician ||
+          (data as any).technicianUserId ||
+          (data as any).assignedStaffId
+      ),
     {
       message: "Assigned staff is required",
     }
