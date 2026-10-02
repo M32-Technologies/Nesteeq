@@ -4,6 +4,7 @@ import {
     getCurrentApartmentHandler,
     getPendingApartmentHandler,
     updateCurrentApartmentHandler,
+    getApartmentStatusHandler,
 } from "./apartment.controller.js";
 import { protect, requireRole } from "../../middlewares/authMiddleware.js";
 import { zodValidate } from "../../middlewares/zodValidate.js";
@@ -11,6 +12,7 @@ import { createApartmentSchema, updateApartmentSchema } from "./apartment.valida
 
 const router = express.Router()
 
+router.get("/status", protect, getApartmentStatusHandler)
 router.get("/current", protect, getCurrentApartmentHandler)
 router.get("/pending", protect, getPendingApartmentHandler)
 

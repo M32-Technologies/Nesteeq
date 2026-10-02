@@ -73,6 +73,10 @@
         default: "pending_payment",
         trim: true,
       },
+      inactiveReason: {
+        type: String,
+        trim: true,
+      },
     },
     {
       timestamps: true,

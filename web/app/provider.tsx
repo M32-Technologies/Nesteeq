@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { NotificationSocketListener } from "@/features/notifications";
+import { GlobalApartmentInactiveListener } from "@/components/global-apartment-inactive-listener";
 
 export function QueryProvider({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -20,6 +21,7 @@ export function QueryProvider({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <NotificationSocketListener />
+      <GlobalApartmentInactiveListener />
       {children}
     </QueryClientProvider>
   );

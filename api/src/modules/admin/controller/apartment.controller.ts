@@ -2,6 +2,7 @@ import { Request , Response  } from "express";
 import { catchAsync } from "../../../utils/catchAsync.js";
 import { getAllApartment , getSingleApartment , updateStatusApartment, getApartmentStats, getApartmentAnalytics } from "../services/apartment.service.js";
 import { GetAllApartmentsQuery, ApartmentAnalyticsQuery } from "../validation/apartment.validation.js";
+import { getCurrentApartment } from "../../apartment/apartment.service.js";
 
 
 export const getAllApartmentHandler = catchAsync(
@@ -58,7 +59,7 @@ export const updateStatusHandler = catchAsync(
         
         const apartmentId = req.params.id as string
         
-        const result = await updateStatusApartment(apartmentId , req.body.status)
+        const result = await updateStatusApartment(apartmentId, req.body.status, req.body.reason)
 
         res.status(200).json({
             success : true , 
