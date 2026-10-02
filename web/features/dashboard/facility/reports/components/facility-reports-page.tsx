@@ -23,8 +23,21 @@ import {
 } from "@/features/dashboard/facility/shared/components/facility-ui"
 
 export function FacilityReportsPage() {
-  const [startDate, setStartDate] = useState("")
-  const [endDate, setEndDate] = useState("")
+  const [startDate, setStartDate] = useState(() => {
+    const now = new Date()
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    const year = thirtyDaysAgo.getFullYear()
+    const month = String(thirtyDaysAgo.getMonth() + 1).padStart(2, "0")
+    const day = String(thirtyDaysAgo.getDate()).padStart(2, "0")
+    return `${year}-${month}-${day}`
+  })
+  const [endDate, setEndDate] = useState(() => {
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = String(now.getMonth() + 1).padStart(2, "0")
+    const day = String(now.getDate()).padStart(2, "0")
+    return `${year}-${month}-${day}`
+  })
 
   const queryParams: ReportsQuery = useMemo(
     () => ({
@@ -98,7 +111,7 @@ export function FacilityReportsPage() {
               />
               <MetricCard
                 title="Maintenance Cost"
-                value={reportData.maintenanceSummary?.totalCost ?? 0}
+                value={formatCurrency(reportData.maintenanceSummary?.totalCost ?? 0)}
                 icon={CircleDollarSign}
                 tone="gray"
               />
@@ -106,7 +119,7 @@ export function FacilityReportsPage() {
 
             <div className="rounded-lg border border-[#E2E8EE] bg-white p-6">
               <h2 className="text-base font-semibold text-[#111111]">Technician Performance</h2>
-              {reportData.technicianPerformance?.length === 0 ? (
+              {!reportData.technicianPerformance || reportData.technicianPerformance.length === 0 ? (
                 <EmptyState title="No technician activity" message="Technician work analytics will appear here." />
               ) : (
                 <div className="mt-4 overflow-x-auto">

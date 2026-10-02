@@ -71,11 +71,34 @@ export const applyApartmentScope = (
       throw new AppError("You do not have permission to view reports for this apartment", 403);
     }
 
-    filter[field] = userApartmentId;
+    const aptValues: unknown[] = [userApartmentId];
+    if (ObjectId.isValid(userApartmentId)) {
+      aptValues.push(new ObjectId(userApartmentId));
+    }
+
+    if (field === "apartment") {
+      filter.$or = [
+        { apartment: { $in: aptValues } },
+        { apartmentId: { $in: aptValues } },
+      ];
+    } else {
+      filter[field] = { $in: aptValues };
+    }
     return;
   }
 
   if (query.apartment) {
-    filter[field] = query.apartment;
+    const aptValues: unknown[] = [query.apartment];
+    if (ObjectId.isValid(query.apartment)) {
+      aptValues.push(new ObjectId(query.apartment));
+    }
+    if (field === "apartment") {
+      filter.$or = [
+        { apartment: { $in: aptValues } },
+        { apartmentId: { $in: aptValues } },
+      ];
+    } else {
+      filter[field] = { $in: aptValues };
+    }
   }
 };

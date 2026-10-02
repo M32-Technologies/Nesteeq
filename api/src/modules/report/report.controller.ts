@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { AppError } from "../../utils/AppError.js";
 import { catchAsync } from "../../utils/catchAsync.js";
+import { resolveFacilityManagerApartmentId } from "../facility/facility.service.js";
 import {
   getComplaintReport,
   getCostReport,
@@ -12,15 +13,28 @@ import {
 } from "./report.service.js";
 import type { ReportQuery } from "./report.schema.js";
 
-const getAuthenticatedUser = (req: Request): AuthenticatedReportUser => {
+const getAuthenticatedUser = async (req: Request): Promise<AuthenticatedReportUser> => {
   if (!req.user?.id || !req.user.role) {
     throw new AppError("Authentication required", 401);
+  }
+
+  let apartmentId = req.user.apartmentId ?? null;
+  if (!apartmentId) {
+    try {
+      apartmentId = (await resolveFacilityManagerApartmentId({
+        id: req.user.id,
+        role: req.user.role,
+        apartmentId: req.user.apartmentId,
+      })) ?? null;
+    } catch {
+      // ignore resolution error
+    }
   }
 
   return {
     id: req.user.id,
     role: req.user.role,
-    apartmentId: req.user.apartmentId ?? null,
+    apartmentId,
     flatId: req.user.flatId ?? null,
   };
 };
@@ -28,7 +42,8 @@ const getAuthenticatedUser = (req: Request): AuthenticatedReportUser => {
 const getQuery = (req: Request): ReportQuery => req.query as unknown as ReportQuery;
 
 export const getReportsOverviewHandler = catchAsync(async (req: Request, res: Response) => {
-  const result = await getReportsOverview(getQuery(req), getAuthenticatedUser(req));
+  const user = await getAuthenticatedUser(req);
+  const result = await getReportsOverview(getQuery(req), user);
 
   res.status(200).json({
     success: true,
@@ -37,7 +52,8 @@ export const getReportsOverviewHandler = catchAsync(async (req: Request, res: Re
 });
 
 export const getComplaintReportHandler = catchAsync(async (req: Request, res: Response) => {
-  const result = await getComplaintReport(getQuery(req), getAuthenticatedUser(req));
+  const user = await getAuthenticatedUser(req);
+  const result = await getComplaintReport(getQuery(req), user);
 
   res.status(200).json({
     success: true,
@@ -46,7 +62,8 @@ export const getComplaintReportHandler = catchAsync(async (req: Request, res: Re
 });
 
 export const getMaintenanceReportHandler = catchAsync(async (req: Request, res: Response) => {
-  const result = await getMaintenanceReport(getQuery(req), getAuthenticatedUser(req));
+  const user = await getAuthenticatedUser(req);
+  const result = await getMaintenanceReport(getQuery(req), user);
 
   res.status(200).json({
     success: true,
@@ -55,7 +72,8 @@ export const getMaintenanceReportHandler = catchAsync(async (req: Request, res: 
 });
 
 export const getTechnicianReportHandler = catchAsync(async (req: Request, res: Response) => {
-  const result = await getTechnicianReport(getQuery(req), getAuthenticatedUser(req));
+  const user = await getAuthenticatedUser(req);
+  const result = await getTechnicianReport(getQuery(req), user);
 
   res.status(200).json({
     success: true,
@@ -64,7 +82,8 @@ export const getTechnicianReportHandler = catchAsync(async (req: Request, res: R
 });
 
 export const getCostReportHandler = catchAsync(async (req: Request, res: Response) => {
-  const result = await getCostReport(getQuery(req), getAuthenticatedUser(req));
+  const user = await getAuthenticatedUser(req);
+  const result = await getCostReport(getQuery(req), user);
 
   res.status(200).json({
     success: true,
@@ -73,7 +92,8 @@ export const getCostReportHandler = catchAsync(async (req: Request, res: Respons
 });
 
 export const getPendingWorkReportHandler = catchAsync(async (req: Request, res: Response) => {
-  const result = await getPendingWorkReport(getQuery(req), getAuthenticatedUser(req));
+  const user = await getAuthenticatedUser(req);
+  const result = await getPendingWorkReport(getQuery(req), user);
 
   res.status(200).json({
     success: true,

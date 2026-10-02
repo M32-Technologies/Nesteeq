@@ -23,6 +23,7 @@ import {
   type ReportFilter,
 } from "./report.policy.js";
 import type { ReportQuery } from "./report.schema.js";
+import { resolveFacilityManagerApartmentId } from "../facility/facility.service.js";
 
 const normalizeOptionalString = (value: string | null | undefined): string | undefined => {
   if (!value) return undefined;
@@ -653,7 +654,190 @@ export const getReportsOverview = async (
   query: ReportQuery,
   user: AuthenticatedReportUser
 ) => {
-  const [complaints, maintenance, technicians, costs, pendingWork] = await Promise.all([
+  await ensureCurrentUserExists(user);
+  assertCanViewReports(user);
+
+  let apartmentId = user.apartmentId;
+  if (!apartmentId) {
+    try {
+      apartmentId = (await resolveFacilityManagerApartmentId(user as any)) ?? "";
+      user.apartmentId = apartmentId;
+    } catch {
+      // ignore
+    }
+  }
+
+  const apartmentValues: unknown[] = [apartmentId];
+  if (apartmentId && Types.ObjectId.isValid(apartmentId)) {
+    apartmentValues.push(new Types.ObjectId(apartmentId));
+  }
+
+  const baseApartmentScope: Record<string, unknown> = apartmentId
+    ? {
+        $or: [
+          { apartment: { $in: apartmentValues } },
+          { apartmentId: { $in: apartmentValues } },
+        ],
+      }
+    : {};
+
+  // Determine date range: explicit query dates or default to last 30 days
+  let dateRange = getDateRange(query);
+  const isExplicitDate = Boolean(query.startDate || query.endDate);
+
+  if (!dateRange && !isExplicitDate) {
+    const defaultStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    defaultStart.setHours(0, 0, 0, 0);
+    const defaultEnd = new Date();
+    defaultEnd.setHours(23, 59, 59, 999);
+    dateRange = {
+      $gte: defaultStart,
+      $lte: defaultEnd,
+    };
+  }
+
+  // 1. Complaint aggregation
+  let complaintFilter: Record<string, unknown> = {
+    ...baseApartmentScope,
+    ...(dateRange ? { createdAt: dateRange } : {}),
+  };
+
+  let totalComplaints = await Complaint.countDocuments(complaintFilter);
+  let resolvedComplaints = await Complaint.countDocuments({
+    ...complaintFilter,
+    status: { $in: ["RESOLVED", "CLOSED", "APPROVED"] },
+  });
+  let pendingComplaints = await Complaint.countDocuments({
+    ...complaintFilter,
+    status: { $in: ["PENDING", "UNDER_REVIEW", "ASSIGNED"] },
+  });
+
+  // Fallback to all-time if default 30-day range returned 0 complaints and user did not specify dates
+  if (!isExplicitDate && totalComplaints === 0) {
+    const allTimeCount = await Complaint.countDocuments(baseApartmentScope);
+    if (allTimeCount > 0) {
+      complaintFilter = { ...baseApartmentScope };
+      totalComplaints = allTimeCount;
+      resolvedComplaints = await Complaint.countDocuments({
+        ...baseApartmentScope,
+        status: { $in: ["RESOLVED", "CLOSED", "APPROVED"] },
+      });
+      pendingComplaints = await Complaint.countDocuments({
+        ...baseApartmentScope,
+        status: { $in: ["PENDING", "UNDER_REVIEW", "ASSIGNED"] },
+      });
+    }
+  }
+
+  // 2. Maintenance aggregation
+  let maintenanceFilter: Record<string, unknown> = {
+    ...baseApartmentScope,
+    ...(dateRange ? { createdAt: dateRange } : {}),
+  };
+
+  let totalMaintenance = await Maintenance.countDocuments(maintenanceFilter);
+  let completedMaintenance = await Maintenance.countDocuments({
+    ...maintenanceFilter,
+    status: { $in: ["COMPLETED", "APPROVED", "CLOSED", "WORK_COMPLETED"] },
+  });
+  let inProgressMaintenance = await Maintenance.countDocuments({
+    ...maintenanceFilter,
+    status: { $in: ["IN_PROGRESS", "ASSIGNED", "ON_HOLD", "AWAITING_APPROVAL"] },
+  });
+
+  if (!isExplicitDate && totalMaintenance === 0) {
+    const allTimeMaintCount = await Maintenance.countDocuments(baseApartmentScope);
+    if (allTimeMaintCount > 0) {
+      maintenanceFilter = { ...baseApartmentScope };
+      totalMaintenance = allTimeMaintCount;
+      completedMaintenance = await Maintenance.countDocuments({
+        ...baseApartmentScope,
+        status: { $in: ["COMPLETED", "APPROVED", "CLOSED", "WORK_COMPLETED"] },
+      });
+      inProgressMaintenance = await Maintenance.countDocuments({
+        ...baseApartmentScope,
+        status: { $in: ["IN_PROGRESS", "ASSIGNED", "ON_HOLD", "AWAITING_APPROVAL"] },
+      });
+    }
+  }
+
+  // 3. Maintenance Cost: sum of actualCost (or finalCost / estimatedCost)
+  const maintenanceDocs = await Maintenance.find(maintenanceFilter).lean();
+  const maintenanceCost = maintenanceDocs.reduce((sum, item: any) => {
+    const cost = item.actualCost ?? item.finalCost ?? item.expenseAmount ?? item.estimatedCost ?? 0;
+    return sum + (Number(cost) || 0);
+  }, 0);
+
+  // 4. Technician Performance: group completed/active maintenance jobs by assigned technician
+  const technicianFilter = apartmentId
+    ? {
+        $or: [
+          { apartmentId: { $in: apartmentValues } },
+          { apartment: { $in: apartmentValues } },
+        ],
+      }
+    : {};
+
+  const technicians = await Technician.find(technicianFilter).lean();
+  const techMap = new Map<string, { technicianId: string; name: string; completedJobs: number; activeJobs: number }>();
+
+  for (const tech of technicians) {
+    const key = tech.userId || tech._id.toString();
+    techMap.set(key, {
+      technicianId: key,
+      name: tech.fullName || (tech as any).name || "Technician",
+      completedJobs: 0,
+      activeJobs: 0,
+    });
+  }
+
+  for (const item of maintenanceDocs) {
+    const staffId = typeof (item as any).assignedStaff === "object"
+      ? (item as any).assignedStaff?._id?.toString() || (item as any).assignedStaff?.id
+      : (item as any).assignedStaff ||
+        (typeof item.assignedTo === "object"
+          ? (item.assignedTo as any)?._id?.toString() || (item.assignedTo as any)?.id
+          : item.assignedTo);
+
+    if (!staffId) continue;
+
+    if (!techMap.has(staffId)) {
+      const found = technicians.find(t => t.userId === staffId || t._id.toString() === staffId);
+      techMap.set(staffId, {
+        technicianId: staffId,
+        name: found ? found.fullName || (found as any).name || "Technician" : "Technician",
+        completedJobs: 0,
+        activeJobs: 0,
+      });
+    }
+
+    const entry = techMap.get(staffId)!;
+    const isCompleted = ["COMPLETED", "APPROVED", "CLOSED", "WORK_COMPLETED"].includes(item.status);
+    if (isCompleted) {
+      entry.completedJobs += 1;
+    } else {
+      entry.activeJobs += 1;
+    }
+  }
+
+  for (const [key, entry] of techMap.entries()) {
+    if (entry.name === "Technician") {
+      const tDoc = await Technician.findOne({
+        $or: [
+          { userId: key },
+          ...(Types.ObjectId.isValid(key) ? [{ _id: new Types.ObjectId(key) }] : []),
+        ],
+      }).lean();
+      if (tDoc) {
+        entry.name = tDoc.fullName || (tDoc as any).name || "Technician";
+      }
+    }
+  }
+
+  const technicianPerformance = Array.from(techMap.values());
+
+  // Also query legacy reports for backward compatibility
+  const [complaints, maintenance, techReport, costs, pendingWork] = await Promise.all([
     getComplaintReport(query, user),
     getMaintenanceReport(query, user),
     getTechnicianReport(query, user),
@@ -662,10 +846,23 @@ export const getReportsOverview = async (
   ]);
 
   return {
+    complaintsSummary: {
+      total: totalComplaints,
+      resolved: resolvedComplaints,
+      pending: pendingComplaints,
+      averageResolutionTimeHours: 0,
+    },
+    maintenanceSummary: {
+      total: totalMaintenance,
+      completed: completedMaintenance,
+      inProgress: inProgressMaintenance,
+      totalCost: maintenanceCost,
+    },
+    technicianPerformance,
     filters: {
       startDate: query.startDate ?? null,
       endDate: query.endDate ?? null,
-      apartment: query.apartment ?? null,
+      apartment: query.apartment ?? apartmentId,
       technician: query.technician ?? null,
       category: query.category ?? null,
       complaintStatus: query.complaintStatus ?? null,
@@ -674,7 +871,7 @@ export const getReportsOverview = async (
     },
     complaints,
     maintenance,
-    technicians,
+    technicians: techReport,
     costs,
     pendingWork,
   };
