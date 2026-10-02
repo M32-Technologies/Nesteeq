@@ -5,6 +5,7 @@ import { AppError } from "../utils/AppError.js";
 type ErrorResponse = {
   success: false;
   status: string;
+  code?: string;
   message: string;
   details?: unknown;
   stack?: string;
@@ -71,6 +72,10 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
         ? error.message
         : appError.message,
   };
+
+  if (appError.code !== undefined) {
+    response.code = appError.code;
+  }
 
   if (appError.details !== undefined) {
     response.details = appError.details;

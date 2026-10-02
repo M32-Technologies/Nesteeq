@@ -14,6 +14,9 @@ type AuthSessionUser = {
   email?: string | null
   image?: string | null
   role?: string | null
+  apartmentStatus?: string | null
+  inactiveReason?: string | null
+  apartmentName?: string | null
 }
 
 type AuthSessionResponse = {
@@ -23,6 +26,9 @@ type AuthSessionResponse = {
 
 export type DashboardSession = {
   role: DashboardRole
+  apartmentStatus?: string | null
+  inactiveReason?: string | null
+  apartmentName?: string | null
   user: {
     name: string
     email: string
@@ -91,6 +97,9 @@ export async function getCurrentDashboardSession() {
 
   return {
     role,
+    apartmentStatus: data.user.apartmentStatus ?? null,
+    inactiveReason: data.user.inactiveReason ?? null,
+    apartmentName: data.user.apartmentName ?? null,
     user: {
       name,
       email: data.user.email || "",

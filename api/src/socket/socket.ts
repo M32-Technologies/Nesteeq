@@ -148,3 +148,47 @@ export const sendRealtimeAlertUpdate = (
 
   return true;
 };
+
+export const emitApartmentStatusChanged = (
+  apartmentId: string,
+  data: {
+    apartmentId: string;
+    status: "active" | "inactive";
+    reason?: string;
+    apartmentName?: string;
+  }
+): boolean => {
+  if (!io) return false;
+  io.to(`apartment:${apartmentId}`).emit("apartment:status_changed", data);
+  if (data.status === "inactive") {
+    io.to(`apartment:${apartmentId}`).emit("apartment_deactivated", data);
+  }
+  return true;
+};
+
+export const emitUserForceLogout = (
+  userId: string,
+  data?: { reason?: string; banned?: boolean }
+): boolean => {
+  if (!io) return false;
+  const userRoom = `user:${userId}`;
+  const payload = {
+    userId,
+    reason: data?.reason || "Your account has been suspended by an administrator.",
+    banned: data?.banned ?? true,
+    timestamp: new Date().toISOString(),
+  };
+
+  // Broadcast to all active sockets belonging to this user
+  io.to(userRoom).emit("user:force_logout", payload);
+  io.to(userRoom).emit("user_banned", payload);
+
+  // Proactively disconnect user's sockets after a brief grace period so event delivery completes
+  setTimeout(() => {
+    if (!io) return;
+    io.in(userRoom).disconnectSockets(true);
+  }, 1500);
+
+  return true;
+};
+
