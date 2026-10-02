@@ -26,6 +26,7 @@ import {
   Download,
   Printer,
   Share2,
+  Search,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -119,6 +120,7 @@ export function ResidentBillsPage() {
 
   const [selectedScope, setSelectedScope] = useState<"ALL" | "COMMON" | "SEPARATE">("ALL");
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
   const [invoicesPage, setInvoicesPage] = useState(1);
   const [receiptsPage, setReceiptsPage] = useState(1);
   const [selectedBill, setSelectedBill] = useState<ResidentBillItem | null>(null);
@@ -601,6 +603,28 @@ export function ResidentBillsPage() {
           const type = b.billType || "MONTHLY_MAINTENANCE";
           if (type !== selectedCategory) return false;
         }
+        // 3. Search query filter
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase().trim();
+          const title = (b.title || "").toLowerCase();
+          const period = (b.billingPeriod || "").toLowerCase();
+          const desc = (b.description || "").toLowerCase();
+          const type = (b.billType || "").toLowerCase();
+          const typeLabel = (BILL_TYPE_CONFIG[b.billType || ""]?.label || "").toLowerCase();
+          const id = (b._id || "").toLowerCase();
+          const shortId = id.slice(-6);
+
+          const matches =
+            title.includes(q) ||
+            period.includes(q) ||
+            desc.includes(q) ||
+            type.includes(q) ||
+            typeLabel.includes(q) ||
+            id.includes(q) ||
+            shortId.includes(q);
+
+          if (!matches) return false;
+        }
         return true;
       })
       .sort((a, b) => {
@@ -626,7 +650,7 @@ export function ResidentBillsPage() {
         const timeB = new Date(b.createdAt || b.dueDate || 0).getTime();
         return timeB - timeA;
       });
-  }, [bills, selectedScope, selectedCategory]);
+  }, [bills, selectedScope, selectedCategory, searchQuery]);
 
   const totalInvoicePages = Math.ceil(filteredBills.length / ITEMS_PER_PAGE) || 1;
   const paginatedBills = useMemo(() => {
@@ -912,8 +936,8 @@ export function ResidentBillsPage() {
           </div>
         </div>
 
-        {/* Scope Filter Tabs (All / Society Common / Flat Separate) */}
-        <div className="border-b border-slate-200/80 bg-slate-50/70 px-5 py-3 flex flex-wrap items-center justify-between gap-3">
+        {/* Scope Filter Tabs & Search Bar */}
+        <div className="border-b border-slate-200/80 bg-slate-50/70 px-5 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-2 max-w-full overflow-x-auto [&::-webkit-scrollbar]:hidden">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider shrink-0">
               Bill Scope:
@@ -966,12 +990,32 @@ export function ResidentBillsPage() {
             </div>
           </div>
 
-          <div className="text-xs text-slate-500 hidden sm:block">
-            {selectedScope === "COMMON"
-              ? "Showing shared society expenses distributed by Treasurer"
-              : selectedScope === "SEPARATE"
-              ? `Showing separate individual bills assigned to ${flatUnitName}`
-              : "Showing all common society and flat separate bills"}
+          {/* Search Bar */}
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search bills, title, period..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setInvoicesPage(1);
+              }}
+              className="h-8 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-7 text-xs font-medium text-slate-800 placeholder:text-slate-400 outline-none transition hover:border-slate-300 focus:border-[#07584F] focus:ring-1 focus:ring-[#07584F]"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  setInvoicesPage(1);
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full cursor-pointer"
+                aria-label="Clear search"
+              >
+                <X className="size-3" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -1055,7 +1099,32 @@ export function ResidentBillsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {paginatedBills.map((bill) => {
+                {paginatedBills.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="px-5 py-12 text-center">
+                      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500 mb-2">
+                        <Search className="size-5" />
+                      </div>
+                      <p className="text-sm font-semibold text-slate-800">No matching bills found</p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Try adjusting your search terms or filters
+                      </p>
+                      {searchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSearchQuery("");
+                            setInvoicesPage(1);
+                          }}
+                          className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[#07584F] hover:underline cursor-pointer"
+                        >
+                          Clear search query
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedBills.map((bill) => {
                     const isPaid = bill.status === "PAID";
                     const isOverdue = bill.status === "OVERDUE";
                     const typeCfg =
@@ -1199,7 +1268,7 @@ export function ResidentBillsPage() {
                         </td>
                       </tr>
                     );
-                  })}
+                  }))}
               </tbody>
             </table>
 

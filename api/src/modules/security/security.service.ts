@@ -84,9 +84,17 @@ export const getUserSummariesByIds = async (userIds: string[]) => {
   return map
 }
 
-export const getApartmentFlatsService = async (apartmentId: string) => {
+export const getApartmentFlatsService = async (
+  apartmentId: string,
+  options?: { occupiedOnly?: boolean }
+) => {
+  const flatFilter: Record<string, unknown> = { apartmentId, status: "active" };
+  if (options?.occupiedOnly) {
+    flatFilter.occupancyStatus = { $nin: ["VACANT", "vacant"] };
+  }
+
   const [flats, residents] = await Promise.all([
-    Flat.find({ apartmentId, status: "active" }).select("_id flatNumber occupancyStatus").sort({ flatNumber: 1 }).lean<LeanFlat[]>(),
+    Flat.find(flatFilter).select("_id flatNumber occupancyStatus").sort({ flatNumber: 1 }).lean<LeanFlat[]>(),
     ResidentModel.find({ apartmentId, status: "active" }).select("_id userId flatId residentType phoneNumber status").sort({ joinedAt: -1 }).lean<LeanResident[]>(),
   ])
   const usersById = await getUserSummariesByIds(residents.map((r) => r.userId))
@@ -106,13 +114,24 @@ export const getApartmentFlatsService = async (apartmentId: string) => {
     })
     residentsByFlat.set(fId, list)
   }
+
+  let mappedFlats = flats.map((f) => ({
+    _id: toId(f._id),
+    flatNumber: f.flatNumber,
+    occupancyStatus: f.occupancyStatus ?? null,
+    residents: residentsByFlat.get(toId(f._id)) ?? [],
+  }))
+
+  if (options?.occupiedOnly) {
+    mappedFlats = mappedFlats.filter(
+      (f) =>
+        f.occupancyStatus?.toUpperCase() !== "VACANT" &&
+        f.residents.some((r) => r.name && r.name.trim().length > 0)
+    )
+  }
+
   return {
-    flats: flats.map((f) => ({
-      _id: toId(f._id),
-      flatNumber: f.flatNumber,
-      occupancyStatus: f.occupancyStatus ?? null,
-      residents: residentsByFlat.get(toId(f._id)) ?? [],
-    })),
+    flats: mappedFlats,
   }
 }
 
@@ -469,6 +488,9 @@ export const getSecuritySummaryService = async (apartmentId: string): Promise<Se
   }
 }
 
-export const getSecurityFlatsService = (apartmentId: string) => getApartmentFlatsService(apartmentId)
+export const getSecurityFlatsService = (
+  apartmentId: string,
+  options?: { occupiedOnly?: boolean }
+) => getApartmentFlatsService(apartmentId, options)
 export const getSecurityResidentsService = ({ apartmentId, search, page, limit }: SecurityResidentsQuery) =>
   getApartmentResidentsService({ apartmentId, search, page, limit })
