@@ -1,4 +1,4 @@
-﻿import fs from "fs"
+import fs from "fs"
 import multer from "multer"
 import path from "path"
 import type { Request, Response, NextFunction } from "express"
@@ -39,7 +39,7 @@ const evidenceStorage = multer.diskStorage({
   },
 })
 
-export const uploadEvidenceMiddleware = multer({
+const evidenceUploadMulter = multer({
   storage: evidenceStorage,
   limits: {
     fileSize: 10 * 1024 * 1024,
@@ -54,7 +54,48 @@ export const uploadEvidenceMiddleware = multer({
       cb(new AppError("Only image and PDF files are allowed as evidence", 400))
     }
   },
-}).single("evidence")
+})
+
+export const uploadEvidenceFields = evidenceUploadMulter.fields([
+  { name: "receipt", maxCount: 1 },
+  { name: "file", maxCount: 1 },
+  { name: "image", maxCount: 1 },
+  { name: "bill", maxCount: 1 },
+  { name: "evidence", maxCount: 1 },
+])
+
+export const uploadEvidenceMiddleware = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  evidenceUploadMulter.any()(req, res, (err: unknown) => {
+    if (err) {
+      return next(err)
+    }
+    if (!req.file && req.files) {
+      if (Array.isArray(req.files) && req.files.length > 0) {
+        const preferred =
+          req.files.find((f) =>
+            ["receipt", "file", "image", "bill", "evidence"].includes(
+              f.fieldname.toLowerCase()
+            )
+          ) || req.files[0]
+        req.file = preferred
+      } else {
+        const filesObj = req.files as Record<string, Express.Multer.File[]>
+        req.file =
+          filesObj.receipt?.[0] ||
+          filesObj.file?.[0] ||
+          filesObj.image?.[0] ||
+          filesObj.bill?.[0] ||
+          filesObj.evidence?.[0] ||
+          Object.values(filesObj).flat()[0]
+      }
+    }
+    next()
+  })
+}
 
 const imageUploadMulter = multer({
   storage,

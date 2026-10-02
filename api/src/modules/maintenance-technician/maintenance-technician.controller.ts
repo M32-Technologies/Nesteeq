@@ -115,7 +115,29 @@ export const uploadEvidenceController = catchAsync(
     const technicianId = getAuthenticatedTechnicianId(req)
     const extraTechId = getExtraTechnicianId(req)
     const jobId = String(req.params.jobId)
-    const data = await uploadEvidence(jobId, req.file, technicianId, extraTechId)
+
+    let file = req.file
+    if (!file && req.files) {
+      if (Array.isArray(req.files) && req.files.length > 0) {
+        file =
+          req.files.find((f) =>
+            ["receipt", "file", "image", "bill", "evidence"].includes(
+              f.fieldname.toLowerCase()
+            )
+          ) || req.files[0]
+      } else {
+        const filesObj = req.files as Record<string, Express.Multer.File[]>
+        file =
+          filesObj.receipt?.[0] ||
+          filesObj.file?.[0] ||
+          filesObj.image?.[0] ||
+          filesObj.bill?.[0] ||
+          filesObj.evidence?.[0] ||
+          Object.values(filesObj).flat()[0]
+      }
+    }
+
+    const data = await uploadEvidence(jobId, file, technicianId, extraTechId)
 
     res.status(200).json({
       success: true,
