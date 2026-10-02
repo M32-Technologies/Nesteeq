@@ -35,7 +35,10 @@ import {
   readOptionalNumber,
   readRequiredFormString,
 } from "@/features/dashboard/facility/shared/utils/form-helpers"
-import { ComplaintDetailsDrawer } from "@/features/dashboard/facility/complaints/components/complaint-details-drawer"
+import {
+  ComplaintDetailsDrawer,
+  type ComplaintDrawerMode,
+} from "@/features/dashboard/facility/complaints/components/complaint-details-drawer"
 import {
   ComplaintsFilters,
   type ComplaintSortKey,
@@ -138,6 +141,15 @@ export function FacilityComplaintsPage({
   const [selectedComplaintId, setSelectedComplaintId] = useState<string | null>(
     null
   )
+  const [drawerMode, setDrawerMode] = useState<ComplaintDrawerMode>("details")
+
+  const handleSelectComplaint = (
+    id: string,
+    mode: ComplaintDrawerMode = "details"
+  ) => {
+    setSelectedComplaintId(id)
+    setDrawerMode(mode)
+  }
 
   const complaintQuery = useMemo(
     () => ({
@@ -170,7 +182,10 @@ export function FacilityComplaintsPage({
 
   const handleSuccess = async (message?: string) => {
     toast.success(message || "Complaint updated")
-    await queryClient.invalidateQueries({ queryKey: ["facility-complaints"] })
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["complaints"] }),
+      queryClient.invalidateQueries({ queryKey: ["facility-complaints"] }),
+    ])
   }
 
   const assignMutation = useMutation({
@@ -256,6 +271,9 @@ export function FacilityComplaintsPage({
       description?: string
       priority?: string
       assignedTo?: string
+      assignedStaff?: string
+      technicianId?: string
+      technician?: string
       complaintId?: string
     }) => createMaintenance(payload),
     onSuccess: () => void handleSuccess("Maintenance task created"),
@@ -284,25 +302,29 @@ export function FacilityComplaintsPage({
     if (!selectedComplaint) return
 
     const formData = new FormData(event.currentTarget)
-    const assignedTo =
+    const selectedTechnicianId =
+      readRequiredFormString(formData, "technicianId") ||
       readRequiredFormString(formData, "assignedStaff") ||
-      readRequiredFormString(formData, "assignedTo")
+      readRequiredFormString(formData, "assignedTo") ||
+      readRequiredFormString(formData, "technician") ||
+      readRequiredFormString(formData, "technicianUserId")
 
-    if (!assignedTo) {
+    if (!selectedTechnicianId) {
       toast.error("Please select a technician")
       return
     }
 
-    const remarks = readFormString(formData, "remarks")
+    const remarks = readFormString(formData, "remarks") || readFormString(formData, "notes")
 
     assignMutation.mutate({
       id: selectedComplaint._id,
       payload: {
-        assignedStaff: assignedTo,
-        assignedTo,
-        technicianId: assignedTo,
-        notes: remarks,
-        remarks,
+        technicianId: selectedTechnicianId,
+        assignedStaff: selectedTechnicianId,
+        assignedTo: selectedTechnicianId,
+        status: "ASSIGNED",
+        remarks: remarks || undefined,
+        notes: remarks || undefined,
       },
     })
   }
@@ -389,13 +411,22 @@ export function FacilityComplaintsPage({
     if (!selectedComplaint) return
 
     const formData = new FormData(event.currentTarget)
+    const assignedStaffId =
+      readFormString(formData, "assignedStaff") ||
+      readFormString(formData, "technicianId") ||
+      readFormString(formData, "assignedTo") ||
+      readFormString(formData, "technician") ||
+      readFormString(formData, "technicianUserId")
 
     createMaintenanceMutation.mutate({
       title: selectedComplaint.title,
       description: selectedComplaint.description,
       priority: selectedComplaint.priority,
       complaintId: selectedComplaint._id,
-      assignedTo: readFormString(formData, "assignedStaff"),
+      assignedTo: assignedStaffId,
+      assignedStaff: assignedStaffId,
+      technicianId: assignedStaffId,
+      technician: assignedStaffId,
     })
   }
 
@@ -456,7 +487,10 @@ export function FacilityComplaintsPage({
         ) : (
           <ComplaintsTable
             complaints={visibleComplaints}
-            onSelectComplaint={setSelectedComplaintId}
+            onSelectComplaint={handleSelectComplaint}
+            onViewDetails={(complaint) => handleSelectComplaint(complaint._id, "details")}
+            onAssignTechnician={(complaint) => handleSelectComplaint(complaint._id, "assign")}
+            onUpdateStatus={(complaint) => handleSelectComplaint(complaint._id, "status")}
           />
         )}
       </div>
@@ -464,13 +498,18 @@ export function FacilityComplaintsPage({
 
       <ComplaintDetailsDrawer
         open={Boolean(selectedComplaintId)}
+        mode={drawerMode}
+        onModeChange={setDrawerMode}
         complaint={selectedComplaint}
         isLoading={detailQuery.isPending}
         isError={detailQuery.isError}
         error={detailQuery.error}
         isRetrying={detailQuery.isFetching}
         onRetry={() => void detailQuery.refetch()}
-        onClose={() => setSelectedComplaintId(null)}
+        onClose={() => {
+          setSelectedComplaintId(null)
+          setDrawerMode("details")
+        }}
         relatedMaintenance={[]}
         isRelatedMaintenanceLoading={false}
         canCreateMaintenance={Boolean(canCreateMaintenance)}

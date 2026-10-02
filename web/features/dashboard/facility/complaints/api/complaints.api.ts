@@ -172,6 +172,8 @@ export async function createMaintenance(payload: {
   priority?: string
   assignedTo?: string
   assignedStaff?: string
+  technicianId?: string
+  technician?: string
   complaintId?: string
   complaint?: string
   estimatedCost?: number
@@ -179,10 +181,18 @@ export async function createMaintenance(payload: {
   scheduledDate?: string
   estimatedDurationHours?: number
 }) {
+  const staffId =
+    payload.assignedStaff ||
+    payload.assignedTo ||
+    payload.technicianId ||
+    payload.technician
   const body = {
     ...payload,
     complaint: payload.complaint || payload.complaintId,
-    assignedStaff: payload.assignedStaff || payload.assignedTo,
+    assignedStaff: staffId,
+    assignedTo: staffId,
+    technicianId: staffId,
+    technician: staffId,
   }
   const response = await api.post<ApiResponse<unknown>>(
     MAINTENANCE_PATH,

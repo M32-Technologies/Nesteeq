@@ -21,10 +21,20 @@ const getAuthenticatedTechnicianId = (req: Request): string => {
   return technicianId
 }
 
+const getExtraTechnicianId = (req: Request): string | undefined => {
+  return (
+    (req.user as any)?.technicianId ||
+    (req.user as any)?.technicianProfileId ||
+    (req.user as any)?.staffRecordId ||
+    (req.user as any)?.staffId
+  )
+}
+
 export const getDashboardStatsController = catchAsync(
   async (req: Request, res: Response) => {
     const technicianId = getAuthenticatedTechnicianId(req)
-    const data = await getDashboardStats(technicianId)
+    const extraTechId = getExtraTechnicianId(req)
+    const data = await getDashboardStats(technicianId, extraTechId)
 
     res.status(200).json({
       success: true,
@@ -37,8 +47,9 @@ export const getDashboardStatsController = catchAsync(
 export const getAssignedJobsController = catchAsync(
   async (req: Request, res: Response) => {
     const technicianId = getAuthenticatedTechnicianId(req)
+    const extraTechId = getExtraTechnicianId(req)
     const status = req.query.status ? String(req.query.status) : undefined
-    const data = await getAssignedJobs(status, technicianId)
+    const data = await getAssignedJobs(status, technicianId, extraTechId)
 
     res.status(200).json({
       success: true,
@@ -51,8 +62,9 @@ export const getAssignedJobsController = catchAsync(
 export const getJobByIdController = catchAsync(
   async (req: Request, res: Response) => {
     const technicianId = getAuthenticatedTechnicianId(req)
+    const extraTechId = getExtraTechnicianId(req)
     const jobId = String(req.params.jobId)
-    const data = await getJobById(jobId, technicianId)
+    const data = await getJobById(jobId, technicianId, extraTechId)
 
     res.status(200).json({
       success: true,
@@ -65,8 +77,9 @@ export const getJobByIdController = catchAsync(
 export const startJobController = catchAsync(
   async (req: Request, res: Response) => {
     const technicianId = getAuthenticatedTechnicianId(req)
+    const extraTechId = getExtraTechnicianId(req)
     const jobId = String(req.params.jobId)
-    const data = await startJob(jobId, technicianId)
+    const data = await startJob(jobId, technicianId, extraTechId)
 
     res.status(200).json({
       success: true,
@@ -79,12 +92,14 @@ export const startJobController = catchAsync(
 export const addProgressUpdateController = catchAsync(
   async (req: Request, res: Response) => {
     const technicianId = getAuthenticatedTechnicianId(req)
+    const extraTechId = getExtraTechnicianId(req)
     const jobId = String(req.params.jobId)
     const { message } = req.body
     const data = await addProgressUpdate(
       jobId,
       String(message || ""),
-      technicianId
+      technicianId,
+      extraTechId
     )
 
     res.status(201).json({
@@ -98,8 +113,9 @@ export const addProgressUpdateController = catchAsync(
 export const uploadEvidenceController = catchAsync(
   async (req: Request, res: Response) => {
     const technicianId = getAuthenticatedTechnicianId(req)
+    const extraTechId = getExtraTechnicianId(req)
     const jobId = String(req.params.jobId)
-    const data = await uploadEvidence(jobId, req.file, technicianId)
+    const data = await uploadEvidence(jobId, req.file, technicianId, extraTechId)
 
     res.status(200).json({
       success: true,
@@ -112,6 +128,7 @@ export const uploadEvidenceController = catchAsync(
 export const submitCostController = catchAsync(
   async (req: Request, res: Response) => {
     const technicianId = getAuthenticatedTechnicianId(req)
+    const extraTechId = getExtraTechnicianId(req)
     const jobId = String(req.params.jobId)
     const {
       amount,
@@ -131,7 +148,8 @@ export const submitCostController = catchAsync(
       finalAmount,
       finalDescription,
       finalReceiptUrl,
-      technicianId
+      technicianId,
+      extraTechId
     )
 
     res.status(200).json({
@@ -145,6 +163,7 @@ export const submitCostController = catchAsync(
 export const completeJobController = catchAsync(
   async (req: Request, res: Response) => {
     const technicianId = getAuthenticatedTechnicianId(req)
+    const extraTechId = getExtraTechnicianId(req)
     const jobId = String(req.params.jobId)
     const { workSummary, notes } = req.body
     const data = await completeJob(
@@ -153,7 +172,8 @@ export const completeJobController = catchAsync(
         workSummary: String(workSummary || ""),
         notes: notes ? String(notes) : undefined,
       },
-      technicianId
+      technicianId,
+      extraTechId
     )
 
     res.status(200).json({

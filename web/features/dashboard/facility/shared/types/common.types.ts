@@ -123,6 +123,7 @@ export type AssignPayload = {
   assignedStaff?: string
   assignedTo?: string
   technicianId?: string
+  status?: string
   scheduledDate?: string
   estimatedDurationHours?: number
   notes?: string

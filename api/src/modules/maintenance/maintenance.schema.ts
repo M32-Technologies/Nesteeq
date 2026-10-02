@@ -54,18 +54,27 @@ export const createMaintenanceBodySchema = z
     complaintId: complaintIdSchema.optional(),
     assignedStaff: userIdSchema.optional(),
     assignedTo: userIdSchema.optional(),
+    technicianId: userIdSchema.optional(),
+    technician: userIdSchema.optional(),
     category: z.enum(complaintCategories).optional(),
     title: titleSchema.optional(),
     description: z.string().trim().max(3000, "Description is too long").optional(),
     priority: z.enum(complaintPriorities).optional(),
+    status: z.enum(maintenanceStatuses).optional(),
     estimatedCost: costSchema.optional(),
     remarks: z.string().trim().max(1000, "Remarks is too long").optional(),
-  });
+  })
+  .passthrough();
 
 export const updateMaintenanceBodySchema = z
   .object({
     complaint: z.string().trim().optional().nullable(),
     complaintId: z.string().trim().optional().nullable(),
+    assignedStaff: userIdSchema.optional().nullable(),
+    assignedTo: userIdSchema.optional().nullable(),
+    technicianId: userIdSchema.optional().nullable(),
+    technician: userIdSchema.optional().nullable(),
+    status: z.enum(maintenanceStatuses).optional(),
     category: z.enum(complaintCategories).optional(),
     title: titleSchema.optional(),
     description: descriptionSchema.optional(),
@@ -74,6 +83,7 @@ export const updateMaintenanceBodySchema = z
     managerRemarks: z.string().trim().max(1000).optional(),
     remarks: z.string().trim().max(1000).optional(),
   })
+  .passthrough()
   .refine(requireAtLeastOneField, {
     message: "At least one field is required",
   });
@@ -83,14 +93,25 @@ export const assignMaintenanceBodySchema = z
     assignedStaff: userIdSchema.optional(),
     assignedTo: userIdSchema.optional(),
     technicianId: userIdSchema.optional(),
+    technician: userIdSchema.optional(),
     status: z.enum(maintenanceStatuses).optional(),
     estimatedCost: costSchema.optional(),
     remarks: z.string().trim().max(1000).optional(),
     notes: z.string().trim().max(1000).optional(),
   })
-  .refine((data) => Boolean(data.assignedStaff || data.assignedTo || data.technicianId), {
-    message: "Assigned staff or technician is required",
-  });
+  .passthrough()
+  .refine(
+    (data) =>
+      Boolean(
+        data.assignedStaff ||
+          data.assignedTo ||
+          data.technicianId ||
+          (data as any).technician
+      ),
+    {
+      message: "Assigned staff or technician is required",
+    }
+  );
 
 export const updateMaintenanceStatusBodySchema = z
   .object({

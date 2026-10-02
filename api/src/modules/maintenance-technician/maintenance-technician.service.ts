@@ -309,76 +309,86 @@ const resolveSingleDocLocation = async (doc: any) => {
 }
 
 export const resolveTechnicianIds = async (
-  technicianUserId: string
+  technicianUserId: string,
+  extraTechnicianId?: string | null
 ): Promise<string[]> => {
   const ids = new Set<string>()
-  if (!technicianUserId) return []
+  if (!technicianUserId && !extraTechnicianId) return []
 
-  const trimmed = technicianUserId.toString().trim()
-  ids.add(trimmed)
+  if (technicianUserId) {
+    const trimmed = technicianUserId.toString().trim()
+    if (trimmed) ids.add(trimmed)
+  }
+  if (extraTechnicianId) {
+    const trimmedExtra = extraTechnicianId.toString().trim()
+    if (trimmedExtra) ids.add(trimmedExtra)
+  }
 
-  try {
-    const objectIdCondition = Types.ObjectId.isValid(trimmed)
-      ? [{ _id: new Types.ObjectId(trimmed) }]
-      : []
-
-    // 1. Check Better Auth user record if available to get linked email / alternative id
-    let userEmail: string | null = null
+  const searchIds = Array.from(ids)
+  for (const trimmed of searchIds) {
     try {
-      const authUser = await getAuthDB()
-        .collection("user")
-        .findOne({
+      const objectIdCondition = Types.ObjectId.isValid(trimmed)
+        ? [{ _id: new Types.ObjectId(trimmed) }]
+        : []
+
+      // 1. Check Better Auth user record if available to get linked email / alternative id
+      let userEmail: string | null = null
+      try {
+        const authUser = await getAuthDB()
+          .collection("user")
+          .findOne({
+            $or: [
+              { id: trimmed },
+              ...(Types.ObjectId.isValid(trimmed)
+                ? [{ _id: new Types.ObjectId(trimmed) }]
+                : []),
+            ],
+          })
+        if (authUser) {
+          if (authUser.id) ids.add(authUser.id.toString())
+          if (authUser._id) ids.add(authUser._id.toString())
+          if (authUser.email) userEmail = authUser.email.toString().toLowerCase()
+        }
+      } catch {
+        // ignore auth DB lookup failure if standalone
+      }
+
+      const techQueryOr: Record<string, unknown>[] = [
+        { userId: trimmed },
+        { id: trimmed },
+        ...objectIdCondition,
+      ]
+      if (userEmail) {
+        techQueryOr.push({ email: userEmail })
+      }
+
+      const [techDocs, staffDocs] = await Promise.all([
+        Technician.find({ $or: techQueryOr })
+          .select("_id userId id")
+          .lean(),
+        Staff.find({
           $or: [
-            { id: trimmed },
-            ...(Types.ObjectId.isValid(trimmed)
-              ? [{ _id: new Types.ObjectId(trimmed) }]
-              : []),
+            { userId: trimmed },
+            ...objectIdCondition,
           ],
         })
-      if (authUser) {
-        if (authUser.id) ids.add(authUser.id.toString())
-        if (authUser._id) ids.add(authUser._id.toString())
-        if (authUser.email) userEmail = authUser.email.toString().toLowerCase()
+          .select("_id userId")
+          .lean(),
+      ])
+
+      for (const tech of techDocs as any[]) {
+        if (tech._id) ids.add(tech._id.toString())
+        if (tech.userId) ids.add(tech.userId.toString())
+        if (tech.id) ids.add(tech.id.toString())
       }
-    } catch {
-      // ignore auth DB lookup failure if standalone
-    }
 
-    const techQueryOr: Record<string, unknown>[] = [
-      { userId: trimmed },
-      { id: trimmed },
-      ...objectIdCondition,
-    ]
-    if (userEmail) {
-      techQueryOr.push({ email: userEmail })
+      for (const staff of staffDocs as any[]) {
+        if (staff._id) ids.add(staff._id.toString())
+        if (staff.userId) ids.add(staff.userId.toString())
+      }
+    } catch (err) {
+      console.error("Error resolving technician IDs:", err)
     }
-
-    const [techDocs, staffDocs] = await Promise.all([
-      Technician.find({ $or: techQueryOr })
-        .select("_id userId id")
-        .lean(),
-      Staff.find({
-        $or: [
-          { userId: trimmed },
-          ...objectIdCondition,
-        ],
-      })
-        .select("_id userId")
-        .lean(),
-    ])
-
-    for (const tech of techDocs as any[]) {
-      if (tech._id) ids.add(tech._id.toString())
-      if (tech.userId) ids.add(tech.userId.toString())
-      if (tech.id) ids.add(tech.id.toString())
-    }
-
-    for (const staff of staffDocs as any[]) {
-      if (staff._id) ids.add(staff._id.toString())
-      if (staff.userId) ids.add(staff.userId.toString())
-    }
-  } catch (err) {
-    console.error("Error resolving technician IDs:", err)
   }
 
   return Array.from(ids)
@@ -401,6 +411,10 @@ export const buildTechnicianScope = (ids: string[]): Record<string, unknown> => 
       { "assignedTo.id": { $in: ids } },
       { "assignedTo.userId": { $in: ids } },
       { assignedTechnicianId: { $in: allPossibleIdValues } },
+      { technician: { $in: allPossibleIdValues } },
+      { "technician._id": { $in: allPossibleIdValues } },
+      { "technician.id": { $in: ids } },
+      { "technician.userId": { $in: ids } },
     ],
   }
 }
@@ -418,113 +432,42 @@ const buildJobLookupFilter = (
   }
 }
 
-export const getDashboardStats = async (technicianUserId: string) => {
-  const ids = await resolveTechnicianIds(technicianUserId)
-  const scopeFilter = buildTechnicianScope(ids)
+export const getDashboardStats = async (
+  technicianUserId: string,
+  extraTechnicianId?: string | null
+) => {
+  const allJobs = await getAssignedJobs("ALL", technicianUserId, extraTechnicianId)
 
-  const [
-    complaintsTotal,
-    complaintsPending,
-    complaintsInProgress,
-    complaintsCompleted,
-    maintTotal,
-    maintPending,
-    maintInProgress,
-    maintCompleted,
-  ] = await Promise.all([
-    Complaint.countDocuments({
-      ...scopeFilter,
-      status: {
-        $in: [
-          "PENDING",
-          "UNDER_REVIEW",
-          "ASSIGNED",
-          "IN_PROGRESS",
-          "WORK_COMPLETED",
-          "AWAITING_APPROVAL",
-          "RESOLVED",
-          "APPROVED",
-          "CLOSED",
-        ],
-      },
-    }),
-    Complaint.countDocuments({
-      ...scopeFilter,
-      status: { $in: ["PENDING", "UNDER_REVIEW", "ASSIGNED"] },
-    }),
-    Complaint.countDocuments({
-      ...scopeFilter,
-      status: "IN_PROGRESS",
-    }),
-    Complaint.countDocuments({
-      ...scopeFilter,
-      status: {
-        $in: [
-          "WORK_COMPLETED",
-          "AWAITING_APPROVAL",
-          "APPROVED",
-          "CLOSED",
-          "RESOLVED",
-        ],
-      },
-    }),
-    Maintenance.countDocuments({
-      ...scopeFilter,
-      $or: [{ complaint: { $exists: false } }, { complaint: null }],
-      status: {
-        $in: [
-          "PENDING",
-          "ASSIGNED",
-          "IN_PROGRESS",
-          "ON_HOLD",
-          "WORK_COMPLETED",
-          "COMPLETED",
-          "AWAITING_APPROVAL",
-          "APPROVED",
-          "CLOSED",
-        ],
-      },
-    }),
-    Maintenance.countDocuments({
-      ...scopeFilter,
-      $or: [{ complaint: { $exists: false } }, { complaint: null }],
-      status: { $in: ["PENDING", "ASSIGNED"] },
-    }),
-    Maintenance.countDocuments({
-      ...scopeFilter,
-      $or: [{ complaint: { $exists: false } }, { complaint: null }],
-      status: { $in: ["IN_PROGRESS", "ON_HOLD"] },
-    }),
-    Maintenance.countDocuments({
-      ...scopeFilter,
-      $or: [{ complaint: { $exists: false } }, { complaint: null }],
-      status: {
-        $in: [
-          "COMPLETED",
-          "WORK_COMPLETED",
-          "AWAITING_APPROVAL",
-          "APPROVED",
-          "CLOSED",
-        ],
-      },
-    }),
-  ])
+  let pending = 0
+  let inProgress = 0
+  let completed = 0
+
+  for (const job of allJobs) {
+    if (job.status === "COMPLETED") {
+      completed++
+    } else if (job.status === "IN_PROGRESS") {
+      inProgress++
+    } else {
+      pending++
+    }
+  }
 
   return {
     stats: {
-      totalAssigned: complaintsTotal + maintTotal,
-      pending: complaintsPending + maintPending,
-      inProgress: complaintsInProgress + maintInProgress,
-      completed: complaintsCompleted + maintCompleted,
+      totalAssigned: allJobs.length,
+      pending,
+      inProgress,
+      completed,
     },
   }
 }
 
 export const getAssignedJobs = async (
   status: string | undefined,
-  technicianUserId: string
+  technicianUserId: string,
+  extraTechnicianId?: string | null
 ): Promise<AssignedJob[]> => {
-  const ids = await resolveTechnicianIds(technicianUserId)
+  const ids = await resolveTechnicianIds(technicianUserId, extraTechnicianId)
   const scopeFilter = buildTechnicianScope(ids)
 
   const complaintFilter: Record<string, any> = { ...scopeFilter }
@@ -537,7 +480,7 @@ export const getAssignedJobs = async (
         $in: ["PENDING", "UNDER_REVIEW", "ASSIGNED", "IN_PROGRESS"],
       }
       maintenanceFilter.status = {
-        $in: ["PENDING", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"],
+        $in: ["SCHEDULED", "PENDING", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"],
       }
     } else if (s === "COMPLETED" || s === "WORK_COMPLETED") {
       complaintFilter.status = {
@@ -558,9 +501,9 @@ export const getAssignedJobs = async (
           "CLOSED",
         ],
       }
-    } else if (s === "ASSIGNED" || s === "PENDING") {
+    } else if (s === "ASSIGNED" || s === "PENDING" || s === "SCHEDULED") {
       complaintFilter.status = { $in: ["PENDING", "UNDER_REVIEW", "ASSIGNED"] }
-      maintenanceFilter.status = { $in: ["PENDING", "ASSIGNED"] }
+      maintenanceFilter.status = { $in: ["SCHEDULED", "PENDING", "ASSIGNED"] }
     } else if (s === "IN_PROGRESS") {
       complaintFilter.status = "IN_PROGRESS"
       maintenanceFilter.status = { $in: ["IN_PROGRESS", "ON_HOLD"] }
@@ -582,11 +525,24 @@ export const getAssignedJobs = async (
         "CLOSED",
       ],
     }
+    maintenanceFilter.status = {
+      $in: [
+        "SCHEDULED",
+        "PENDING",
+        "ASSIGNED",
+        "IN_PROGRESS",
+        "ON_HOLD",
+        "WORK_COMPLETED",
+        "COMPLETED",
+        "AWAITING_APPROVAL",
+        "APPROVED",
+        "CLOSED",
+      ],
+    }
   }
 
   const [complaintDocs, maintenanceDocs] = await Promise.all([
     Complaint.find(complaintFilter).sort({ createdAt: -1 }).lean(),
-    Maintenance.find(maintenanceFilter).sort({ createdAt: -1 }).lean(),
     Maintenance.find(maintenanceFilter)
       .populate("complaint")
       .sort({ createdAt: -1 })
@@ -730,9 +686,10 @@ export const getAssignedJobs = async (
 
 export const getJobById = async (
   jobId: string,
-  technicianUserId: string
+  technicianUserId: string,
+  extraTechnicianId?: string | null
 ): Promise<JobDetails> => {
-  const ids = await resolveTechnicianIds(technicianUserId)
+  const ids = await resolveTechnicianIds(technicianUserId, extraTechnicianId)
   const query = buildJobLookupFilter(jobId, ids)
 
   // First try Maintenance collection
@@ -921,8 +878,12 @@ export const getJobById = async (
   throw new AppError("Maintenance job not found", 404)
 }
 
-export const startJob = async (jobId: string, technicianUserId: string) => {
-  const ids = await resolveTechnicianIds(technicianUserId)
+export const startJob = async (
+  jobId: string,
+  technicianUserId: string,
+  extraTechnicianId?: string | null
+) => {
+  const ids = await resolveTechnicianIds(technicianUserId, extraTechnicianId)
   const query = buildJobLookupFilter(jobId, ids)
   const now = new Date()
 
@@ -993,9 +954,10 @@ export const startJob = async (jobId: string, technicianUserId: string) => {
 export const addProgressUpdate = async (
   jobId: string,
   message: string,
-  technicianUserId: string
+  technicianUserId: string,
+  extraTechnicianId?: string | null
 ) => {
-  const ids = await resolveTechnicianIds(technicianUserId)
+  const ids = await resolveTechnicianIds(technicianUserId, extraTechnicianId)
   const query = buildJobLookupFilter(jobId, ids)
   const now = new Date()
 
@@ -1076,13 +1038,14 @@ export const addProgressUpdate = async (
 export const uploadEvidence = async (
   jobId: string,
   file: Express.Multer.File | undefined,
-  technicianUserId: string
+  technicianUserId: string,
+  extraTechnicianId?: string | null
 ) => {
   if (!file) {
     throw new AppError("Evidence file is required", 400)
   }
 
-  const ids = await resolveTechnicianIds(technicianUserId)
+  const ids = await resolveTechnicianIds(technicianUserId, extraTechnicianId)
   const query = buildJobLookupFilter(jobId, ids)
   const filename = file.filename
   const originalname = file.originalname || file.filename
@@ -1158,9 +1121,10 @@ export const submitCost = async (
   amount: number,
   description: string,
   receiptUrl: string | null,
-  technicianUserId: string
+  technicianUserId: string,
+  extraTechnicianId?: string | null
 ) => {
-  const ids = await resolveTechnicianIds(technicianUserId)
+  const ids = await resolveTechnicianIds(technicianUserId, extraTechnicianId)
   const query = buildJobLookupFilter(jobId, ids)
   const now = new Date()
   const numAmount = Number(amount) || 0
@@ -1289,9 +1253,10 @@ export const submitCost = async (
 export const completeJob = async (
   jobId: string,
   payload: { workSummary: string; notes?: string },
-  technicianUserId: string
+  technicianUserId: string,
+  extraTechnicianId?: string | null
 ) => {
-  const ids = await resolveTechnicianIds(technicianUserId)
+  const ids = await resolveTechnicianIds(technicianUserId, extraTechnicianId)
   const query = buildJobLookupFilter(jobId, ids)
   const now = new Date()
 

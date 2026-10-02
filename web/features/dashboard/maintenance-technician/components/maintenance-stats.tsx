@@ -3,18 +3,23 @@
 import { useQuery } from "@tanstack/react-query"
 import { Activity, CheckCircle, Clock, Wrench, type LucideIcon } from "lucide-react"
 
+import { useSession } from "@/lib/auth-client"
 import { getMaintenanceDashboardStats } from "../services/maintenance.service"
 
 export const maintenanceQueryKeys = {
   all: ["maintenance"] as const,
-  dashboard: () => [...maintenanceQueryKeys.all, "dashboard"] as const,
+  dashboard: (userId?: string) =>
+    [...maintenanceQueryKeys.all, "dashboard", userId ?? "me"] as const,
 }
 
 export function useMaintenanceDashboardStatsQuery() {
+  const { data: session } = useSession()
   return useQuery({
-    queryKey: maintenanceQueryKeys.dashboard(),
+    queryKey: maintenanceQueryKeys.dashboard(session?.user?.id),
     queryFn: getMaintenanceDashboardStats,
-    staleTime: 60 * 1000,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnMount: "always",
   })
 }
 

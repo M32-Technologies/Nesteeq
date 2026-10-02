@@ -21,11 +21,13 @@ import {
   DropdownMenuLinkItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useSession } from "@/lib/auth-client"
 import { type AssignedJob, getAssignedJobs } from "../services/jobs.service"
 import { formatJobLocation } from "./maintenance-jobs-table"
 
 export const completedJobsQueryKeys = {
-  all: ["maintenance-technician", "jobs", "completed"] as const,
+  all: (userId?: string) =>
+    ["maintenance-technician", "jobs", "completed", userId ?? "me"] as const,
 }
 
 const priorityStyles: Record<AssignedJob["priority"], string> = {
@@ -35,6 +37,7 @@ const priorityStyles: Record<AssignedJob["priority"], string> = {
 }
 
 export default function CompletedJobsList() {
+  const { data: session } = useSession()
   const [search, setSearch] = useState("")
   const [priorityFilter, setPriorityFilter] = useState<string>("ALL")
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL")
@@ -46,9 +49,11 @@ export default function CompletedJobsList() {
     isError,
     error,
   } = useQuery({
-    queryKey: completedJobsQueryKeys.all,
+    queryKey: completedJobsQueryKeys.all(session?.user?.id),
     queryFn: () => getAssignedJobs("COMPLETED"),
-    staleTime: 60 * 1000,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnMount: "always",
   })
 
   // Ensure only COMPLETED jobs are shown

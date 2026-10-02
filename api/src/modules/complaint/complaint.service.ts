@@ -130,7 +130,7 @@ const findAuthUserById = async (userId: string): Promise<AuthUserRecord | null> 
 };
 
 const getAuthUserId = (user: AuthUserRecord, fallback: string): string =>
-  user.id ?? user._id?.toHexString() ?? fallback;
+  user.id ?? (typeof (user as any)._id?.toHexString === "function" ? (user as any)._id.toHexString() : user._id ? String(user._id) : fallback);
 
 const ensureCurrentUserExists = async (
   user: AuthenticatedComplaintUser
@@ -566,9 +566,8 @@ const updateComplaintDocument = async (
     throw new AppError("Complaint not found", 404);
   }
 
-  return updatedComplaint;
   const [enriched] = await enrichComplaints([updatedComplaint]);
-  return enriched;
+  return enriched || updatedComplaint;
 };
 
 const createRemark = (message: string | undefined, user: AuthenticatedComplaintUser): ComplaintRemark | null => {
@@ -1110,6 +1109,23 @@ export const updateComplaint = async (
     set.attachments = (data as any).attachments;
   }
 
+  if ((data as any).assignedStaff || (data as any).assignedTo || (data as any).technicianId) {
+    const techInputId = (data as any).assignedStaff || (data as any).assignedTo || (data as any).technicianId;
+    try {
+      const staff = await ensureStaffUser(techInputId);
+      const staffId = getAuthUserId(staff, techInputId);
+      set.assignedStaff = staffId;
+      set.assignedTo = staffId;
+      set.status = "ASSIGNED";
+    } catch {
+      // ignore
+    }
+  }
+
+  if ((data as any).status) {
+    set.status = (data as any).status;
+  }
+
   return updateComplaintDocument(complaintId, set, createRemark(data.remarks, user));
 };
 
@@ -1130,7 +1146,13 @@ export const assignComplaint = async (
     throw new AppError(`Complaint cannot be assigned while it is ${currentStatus}`, 400);
   }
 
-  const staffInputId = data.assignedStaff || (data as any).assignedTo || (data as any).technicianId;
+  const staffInputId =
+    data.assignedStaff ||
+    (data as any).assignedTo ||
+    (data as any).technicianId ||
+    (data as any).technician ||
+    (data as any).technicianUserId ||
+    (data as any).assignedStaffId;
   if (!staffInputId) {
     throw new AppError("Assigned staff is required", 400);
   }

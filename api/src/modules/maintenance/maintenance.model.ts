@@ -245,6 +245,18 @@ const maintenanceSchema = new Schema(
       default: null,
       index: true,
     },
+    assignedTo: {
+      type: String,
+      trim: true,
+      default: null,
+      index: true,
+    },
+    technician: {
+      type: String,
+      trim: true,
+      default: null,
+      index: true,
+    },
     category: {
       type: String,
       enum: [...complaintCategories],
@@ -415,6 +427,8 @@ const maintenanceSchema = new Schema(
 maintenanceSchema.index({ complaint: 1, status: 1 });
 maintenanceSchema.index({ apartment: 1, status: 1, createdAt: -1 });
 maintenanceSchema.index({ assignedStaff: 1, status: 1, createdAt: -1 });
+maintenanceSchema.index({ assignedTo: 1, status: 1, createdAt: -1 });
+maintenanceSchema.index({ technician: 1, status: 1, createdAt: -1 });
 maintenanceSchema.index({ resident: 1, createdAt: -1 });
 
 export type MaintenanceDocument = InferSchemaType<typeof maintenanceSchema>;
