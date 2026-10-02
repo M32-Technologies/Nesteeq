@@ -4,11 +4,12 @@ import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { Search, Bell, ChevronDown, LogOut, Settings, Menu, Shield, Home } from "lucide-react"
+import { Bell, ChevronDown, LogOut, Settings, Menu, Shield, Home } from "lucide-react"
 import { toast } from "sonner"
 
 import { authClient, useSession } from "@/lib/auth-client"
 import { cn } from "@/lib/utils"
+import { NotificationDropdown } from "@/features/notifications"
 
 type AdminNavbarProps = {
   onMenuClick?: () => void
@@ -26,6 +27,19 @@ export default function AdminNavbar({ onMenuClick }: AdminNavbarProps) {
   const userEmail = user?.email || ""
   const userInitial = userName ? userName.charAt(0).toUpperCase() : ""
   const userAvatar = user?.image || null
+
+  const [hasAvatarError, setHasAvatarError] = useState(false)
+
+  useEffect(() => {
+    setHasAvatarError(false)
+  }, [userAvatar])
+
+  const isValidAvatarUrl = Boolean(
+    userAvatar &&
+      (userAvatar.startsWith("http://") ||
+        userAvatar.startsWith("https://") ||
+        userAvatar.startsWith("/"))
+  )
 
   // Close profile dropdown on outside click
   useEffect(() => {
@@ -83,18 +97,8 @@ export default function AdminNavbar({ onMenuClick }: AdminNavbarProps) {
         </div>
       </div>
 
-      {/* 2. RIGHT: Normal Search Bar + Notification Bell + Profile */}
+      {/* 2. RIGHT: Home Button + Notification Bell + Profile */}
       <div className="flex items-center gap-2.5 sm:gap-3 shrink-0 ml-4">
-        {/* Normal Search Bar (Requested by user: "the serch bar normal type ok") */}
-        <div className="relative hidden md:flex items-center w-[200px] lg:w-[240px]">
-          <Search className="pointer-events-none absolute left-3.5 h-3.5 w-3.5 text-[#94A3B8]" />
-          <input
-            type="text"
-            placeholder="Search..."
-            aria-label="Search"
-            className="h-10 w-full rounded-2xl border border-slate-200/80 bg-white pl-9 pr-3.5 text-xs text-[#0F172A] placeholder:text-[#94A3B8] shadow-2xs outline-none focus:border-[#07584F] focus:ring-1 focus:ring-[#07584F] transition-all"
-          />
-        </div>
 
         {/* Go to Home Screen Button */}
         <Link
@@ -107,14 +111,29 @@ export default function AdminNavbar({ onMenuClick }: AdminNavbarProps) {
         </Link>
 
         {/* Notification Button */}
-        <button
-          type="button"
-          aria-label="Notifications"
-          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200/80 bg-white text-[#334155] shadow-2xs transition-colors hover:bg-slate-50 hover:text-[#0F172A] cursor-pointer"
-        >
-          <Bell className="h-4 w-4 text-[#334155]" />
-          <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-[#EF4444] ring-2 ring-white" />
-        </button>
+        <NotificationDropdown>
+          {({ unreadCount }) => (
+            <button
+              type="button"
+              aria-label={
+                unreadCount > 0
+                  ? `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}`
+                  : "Notifications"
+              }
+              className="group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200/80 bg-white text-[#334155] shadow-2xs transition-colors hover:bg-slate-50 hover:text-[#0F172A] cursor-pointer"
+            >
+              <Bell className="h-4.5 w-4.5 text-[#334155] transition-transform duration-200 group-hover:rotate-12" />
+              {unreadCount > 0 && (
+                <span
+                  className="absolute -top-1.5 -right-1.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white shadow-xs ring-2 ring-white animate-in zoom-in-75"
+                  aria-hidden="true"
+                >
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </button>
+          )}
+        </NotificationDropdown>
 
         {/* Super Admin Profile Area */}
         <div className="relative" ref={profileRef}>
@@ -126,15 +145,15 @@ export default function AdminNavbar({ onMenuClick }: AdminNavbarProps) {
             className="flex items-center gap-2 rounded-2xl border border-slate-200/80 bg-white py-1 pl-1 pr-2.5 shadow-2xs hover:border-slate-300 transition-all cursor-pointer"
           >
             {/* Avatar */}
-            <span className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#07584F] text-xs font-semibold text-white">
+            <span className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#07584F] text-xs font-semibold text-white select-none">
               {isPending ? (
                 <span className="h-full w-full animate-pulse bg-slate-200" />
-              ) : userAvatar ? (
-                <Image
+              ) : userAvatar && isValidAvatarUrl && !hasAvatarError ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
                   src={userAvatar}
                   alt={userName || "Super Admin"}
-                  width={32}
-                  height={32}
+                  onError={() => setHasAvatarError(true)}
                   className="h-full w-full object-cover"
                 />
               ) : userInitial ? (

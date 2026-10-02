@@ -28,3 +28,4 @@ export {
   Toolbar,
 } from "./facility-layout"
 export { TechnicianSelect } from "./technician-select"
+export { MaintenanceTypeSelect } from "./maintenance-type-select"

@@ -2,7 +2,7 @@
 // ManagerDetailsModal.tsx
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import {
   X,
@@ -11,14 +11,17 @@ import {
   ShieldCheck,
   Phone,
   Calendar,
-  Hash,
+  Building2,
+  MapPin,
+  Layers,
+  Mail,
   Ban,
   UserCheck,
   Loader2,
-  Home,
 } from "lucide-react"
 import { toast } from "sonner"
 import { authClient } from "@/lib/auth-client"
+import { fetchApartmentById } from "@/features/admin/apartments/api/apartment.api"
 import type { BetterAuthUser } from "../types"
 
 function formatRoleTitle(role?: string | null): string {
@@ -53,15 +56,15 @@ function DetailRow({
   mono?: boolean
 }) {
   return (
-    <div className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#07584F]/8">
+    <div className="flex items-center gap-3.5 py-3 first:pt-1 last:pb-1">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#07584F] border border-slate-200/50">
         <Icon className="h-4 w-4 text-[#07584F]" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-[#94A3B8]">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
           {label}
         </p>
-        <div className={`mt-0.5 text-[13px] font-medium text-[#0F172A] ${mono ? "font-mono text-[12px]" : ""}`}>
+        <div className={`mt-0.5 text-[13px] font-medium text-slate-900 ${mono ? "font-mono text-[12px]" : ""}`}>
           {children}
         </div>
       </div>
@@ -78,6 +81,45 @@ export default function ManagerDetailsModal({
   const [isActionLoading, setIsActionLoading] = useState(false)
   const [banReason, setBanReason] = useState("")
   const [showBanInput, setShowBanInput] = useState(false)
+
+  const [apartmentInfo, setApartmentInfo] = useState<{
+    name?: string
+    address?: string
+    city?: string
+    state?: string
+    status?: string
+    totalUnits?: string | number
+  } | null>(
+    user?.apartmentDetails || (user?.apartmentName ? { name: user.apartmentName } : null)
+  )
+
+  useEffect(() => {
+    if (!user) return
+    if (user.apartmentDetails) {
+      setApartmentInfo(user.apartmentDetails)
+      return
+    }
+    if (user.apartmentName) {
+      setApartmentInfo({ name: user.apartmentName })
+    }
+    if (user.apartmentId && !user.apartmentDetails) {
+      fetchApartmentById(user.apartmentId)
+        .then((apt) => {
+          if (apt) {
+            setApartmentInfo({
+              name: apt.name,
+              address: apt.address,
+              city: apt.city,
+              state: apt.state,
+              status: apt.status,
+            })
+          }
+        })
+        .catch(() => {
+          // silently keep fallback
+        })
+    }
+  }, [user?.apartmentId, user?.apartmentDetails, user?.apartmentName])
 
   if (!isOpen || !user) return null
 
@@ -129,75 +171,166 @@ export default function ManagerDetailsModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
       {/* Backdrop */}
       <div
         role="presentation"
         onClick={onClose}
-        className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-150"
+        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
       />
 
       {/* Modal Dialog */}
-      <div className="relative w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.25)] animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-200">
-        {/* Header — gradient band + avatar overlapping into content */}
-        <div className="relative bg-gradient-to-br from-[#07584F] to-[#0B6E62] px-6 pb-14 pt-5">
-          <div className="flex items-center justify-between">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              {formatRoleTitle(user.role)}
-            </span>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close details"
-              className="flex h-7 w-7 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/15 hover:text-white"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Avatar — straddles header/content boundary */}
-        <div className="relative -mt-11 px-6">
-          <span className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-[#07584F] text-2xl font-bold text-white shadow-lg">
-            {user.image ? (
-              <Image
-                src={user.image}
-                alt={user.name || user.email}
-                width={80}
-                height={80}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <span>{userInitial}</span>
-            )}
-          </span>
-        </div>
-
-        {/* Name / status / email */}
-        <div className="px-6 pb-1 pt-3">
+      <div className="relative w-full max-w-lg my-auto max-h-[92vh] flex flex-col overflow-hidden rounded-3xl bg-white shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-200">
+        {/* Top Header Bar */}
+        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50/70">
           <div className="flex items-center gap-2">
-            <h4 className="truncate text-lg font-bold text-[#0F172A]">
-              {user.name || "Unnamed User"}
-            </h4>
-            {user.banned ? (
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-[10.5px] font-semibold text-red-700">
-                <span className="h-1.5 w-1.5 rounded-full bg-red-600" />
-                Suspended
-              </span>
-            ) : (
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10.5px] font-semibold text-emerald-700">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
-                Active
-              </span>
-            )}
+            <span className="flex h-2 w-2 rounded-full bg-[#07584F]" />
+            <h3 className="text-sm font-bold text-slate-800 tracking-tight">
+              User Details
+            </h3>
           </div>
-          <p className="truncate text-[12.5px] text-[#64748B]">{user.email}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close details"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
-        {/* Content */}
-        <div className="px-6 pb-6 pt-3">
-          <div className="divide-y divide-[#F1F5F9] rounded-2xl border border-[#F1F5F9] px-4">
+        {/* Scrollable Content Body */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {/* Hero Profile Header */}
+          <div className="flex items-start gap-4 p-4 rounded-2xl bg-gradient-to-br from-[#F8FAF8] via-white to-slate-50/50 border border-slate-200/70">
+            <span className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[#07584F] text-xl font-bold text-white shadow-md">
+              {user.image ? (
+                <Image
+                  src={user.image}
+                  alt={user.name || user.email}
+                  width={56}
+                  height={56}
+                  unoptimized
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <span>{userInitial}</span>
+              )}
+            </span>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h4 className="truncate text-lg font-bold text-slate-900">
+                  {user.name || "Unnamed User"}
+                </h4>
+                {user.banned ? (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-50 border border-red-200 px-2.5 py-0.5 text-[11px] font-semibold text-red-700">
+                    <span className="h-1.5 w-1.5 rounded-full bg-red-600" />
+                    Suspended
+                  </span>
+                ) : user.emailVerified ? (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
+                    Active
+                  </span>
+                ) : (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-600" />
+                    Pending Verification
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+                <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                <span className="truncate">{user.email}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 1. Assigned Property Card */}
+          <div className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-200/60 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#07584F]/10 text-[#07584F]">
+                  <Building2 className="h-4 w-4" />
+                </span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Assigned Property
+                </span>
+              </div>
+
+              {apartmentInfo?.status && (
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                    apartmentInfo.status === "active"
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : "bg-rose-50 text-rose-700 border border-rose-200"
+                  }`}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      apartmentInfo.status === "active"
+                        ? "bg-emerald-500"
+                        : "bg-rose-500"
+                    }`}
+                  />
+                  {apartmentInfo.status === "active"
+                    ? "Active Community"
+                    : "Inactive Community"}
+                </span>
+              )}
+            </div>
+
+            <div className="pt-3">
+              {apartmentInfo?.name || user.apartmentName ? (
+                <div className="space-y-2">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="text-base font-bold text-slate-900">
+                      {apartmentInfo?.name || user.apartmentName}
+                    </p>
+                    {apartmentInfo?.totalUnits && (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-white border border-slate-200/60 px-2 py-0.5 text-[11px] font-medium text-slate-700 shadow-2xs">
+                        <Layers className="h-3 w-3 text-slate-400" />
+                        <span>{apartmentInfo.totalUnits} Units</span>
+                      </span>
+                    )}
+                  </div>
+
+                  {(apartmentInfo?.city || apartmentInfo?.address) && (
+                    <div className="flex items-start gap-1.5 text-xs text-slate-600">
+                      <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400 mt-0.5" />
+                      <span>
+                        {[
+                          apartmentInfo.address,
+                          apartmentInfo.city,
+                          apartmentInfo.state,
+                        ]
+                          .filter(Boolean)
+                          .join(", ")}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ) : user.apartmentId ? (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-slate-500">
+                    Apartment Reference:
+                  </p>
+                  <p className="font-mono text-xs text-slate-700 bg-white border border-slate-200/60 rounded-lg px-2.5 py-1 w-fit">
+                    {user.apartmentId}
+                  </p>
+                </div>
+              ) : (
+                <div className="py-1 text-xs text-slate-400 font-medium">
+                  No property assigned to this user yet.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 2. Account Details Card */}
+          <div className="divide-y divide-slate-100 rounded-2xl border border-slate-200/80 bg-white px-4 py-1">
             <DetailRow icon={ShieldCheck} label="System Role">
               <span className="font-semibold text-[#07584F]">
                 {formatRoleTitle(user.role)}
@@ -205,47 +338,48 @@ export default function ManagerDetailsModal({
             </DetailRow>
 
             <DetailRow icon={Phone} label="Contact Phone">
-              {user.phone || <span className="text-[#94A3B8] font-normal">Not provided</span>}
+              {user.phone ? (
+                <span className="font-medium text-slate-900">{user.phone}</span>
+              ) : (
+                <span className="text-slate-400 font-normal">Not provided</span>
+              )}
             </DetailRow>
-
-            <DetailRow icon={Hash} label="Apartment ID Reference" mono>
-              {user.apartmentId || <span className="text-[#94A3B8] font-normal font-sans">None assigned yet</span>}
-            </DetailRow>
-
-            {user.flatId && (
-              <DetailRow icon={Home} label="Flat ID Reference" mono>
-                {user.flatId}
-              </DetailRow>
-            )}
 
             <DetailRow icon={Calendar} label="Registered On">
-              {formattedDate}
+              <span className="text-slate-700">{formattedDate}</span>
             </DetailRow>
 
             <DetailRow
               icon={user.emailVerified ? CheckCircle2 : AlertTriangle}
               label="Email Verification"
             >
-              <span className={user.emailVerified ? "text-emerald-700" : "text-amber-700"}>
-                {user.emailVerified ? "Verified" : "Unverified"}
+              <span
+                className={`inline-flex items-center gap-1 font-semibold ${
+                  user.emailVerified ? "text-emerald-700" : "text-amber-700"
+                }`}
+              >
+                {user.emailVerified ? "Verified Account" : "Pending Verification"}
               </span>
             </DetailRow>
           </div>
 
           {/* Suspension reason (read-only, when banned) */}
           {user.banned && user.banReason && (
-            <div className="mt-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-red-700">
+            <div className="rounded-2xl border border-red-200/70 bg-red-50/80 px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-red-700">
                 Suspension Reason
               </p>
-              <p className="mt-0.5 text-[12.5px] text-red-700">{user.banReason}</p>
+              <p className="mt-1 text-xs text-red-800">{user.banReason}</p>
             </div>
           )}
 
           {/* Ban reason input */}
           {showBanInput && !user.banned && (
-            <div className="mt-3 rounded-xl border border-red-100 bg-red-50 p-3.5 animate-in fade-in slide-in-from-top-1 duration-150">
-              <label htmlFor="ban-reason" className="mb-1.5 block text-[11.5px] font-semibold text-red-800">
+            <div className="rounded-2xl border border-red-200/70 bg-red-50/70 p-4 animate-in fade-in slide-in-from-top-1 duration-150 space-y-2">
+              <label
+                htmlFor="ban-reason"
+                className="block text-xs font-semibold text-red-900"
+              >
                 Reason for account suspension
               </label>
               <input
@@ -253,19 +387,19 @@ export default function ManagerDetailsModal({
                 type="text"
                 value={banReason}
                 onChange={(e) => setBanReason(e.target.value)}
-                placeholder="e.g. Terms violation, requested deactivation..."
-                className="w-full rounded-lg border border-red-200 bg-white px-3 py-2 text-[12.5px] text-[#0F172A] outline-none placeholder:text-red-300 focus:ring-2 focus:ring-red-500/30"
+                placeholder="e.g. Terms violation, deactivation request..."
+                className="w-full rounded-xl border border-red-200 bg-white px-3.5 py-2.5 text-xs text-slate-900 outline-none placeholder:text-red-300 focus:ring-2 focus:ring-red-500/30"
               />
             </div>
           )}
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between gap-3 border-t border-[#F1F5F9] bg-[#F8FAF8] px-6 py-4">
+        <div className="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-4">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl border border-[#E5E7EB] bg-white px-4 py-2 text-[12.5px] font-semibold text-[#475569] shadow-2xs transition-colors hover:bg-slate-50"
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 shadow-2xs transition-colors hover:bg-slate-100 cursor-pointer"
           >
             Close
           </button>
@@ -275,7 +409,7 @@ export default function ManagerDetailsModal({
               type="button"
               disabled={isActionLoading}
               onClick={handleToggleBan}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#07584F] px-4 py-2 text-[12.5px] font-semibold text-white shadow-2xs transition-colors hover:bg-[#064841] disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#07584F] px-4 py-2 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-[#064841] disabled:opacity-50 cursor-pointer"
             >
               {isActionLoading ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -289,7 +423,7 @@ export default function ManagerDetailsModal({
               <button
                 type="button"
                 onClick={() => setShowBanInput(false)}
-                className="rounded-xl border border-slate-200 px-3.5 py-2 text-[12.5px] font-medium text-slate-600 transition-colors hover:bg-slate-100"
+                className="rounded-xl border border-slate-200 px-3.5 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 cursor-pointer"
               >
                 Cancel
               </button>
@@ -297,7 +431,7 @@ export default function ManagerDetailsModal({
                 type="button"
                 disabled={isActionLoading}
                 onClick={handleToggleBan}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-2 text-[12.5px] font-semibold text-white shadow-2xs transition-colors hover:bg-red-700 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-2 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-red-700 disabled:opacity-50 cursor-pointer"
               >
                 {isActionLoading ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -311,7 +445,7 @@ export default function ManagerDetailsModal({
             <button
               type="button"
               onClick={() => setShowBanInput(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-4 py-2 text-[12.5px] font-semibold text-red-600 shadow-2xs transition-colors hover:bg-red-50"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-4 py-2 text-xs font-semibold text-red-600 shadow-2xs transition-colors hover:bg-red-50 cursor-pointer"
             >
               <Ban className="h-3.5 w-3.5" />
               <span>Suspend Account</span>

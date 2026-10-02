@@ -58,6 +58,11 @@ export default function AdminSettingsPage() {
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [avatarError, setAvatarError] = useState(false)
+
+  useEffect(() => {
+    setAvatarError(false)
+  }, [avatarUrl])
 
   // Loading States
   const [isSavingProfile, setIsSavingProfile] = useState(false)
@@ -307,11 +312,12 @@ export default function AdminSettingsPage() {
             <div className="flex flex-col items-center text-center">
               <div className="relative group">
                 <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-[#07584F] text-white text-2xl font-bold shadow-md ring-4 ring-[#EAF5EE] overflow-hidden">
-                  {avatarUrl ? (
+                  {avatarUrl && !avatarError ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={avatarUrl}
-                      alt={name || "Admin"}
+                      alt=""
+                      onError={() => setAvatarError(true)}
                       className="h-full w-full object-cover"
                     />
                   ) : (

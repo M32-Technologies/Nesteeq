@@ -21,6 +21,7 @@ import {
   calculateBillValues,
   roundMoney,
 } from "../billing/billing.calculation.js";
+import { getMonthlyFinanceService } from "../finance/finance.service.js";
 import { AppError } from "../../utils/AppError.js";
 
 const MONTH_NAMES = [
@@ -296,11 +297,15 @@ export const updateTreasurerSettingsService = async (
 
 export const getMaintenancePayoutsService = async (apartmentId: string) => {
   const id = getApartmentObjectId(apartmentId);
+  const aptValues: unknown[] = [apartmentId, String(apartmentId)];
+  if (Types.ObjectId.isValid(apartmentId)) {
+    aptValues.push(id);
+  }
 
   const query: Record<string, unknown> = {
-    apartment: id,
+    apartment: { $in: aptValues },
     "costReview.status": "APPROVED",
-    "costReview.forwardedToRole": "TREASURER",
+    "costReview.forwardedToRole": { $in: ["TREASURER", null] },
   };
 
   const jobs = await (Maintenance as any).find(query)
@@ -321,12 +326,17 @@ export const getMaintenancePayoutsService = async (apartmentId: string) => {
     if (job.flat) flatIds.add(job.flat.toString());
   }
 
-  const flats = flatIds.size > 0
-    ? await Flat.find(
-        { _id: { $in: Array.from(flatIds).map((fid) => new Types.ObjectId(fid)) } },
-        "flatNumber"
-      ).lean()
-    : [];
+  const validFlatObjectIds = Array.from(flatIds)
+    .filter((fid) => Types.ObjectId.isValid(fid))
+    .map((fid) => new Types.ObjectId(fid));
+
+  const flats =
+    validFlatObjectIds.length > 0
+      ? await Flat.find(
+          { _id: { $in: validFlatObjectIds } },
+          "flatNumber"
+        ).lean()
+      : [];
   const flatMap = new Map(flats.map((f) => [f._id.toString(), f.flatNumber]));
 
   const uniqueUserIds = Array.from(userIds);
@@ -350,7 +360,7 @@ export const getMaintenancePayoutsService = async (apartmentId: string) => {
   }
 
   return jobs.map((job: any) => {
-    const flatNum = job.flat ? flatMap.get(job.flat.toString()) : undefined;
+    const flatNum = job.flat ? (flatMap.get(job.flat.toString()) || job.flat) : undefined;
     const techName =
       (job.costReview?.submittedBy ? userMap.get(job.costReview.submittedBy.toString()) : undefined) ||
       (job.assignedStaff ? userMap.get(job.assignedStaff.toString()) : undefined) ||
@@ -392,7 +402,7 @@ export const processMaintenancePayoutService = async (
       _id: new Types.ObjectId(jobId),
       $or: [{ apartment: aptId }, { apartment: apartmentId }],
       "costReview.status": "APPROVED",
-      "costReview.forwardedToRole": "TREASURER",
+      "costReview.forwardedToRole": { $in: ["TREASURER", null] },
     },
     {
       $set: {
@@ -612,37 +622,55 @@ export const getDefaultersReportService = async (
   const start = (page - 1) * limit;
   const paginated = processed.slice(start, start + limit);
 
+  const totalOverdueAmount = roundMoney(
+    processed.reduce((sum, b) => sum + (b.balanceAmount || 0), 0)
+  );
+
   return {
     defaulters: paginated,
+    totalOverdueAmount,
+    defaulterCount: total,
     pagination: {
       total,
       page,
       limit,
       totalPages,
+      pages: totalPages,
     },
   };
 };
 
 export const getExpenseBreakdownReportService = async (
   apartmentId: string,
-  year: number,
-  month?: number
+  year?: number,
+  month?: number,
+  startDateInput?: string,
+  endDateInput?: string
 ) => {
   const aptId = getApartmentObjectId(apartmentId);
 
-  const startDate = month && month > 0
-    ? new Date(Date.UTC(year, month - 1, 1))
-    : new Date(Date.UTC(year, 0, 1));
-  const endDate = month && month > 0
-    ? new Date(Date.UTC(year, month, 1))
-    : new Date(Date.UTC(year + 1, 0, 1));
+  let startDate: Date;
+  let endDate: Date;
+
+  if (startDateInput && endDateInput) {
+    startDate = new Date(startDateInput);
+    endDate = new Date(endDateInput);
+  } else {
+    const yr = year || new Date().getFullYear();
+    startDate = month && month > 0
+      ? new Date(Date.UTC(yr, month - 1, 1))
+      : new Date(Date.UTC(yr, 0, 1));
+    endDate = month && month > 0
+      ? new Date(Date.UTC(yr, month, 1))
+      : new Date(Date.UTC(yr + 1, 0, 1));
+  }
 
   const aggregation = await Expense.aggregate([
     {
       $match: {
         apartmentId: aptId,
         status: { $in: ["APPROVED", "PAID"] },
-        expenseDate: { $gte: startDate, $lt: endDate },
+        expenseDate: { $gte: startDate, $lte: endDate },
       },
     },
     {
@@ -657,22 +685,147 @@ export const getExpenseBreakdownReportService = async (
     },
   ]);
 
-  const categories: Record<string, { total: number; count: number }> = {};
   let totalAmount = 0;
   let totalCount = 0;
 
   for (const item of aggregation) {
-    const cat = item._id || "OTHER";
-    categories[cat] = { total: item.total, count: item.count };
-    totalAmount += item.total;
-    totalCount += item.count;
+    totalAmount += item.total || 0;
+    totalCount += item.count || 0;
   }
 
+  const categories = aggregation.map((item) => {
+    const cat = item._id || "OTHER";
+    const total = item.total || 0;
+    const percentage = totalAmount > 0 ? (total / totalAmount) * 100 : 0;
+    return {
+      category: cat,
+      totalAmount: total,
+      total,
+      count: item.count || 0,
+      percentage: Number(percentage.toFixed(2)),
+    };
+  });
+
   return {
-    categories,
+    totalApprovedAmount: totalAmount,
     totalAmount,
     totalCount,
-    year,
+    categories,
+    year: year || startDate.getFullYear(),
     month: month || null,
   };
 };
+
+export const exportTreasurerReportCsvService = async (
+  apartmentId: string,
+  options: {
+    type: "summary" | "defaulters" | "expenses";
+    year?: number;
+    month?: number;
+    days?: number;
+    overdueDays?: number;
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+  }
+) => {
+  const escapeCsv = (val: unknown) => {
+    if (val === null || val === undefined) return '""';
+    return `"${String(val).replace(/"/g, '""')}"`;
+  };
+
+  if (options.type === "summary") {
+    const selectedYear = options.year || new Date().getFullYear();
+    const data = await getMonthlyFinanceService(apartmentId, options.month, selectedYear);
+    const rows = data.months || [];
+
+    const monthLabels = [
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+
+    const header = [
+      "Month",
+      "Year",
+      "Collection",
+      "Expenses",
+      "Outstanding",
+      "Late Fees",
+      "Balance",
+    ];
+
+    const csvRows = rows.map((row) => [
+      escapeCsv(monthLabels[row.month - 1] || `Month ${row.month}`),
+      row.year,
+      row.collection,
+      row.expenses,
+      row.outstanding,
+      row.lateFees,
+      row.balance,
+    ]);
+
+    const csvContent = [header.join(","), ...csvRows.map((r) => r.join(","))].join("\n");
+    const filename = `financial-summary-${selectedYear}${
+      options.month ? `-${options.month}` : ""
+    }.csv`;
+    return { csvContent, filename };
+  }
+
+  if (options.type === "defaulters") {
+    const data = await getDefaultersReportService(apartmentId, {
+      overdueDays: options.overdueDays || options.days,
+      search: options.search,
+      limit: 10000,
+    });
+
+    const header = [
+      "Flat",
+      "Resident",
+      "Due Amount (INR)",
+      "Due Date",
+      "Overdue Days",
+      "Status",
+    ];
+
+    const csvRows = data.defaulters.map((d) => [
+      escapeCsv(d.flatNumber ? `Flat ${d.flatNumber}` : d.unitName || "N/A"),
+      escapeCsv(d.residentName || "Resident"),
+      d.balanceAmount,
+      escapeCsv(d.dueDate ? new Date(d.dueDate).toISOString().slice(0, 10) : "N/A"),
+      d.overdueDays,
+      d.status,
+    ]);
+
+    const csvContent = [header.join(","), ...csvRows.map((r) => r.join(","))].join("\n");
+    const filename = `defaulters-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    return { csvContent, filename };
+  }
+
+  if (options.type === "expenses") {
+    const data = await getExpenseBreakdownReportService(
+      apartmentId,
+      options.year,
+      options.month,
+      options.startDate,
+      options.endDate
+    );
+
+    const header = ["Category", "Amount (INR)", "Expense Count", "Share (%)"];
+
+    const csvRows = data.categories.map((c) => [
+      escapeCsv(c.category),
+      c.totalAmount,
+      c.count,
+      escapeCsv(`${c.percentage.toFixed(1)}%`),
+    ]);
+
+    const csvContent = [header.join(","), ...csvRows.map((r) => r.join(","))].join("\n");
+    const filename = `expense-breakdown-${options.year || new Date().getFullYear()}${
+      options.month ? `-${options.month}` : ""
+    }.csv`;
+    return { csvContent, filename };
+  }
+
+  throw new AppError("Invalid report type for CSV export", 400);
+};
+

@@ -20,7 +20,7 @@ import { getUserDashboardHref } from "@/features/dashboard/config/sidebar-naviga
 
 export default function HomePage() {
   const [isMounted, setIsMounted] = useState(false);
-  const { data: session } = useSession();
+  const { data: session, isPending, isRefetching } = useSession();
 
   useEffect(() => {
     setIsMounted(true);
@@ -28,6 +28,7 @@ export default function HomePage() {
 
   const user = isMounted ? session?.user : null;
   const dashboardHref = getUserDashboardHref(user?.role);
+  const isAuthLoading = !isMounted || isPending || (!session && isRefetching);
 
   return (
     <>
@@ -56,7 +57,9 @@ export default function HomePage() {
                 </p>
 
                 <div className="mt-8 flex flex-wrap items-center gap-3">
-                  {user ? (
+                  {isAuthLoading ? (
+                    <div className="h-12 w-44 animate-pulse rounded-full bg-black/[0.06]" />
+                  ) : user ? (
                     <Link
                       href={dashboardHref}
                       className="group inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[var(--brand)] px-7 text-sm font-semibold text-white transition hover:bg-[var(--brand-hover)]"

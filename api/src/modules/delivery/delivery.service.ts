@@ -31,6 +31,8 @@ import {
 } from "./delivery.types.js"
 import { SecurityDeliveryModel } from "./delivery.model.js"
 import { ResidentModel } from "../resident/resident.model.js"
+import { Flat } from "../flat/flat.model.js"
+import { createBulkNotifications } from "../notification/notification.service.js"
 import { type PipelineStage, Types } from "mongoose"
 const deliveryTransitions: Record<
   DeliveryStatusType,
@@ -126,9 +128,9 @@ const enrichDeliveries = async (
 
   const residents = orConditions.length
     ? await ResidentModel.find(residentsQuery)
-        .sort({ residentType: 1, joinedAt: -1 })
-        .select("_id userId flatId phoneNumber residentType status")
-        .lean()
+      .sort({ residentType: 1, joinedAt: -1 })
+      .select("_id userId flatId phoneNumber residentType status")
+      .lean()
     : []
 
   const residentRecords = residents as unknown as Array<{
@@ -223,6 +225,44 @@ const findResidentIdsForSearch = async (
   })
 }
 
+const getDeliveryRecipientUserIds = async (
+  apartmentId: string,
+  flatId: ObjectIdLike | string,
+  residentId?: ObjectIdLike | string | null
+): Promise<string[]> => {
+  let recipientUserIds: string[] = []
+
+  if (residentId) {
+    const resident = await ResidentModel.findOne({
+      _id: residentId,
+      apartmentId,
+      status: { $in: ["active", "pending"] },
+    })
+      .select("userId")
+      .lean()
+
+    if (resident?.userId) {
+      recipientUserIds.push(resident.userId)
+    }
+  }
+
+  if (recipientUserIds.length === 0) {
+    const flatResidents = await ResidentModel.find({
+      apartmentId,
+      flatId: toId(flatId),
+      status: { $in: ["active", "pending"] },
+    })
+      .select("userId")
+      .lean()
+
+    recipientUserIds = flatResidents
+      .map((r) => r.userId)
+      .filter((id): id is string => Boolean(id))
+  }
+
+  return [...new Set(recipientUserIds)]
+}
+
 export const createDeliveryService = async ({
   apartmentId,
   userId,
@@ -264,6 +304,14 @@ export const createDeliveryService = async ({
     }
   }
 
+  const [flat, recipientUserIds] = await Promise.all([
+    Flat.findOne({ _id: flatId, apartmentId }).select("flatNumber").lean(),
+    getDeliveryRecipientUserIds(apartmentId, flatId, resolvedResidentId),
+  ])
+
+  const flatNumber = flat?.flatNumber || "your flat"
+  const isNotified = recipientUserIds.length > 0
+
   const delivery = await SecurityDeliveryModel.create({
     apartmentId,
     flatId,
@@ -277,10 +325,32 @@ export const createDeliveryService = async ({
     packageDescription:
       normalizeText(packageDescription),
     notes: normalizeText(notes),
-    status: DeliveryStatus.WAITING,
+    status: isNotified ? DeliveryStatus.NOTIFIED : DeliveryStatus.WAITING,
     receivedBy: userId,
     receivedAt: new Date(),
   })
+
+  if (isNotified) {
+    const descSuffix = packageDescription ? ` (${packageDescription})` : ""
+    const typeLabel = deliveryType ? deliveryType.toLowerCase() : "package"
+
+    createBulkNotifications({
+      apartment: apartmentId,
+      recipientUserIds,
+      type: "DELIVERY_ARRIVED",
+      severity: "INFO",
+      title: `Delivery Arrived - ${deliveryCompany}`,
+      message: `A ${typeLabel} from ${deliveryCompany}${descSuffix} has arrived at the security gate for Flat ${flatNumber}.`,
+      relatedResourceType: "DELIVERY",
+      relatedResourceId: delivery._id.toString(),
+      createdBy: userId,
+    }).catch((notifError) => {
+      console.error(
+        "[Delivery] Failed to dispatch arrival notification:",
+        notifError
+      )
+    })
+  }
 
   const enriched = await enrichDeliveries(apartmentId, [
     delivery.toObject() as LeanDelivery,
@@ -367,8 +437,8 @@ export const listDeliveriesService = async ({
 
     const residentFlatIds = residentIds.length
       ? await ResidentModel.distinct("flatId", {
-          _id: { $in: residentIds },
-        })
+        _id: { $in: residentIds },
+      })
       : []
 
     const allFlatIds = Array.from(
@@ -442,12 +512,59 @@ export const updateDeliveryStatusService = async ({
 
   if (status === DeliveryStatus.NOTIFIED) {
     delivery.status = DeliveryStatus.NOTIFIED
+
+    getDeliveryRecipientUserIds(apartmentId, delivery.flatId, delivery.residentId)
+      .then(async (recipientUserIds) => {
+        if (recipientUserIds.length === 0) return
+        const flat = await Flat.findOne({ _id: delivery.flatId, apartmentId }).select("flatNumber").lean()
+        const flatNumber = flat?.flatNumber || "your flat"
+        const descSuffix = delivery.packageDescription ? ` (${delivery.packageDescription})` : ""
+        const typeLabel = delivery.deliveryType ? delivery.deliveryType.toLowerCase() : "package"
+
+        return createBulkNotifications({
+          apartment: apartmentId,
+          recipientUserIds,
+          type: "DELIVERY_ARRIVED",
+          severity: "INFO",
+          title: `Delivery Arrived - ${delivery.deliveryCompany}`,
+          message: `A ${typeLabel} from ${delivery.deliveryCompany}${descSuffix} has arrived at the security gate for Flat ${flatNumber}.`,
+          relatedResourceType: "DELIVERY",
+          relatedResourceId: `${delivery._id.toString()}-notified`,
+          createdBy: userId,
+        })
+      })
+      .catch((notifError) => {
+        console.error("[Delivery] Failed to dispatch notified notification:", notifError)
+      })
   }
 
   if (status === DeliveryStatus.COLLECTED) {
     delivery.status = DeliveryStatus.COLLECTED
     delivery.collectedBy = userId
     delivery.collectedAt = now
+
+    getDeliveryRecipientUserIds(apartmentId, delivery.flatId, delivery.residentId)
+      .then(async (recipientUserIds) => {
+        if (recipientUserIds.length === 0) return
+        const flat = await Flat.findOne({ _id: delivery.flatId, apartmentId }).select("flatNumber").lean()
+        const flatNumber = flat?.flatNumber || "your flat"
+        const typeLabel = delivery.deliveryType ? delivery.deliveryType.toLowerCase() : "package"
+
+        return createBulkNotifications({
+          apartment: apartmentId,
+          recipientUserIds,
+          type: "DELIVERY_COLLECTED",
+          severity: "SUCCESS",
+          title: `Delivery Collected - ${delivery.deliveryCompany}`,
+          message: `The ${typeLabel} from ${delivery.deliveryCompany} for Flat ${flatNumber} has been collected from the security gate.`,
+          relatedResourceType: "DELIVERY",
+          relatedResourceId: `${delivery._id.toString()}-collected`,
+          createdBy: userId,
+        })
+      })
+      .catch((notifError) => {
+        console.error("[Delivery] Failed to dispatch collected notification:", notifError)
+      })
   }
 
   if (status === DeliveryStatus.RETURNED) {

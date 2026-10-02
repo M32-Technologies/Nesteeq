@@ -119,9 +119,9 @@ export function AnnouncementsPageContent({
       setIsEmergencyOpen(false);
     } catch (err: unknown) {
       const message =
-        err instanceof Error
-          ? err.message
-          : "Failed to broadcast emergency alert";
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        (err as Error)?.message ||
+        "Failed to broadcast emergency alert";
       toast.error(message);
       throw err;
     }

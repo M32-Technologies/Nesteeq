@@ -7,7 +7,6 @@ import {
   Building,
   Phone,
   Mail,
-  Download,
   Share2,
   CheckCircle2,
   ShieldCheck,
@@ -51,10 +50,6 @@ export function ResidentNoticeDetailDrawer({
       );
       alert("Notice copied to clipboard!");
     }
-  };
-
-  const handlePrint = () => {
-    window.print();
   };
 
   const getTypeBadge = (type: AnnouncementType) => {
@@ -244,11 +239,10 @@ export function ResidentNoticeDetailDrawer({
 
           <button
             type="button"
-            onClick={handlePrint}
-            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4.5 py-2.5 text-xs font-bold text-white shadow-sm shadow-indigo-600/20 hover:bg-indigo-700 transition cursor-pointer active:scale-95"
+            onClick={onClose}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200/90 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100 shadow-2xs transition cursor-pointer"
           >
-            <Download className="size-4" />
-            <span>Download Official Notice (PDF)</span>
+            <span>Close</span>
           </button>
         </div>
       </div>

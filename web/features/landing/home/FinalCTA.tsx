@@ -9,7 +9,7 @@ import { getUserDashboardHref } from "@/features/dashboard/config/sidebar-naviga
 
 export default function FinalCTA() {
   const [isMounted, setIsMounted] = useState(false);
-  const { data: session } = useSession();
+  const { data: session, isPending, isRefetching } = useSession();
 
   useEffect(() => {
     setIsMounted(true);
@@ -17,6 +17,7 @@ export default function FinalCTA() {
 
   const user = isMounted ? session?.user : null;
   const dashboardHref = getUserDashboardHref(user?.role);
+  const isAuthLoading = !isMounted || isPending || (!session && isRefetching);
 
   return (
     <section className="bg-[var(--brand-dark)] px-5 py-24 sm:px-7 lg:px-10 lg:py-32">
@@ -49,13 +50,17 @@ export default function FinalCTA() {
           transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
           className="mt-12"
         >
-          <Link
-            href={user ? dashboardHref : "/pricing"}
-            className="group inline-flex h-14 items-center justify-center gap-2 rounded-full bg-white px-8 text-base font-semibold text-[var(--brand-dark)] transition-all hover:scale-105 hover:bg-white/90 active:scale-100"
-          >
-            {user ? "Go to dashboard" : "Get started"}
-            <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
-          </Link>
+          {isAuthLoading ? (
+            <div className="inline-flex h-14 w-48 animate-pulse rounded-full bg-white/20" />
+          ) : (
+            <Link
+              href={user ? dashboardHref : "/pricing"}
+              className="group inline-flex h-14 items-center justify-center gap-2 rounded-full bg-white px-8 text-base font-semibold text-[var(--brand-dark)] transition-all hover:scale-105 hover:bg-white/90 active:scale-100"
+            >
+              {user ? "Go to dashboard" : "Get started"}
+              <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+            </Link>
+          )}
         </motion.div>
       </div>
     </section>

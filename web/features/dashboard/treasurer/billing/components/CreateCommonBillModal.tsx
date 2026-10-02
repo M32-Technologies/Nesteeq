@@ -7,11 +7,9 @@ import {
   ArrowUpCircle,
   Building,
   Building2,
-  Calendar,
   Car,
   CheckCircle2,
   DollarSign,
-  Droplets,
   FileText,
   Layers,
   Plus,
@@ -20,7 +18,6 @@ import {
   Users,
   Wrench,
   X,
-  Zap,
 } from "lucide-react";
 
 import { getBillRecipients } from "../services/billing.service";
@@ -48,24 +45,6 @@ const BILL_PRESETS = [
     description: "Regular charges for common cleaning, security guards, shared lighting, and general upkeep.",
   },
   {
-    type: "WATER",
-    label: "Water Bill",
-    badge: "Utility",
-    badgeColor: "bg-sky-50 text-sky-700 border-sky-200",
-    icon: Droplets,
-    defaultName: "Water Supply Charges",
-    description: "Fixed or shared community water tanker, municipal supply, and pumping charges.",
-  },
-  {
-    type: "COMMON_ELECTRICITY",
-    label: "Common Electricity",
-    badge: "Utility",
-    badgeColor: "bg-amber-50 text-amber-700 border-amber-200",
-    icon: Zap,
-    defaultName: "Common Area Electricity",
-    description: "Corridor lighting, parking lot lights, clubhouse, and security cabin power consumption.",
-  },
-  {
     type: "LIFT_MAINTENANCE",
     label: "Lift Maintenance AMC",
     badge: "Facility",
@@ -73,6 +52,15 @@ const BILL_PRESETS = [
     icon: ArrowUpCircle,
     defaultName: "Lift AMC & Inspection",
     description: "Elevator annual maintenance contracts, safety certification, and quarterly servicing.",
+  },
+  {
+    type: "LIFT_AMC",
+    label: "Lift AMC Contract",
+    badge: "Contract",
+    badgeColor: "bg-blue-50 text-blue-700 border-blue-200",
+    icon: ArrowUpCircle,
+    defaultName: "Lift AMC Contract",
+    description: "Annual maintenance contracts and quarterly elevator safety certification.",
   },
   {
     type: "SPECIAL_REPAIR",
@@ -447,8 +435,7 @@ export default function CreateCommonBillModal({
                   {hasPeriod ? "No Period" : "Add Period"}
                 </button>
               </div>
-              <div className="mt-1.5 flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-slate-400" />
+              <div className="mt-1.5">
                 <input
                   id={periodInputId}
                   type="month"

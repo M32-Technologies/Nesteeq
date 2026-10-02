@@ -6,19 +6,21 @@ const objectIdSchema = z
 
 export const createWalletSchema = z.object({
   body: z.object({
-    apartmentId: objectIdSchema,
+    apartmentId: objectIdSchema.optional(),
     residentId: objectIdSchema,
   }),
 });
 
 export const getWalletsSchema = z.object({
-  query: z.object({
-    apartmentId: objectIdSchema,
-    status: z.enum(["ALL", "ACTIVE", "ZERO"]).optional(),
-    search: z.string().trim().optional(),
-    page: z.coerce.number().int().positive().optional(),
-    limit: z.coerce.number().int().positive().max(100).optional(),
-  }),
+  query: z
+    .object({
+      apartmentId: objectIdSchema.optional(),
+      status: z.enum(["ALL", "ACTIVE", "ZERO"]).optional(),
+      search: z.string().trim().optional(),
+      page: z.coerce.number().int().positive().optional(),
+      limit: z.coerce.number().int().positive().max(100).optional(),
+    })
+    .optional(),
 });
 
 export const getWalletSchema = z.object({
@@ -26,9 +28,11 @@ export const getWalletSchema = z.object({
     residentId: objectIdSchema,
   }),
 
-  query: z.object({
-    apartmentId: objectIdSchema,
-  }),
+  query: z
+    .object({
+      apartmentId: objectIdSchema.optional(),
+    })
+    .optional(),
 });
 
 export const addWalletFundsSchema = z.object({
@@ -37,7 +41,7 @@ export const addWalletFundsSchema = z.object({
   }),
 
   body: z.object({
-    apartmentId: objectIdSchema,
+    apartmentId: objectIdSchema.optional(),
 
     amount: z
       .number()
@@ -56,7 +60,7 @@ export const deductWalletFundsSchema = z.object({
   }),
 
   body: z.object({
-    apartmentId: objectIdSchema,
+    apartmentId: objectIdSchema.optional(),
 
     billId: objectIdSchema,
 

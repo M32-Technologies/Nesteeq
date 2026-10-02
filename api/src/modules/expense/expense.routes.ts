@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import {
   createExpense,
+  exportExpensesCsv,
   getExpenseById,
   getExpenseSummary,
   getExpenses,
@@ -26,6 +27,8 @@ const router = Router();
 router.use(protect, requireRole("treasurer"));
 
 router.post("/", zodValidate(createExpenseSchema), createExpense);
+
+router.get("/export/csv", zodValidate(getExpensesSchema), exportExpensesCsv);
 
 router.get("/", zodValidate(getExpensesSchema), getExpenses);
 

@@ -11,19 +11,33 @@ import { AppError } from "../../utils/AppError.js";
 
 
 
+import { Types } from "mongoose";
 import type { GetMaintenanceQuery } from "./maintenance.schema.js";
 import type { AuthenticatedMaintenanceUser } from "./maintenance.service.js";
 import type { MaintenanceDocument } from "./maintenance.model.js";
 
-const normalizeOptionalString = (value: string | null | undefined): string | undefined => {
-  if (!value) return undefined;
-  const trimmed = value.trim();
+const normalizeOptionalString = (value: unknown): string | undefined => {
+  if (value === null || value === undefined) return undefined;
+  let str: string;
+  if (typeof value === "string") {
+    str = value;
+  } else if (typeof value === "object" && value !== null && "_id" in value) {
+    str = String((value as any)._id);
+  } else if (typeof (value as any)?.toHexString === "function") {
+    str = (value as any).toHexString();
+  } else if (typeof (value as any)?.toString === "function") {
+    str = (value as any).toString();
+    if (str === "[object Object]") return undefined;
+  } else {
+    str = String(value);
+  }
+  const trimmed = str.trim();
   return trimmed === "" ? undefined : trimmed;
 };
 
 const sameId = (id1: any, id2: any): boolean => {
   if (!id1 || !id2) return false;
-  return id1.toString() === id2.toString();
+  return id1.toString().toLowerCase() === id2.toString().toLowerCase();
 };
 
 
@@ -59,7 +73,7 @@ export const assertManagerCanManageApartment = (
       throw new AppError("Management user must be linked to an apartment", 403);
     }
 
-    if (!targetApartmentId || targetApartmentId !== managerApartmentId) {
+    if (!targetApartmentId || !sameId(targetApartmentId, managerApartmentId)) {
       throw new AppError("You do not have permission to manage maintenance for this apartment", 403);
     }
   }
@@ -128,12 +142,12 @@ export const ensureStaffCanWorkOnApartment = (
       throw new AppError("Management user must be linked to an apartment", 403);
     }
 
-    if (!staffApartmentId || staffApartmentId !== managerApartmentId) {
+    if (staffApartmentId && staffApartmentId !== managerApartmentId) {
       throw new AppError("Staff member does not belong to your apartment", 403);
     }
   }
 
-  if (staffApartmentId && staffApartmentId !== targetApartmentId) {
+  if (staffApartmentId && targetApartmentId && staffApartmentId !== targetApartmentId) {
     throw new AppError("Staff member does not belong to this apartment", 400);
   }
 
@@ -156,8 +170,11 @@ const applySharedFilters = (
     filter.priority = query.priority;
   }
 
-  if (query.complaint) {
-    filter.complaint = query.complaint;
+  const complaintId = query.complaint || (query as any).complaintId;
+  if (complaintId) {
+    filter.complaint = Types.ObjectId.isValid(complaintId)
+      ? new Types.ObjectId(complaintId)
+      : complaintId;
   }
 
   if (query.costStatus) {
@@ -178,13 +195,21 @@ const applyManagerFilters = (
       throw new AppError("Management user must be linked to an apartment", 403);
     }
 
-    if (query.apartment && query.apartment !== managerApartmentId) {
+    if (query.apartment && !sameId(query.apartment, managerApartmentId)) {
       throw new AppError("You do not have permission to view maintenance for this apartment", 403);
     }
 
-    filter.apartment = managerApartmentId;
+    const aptValues: unknown[] = [managerApartmentId];
+    if (Types.ObjectId.isValid(managerApartmentId)) {
+      aptValues.push(new Types.ObjectId(managerApartmentId));
+    }
+    filter.apartment = { $in: aptValues };
   } else if (query.apartment) {
-    filter.apartment = query.apartment;
+    const aptValues: unknown[] = [query.apartment];
+    if (Types.ObjectId.isValid(query.apartment)) {
+      aptValues.push(new Types.ObjectId(query.apartment));
+    }
+    filter.apartment = { $in: aptValues };
   }
 
   if (query.flat) {

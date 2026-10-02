@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   useMutation,
   useQuery,
@@ -108,9 +108,8 @@ const ITEMS_PER_PAGE = 8;
 const BILL_CATEGORY_FILTERS = [
   { value: "ALL", label: "All Bills" },
   { value: "MONTHLY_MAINTENANCE", label: "Maintenance" },
-  { value: "WATER", label: "Water" },
-  { value: "COMMON_ELECTRICITY", label: "Electricity" },
-  { value: "LIFT_MAINTENANCE", label: "Lift AMC" },
+  { value: "LIFT_MAINTENANCE", label: "Lift Maintenance" },
+  { value: "LIFT_AMC", label: "Lift AMC" },
   { value: "SPECIAL_REPAIR", label: "Special Repair" },
   { value: "PARKING_MAINTENANCE", label: "Parking" },
   { value: "OTHER", label: "Other" },
@@ -482,10 +481,18 @@ export default function TreasurerBilling() {
   }, [bills, selectedStatusFilter, searchTerm]);
 
   const totalPages = Math.ceil(filteredBills.length / ITEMS_PER_PAGE) || 1;
+  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const paginatedBills = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    const start = (validCurrentPage - 1) * ITEMS_PER_PAGE;
     return filteredBills.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredBills, currentPage]);
+  }, [filteredBills, validCurrentPage]);
   const serverSummary = billingSummaryQuery.data;
   const billingStats = useMemo(() => {
     if (selectedCategoryFilter === "ALL" && serverSummary) {

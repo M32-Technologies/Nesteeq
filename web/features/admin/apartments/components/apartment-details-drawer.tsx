@@ -20,6 +20,8 @@ import {
   Loader2,
   AlertCircle,
   Ban,
+  ShieldAlert,
+  Info,
 } from "lucide-react"
 import { toast } from "sonner"
 import { fetchApartmentById, updateApartmentStatus } from "../api/apartment.api"
@@ -80,14 +82,18 @@ export default function ApartmentDetailsDrawer({
   const [details, setDetails] = useState<ApartmentDetail | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false)
+  const [deactivationReason, setDeactivationReason] = useState("")
   const [error, setError] = useState<string | null>(null)
 
-  const handleStatusChange = async (newStatus: "active" | "inactive") => {
+  const handleStatusChange = async (newStatus: "active" | "inactive", reason?: string) => {
     if (!details || !apartmentId) return
     setIsUpdatingStatus(true)
     try {
-      const updated = await updateApartmentStatus(apartmentId, newStatus)
-      setDetails((prev) => (prev ? { ...prev, status: updated.status } : null))
+      const updated = await updateApartmentStatus(apartmentId, newStatus, reason)
+      setDetails((prev) => (prev ? { ...prev, status: updated.status, inactiveReason: updated.inactiveReason } : null))
+      setShowDeactivateConfirm(false)
+      setDeactivationReason("")
       toast.success(
         `${details.name} is now ${newStatus === "active" ? "active" : "inactive"}.`
       )
@@ -282,42 +288,31 @@ export default function ApartmentDetailsDrawer({
                 {/* Status Management & Action */}
                 <div className="rounded-2xl border border-[#EEF1EF] bg-white p-4 space-y-3">
                   <SectionHeader title="Community Status & Access Control" />
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-slate-50/70 border border-[#F1F5F9]">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-[#0F172A]">Current:</span>
-                        {renderStatusBadge(details.status)}
-                      </div>
-                      <p className="text-[11px] text-[#64748B]">
-                        {details.status === "active"
-                          ? "This community is live with full resident and manager access."
-                          : details.status === "pending_payment"
-                          ? "Awaiting subscription payment, but admin can activate immediately."
-                          : "This community is deactivated. Portal access is blocked."}
-                      </p>
-                    </div>
+                  {details.status === "inactive" ? (
+                    <div className="rounded-xl border border-rose-200/80 bg-gradient-to-b from-rose-50/50 to-white p-4 space-y-3.5 shadow-2xs">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-100 text-rose-700 border border-rose-200/60 shrink-0">
+                            <ShieldAlert className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-xs font-bold text-slate-900">
+                                Portal Access Restricted
+                              </h4>
+                              {renderStatusBadge("inactive")}
+                            </div>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              Residents and staff cannot log in to their portals.
+                            </p>
+                          </div>
+                        </div>
 
-                    <div className="shrink-0 flex items-center gap-2">
-                      {details.status === "active" ? (
-                        <button
-                          type="button"
-                          onClick={() => handleStatusChange("inactive")}
-                          disabled={isUpdatingStatus}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 shadow-2xs hover:bg-red-50 hover:border-red-300 disabled:opacity-50 transition-colors cursor-pointer"
-                        >
-                          {isUpdatingStatus ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Ban className="h-3.5 w-3.5" />
-                          )}
-                          <span>Deactivate</span>
-                        </button>
-                      ) : (
                         <button
                           type="button"
                           onClick={() => handleStatusChange("active")}
                           disabled={isUpdatingStatus}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-[#07584F] px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-[#064e46] disabled:opacity-50 transition-colors cursor-pointer"
+                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#07584F] hover:bg-[#064e46] px-4 py-2 text-xs font-semibold text-white shadow-xs transition-colors cursor-pointer disabled:opacity-50 shrink-0"
                         >
                           {isUpdatingStatus ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -326,9 +321,138 @@ export default function ApartmentDetailsDrawer({
                           )}
                           <span>Activate Community</span>
                         </button>
+                      </div>
+
+                      {details.inactiveReason && (
+                        <div className="rounded-xl border border-rose-200/80 bg-rose-50/40 p-3 text-xs flex items-start gap-2.5">
+                          <Info className="h-4 w-4 text-rose-500 shrink-0 mt-0.5" />
+                          <div className="min-w-0 flex-1">
+                            <span className="font-semibold text-rose-900 block text-[11px] uppercase tracking-wider mb-0.5">
+                              Deactivation Reason
+                            </span>
+                            <p className="text-rose-800 text-xs leading-relaxed italic">
+                              "{details.inactiveReason}"
+                            </p>
+                          </div>
+                        </div>
                       )}
                     </div>
-                  </div>
+                  ) : details.status === "active" ? (
+                    <div className="rounded-xl border border-emerald-200/70 bg-gradient-to-b from-emerald-50/30 to-white p-4 space-y-3.5 shadow-2xs">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 border border-emerald-200/60 shrink-0">
+                            <CheckCircle2 className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-xs font-bold text-slate-900">
+                                Community Operational
+                              </h4>
+                              {renderStatusBadge("active")}
+                            </div>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              Live with full resident, staff, and manager access.
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setShowDeactivateConfirm(true)}
+                          disabled={isUpdatingStatus || showDeactivateConfirm}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 hover:border-rose-300 text-rose-700 font-semibold text-xs px-3.5 py-2 shadow-2xs transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+                        >
+                          {isUpdatingStatus ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Ban className="h-3.5 w-3.5" />
+                          )}
+                          <span>Deactivate</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-amber-200/70 bg-gradient-to-b from-amber-50/30 to-white p-4 space-y-3.5 shadow-2xs">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700 border border-amber-200/60 shrink-0">
+                            <Clock className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-xs font-bold text-slate-900">
+                                Pending Subscription
+                              </h4>
+                              {renderStatusBadge("pending_payment")}
+                            </div>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              Awaiting payment. Super Admin can activate manually.
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleStatusChange("active")}
+                          disabled={isUpdatingStatus}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#07584F] hover:bg-[#064e46] px-4 py-2 text-xs font-semibold text-white shadow-xs transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+                        >
+                          {isUpdatingStatus ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                          )}
+                          <span>Activate Community</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {showDeactivateConfirm && (
+                    <div className="p-4 bg-rose-50/90 border border-rose-200 rounded-xl space-y-3 animate-in fade-in duration-200 shadow-2xs">
+                      <div className="flex items-center gap-2 text-rose-900 font-bold text-xs">
+                        <Ban className="h-4 w-4 text-rose-600" />
+                        <span>Confirm Community Deactivation</span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 leading-relaxed">
+                        Specify a reason below. This will be displayed on the Property Manager's portal and included in the notification email.
+                      </p>
+                      <input
+                        type="text"
+                        value={deactivationReason}
+                        onChange={(e) => setDeactivationReason(e.target.value)}
+                        placeholder="e.g. Subscription payment overdue, administrative review..."
+                        className="w-full text-xs rounded-xl border border-rose-200 bg-white px-3 py-2 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-400/40 focus:border-rose-400 shadow-2xs"
+                      />
+                      <div className="flex items-center justify-end gap-2 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowDeactivateConfirm(false);
+                            setDeactivationReason("");
+                          }}
+                          disabled={isUpdatingStatus}
+                          className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition cursor-pointer font-medium"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleStatusChange("inactive", deactivationReason)}
+                          disabled={isUpdatingStatus}
+                          className="text-xs px-3.5 py-1.5 rounded-lg bg-rose-600 text-white font-semibold hover:bg-rose-700 transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                        >
+                          {isUpdatingStatus ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Ban className="h-3 w-3" />
+                          )}
+                          Confirm Deactivation
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   useMutation,
   useQuery,
@@ -32,6 +32,7 @@ import {
 import { toast } from "sonner";
 
 import {
+  exportPaymentsCsv,
   getBills,
   getPayments,
   recordBillPayment,
@@ -241,7 +242,7 @@ export default function TreasurerPayments() {
     if (datePreset === "THIS_WEEK") {
       const day = now.getDay();
       const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Monday
-      const start = new Date(now.setDate(diff));
+      const start = new Date(now.getFullYear(), now.getMonth(), diff);
       start.setHours(0, 0, 0, 0);
       return { start, end: new Date() };
     }
@@ -337,59 +338,38 @@ export default function TreasurerPayments() {
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(filteredPayments.length / ITEMS_PER_PAGE));
+  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const paginatedPayments = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    const start = (validCurrentPage - 1) * ITEMS_PER_PAGE;
     return filteredPayments.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredPayments, currentPage]);
+  }, [filteredPayments, validCurrentPage]);
 
   // CSV Export Handler
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     if (filteredPayments.length === 0) {
       toast.error("No transactions to export.");
       return;
     }
 
-    const headers = [
-      "Receipt Number",
-      "Date",
-      "Flat",
-      "Resident Name",
-      "Payment Purpose / Bill",
-      "Payment Mode",
-      "Reference / UTR",
-      "Amount (INR)",
-      "Status",
-      "Reversal Reason",
-    ];
-
-    const rows = filteredPayments.map((p) => [
-      p.receiptNumber || `REC-${p._id.slice(-6).toUpperCase()}`,
-      new Date(p.paidAt).toLocaleString("en-IN"),
-      p.unitName || (p.flatNumber ? `Flat ${p.flatNumber}` : "Unit"),
-      `"${(p.residentName || "").replace(/"/g, '""')}"`,
-      `"${(p.billTitle || "Maintenance").replace(/"/g, '""')}"`,
-      p.paymentMethod || p.source,
-      `"${(p.referenceNo || "").replace(/"/g, '""')}"`,
-      p.amount,
-      p.reversed ? "REVERSED" : "COMPLETED",
-      `"${(p.reversalReason || "").replace(/"/g, '""')}"`,
-    ]);
-
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute(
-      "download",
-      `Nesteeq_Collection_Register_${new Date().toISOString().split("T")[0]}.csv`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Collection register successfully exported to CSV.");
+    try {
+      await exportPaymentsCsv({
+        paymentMethod: selectedMethod !== "ALL" ? selectedMethod : undefined,
+        includeReversed: statusFilter === "ALL" || statusFilter === "REVERSED",
+        startDate: dateRangeBounds ? dateRangeBounds.start.toISOString() : undefined,
+        endDate: dateRangeBounds ? dateRangeBounds.end.toISOString() : undefined,
+        search: searchQuery.trim() || undefined,
+      });
+      toast.success("Collection register successfully exported to CSV.");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to export CSV.");
+    }
   };
 
   // Helper badge for payment method

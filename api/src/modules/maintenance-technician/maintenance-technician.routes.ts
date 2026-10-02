@@ -22,7 +22,7 @@ import {
 const router = Router()
 
 router.use(protect)
-router.use(requireRole("maintenance_technician"))
+router.use(requireRole("maintenance_technician", "technician", "maintenance_staff"))
 
 router.get("/dashboard", getDashboardStatsController)
 router.get("/jobs", getAssignedJobsController)
@@ -39,6 +39,11 @@ router.post(
   uploadEvidenceController
 )
 router.post(
+  "/jobs/:jobId/cost",
+  zodValidate(costSubmissionSchema),
+  submitCostController
+)
+router.patch(
   "/jobs/:jobId/cost",
   zodValidate(costSubmissionSchema),
   submitCostController

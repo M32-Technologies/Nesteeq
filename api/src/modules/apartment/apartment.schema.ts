@@ -8,6 +8,7 @@ export interface IApartment {
   city: string;
   address: string;
   status: string;
+  inactiveReason?: string;
   totalUnits: string;
   totalFloors?: string;
   totalBlocks: string;
@@ -18,3 +19,4 @@ export interface IApartment {
   updatedAt?: Date;
   _id?: Types.ObjectId;
 }
+

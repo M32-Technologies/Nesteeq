@@ -15,6 +15,7 @@ import {
   recordBillPaymentService,
   updateBillService,
   waiveLateFeeService,
+  generateReceiptFileService,
 } from "./billing.service.js";
 
 import { BillStatus } from "./billing.interface.js";
@@ -231,7 +232,7 @@ export const getMyResidentBills = catchAsync(
   async (req: Request, res: Response) => {
     const user = {
       id: req.user!.id,
-      role: req.user?.role || "resident",
+      role: req.user!.role ?? "RESIDENT",
       apartmentId: req.user!.apartmentId ?? null,
       flatId: req.user!.flatId ?? null,
     };
@@ -250,7 +251,7 @@ export const payResidentBill = catchAsync(
     const user = {
       id: req.user!.id,
       name: req.user!.name,
-      role: req.user?.role || "resident",
+      role: req.user!.role ?? "RESIDENT",
       apartmentId: req.user!.apartmentId ?? null,
       flatId: req.user!.flatId ?? null,
     };
@@ -297,5 +298,22 @@ export const deleteBill = catchAsync(
     });
   }
 );
+
+export const downloadReceiptFile = catchAsync(
+  async (req: Request, res: Response) => {
+    const receiptId = req.params.id as string;
+    const format = req.query.format === "txt" ? "txt" : "html";
+
+    const { content, filename, mimeType } = await generateReceiptFileService(
+      receiptId,
+      format
+    );
+
+    res.setHeader("Content-Type", mimeType);
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.status(200).send(content);
+  }
+);
+
 
 

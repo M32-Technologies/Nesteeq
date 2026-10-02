@@ -1,6 +1,10 @@
 import { Types } from "mongoose";
 
 import { getAuthDB } from "../../config/auth-db.js";
+import {
+  ANNOUNCEMENT_CREATED_JOB,
+  notificationQueue,
+} from "../../infrastructure/queues/notification.queue.js";
 import { AppError } from "../../utils/AppError.js";
 import { escapeRegExp } from "../../utils/regex.js";
 import { Block } from "../block/block.model.js";
@@ -243,6 +247,21 @@ export const createAnnouncementService = async (
     expiresAt,
   });
 
+  if (announcement.status === AnnouncementStatus.PUBLISHED) {
+    const isEmergency = announcement.type === AnnouncementType.EMERGENCY;
+    await notificationQueue.add(
+      ANNOUNCEMENT_CREATED_JOB,
+      {
+        announcementId: announcement._id.toString(),
+        apartmentId,
+        type: isEmergency ? "emergency" : "normal",
+      },
+      {
+        priority: isEmergency ? 1 : 10,
+      }
+    );
+  }
+
   const [enriched] = await enrichAnnouncements(apartmentId, [
     announcement.toObject() as unknown as IAnnouncement & { _id: Types.ObjectId },
   ]);
@@ -442,8 +461,27 @@ export const updateAnnouncementStatusService = async (
     throw new AppError("Announcement not found in this apartment", 404);
   }
 
+  const previousStatus = announcement.status;
   announcement.status = status;
   await announcement.save();
+
+  if (
+    status === AnnouncementStatus.PUBLISHED &&
+    previousStatus !== AnnouncementStatus.PUBLISHED
+  ) {
+    const isEmergency = announcement.type === AnnouncementType.EMERGENCY;
+    await notificationQueue.add(
+      ANNOUNCEMENT_CREATED_JOB,
+      {
+        announcementId: announcement._id.toString(),
+        apartmentId,
+        type: isEmergency ? "emergency" : "normal",
+      },
+      {
+        priority: isEmergency ? 1 : 10,
+      }
+    );
+  }
 
   const [enriched] = await enrichAnnouncements(apartmentId, [
     announcement.toObject() as unknown as IAnnouncement & { _id: Types.ObjectId },
@@ -647,6 +685,18 @@ export const broadcastEmergencyService = async (
     targetIds,
     expiresAt: null,
   });
+
+  await notificationQueue.add(
+    ANNOUNCEMENT_CREATED_JOB,
+    {
+      announcementId: announcement._id.toString(),
+      apartmentId,
+      type: "emergency",
+    },
+    {
+      priority: 1,
+    }
+  );
 
   return {
     id: announcement._id.toString(),

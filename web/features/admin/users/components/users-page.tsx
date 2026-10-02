@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { AlertCircle } from "lucide-react"
 import { authClient } from "@/lib/auth-client"
+import { fetchApartments, fetchApartmentById } from "@/features/admin/apartments/api/apartment.api"
 import UserKpiCards from "@/features/admin/users/components/user-kpi-cards"
 import PropertyManagersTable, {
   isAdminUser,
@@ -48,23 +49,97 @@ export default function UsersPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await authClient.admin.listUsers({
-        query: {
-          limit: 1000,
-          sortBy: "createdAt",
-          sortDirection: "desc",
-        },
-      })
+      const [usersRes, aptsRes] = await Promise.all([
+        authClient.admin.listUsers({
+          query: {
+            limit: 1000,
+            sortBy: "createdAt",
+            sortDirection: "desc",
+          },
+        }),
+        fetchApartments({ limit: 1000 }).catch((err) => {
+          console.error("fetchApartments error in UsersPage:", err)
+          return null
+        }),
+      ])
 
-      if (res.error) {
-        setError(res.error.message || "Failed to load user directory.")
+      if (usersRes.error) {
+        setError(usersRes.error.message || "Failed to load user directory.")
         return
       }
 
-      const rawUsers = (res.data?.users || []) as BetterAuthUser[]
+      const rawUsers = (usersRes.data?.users || []) as BetterAuthUser[]
       // Strictly exclude any admin or super_admin user
       const nonAdminUsers = rawUsers.filter((u) => !isAdminUser(u))
-      setAllUsers(nonAdminUsers)
+
+      // Build apartment lookup map from existing fetchApartments API
+      const apartmentMap = new Map<string, {
+        id: string
+        name: string
+        address?: string
+        city?: string
+        state?: string
+        status?: string
+        totalUnits?: string | number
+      }>()
+
+      if (aptsRes?.apartments) {
+        for (const apt of aptsRes.apartments) {
+          apartmentMap.set(apt._id, {
+            id: apt._id,
+            name: apt.name,
+            address: apt.address,
+            city: apt.city,
+            state: apt.state,
+            status: apt.status,
+            totalUnits: apt.totalUnits,
+          })
+        }
+      }
+
+      // Fallback: If any user has an apartmentId not in apartmentMap, fetch it individually
+      const missingAptIds = Array.from(
+        new Set(
+          nonAdminUsers
+            .map((u) => u.apartmentId)
+            .filter((id): id is string => Boolean(id) && !apartmentMap.has(id!))
+        )
+      )
+
+      if (missingAptIds.length > 0) {
+        await Promise.all(
+          missingAptIds.map(async (aptId) => {
+            try {
+              const apt = await fetchApartmentById(aptId)
+              if (apt) {
+                apartmentMap.set(apt._id, {
+                  id: apt._id,
+                  name: apt.name,
+                  address: apt.address,
+                  city: apt.city,
+                  state: apt.state,
+                  status: apt.status,
+                  totalUnits: apt.totalUnits,
+                })
+              }
+            } catch (e) {
+              console.error(`Could not fetch apartment ${aptId}:`, e)
+            }
+          })
+        )
+      }
+
+      // Attach apartment details at data taking time
+      const enrichedUsers = nonAdminUsers.map((u) => {
+        const apt = u.apartmentId ? apartmentMap.get(u.apartmentId) : null
+        return {
+          ...u,
+          apartmentName: apt?.name ?? null,
+          apartmentDetails: apt ?? null,
+        }
+      })
+
+      setAllUsers(enrichedUsers)
     } catch {
       setError("Unable to connect to the authentication server.")
     } finally {

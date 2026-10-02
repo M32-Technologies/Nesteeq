@@ -215,13 +215,15 @@ const maintenanceSchema = new Schema(
     complaint: {
       type: Schema.Types.ObjectId,
       ref: "Complaint",
-      required: true,
+      required: false,
+      default: null,
       index: true,
     },
     resident: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
+      default: null,
       index: true,
     },
     apartment: {
@@ -232,8 +234,9 @@ const maintenanceSchema = new Schema(
     },
     flat: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
+      default: "COMMON_AREA",
       index: true,
     },
     assignedStaff: {
@@ -301,6 +304,50 @@ const maintenanceSchema = new Schema(
     finalCost: {
       type: Number,
       min: 0,
+      default: null,
+    },
+    expenseAmount: {
+      type: Number,
+      min: 0,
+      default: null,
+    },
+    expenseDescription: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    expenseReceiptUrl: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    expenseStatus: {
+      type: String,
+      enum: ["PENDING_FACILITY_APPROVAL", "APPROVED", "REJECTED"],
+      default: null,
+      index: true,
+    },
+    expenseSubmittedAt: {
+      type: Date,
+      default: null,
+    },
+    expenseSubmittedBy: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    expenseReviewedAt: {
+      type: Date,
+      default: null,
+    },
+    expenseReviewedBy: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    expenseRejectionReason: {
+      type: String,
+      trim: true,
       default: null,
     },
     progressUpdates: {

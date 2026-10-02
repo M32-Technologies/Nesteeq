@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import api from "@/lib/axios";
 import { useResidentDashboard } from "@/features/dashboard/resident/hooks/use-resident-dashboard";
 import {
   fetchResidentBills,
@@ -414,175 +415,60 @@ export function ResidentBillsPage() {
     }, 200);
   };
 
-  const handleDownloadReceiptHtml = (
+  const handleDownloadReceiptHtml = async (
     receipt: ResidentPaymentItem & { billTitle?: string; billingPeriod?: string; billScope?: string }
   ) => {
-    const receiptNo = `REC-${receipt._id.slice(-6).toUpperCase()}`;
-    const dateStr = formatDate(receipt.paidAt);
-    const formattedAmt = formatCurrency(receipt.amount);
-    const society = apartmentName || "Nesteeq Residential Society";
-    const resident = userName || "Resident Member";
-    const unit = flatUnitName || "N/A";
-    const source = receipt.source || "ONLINE / UPI";
-    const desc = receipt.description || receipt.billTitle || "Monthly Society Maintenance Settlement";
-    const refNo = receipt.billId ? `BILL-${receipt.billId.slice(-6).toUpperCase()}` : receipt._id;
-
-    const htmlContent = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Payment Receipt - ${receiptNo}</title>
-  <style>
-    @page {
-      size: A4 portrait;
-      margin: 10mm 14mm;
+    try {
+      const res = await api.get(`/api/v1/bills/receipt/${receipt._id}/download?format=html`, {
+        responseType: "blob",
+      });
+      let filename = `Receipt_${receipt._id}_${flatUnitName || "Unit"}.html`;
+      const disposition = res.headers["content-disposition"];
+      if (disposition) {
+        const match = disposition.match(/filename="?([^";]+)"?/i);
+        if (match?.[1]) filename = match[1];
+      }
+      const blob = new Blob([res.data], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success("Official receipt downloaded!");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to download receipt.");
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-    body { background-color: #f8fafc; color: #1e293b; padding: 24px 16px; display: flex; justify-content: center; }
-    .receipt-container { background: #ffffff; max-width: 580px; width: 100%; border-radius: 14px; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.06); overflow: hidden; page-break-inside: avoid; break-inside: avoid; }
-    .header { background: linear-gradient(135deg, #07584F 0%, #0c7368 100%); color: #ffffff; padding: 22px 24px; text-align: center; }
-    .logo-badge { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; background: rgba(255,255,255,0.2); border-radius: 10px; font-size: 20px; font-weight: 800; margin-bottom: 8px; }
-    .society-title { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
-    .voucher-sub { font-size: 11px; opacity: 0.85; margin-top: 3px; }
-    .badge-pill { display: inline-flex; align-items: center; gap: 6px; background: #ecfdf5; color: #065f46; font-size: 10px; font-weight: 700; padding: 3px 12px; border-radius: 999px; margin-top: 8px; border: 1px solid #a7f3d0; }
-    .body { padding: 20px 24px; }
-    .amount-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; text-align: center; margin-bottom: 14px; }
-    .amount-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; }
-    .amount-val { font-size: 28px; font-weight: 800; color: #07584F; margin-top: 2px; }
-    .amount-sub { font-size: 10px; color: #64748b; margin-top: 2px; }
-    .details-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0; }
-    .details-table tr:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
-    .details-table td { padding: 9px 14px; font-size: 11px; }
-    .label-col { color: #64748b; width: 38%; font-weight: 500; }
-    .val-col { color: #0f172a; font-weight: 600; text-align: right; }
-    .tag { background: #f1f5f9; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600; color: #334155; }
-    .stamp-box { border: 1px dashed #cbd5e1; background: #fafafa; border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; font-size: 10px; margin-bottom: 16px; }
-    .stamp-text { color: #475569; }
-    .stamp-strong { font-weight: 700; color: #1e293b; }
-    .verified-mark { background: #dcfce7; color: #15803d; border: 1px solid #86efac; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; }
-    .actions { display: flex; gap: 10px; justify-content: center; margin-bottom: 6px; }
-    .btn-print { background: #07584F; color: #ffffff; border: none; border-radius: 8px; padding: 9px 18px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
-    .btn-print:hover { background: #064c44; }
-    .footer-note { text-align: center; font-size: 9px; color: #94a3b8; margin-top: 12px; }
-    @media print {
-      body { background: #ffffff; padding: 0; }
-      .receipt-container { box-shadow: none; border: 1px solid #cbd5e1; border-radius: 8px; page-break-inside: avoid; break-inside: avoid; }
-      .no-print { display: none !important; }
-    }
-  </style>
-</head>
-<body>
-  <div class="receipt-container">
-    <div class="header">
-      <div class="logo-badge">N</div>
-      <h1 class="society-title">${society}</h1>
-      <p class="voucher-sub">Official Society Maintenance & Billing Payment Receipt</p>
-      <div>
-        <span class="badge-pill">✓ PAYMENT RECONCILED</span>
-      </div>
-    </div>
-    <div class="body">
-      <div class="amount-box">
-        <div class="amount-label">Total Amount Settled</div>
-        <div class="amount-val">${formattedAmt}</div>
-        <div class="amount-sub">Received with thanks on ${dateStr}</div>
-      </div>
-      <table class="details-table">
-        <tr>
-          <td class="label-col">Receipt Number</td>
-          <td class="val-col" style="font-family: monospace; font-size: 12px;">${receiptNo}</td>
-        </tr>
-        <tr>
-          <td class="label-col">Resident Name</td>
-          <td class="val-col">${resident}</td>
-        </tr>
-        <tr>
-          <td class="label-col">Flat / Unit</td>
-          <td class="val-col">${unit}</td>
-        </tr>
-        <tr>
-          <td class="label-col">Society Community</td>
-          <td class="val-col">${society}</td>
-        </tr>
-        <tr>
-          <td class="label-col">Payment Channel</td>
-          <td class="val-col"><span class="tag">${source}</span></td>
-        </tr>
-        <tr>
-          <td class="label-col">Description</td>
-          <td class="val-col">${desc}</td>
-        </tr>
-        <tr>
-          <td class="label-col">Reference / Bill ID</td>
-          <td class="val-col" style="font-family: monospace;">${refNo}</td>
-        </tr>
-      </table>
-      <div class="stamp-box">
-        <div class="stamp-text">
-          <div class="stamp-strong">Authorized Society Ledger Record</div>
-          <div>Digitally validated by Society Treasurer Office. No physical signature required.</div>
-        </div>
-        <div class="verified-mark">✓</div>
-      </div>
-      <div class="actions no-print">
-        <button class="btn-print" onclick="window.print()">
-          Print / Save as PDF
-        </button>
-      </div>
-      <p class="footer-note">
-        Generated digitally via Nesteeq Resident Portal • Official Ledger Acknowledgment
-      </p>
-    </div>
-  </div>
-</body>
-</html>`;
-
-    const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `Receipt_${receiptNo}_${flatUnitName || "Unit"}.html`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    toast.success("Official receipt downloaded!");
   };
 
-  const handleDownloadReceiptTxt = (
+  const handleDownloadReceiptTxt = async (
     receipt: ResidentPaymentItem & { billTitle?: string; billingPeriod?: string; billScope?: string }
   ) => {
-    const receiptNo = `REC-${receipt._id.slice(-6).toUpperCase()}`;
-    const content = `=====================================================
-            NESTEEQ SOCIETY PAYMENT RECEIPT
-=====================================================
-Receipt Number : ${receiptNo}
-Date & Time    : ${formatDate(receipt.paidAt)}
-Status         : PAID & RECONCILED (Official)
------------------------------------------------------
-Society Name   : ${apartmentName || "Society"}
-Resident       : ${userName || "Resident"}
-Flat / Unit    : ${flatUnitName || "N/A"}
------------------------------------------------------
-Payment Channel: ${receipt.source || "ONLINE / UPI"}
-Amount Settled : ${formatCurrency(receipt.amount)}
-Description    : ${receipt.description || receipt.billTitle || "Society Maintenance Settlement"}
------------------------------------------------------
-Generated digitally via Nesteeq Resident Portal.
-Reconciled with Society Treasurer Ledger.
-=====================================================`;
-
-    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `Receipt_${receiptNo}_${flatUnitName || "Unit"}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    toast.success("Receipt voucher downloaded!");
+    try {
+      const res = await api.get(`/api/v1/bills/receipt/${receipt._id}/download?format=txt`, {
+        responseType: "blob",
+      });
+      let filename = `Receipt_${receipt._id}_${flatUnitName || "Unit"}.txt`;
+      const disposition = res.headers["content-disposition"];
+      if (disposition) {
+        const match = disposition.match(/filename="?([^";]+)"?/i);
+        if (match?.[1]) filename = match[1];
+      }
+      const blob = new Blob([res.data], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success("Receipt voucher downloaded!");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to download voucher.");
+    }
   };
 
   const {
@@ -701,21 +587,45 @@ Reconciled with Society Treasurer Ledger.
   );
 
   const filteredBills = useMemo(() => {
-    return bills.filter((b) => {
-      // 1. Scope filter (Common vs Separate)
-      if (selectedScope === "COMMON" && !b.isCommonBill && b.billScope !== "COMMON") {
-        return false;
-      }
-      if (selectedScope === "SEPARATE" && (b.isCommonBill || b.billScope === "COMMON")) {
-        return false;
-      }
-      // 2. Category filter
-      if (selectedCategory !== "ALL") {
-        const type = b.billType || "MONTHLY_MAINTENANCE";
-        if (type !== selectedCategory) return false;
-      }
-      return true;
-    });
+    return bills
+      .filter((b) => {
+        // 1. Scope filter (Common vs Separate)
+        if (selectedScope === "COMMON" && !b.isCommonBill && b.billScope !== "COMMON") {
+          return false;
+        }
+        if (selectedScope === "SEPARATE" && (b.isCommonBill || b.billScope === "COMMON")) {
+          return false;
+        }
+        // 2. Category filter
+        if (selectedCategory !== "ALL") {
+          const type = b.billType || "MONTHLY_MAINTENANCE";
+          if (type !== selectedCategory) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const isUnpaidA =
+          a.status !== "PAID" &&
+          (a.balanceAmount > 0 ||
+            a.status === "PENDING" ||
+            a.status === "OVERDUE" ||
+            a.status === "PARTIALLY_PAID");
+        const isUnpaidB =
+          b.status !== "PAID" &&
+          (b.balanceAmount > 0 ||
+            b.status === "PENDING" ||
+            b.status === "OVERDUE" ||
+            b.status === "PARTIALLY_PAID");
+
+        // 1. Unpaid / payable bills come first
+        if (isUnpaidA && !isUnpaidB) return -1;
+        if (!isUnpaidA && isUnpaidB) return 1;
+
+        // 2. Within the same group, newest created bills come first
+        const timeA = new Date(a.createdAt || a.dueDate || 0).getTime();
+        const timeB = new Date(b.createdAt || b.dueDate || 0).getTime();
+        return timeB - timeA;
+      });
   }, [bills, selectedScope, selectedCategory]);
 
   const totalInvoicePages = Math.ceil(filteredBills.length / ITEMS_PER_PAGE) || 1;

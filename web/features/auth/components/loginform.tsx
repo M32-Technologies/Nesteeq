@@ -22,6 +22,8 @@ import {
 import { useAcceptInvite } from "../hooks/useAcceptInvite"
 import { useResolveInvite } from "../hooks/useResolveInvite"
 import LoginOtpStep from "./login-otp-step"
+import { ApartmentInactiveModal } from "@/components/apartment-inactive-modal"
+import api from "@/lib/axios"
 
 type LoginStep = "email" | "otp"
 
@@ -37,6 +39,12 @@ function LoginForm() {
   const [step, setStep] = useState<LoginStep>("email")
   const [email, setEmail] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showInactiveModal, setShowInactiveModal] = useState(false)
+  const [inactiveData, setInactiveData] = useState<{
+    role?: string | null;
+    apartmentName?: string | null;
+    reason?: string | null;
+  }>({})
 
   const {
     register,
@@ -113,9 +121,77 @@ function LoginForm() {
 
     const { data } = await authClient.getSession()
 
-    toast.success("Welcome back to Nesteeq.")
+    const rawUser = data?.user as {
+      role?: string | null;
+      apartmentStatus?: string | null;
+      inactiveReason?: string | null;
+      apartmentName?: string | null;
+    } | undefined;
 
-    const userRole = acceptedRole ?? data?.user?.role
+    const userRole = acceptedRole ?? rawUser?.role;
+    const isPlatformAdmin =
+      userRole?.trim().toLowerCase() === "admin" ||
+      userRole?.trim().toLowerCase() === "super_admin";
+
+    // Check if apartment status is inactive
+    let isInactive = rawUser?.apartmentStatus === "inactive";
+    let inactiveReason = rawUser?.inactiveReason;
+    let apartmentName = rawUser?.apartmentName;
+
+    if (!isPlatformAdmin) {
+      try {
+        const statusRes = await api.get<{
+          success: boolean;
+          data: {
+            hasApartment: boolean;
+            status: string | null;
+            name: string | null;
+            inactiveReason: string | null;
+          };
+        }>("/api/v1/apartment/status");
+
+        if (statusRes.data?.data?.status === "inactive") {
+          isInactive = true;
+          inactiveReason = statusRes.data.data.inactiveReason ?? inactiveReason;
+          apartmentName = statusRes.data.data.name ?? apartmentName;
+        }
+      } catch (err: unknown) {
+        const errData = (err as {
+          response?: {
+            data?: {
+              code?: string;
+              details?: {
+                inactiveReason?: string;
+                apartmentName?: string;
+              };
+            };
+          };
+        })?.response?.data;
+
+        if (errData?.code === "APARTMENT_INACTIVE") {
+          isInactive = true;
+          inactiveReason = errData.details?.inactiveReason ?? inactiveReason;
+          apartmentName = errData.details?.apartmentName ?? apartmentName;
+        }
+      }
+    }
+
+    if (isInactive && !isPlatformAdmin) {
+      setInactiveData({
+        role: userRole,
+        apartmentName,
+        reason: inactiveReason,
+      });
+      setShowInactiveModal(true);
+      try {
+        await authClient.signOut();
+      } catch {
+        // Ignore signout error
+      }
+      return;
+    }
+
+    toast.success("Welcome back to Nesteeq.")
 
     if (fromPricing) {
       router.push("/pricing")
@@ -296,6 +372,17 @@ function LoginForm() {
           Secure access to your Nesteeq community.
         </p>
       </motion.section>
+
+      <ApartmentInactiveModal
+        isOpen={showInactiveModal}
+        role={inactiveData.role}
+        apartmentName={inactiveData.apartmentName}
+        reason={inactiveData.reason}
+        onLogout={() => {
+          setShowInactiveModal(false);
+          setStep("email");
+        }}
+      />
     </main>
   )
 }

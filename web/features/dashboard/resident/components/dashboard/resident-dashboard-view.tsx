@@ -27,6 +27,8 @@ import {
 import { useResidentDashboard, type UnifiedFeedItem } from "../../hooks/use-resident-dashboard";
 import { CreateComplaintModal } from "../create-complaint-modal";
 import { CreateVisitorPassModal } from "../create-visitor-pass-modal";
+import { ResidentNoticeDetailDrawer } from "@/features/announcements/components/resident/resident-notice-detail-drawer";
+import type { AnnouncementItem } from "@/features/announcements/types";
 
 export function ResidentDashboardView() {
   const router = useRouter();
@@ -59,6 +61,7 @@ export function ResidentDashboardView() {
   const [isRefetching, setIsRefetching] = useState(false);
   const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
   const [isVisitorModalOpen, setIsVisitorModalOpen] = useState(false);
+  const [selectedNotice, setSelectedNotice] = useState<AnnouncementItem | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -71,18 +74,53 @@ export function ResidentDashboardView() {
     setTimeout(() => setIsRefetching(false), 400);
   };
 
-  // Filter feed items
+  const handleViewNotice = (item: UnifiedFeedItem) => {
+    if (item.noticeData) {
+      setSelectedNotice(item.noticeData);
+      return;
+    }
+    const cleanId = item.id.replace(/^ann-/, "");
+    const found = announcements.find(
+      (a) => a.id === cleanId || (a as { _id?: string })._id === cleanId
+    );
+    if (found) {
+      setSelectedNotice(found);
+      return;
+    }
+    // Fallback announcement item constructed from feed item
+    setSelectedNotice({
+      id: cleanId,
+      title: item.title,
+      message: item.description,
+      type: (item.tags?.[0] as any) || "GENERAL",
+      priority: item.badge?.label?.includes("CRITICAL") ? "URGENT" : "NORMAL",
+      status: "PUBLISHED",
+      targetType: "ALL_RESIDENTS",
+      createdBy: item.author?.name || "Management",
+      creator: {
+        id: "mgmt",
+        name: item.author?.name || "Management",
+        email: null,
+        phone: null,
+      },
+      creatorRole: item.author?.role || "Verified Management",
+      createdAt: item.rawDate ? new Date(item.rawDate).toISOString() : new Date().toISOString(),
+      updatedAt: item.rawDate ? new Date(item.rawDate).toISOString() : new Date().toISOString(),
+      expiresAt: null,
+    });
+  };
+
+  // Filter feed items - strictly limit to 10 most recent activities
   const filteredFeed = useMemo(() => {
+    let feed = unifiedFeedItems;
     if (activeTab === "ANNOUNCEMENTS") {
-      return unifiedFeedItems.filter((i) => i.type === "ANNOUNCEMENT");
+      feed = unifiedFeedItems.filter((i) => i.type === "ANNOUNCEMENT");
+    } else if (activeTab === "COMPLAINTS") {
+      feed = unifiedFeedItems.filter((i) => i.type === "COMPLAINT");
+    } else if (activeTab === "PASSES") {
+      feed = unifiedFeedItems.filter((i) => i.type === "PASS");
     }
-    if (activeTab === "COMPLAINTS") {
-      return unifiedFeedItems.filter((i) => i.type === "COMPLAINT");
-    }
-    if (activeTab === "PASSES") {
-      return unifiedFeedItems.filter((i) => i.type === "PASS");
-    }
-    return unifiedFeedItems;
+    return feed.slice(0, 10);
   }, [unifiedFeedItems, activeTab]);
 
   const quickActions: Array<{
@@ -232,6 +270,7 @@ export function ResidentDashboardView() {
         <SocietyNoticesCard
           count={announcements.length}
           criticalAlert={criticalAlert}
+          onViewAlert={() => criticalAlert && setSelectedNotice(criticalAlert as AnnouncementItem)}
         />
       </div>
 
@@ -336,7 +375,11 @@ export function ResidentDashboardView() {
               </div>
             ) : (
               filteredFeed.map((item) => (
-                <ActivityRow key={item.id} item={item} />
+                <ActivityRow
+                  key={item.id}
+                  item={item}
+                  onViewNotice={handleViewNotice}
+                />
               ))
             )}
           </div>
@@ -492,6 +535,12 @@ export function ResidentDashboardView() {
         flatUnitName={flatUnitName}
         onSuccess={() => refetchAll()}
       />
+
+      {/* Notice Detail Drawer */}
+      <ResidentNoticeDetailDrawer
+        notice={selectedNotice}
+        onClose={() => setSelectedNotice(null)}
+      />
     </div>
   );
 }
@@ -564,14 +613,17 @@ function SummaryCard({
 function SocietyNoticesCard({
   count,
   criticalAlert,
+  onViewAlert,
 }: {
   count: number;
   criticalAlert?: {
+    id?: string;
     title: string;
     message: string;
     type?: string;
     priority?: string;
   } | null;
+  onViewAlert?: () => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -693,13 +745,27 @@ function SocietyNoticesCard({
           {/* Popover Footer Action */}
           <div className="pt-2 border-t border-[#EEF1F4] flex items-center justify-between">
             <span className="text-[11px] text-[#637083]">High Priority Notice</span>
-            <Link
-              href="/resident/announcements"
-              className="inline-flex items-center gap-1 rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition shadow-xs"
-            >
-              <span>View Alert</span>
-              <ArrowRight className="size-3" />
-            </Link>
+            {onViewAlert ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOpen(false);
+                  onViewAlert();
+                }}
+                className="inline-flex items-center gap-1 rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition shadow-xs cursor-pointer"
+              >
+                <span>View Alert</span>
+                <ArrowRight className="size-3" />
+              </button>
+            ) : (
+              <Link
+                href="/resident/announcements"
+                className="inline-flex items-center gap-1 rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition shadow-xs"
+              >
+                <span>View Alert</span>
+                <ArrowRight className="size-3" />
+              </Link>
+            )}
           </div>
         </div>
       )}
@@ -708,7 +774,13 @@ function SocietyNoticesCard({
 }
 
 // Activity Row Component matching Security ActivityRow
-function ActivityRow({ item }: { item: UnifiedFeedItem }) {
+function ActivityRow({
+  item,
+  onViewNotice,
+}: {
+  item: UnifiedFeedItem;
+  onViewNotice?: (item: UnifiedFeedItem) => void;
+}) {
   const getBadgeClass = (variant: string) => {
     switch (variant) {
       case "rose":
@@ -737,9 +809,14 @@ function ActivityRow({ item }: { item: UnifiedFeedItem }) {
     }
   };
 
+  const isAnnouncement = item.type === "ANNOUNCEMENT";
+
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-[#EEF1F4] bg-white p-3.5 transition-colors hover:bg-[#F7F8F5]">
-      <div className="flex items-start gap-3 min-w-0">
+      <div
+        className={`flex items-start gap-3 min-w-0 ${isAnnouncement ? "cursor-pointer group/item" : ""}`}
+        onClick={isAnnouncement ? () => onViewNotice?.(item) : undefined}
+      >
         <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#F7F8F5] border border-[#EEF1F4] mt-0.5">
           {getIcon(item.type)}
         </div>
@@ -753,7 +830,7 @@ function ActivityRow({ item }: { item: UnifiedFeedItem }) {
             <span className="text-xs text-[#637083]">{item.date}</span>
           </div>
 
-          <h3 className="text-sm font-semibold text-[#111111] mt-1 truncate">
+          <h3 className={`text-sm font-semibold text-[#111111] mt-1 truncate ${isAnnouncement ? "group-hover/item:text-[#07584F] transition-colors" : ""}`}>
             {item.title}
           </h3>
 
@@ -767,13 +844,25 @@ function ActivityRow({ item }: { item: UnifiedFeedItem }) {
         </div>
       </div>
 
-      <Link
-        href={item.ctaHref}
-        className="inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-lg border border-[#DDE3DF] bg-white px-3 text-xs font-medium text-[#111111] hover:bg-[#F7F8F5] transition-colors self-start sm:self-center"
-      >
-        <span>{item.ctaText}</span>
-        <ExternalLink className="size-3 text-[#637083]" />
-      </Link>
+      {isAnnouncement ? (
+        <button
+          type="button"
+          onClick={() => onViewNotice?.(item)}
+          className="inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-lg border border-[#DDE3DF] bg-white px-3 text-xs font-medium text-[#111111] hover:bg-[#F7F8F5] hover:border-[#07584F] hover:text-[#07584F] transition-colors self-start sm:self-center cursor-pointer"
+        >
+          <span>{item.ctaText}</span>
+          <ExternalLink className="size-3 text-[#637083]" />
+        </button>
+      ) : (
+        <Link
+          href={item.ctaHref}
+          className="inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-lg border border-[#DDE3DF] bg-white px-3 text-xs font-medium text-[#111111] hover:bg-[#F7F8F5] transition-colors self-start sm:self-center"
+        >
+          <span>{item.ctaText}</span>
+          <ExternalLink className="size-3 text-[#637083]" />
+        </Link>
+      )}
     </div>
   );
 }
+

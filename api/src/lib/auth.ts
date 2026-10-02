@@ -3,8 +3,11 @@ import { APIError, createAuthMiddleware } from "better-auth/api"
 import { mongodbAdapter } from "@better-auth/mongo-adapter"
 import { getAuthDB, getAuthMongoClient } from "../config/auth-db.js"
 import { env } from "../config/env.js"
-import { admin, emailOTP } from "better-auth/plugins"
+import { admin, customSession, emailOTP } from "better-auth/plugins"
 import { emailService } from "../services/EmailService.js"
+import { Apartment } from "../modules/apartment/apartment.model.js"
+import { isValidObjectId } from "mongoose"
+import { emitUserForceLogout } from "../socket/socket.js"
 
 export const auth = betterAuth({
   database: mongodbAdapter(getAuthDB(), {
@@ -87,6 +90,31 @@ export const auth = betterAuth({
         })
       }
     }),
+    after: createAuthMiddleware(async (ctx) => {
+      if (
+        ctx.path.endsWith("/admin/ban-user") ||
+        (ctx.path.endsWith("/admin/update-user") && (ctx.body as { banned?: boolean })?.banned === true)
+      ) {
+        const returned = (ctx.context as { returned?: unknown })?.returned;
+        const isError =
+          !returned ||
+          returned instanceof Error ||
+          (typeof returned === "object" && "statusCode" in (returned as Record<string, unknown>));
+
+        if (!isError) {
+          const body = ctx.body as { userId?: string; banReason?: string } | undefined;
+          const userObj = (returned as { user?: { id?: string } })?.user;
+          const targetUserId = body?.userId || userObj?.id;
+
+          if (typeof targetUserId === "string" && targetUserId.trim()) {
+            emitUserForceLogout(targetUserId.trim(), {
+              reason: body?.banReason || "Your account has been suspended by an administrator.",
+              banned: true,
+            });
+          }
+        }
+      }
+    }),
   },
   emailAndPassword: {
     enabled: true,
@@ -101,18 +129,58 @@ export const auth = betterAuth({
       disableSignUp: false,
       sendVerificationOnSignUp: true,
       sendVerificationOTP: async ({ email, otp, type }) => {
+        console.log(`\n=========================================`)
+        console.log(`🔑 [DEV OTP] Type: ${type}`)
+        console.log(`📧 Email: ${email}`)
+        console.log(`🔢 Code:  ${otp}`)
+        console.log(`=========================================\n`)
         if (type == "sign-in") {
           await emailService.sendLoginOtp(email, otp)
         } else if (type == "email-verification") {
           await emailService.sendVerificationOtp(email, otp)
         }
-      },  
+      },
     }),
     admin({
       defaultRole: "resident",
       adminRoles: ["admin"],
     }),
-    
+    customSession(async ({ user, session }) => {
+      let apartmentStatus: string | null = null;
+      let inactiveReason: string | null = null;
+      let apartmentName: string | null = null;
+
+      const rawUser = user as { role?: string; apartmentId?: string; id?: string };
+      const userRole = (rawUser.role ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+      if (userRole !== "admin" && userRole !== "super_admin") {
+        let apartmentId = rawUser.apartmentId;
+        if (!apartmentId && userRole === "property_manager" && rawUser.id) {
+          const apt = await Apartment.findOne({ managerId: rawUser.id }).select("_id status name inactiveReason");
+          if (apt) {
+            apartmentId = apt._id.toString();
+          }
+        }
+
+        if (apartmentId && isValidObjectId(apartmentId)) {
+          const apt = await Apartment.findById(apartmentId).select("name status inactiveReason");
+          if (apt) {
+            apartmentStatus = apt.status;
+            inactiveReason = apt.inactiveReason ?? null;
+            apartmentName = apt.name;
+          }
+        }
+      }
+
+      return {
+        user: {
+          ...user,
+          apartmentStatus,
+          inactiveReason,
+          apartmentName,
+        },
+        session,
+      };
+    }),
   ],
   user: {
     additionalFields: {
