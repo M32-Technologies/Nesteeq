@@ -109,8 +109,7 @@ export default function MaintenanceCostForm({
       let receiptUrl: string | null = null
       if (selectedFile) {
         const formData = new FormData()
-        formData.append("receipt", selectedFile)
-        formData.append("file", selectedFile)
+        formData.append("evidence", selectedFile)
         const uploadRes = await uploadEvidence(jobId, formData)
         receiptUrl = uploadRes.fileUrl
       }
