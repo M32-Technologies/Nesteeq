@@ -12,6 +12,7 @@ import type {
   Maintenance,
   MaintenanceListData,
   MaintenanceQuery,
+  MaintenanceTaskTemplate,
   MaintenanceUpdatePayload,
 } from "../types/maintenance.types"
 
@@ -209,3 +210,18 @@ export async function fetchMaintenanceStats(): Promise<FacilityMaintenanceStats>
     completed: workCompleted + approved + closed,
   }
 }
+
+export async function fetchMaintenanceTypes(): Promise<MaintenanceTaskTemplate[]> {
+  const response = await api.get<ApiResponse<MaintenanceTaskTemplate[]>>(
+    `${MAINTENANCE_PATH}/types`
+  )
+
+  if (!response.data.success) {
+    throw new Error(response.data.message || "Failed to load maintenance types")
+  }
+
+  return response.data.data
+}
+
+export { createMaintenance } from "@/features/dashboard/facility/complaints/api/complaints.api"
+

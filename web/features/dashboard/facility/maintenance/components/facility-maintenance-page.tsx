@@ -41,6 +41,7 @@ import {
   PageHeader,
   priorityWeight,
 } from "@/features/dashboard/facility/shared/components/facility-ui"
+import { CreateMaintenanceModal } from "@/features/dashboard/facility/maintenance/components/create-maintenance-modal"
 import { MaintenanceDetailsDrawer } from "@/features/dashboard/facility/maintenance/components/maintenance-details-drawer"
 import {
   MaintenanceFilters,
@@ -124,6 +125,22 @@ export function FacilityMaintenancePage() {
   const [selectedMaintenanceId, setSelectedMaintenanceId] = useState<string | null>(
     null
   )
+  const [drawerMode, setDrawerMode] = useState<"details" | "assign" | "edit">("details")
+  const [isSavingAssignAndStatus, setIsSavingAssignAndStatus] = useState(false)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+
+  const handleOpenMaintenance = (
+    id: string,
+    mode: "details" | "assign" | "edit" = "details"
+  ) => {
+    setSelectedMaintenanceId(id)
+    setDrawerMode(mode)
+  }
+
+  const handleCloseDrawer = () => {
+    setSelectedMaintenanceId(null)
+    setDrawerMode("details")
+  }
 
   const maintenanceQueryObj = useMemo(
     () => ({
@@ -157,6 +174,8 @@ export function FacilityMaintenancePage() {
   const handleSuccess = async (message?: string) => {
     toast.success(message || "Maintenance updated")
     await queryClient.invalidateQueries({ queryKey: ["facility-maintenance"] })
+    await detailQuery.refetch()
+    handleCloseDrawer()
   }
 
   const assignMutation = useMutation({
@@ -264,14 +283,94 @@ export function FacilityMaintenancePage() {
       toast.error(getApiErrorMessage(error, "Unable to reject cost")),
   })
 
+  const handleAssignAndStatus = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!selectedItem) return
+
+    const formData = new FormData(event.currentTarget)
+    const selectedTechnicianId =
+      readFormString(formData, "assignedStaff") ||
+      readFormString(formData, "assignedStaffId") ||
+      readFormString(formData, "technicianUserId") ||
+      readFormString(formData, "assignedTo") ||
+      readFormString(formData, "technicianId")
+    const nextStatus = readFormString(formData, "status") as MaintenanceStatus | undefined
+    const remarks = readFormString(formData, "remarks")
+
+    const currentStaffId =
+      typeof (selectedItem as any).assignedStaff === "object"
+        ? (selectedItem as any).assignedStaff?._id || (selectedItem as any).assignedStaff?.id || (selectedItem as any).assignedStaff?.userId
+        : (selectedItem as any).assignedStaff ||
+          (typeof selectedItem.assignedTo === "object"
+            ? selectedItem.assignedTo?._id || (selectedItem.assignedTo as any)?.id || (selectedItem.assignedTo as any)?.userId
+            : selectedItem.assignedTo || "")
+
+    const isTechnicianChanged = Boolean(
+      selectedTechnicianId &&
+      currentStaffId &&
+      selectedTechnicianId !== currentStaffId &&
+      String(selectedTechnicianId) !== String(currentStaffId)
+    ) || Boolean(selectedTechnicianId && !currentStaffId)
+
+    const isStatusChanged = Boolean(nextStatus && nextStatus !== selectedItem.status)
+
+    if (!isTechnicianChanged && !isStatusChanged && (!remarks || !remarks.trim())) {
+      toast.info("No changes to save")
+      return
+    }
+
+    try {
+      setIsSavingAssignAndStatus(true)
+
+      if (isTechnicianChanged) {
+        await assignMaintenance(selectedItem._id, {
+          assignedStaff: selectedTechnicianId,
+          assignedTo: selectedTechnicianId,
+          technicianId: selectedTechnicianId,
+          status: nextStatus,
+          remarks: remarks || undefined,
+          notes: remarks || undefined,
+        } as any)
+      } else if (isStatusChanged && nextStatus) {
+        await updateMaintenanceStatus(selectedItem._id, {
+          status: nextStatus,
+          remarks: remarks || undefined,
+          notes: remarks || undefined,
+        })
+      } else if (selectedTechnicianId) {
+        await assignMaintenance(selectedItem._id, {
+          assignedStaff: selectedTechnicianId,
+          assignedTo: selectedTechnicianId,
+          technicianId: selectedTechnicianId,
+          status: nextStatus,
+          remarks: remarks || undefined,
+          notes: remarks || undefined,
+        } as any)
+      }
+
+      toast.success("Assignment & Status updated")
+      await queryClient.invalidateQueries({ queryKey: ["facility-maintenance"] })
+      await detailQuery.refetch()
+      handleCloseDrawer()
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to update assignment or status"))
+    } finally {
+      setIsSavingAssignAndStatus(false)
+    }
+  }
+
   const handleAssign = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!selectedItem) return
 
     const formData = new FormData(event.currentTarget)
-    const assignedTo = readRequiredFormString(formData, "assignedStaff")
+    const assignedStaff =
+      readRequiredFormString(formData, "assignedStaff") ||
+      readRequiredFormString(formData, "assignedStaffId") ||
+      readRequiredFormString(formData, "assignedTo") ||
+      readRequiredFormString(formData, "technicianId")
 
-    if (!assignedTo) {
+    if (!assignedStaff) {
       toast.error("Technician user ID is required")
       return
     }
@@ -279,8 +378,11 @@ export function FacilityMaintenancePage() {
     assignMutation.mutate({
       id: selectedItem._id,
       payload: {
-        assignedTo,
+        assignedStaff,
+        assignedTo: assignedStaff,
+        technicianId: assignedStaff,
         notes: readFormString(formData, "remarks"),
+        remarks: readFormString(formData, "remarks"),
       },
     })
   }
@@ -422,7 +524,20 @@ export function FacilityMaintenancePage() {
   return (
     <div className="min-h-screen min-w-0 bg-[#F6F8FA] px-4 py-6 sm:px-6 lg:px-7 xl:px-8">
       <div className="mx-auto w-full max-w-[1600px] min-w-0">
-        <PageHeader title="Maintenance" eyebrow="Facility Manager" />
+        <PageHeader
+          title="Maintenance"
+          eyebrow="Facility Manager"
+          actions={
+            <button
+              type="button"
+              onClick={() => setIsCreateModalOpen(true)}
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#07584F] px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-[#064C44] active:scale-[0.98]"
+            >
+              <span>+</span>
+              <span>Create Maintenance</span>
+            </button>
+          }
+        />
 
         <MaintenanceStats stats={statsQuery.data} />
 
@@ -460,7 +575,7 @@ export function FacilityMaintenancePage() {
           ) : (
             <MaintenanceTable
               maintenance={visibleMaintenance}
-              onSelectMaintenance={setSelectedMaintenanceId}
+              onSelectMaintenance={handleOpenMaintenance}
             />
           )}
         </div>
@@ -468,18 +583,20 @@ export function FacilityMaintenancePage() {
 
       <MaintenanceDetailsDrawer
         open={Boolean(selectedMaintenanceId)}
+        mode={drawerMode}
         maintenance={selectedItem}
         isLoading={detailQuery.isPending}
         isError={detailQuery.isError}
         error={detailQuery.error}
         isRetrying={detailQuery.isFetching}
         onRetry={() => void detailQuery.refetch()}
-        onClose={() => setSelectedMaintenanceId(null)}
+        onClose={handleCloseDrawer}
         statusOptions={statusOptions}
         canApprove={canApprove}
         canCancel={canCancel}
         canClose={canClose}
         canReviewCost={canReviewCost}
+        onAssignAndStatus={handleAssignAndStatus}
         onAssign={handleAssign}
         onStatusUpdate={handleStatusUpdate}
         onEdit={handleEdit}
@@ -489,6 +606,7 @@ export function FacilityMaintenancePage() {
         onCloseMaintenance={handleClose}
         onApproveCost={handleApproveCost}
         onRejectCost={handleRejectCost}
+        isSavingAssignAndStatus={isSavingAssignAndStatus}
         isAssigning={assignMutation.isPending}
         isUpdatingStatus={statusMutation.isPending}
         isUpdating={updateMutation.isPending}
@@ -498,6 +616,11 @@ export function FacilityMaintenancePage() {
         isClosing={closeMutation.isPending}
         isApprovingCost={approveCostMutation.isPending}
         isRejectingCost={rejectCostMutation.isPending}
+      />
+
+      <CreateMaintenanceModal
+        open={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
       />
     </div>
   )

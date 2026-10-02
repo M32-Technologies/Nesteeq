@@ -4,7 +4,7 @@ import { useFacilityDashboardQuery } from "@/features/dashboard/facility/dashboa
 import { getApiErrorMessage } from "@/features/dashboard/facility/shared/utils/facility-error"
 import { FacilityDashboardActions } from "@/features/dashboard/facility/dashboard/components/facility-dashboard-actions"
 import { FacilityDashboardStats } from "@/features/dashboard/facility/dashboard/components/facility-dashboard-stats"
-import { NotificationsPanel } from "@/features/dashboard/facility/dashboard/components/notifications-panel"
+import { PendingExpenseApprovalsPanel } from "@/features/dashboard/facility/dashboard/components/pending-expense-approvals-panel"
 import { OverdueSchedulesPanel } from "@/features/dashboard/facility/dashboard/components/overdue-schedules-panel"
 import { PendingActionList } from "@/features/dashboard/facility/dashboard/components/pending-action-list"
 import { RecentActivityPanel } from "@/features/dashboard/facility/dashboard/components/recent-activity-panel"
@@ -57,7 +57,9 @@ export function FacilityDashboardPage() {
               </div>
 
               <div className="space-y-6">
-                <NotificationsPanel />
+                <PendingExpenseApprovalsPanel
+                  initialExpenses={dashboard.pendingActions?.maintenanceCostToReview}
+                />
                 <RecentActivityPanel
                   activities={dashboard.recentActivities}
                 />

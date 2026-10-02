@@ -142,12 +142,12 @@ export const ensureStaffCanWorkOnApartment = (
       throw new AppError("Management user must be linked to an apartment", 403);
     }
 
-    if (!staffApartmentId || staffApartmentId !== managerApartmentId) {
+    if (staffApartmentId && staffApartmentId !== managerApartmentId) {
       throw new AppError("Staff member does not belong to your apartment", 403);
     }
   }
 
-  if (staffApartmentId && staffApartmentId !== targetApartmentId) {
+  if (staffApartmentId && targetApartmentId && staffApartmentId !== targetApartmentId) {
     throw new AppError("Staff member does not belong to this apartment", 400);
   }
 
@@ -170,8 +170,11 @@ const applySharedFilters = (
     filter.priority = query.priority;
   }
 
-  if (query.complaint) {
-    filter.complaint = query.complaint;
+  const complaintId = query.complaint || (query as any).complaintId;
+  if (complaintId) {
+    filter.complaint = Types.ObjectId.isValid(complaintId)
+      ? new Types.ObjectId(complaintId)
+      : complaintId;
   }
 
   if (query.costStatus) {

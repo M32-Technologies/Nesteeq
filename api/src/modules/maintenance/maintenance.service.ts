@@ -9,14 +9,15 @@ import { isManagementRole, isMaintenanceRole, normalizeRole } from "../../utils/
 
 import { createNotification } from "../notification/notification.service.js";
 import { Complaint, type ComplaintDocument } from "../complaint/complaint.model.js";
+import { Schedule } from "../schedule/schedule.model.js";
+import { Staff } from "../staff/staff.model.js";
+import { Technician } from "../technician/technician.model.js";
 import {
   Maintenance,
   type MaintenanceDocument,
   type MaintenanceCostStatus,
 } from "./maintenance.model.js";
 import { Apartment } from "../apartment/apartment.model.js";
-import { Staff } from "../staff/staff.model.js";
-import { Technician } from "../technician/technician.model.js";
 import {
   activeMaintenanceStatuses,
   approvalAllowedStatuses,
@@ -84,6 +85,7 @@ type AuthUserRecord = {
   role?: string | null;
   apartmentId?: string | null;
   flatId?: string | null;
+  staffRecordId?: string | null;
 };
 
 type ComplaintRemark = {
@@ -373,16 +375,88 @@ export const enrichMaintenance = async (maintenanceList: any[]): Promise<any[]> 
   });
 };
 
-const ensureStaffUser = async (staffId: string): Promise<AuthUserRecord> => {
-  const staff = await findAuthUserById(staffId);
+const ensureStaffUser = async (
+  staffId: string,
+  apartmentId?: string
+): Promise<AuthUserRecord> => {
+  let resolvedUserId = staffId;
+  let staffApartmentId: string | undefined = apartmentId;
+  let staffRecordId: string | undefined = undefined;
+
+  // 1. Check Technician collection
+  if (Types.ObjectId.isValid(staffId)) {
+    const techDoc = await Technician.findById(staffId).lean();
+    if (techDoc) {
+      resolvedUserId = (techDoc as any).userId;
+      staffRecordId = (techDoc as any)._id?.toString();
+      staffApartmentId = (techDoc as any).apartmentId?.toString() || staffApartmentId;
+    }
+  }
+  if (resolvedUserId === staffId) {
+    const techDoc = await Technician.findOne({ userId: staffId }).lean();
+    if (techDoc) {
+      staffRecordId = (techDoc as any)._id?.toString();
+      staffApartmentId = (techDoc as any).apartmentId?.toString() || staffApartmentId;
+    }
+  }
+
+  // 2. Check Staff collection if still not found
+  if (Types.ObjectId.isValid(staffId) && !staffRecordId) {
+    const staffDoc = await Staff.findById(staffId).lean();
+    if (staffDoc) {
+      resolvedUserId = (staffDoc as any).userId;
+      staffRecordId = (staffDoc as any)._id?.toString();
+      staffApartmentId = (staffDoc as any).apartmentId?.toString() || staffApartmentId;
+    }
+  }
+  if (resolvedUserId === staffId && !staffRecordId) {
+    const staffDoc = await Staff.findOne({ userId: staffId }).lean();
+    if (staffDoc) {
+      staffRecordId = (staffDoc as any)._id?.toString();
+      staffApartmentId = (staffDoc as any).apartmentId?.toString() || staffApartmentId;
+    }
+  }
+
+  // 3. Query Auth User by resolvedUserId (and fallback to staffId if different)
+  let staff = await findAuthUserById(resolvedUserId);
+  if (!staff && resolvedUserId !== staffId) {
+    staff = await findAuthUserById(staffId);
+  }
 
   if (!staff) {
     throw new AppError("Staff not found", 404);
   }
 
-  if (!staff.role || !isMaintenanceRole(staff.role)) {
-    throw new AppError("Assigned user must be maintenance staff", 400);
+  // 4. If staff record not found yet, check if there's a linked Technician/Staff for this auth user
+  if (!staffApartmentId || !staffRecordId) {
+    const authId = staff.id || (staff._id ? staff._id.toString() : undefined);
+    if (authId) {
+      const linkedTech = await Technician.findOne({ userId: authId }).lean();
+      if (linkedTech) {
+        staffRecordId = staffRecordId || (linkedTech as any)._id?.toString();
+        staffApartmentId = staffApartmentId || (linkedTech as any).apartmentId?.toString();
+      } else {
+        const linkedStaff = await Staff.findOne({ userId: authId }).lean();
+        if (linkedStaff) {
+          staffRecordId = staffRecordId || (linkedStaff as any)._id?.toString();
+          staffApartmentId = staffApartmentId || (linkedStaff as any).apartmentId?.toString();
+        }
+      }
+    }
   }
+
+  if (!staff.role || !isMaintenanceRole(staff.role)) {
+    if (staffRecordId) {
+      staff.role = "MAINTENANCE_TECHNICIAN";
+    } else {
+      throw new AppError("Assigned user must be maintenance staff", 400);
+    }
+  }
+
+  if (!staff.apartmentId && staffApartmentId) {
+    staff.apartmentId = staffApartmentId;
+  }
+  staff.staffRecordId = staffRecordId;
 
   return staff;
 };
@@ -480,8 +554,14 @@ const syncComplaintFromMaintenance = async (
   user: AuthenticatedMaintenanceUser,
   remark?: string
 ): Promise<void> => {
-  const complaintId = getMongoId(maintenance.complaint);
-  assertValidComplaintId(complaintId);
+  const rawComplaint = (maintenance as any).complaint || (maintenance as any).complaintId;
+  if (!rawComplaint) {
+    return;
+  }
+  const complaintId = getMongoId(rawComplaint);
+  if (!complaintId || !Types.ObjectId.isValid(complaintId)) {
+    return;
+  }
 
   await syncComplaint(complaintId, set, createComplaintRemark(remark, user));
 };
@@ -490,89 +570,227 @@ export const createMaintenance = async (
   data: CreateMaintenanceInput,
   user: AuthenticatedMaintenanceUser
 ) => {
+  try {
+    await ensureCurrentUserExists(user);
+
+    if (!isManagementRole(user.role)) {
+      throw new AppError("Only management users can create maintenance work", 403);
+    }
+
+    const rawComplaintId = data.complaint || (data as any).complaintId;
+    let apartmentVal = user.apartmentId || "";
+    let residentVal: string | null = null;
+    let flatVal: string = "COMMON_AREA";
+    let complaintDoc: any = null;
+
+    if (rawComplaintId) {
+      const complaintId = String(rawComplaintId);
+      complaintDoc = await Complaint.findById(complaintId);
+      if (!complaintDoc) {
+        throw new AppError("Complaint not found", 404);
+      }
+
+      const complaintStatus = getComplaintStatus(complaintDoc);
+      if (complaintTerminalStatuses.has(complaintStatus) || !complaintMaintenanceSourceStatuses.has(complaintStatus)) {
+        throw new AppError(`Complaint cannot be used for maintenance while it is ${complaintStatus}`, 400);
+      }
+
+      apartmentVal =
+        getMongoId(complaintDoc.apartment) ||
+        getMongoId((complaintDoc as any).apartmentId) ||
+        user.apartmentId ||
+        "";
+      residentVal =
+        getMongoId(complaintDoc.resident) ||
+        getMongoId((complaintDoc as any).residentId) ||
+        null;
+      flatVal =
+        getMongoId(complaintDoc.flat) ||
+        getMongoId((complaintDoc as any).flatId) ||
+        "COMMON_AREA";
+
+      const existingActiveMaintenance = await Maintenance.findOne({
+        complaint: complaintId,
+        status: { $in: activeMaintenanceStatuses },
+      }).lean();
+
+      if (existingActiveMaintenance) {
+        throw new AppError("An active maintenance record already exists for this complaint", 409);
+      }
+    }
+
+    assertManagerCanManageApartment(user, apartmentVal);
+
+    let assignedStaff: string | null = null;
+    let staffUser: AuthUserRecord | null = null;
+    const now = new Date();
+
+    const rawStaffId = data.assignedStaff || (data as any).assignedTo;
+    if (rawStaffId) {
+      staffUser = await ensureStaffUser(rawStaffId, apartmentVal);
+      assignedStaff = ensureStaffCanWorkOnApartment(staffUser, rawStaffId, apartmentVal, user);
+    }
+
+    const title = data.title ?? complaintDoc?.title ?? "Routine Maintenance";
+    const category = data.category ?? complaintDoc?.category ?? "MAINTENANCE";
+    const description =
+      data.description ??
+      complaintDoc?.description ??
+      (data.remarks ? data.remarks : `${title} scheduled facility maintenance work.`);
+    const priority = data.priority ?? complaintDoc?.priority ?? "MEDIUM";
+    const estimatedCost = data.estimatedCost ?? complaintDoc?.estimatedCost ?? null;
+
+    const maintenance = await Maintenance.create({
+      complaint: complaintDoc ? complaintDoc._id : null,
+      resident: residentVal,
+      apartment: apartmentVal,
+      flat: flatVal,
+      assignedStaff,
+      category,
+      title,
+      description,
+      priority,
+      status: assignedStaff ? "ASSIGNED" : "PENDING",
+      assignedBy: assignedStaff ? user.id : null,
+      assignedAt: assignedStaff ? now : null,
+      estimatedCost,
+      createdBy: user.id,
+      updatedBy: user.id,
+    });
+
+    if (complaintDoc) {
+      const complaintStatus = getComplaintStatus(complaintDoc);
+      const complaintSet: Record<string, unknown> = assignedStaff
+        ? {
+            status: "ASSIGNED",
+            assignedStaff,
+            assignedTo: assignedStaff,
+            assignedBy: user.id,
+            assignedAt: now,
+            estimatedCost,
+            maintenanceId: maintenance._id,
+          }
+        : {
+            ...(complaintStatus === "PENDING" ? { status: "UNDER_REVIEW" } : {}),
+            maintenanceId: maintenance._id,
+          };
+
+      await syncComplaint(
+        String(complaintDoc._id),
+        complaintSet,
+        createComplaintRemark(data.remarks, user)
+      );
+    }
+
+    if (assignedStaff) {
+      await createNotification({
+        apartment: maintenance.apartment,
+        recipientUserId: assignedStaff,
+        type: "TASK_ASSIGNED",
+        severity: maintenance.priority === "URGENT" ? "WARNING" : "INFO",
+        title: "Maintenance work assigned",
+        message: `${maintenance.title} has been assigned to you.`,
+        relatedResourceType: "maintenance",
+        relatedResourceId: String(maintenance._id),
+        createdBy: user.id,
+      }).catch((notifErr) => {
+        console.warn("Non-fatal: Failed to send assignment notification:", notifErr);
+      });
+    }
+
+    return maintenance;
+  } catch (error) {
+    console.error("[CRITICAL createMaintenance ERROR]:", error);
+    throw error;
+  }
+};
+
+export const getMaintenanceTypes = async (user: AuthenticatedMaintenanceUser) => {
   await ensureCurrentUserExists(user);
 
-  if (!isManagementRole(user.role)) {
-    throw new AppError("Only management users can create maintenance work", 403);
+  const predefinedTypes = [
+    {
+      id: "ELECTRICAL_REPAIR",
+      title: "Electrical Repair",
+      category: "ELECTRICAL",
+      description: "Wiring, switchboard, fuse, circuit breaker, or electrical fixture repairs",
+    },
+    {
+      id: "PLUMBING_WORK",
+      title: "Plumbing Work",
+      category: "PLUMBING",
+      description: "Pipe leakage, faucet repair, drain blockage, or sanitary fittings",
+    },
+    {
+      id: "HVAC_MAINTENANCE",
+      title: "HVAC Maintenance",
+      category: "MAINTENANCE",
+      description: "Air conditioning, cooling systems, ventilation, and filter servicing",
+    },
+    {
+      id: "CARPENTRY_WORK",
+      title: "Carpentry & Woodwork",
+      category: "MAINTENANCE",
+      description: "Door, window, lock, cabinet, furniture, or wooden fixture repairs",
+    },
+    {
+      id: "GENERAL_SERVICING",
+      title: "General Servicing",
+      category: "MAINTENANCE",
+      description: "Periodic facility servicing, preventive maintenance, and handyman tasks",
+    },
+    {
+      id: "CLEANING_SANITIZATION",
+      title: "Cleaning & Sanitization",
+      category: "CLEANING",
+      description: "Deep cleaning, corridor sanitization, common area upkeep, and waste disposal",
+    },
+    {
+      id: "SECURITY_CHECK",
+      title: "Security System Check",
+      category: "SECURITY",
+      description: "CCTV, intercom, access control gates, and perimeter sensor maintenance",
+    },
+    {
+      id: "LIFT_SERVICING",
+      title: "Elevator / Lift Servicing",
+      category: "LIFT",
+      description: "Elevator routine maintenance, sensor calibration, and emergency repairs",
+    },
+    {
+      id: "WATER_SUPPLY",
+      title: "Water Supply & Tank Inspection",
+      category: "WATER",
+      description: "Overhead tank inspection, pump maintenance, and water filtration system",
+    },
+    {
+      id: "OTHER_MAINTENANCE",
+      title: "Other Maintenance Task",
+      category: "OTHER",
+      description: "Miscellaneous repair or maintenance request",
+    },
+  ];
+
+  try {
+    const activeSchedules = await Schedule.find({
+      status: { $in: ["SCHEDULED", "IN_PROGRESS"] },
+    })
+      .select("_id title description workType")
+      .limit(20)
+      .lean();
+
+    const scheduleTypes = activeSchedules.map((s) => ({
+      id: s._id.toString(),
+      title: s.title,
+      category: s.workType === "maintenance" ? "MAINTENANCE" : "OTHER",
+      description: s.description || undefined,
+      isSchedule: true,
+    }));
+
+    return [...predefinedTypes, ...scheduleTypes];
+  } catch {
+    return predefinedTypes;
   }
-
-  const complaint = await getComplaintOrThrow(data.complaint);
-  const complaintStatus = getComplaintStatus(complaint);
-
-  if (complaintTerminalStatuses.has(complaintStatus) || !complaintMaintenanceSourceStatuses.has(complaintStatus)) {
-    throw new AppError(`Complaint cannot be used for maintenance while it is ${complaintStatus}`, 400);
-  }
-
-  assertManagerCanManageApartment(user, complaint.apartment);
-
-  const existingActiveMaintenance = await Maintenance.findOne({
-    complaint: data.complaint,
-    status: { $in: activeMaintenanceStatuses },
-  }).lean();
-
-  if (existingActiveMaintenance) {
-    throw new AppError("An active maintenance record already exists for this complaint", 409);
-  }
-
-  let assignedStaff: string | null = null;
-  const now = new Date();
-
-  if (data.assignedStaff) {
-    const staff = await ensureStaffUser(data.assignedStaff);
-    assignedStaff = ensureStaffCanWorkOnApartment(staff, data.assignedStaff, complaint.apartment, user);
-  }
-
-  const maintenance = await Maintenance.create({
-    complaint: complaint._id,
-    resident: complaint.resident,
-    apartment: complaint.apartment,
-    flat: complaint.flat,
-    assignedStaff,
-    category: data.category ?? complaint.category,
-    title: data.title ?? complaint.title,
-    description: data.description ?? complaint.description,
-    priority: data.priority ?? complaint.priority,
-    status: assignedStaff ? "ASSIGNED" : "PENDING",
-    assignedBy: assignedStaff ? user.id : null,
-    assignedAt: assignedStaff ? now : null,
-    estimatedCost: data.estimatedCost ?? complaint.estimatedCost ?? null,
-    createdBy: user.id,
-    updatedBy: user.id,
-  });
-
-  const complaintSet: Record<string, unknown> = assignedStaff
-    ? {
-        status: "ASSIGNED",
-        assignedStaff,
-        assignedBy: user.id,
-        assignedAt: now,
-        estimatedCost: data.estimatedCost ?? complaint.estimatedCost ?? null,
-      }
-    : complaintStatus === "PENDING"
-      ? { status: "UNDER_REVIEW" }
-      : {};
-
-  await syncComplaint(
-    data.complaint,
-    complaintSet,
-    createComplaintRemark(data.remarks, user)
-  );
-
-  if (assignedStaff) {
-    await createNotification({
-      apartment: maintenance.apartment,
-      recipientUserId: assignedStaff,
-      type: "TASK_ASSIGNED",
-      severity: maintenance.priority === "URGENT" ? "WARNING" : "INFO",
-      title: "Maintenance work assigned",
-      message: `${maintenance.title} has been assigned to you.`,
-      relatedResourceType: "maintenance",
-      relatedResourceId: String(maintenance._id),
-      createdBy: user.id,
-    });
-  }
-
-  return maintenance;
 };
 
 export const getMaintenance = async (
@@ -685,11 +903,22 @@ export const assignMaintenance = async (
     throw new AppError(`Maintenance cannot be assigned while it is ${currentStatus}`, 400);
   }
 
-  const staff = await ensureStaffUser(data.assignedStaff);
-  const staffId = ensureStaffCanWorkOnApartment(staff, data.assignedStaff, maintenance.apartment, user);
+  const staffIdentifier = data.assignedStaff || (data as any).assignedTo || (data as any).technicianId;
+  if (!staffIdentifier) {
+    throw new AppError("Assigned staff or technician is required", 400);
+  }
 
-  if (currentStatus === "ASSIGNED" && sameId(maintenance.assignedStaff, staffId)) {
-    throw new AppError("Maintenance is already assigned to this staff member", 409);
+  const staff = await ensureStaffUser(staffIdentifier, maintenance.apartment);
+  const staffId = ensureStaffCanWorkOnApartment(staff, staffIdentifier, maintenance.apartment, user);
+
+  const targetStatus = (data as any).status || (currentStatus === "PENDING" ? "ASSIGNED" : currentStatus);
+
+  if (targetStatus !== currentStatus) {
+    assertValidTransition(currentStatus, targetStatus);
+  }
+
+  if (sameId(maintenance.assignedStaff, staffId) && targetStatus === currentStatus) {
+    throw new AppError("Maintenance is already assigned to this staff member with this status", 409);
   }
 
   const now = new Date();
@@ -697,15 +926,20 @@ export const assignMaintenance = async (
     assignedStaff: staffId,
     assignedBy: user.id,
     assignedAt: now,
-    status: "ASSIGNED",
+    status: targetStatus,
     updatedBy: user.id,
   };
+
+  if (targetStatus === "IN_PROGRESS" && !maintenance.startedAt) {
+    set.startedAt = now;
+  }
 
   if (data.estimatedCost !== undefined) {
     set.estimatedCost = data.estimatedCost;
   }
 
-  const managerRemark = createNote(data.remarks, user);
+  const remarkText = data.remarks || (data as any).notes;
+  const managerRemark = createNote(remarkText, user);
   const updatedMaintenance = await updateMaintenanceDocument(
     maintenanceId,
     set,
@@ -713,7 +947,7 @@ export const assignMaintenance = async (
   );
 
   const complaintSet: Record<string, unknown> = {
-    status: "ASSIGNED",
+    status: targetStatus,
     assignedStaff: staffId,
     assignedBy: user.id,
     assignedAt: now,
@@ -723,7 +957,7 @@ export const assignMaintenance = async (
     complaintSet.estimatedCost = data.estimatedCost;
   }
 
-  await syncComplaintFromMaintenance(updatedMaintenance, complaintSet, user, data.remarks);
+  await syncComplaintFromMaintenance(updatedMaintenance, complaintSet, user, remarkText);
 
   await createNotification({
     apartment: updatedMaintenance.apartment,

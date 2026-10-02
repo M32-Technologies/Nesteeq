@@ -14,12 +14,28 @@ export const progressUpdateSchema = z.union([
   progressUpdateBodySchema,
 ])
 
-export const costSubmissionBodySchema = z.object({
-  amount: z.coerce
-    .number()
-    .min(0, "Amount must be a non-negative number"),
-  description: z.string().trim().optional(),
-})
+export const costSubmissionBodySchema = z
+  .object({
+    amount: z.coerce
+      .number()
+      .min(0, "Amount must be a non-negative number")
+      .optional(),
+    expenseAmount: z.coerce
+      .number()
+      .min(0, "Amount must be a non-negative number")
+      .optional(),
+    description: z.string().trim().optional(),
+    expenseDescription: z.string().trim().optional(),
+    receiptUrl: z.string().trim().nullable().optional(),
+    expenseReceiptUrl: z.string().trim().nullable().optional(),
+  })
+  .passthrough()
+  .refine(
+    (data) => data.amount !== undefined || data.expenseAmount !== undefined,
+    {
+      message: "Amount is required",
+    }
+  )
 
 export const costSubmissionSchema = z.union([
   z.object({

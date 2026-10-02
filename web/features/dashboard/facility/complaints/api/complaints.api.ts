@@ -129,18 +129,64 @@ export async function approveComplaint(id: string, payload: ReasonPayload = {}) 
   return response.data.data
 }
 
+export async function approveComplaintExpense(
+  id: string,
+  payload: { remarks?: string } = {}
+) {
+  const response = await api.patch<ApiResponse<Complaint>>(
+    `${COMPLAINTS_PATH}/${id}/expense/approve`,
+    payload
+  )
+
+  if (!response.data.success) {
+    throw new Error(
+      response.data.message || "Failed to approve maintenance expense"
+    )
+  }
+
+  return response.data.data
+}
+
+export async function rejectComplaintExpense(
+  id: string,
+  payload: { reason?: string; remarks?: string } = {}
+) {
+  const response = await api.patch<ApiResponse<Complaint>>(
+    `${COMPLAINTS_PATH}/${id}/expense/reject`,
+    payload
+  )
+
+  if (!response.data.success) {
+    throw new Error(
+      response.data.message || "Failed to reject maintenance expense"
+    )
+  }
+
+  return response.data.data
+}
+
 export async function createMaintenance(payload: {
   title: string
+  category?: string
   description?: string
   priority?: string
   assignedTo?: string
+  assignedStaff?: string
   complaintId?: string
+  complaint?: string
+  estimatedCost?: number
+  remarks?: string
   scheduledDate?: string
   estimatedDurationHours?: number
 }) {
+  const body = {
+    ...payload,
+    complaint: payload.complaint || payload.complaintId,
+    assignedStaff: payload.assignedStaff || payload.assignedTo,
+  }
   const response = await api.post<ApiResponse<unknown>>(
     MAINTENANCE_PATH,
-    payload
+    body
   )
 
   if (!response.data.success) {
