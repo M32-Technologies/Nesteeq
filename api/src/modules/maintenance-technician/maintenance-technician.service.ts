@@ -659,7 +659,7 @@ export const getAssignedJobs = async (
     const idStr = doc._id.toString()
     seenComplaintIds.add(idStr)
     const rawDateVal = doc.assignedAt || doc.createdAt || new Date()
-    const assignedDate = new Date(rawDateVal).toISOString().split("T")[0]
+    const assignedDate = new Date(rawDateVal).toISOString()
     const createdAtStr = doc.createdAt
       ? new Date(doc.createdAt).toISOString()
       : new Date(rawDateVal).toISOString()
@@ -697,7 +697,7 @@ export const getAssignedJobs = async (
 
     const idStr = doc._id.toString()
     const rawDateVal = doc.assignedAt || doc.createdAt || new Date()
-    const assignedDate = new Date(rawDateVal).toISOString().split("T")[0]
+    const assignedDate = new Date(rawDateVal).toISOString()
     const createdAtStr = doc.createdAt
       ? new Date(doc.createdAt).toISOString()
       : new Date(rawDateVal).toISOString()
@@ -738,9 +738,9 @@ export const getAssignedJobs = async (
   }
 
   jobs.sort((a, b) => {
-    const timeA = new Date(a.createdAt || a.assignedDate).getTime() || 0
-    const timeB = new Date(b.createdAt || b.assignedDate).getTime() || 0
-    return timeB - timeA
+    const dateA = new Date(a.assignedDate || a.createdAt || 0).getTime()
+    const dateB = new Date(b.assignedDate || b.createdAt || 0).getTime()
+    return dateB - dateA
   })
 
   return jobs

@@ -100,13 +100,17 @@ export default function MaintenanceJobsTable({
   page,
   pageSize,
 }: MaintenanceJobsTableProps) {
-  const formatDate = (dateString: string) => {
+  const formatJobDate = (dateString?: string) => {
+    if (!dateString) return "-"
     try {
-      return new Intl.DateTimeFormat("en-IN", {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) return dateString
+      return date.toLocaleDateString("en-GB", {
         day: "2-digit",
         month: "short",
         year: "numeric",
-      }).format(new Date(dateString))
+        timeZone: "Asia/Kolkata", // ensures midnight/early morning IST displays Oct 3, not UTC Oct 2
+      })
     } catch {
       return dateString
     }
@@ -274,7 +278,7 @@ export default function MaintenanceJobsTable({
                     <td className="px-4 py-4 align-middle">
                       <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
                         <Calendar size={13} className="shrink-0 text-slate-400" />
-                        <span>{formatDate(job.assignedDate)}</span>
+                        <span>{formatJobDate(job.assignedDate || job.createdAt)}</span>
                       </div>
                     </td>
 

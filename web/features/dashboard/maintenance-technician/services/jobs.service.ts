@@ -94,7 +94,12 @@ export const getAssignedJobs = async (status?: string): Promise<AssignedJob[]> =
       throw new Error(response.data.message || "Failed to fetch assigned jobs")
     }
 
-    return response.data.data
+    const allJobs = response.data.data || []
+    return allJobs.sort((a, b) => {
+      const dateA = new Date(a.assignedDate || a.createdAt || 0).getTime()
+      const dateB = new Date(b.assignedDate || b.createdAt || 0).getTime()
+      return dateB - dateA // Newest first
+    })
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Failed to fetch assigned jobs"))
   }

@@ -35,7 +35,7 @@ export default function AssignedJobsList() {
   })
 
   const filteredJobs = useMemo(() => {
-    return jobs.filter((job) => {
+    const list = jobs.filter((job) => {
       const matchesSearch =
         search.trim() === "" ||
         job.jobId.toLowerCase().includes(search.toLowerCase()) ||
@@ -58,6 +58,12 @@ export default function AssignedJobsList() {
         priorityFilter === "ALL" || job.priority === priorityFilter
 
       return matchesSearch && matchesStatus && matchesPriority
+    })
+
+    return [...list].sort((a, b) => {
+      const dateA = new Date(a.assignedDate || a.createdAt || 0).getTime()
+      const dateB = new Date(b.assignedDate || b.createdAt || 0).getTime()
+      return dateB - dateA // Newest first
     })
   }, [jobs, search, statusFilter, priorityFilter])
 
