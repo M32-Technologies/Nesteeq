@@ -1,8 +1,13 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { Eye, MoreVertical, Pencil, UserCheck } from "lucide-react"
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import type { ComplaintDrawerMode } from "@/features/dashboard/facility/complaints/components/complaint-details-drawer"
 import type {
   Complaint,
@@ -16,6 +21,9 @@ import {
 interface ComplaintsTableProps {
   complaints: Complaint[]
   onSelectComplaint: (id: string, mode?: ComplaintDrawerMode) => void
+  onViewDetails?: (complaint: Complaint) => void
+  onAssignTechnician?: (complaint: Complaint) => void
+  onUpdateStatus?: (complaint: Complaint) => void
 }
 
 const statusBadgeStyles: Record<string, string> = {
@@ -44,14 +52,33 @@ const priorityBadgeStyles: Record<string, string> = {
 export function ComplaintsTable({
   complaints,
   onSelectComplaint,
+  onViewDetails: customViewDetails,
+  onAssignTechnician: customAssignTechnician,
+  onUpdateStatus: customUpdateStatus,
 }: ComplaintsTableProps) {
-  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
+  const onViewDetails = (complaint: Complaint) => {
+    if (customViewDetails) {
+      customViewDetails(complaint)
+    } else {
+      onSelectComplaint(complaint._id, "details")
+    }
+  }
 
-  useEffect(() => {
-    const handleClickOutside = () => setOpenDropdownId(null)
-    document.addEventListener("click", handleClickOutside)
-    return () => document.removeEventListener("click", handleClickOutside)
-  }, [])
+  const onAssignTechnician = (complaint: Complaint) => {
+    if (customAssignTechnician) {
+      customAssignTechnician(complaint)
+    } else {
+      onSelectComplaint(complaint._id, "assign")
+    }
+  }
+
+  const onUpdateStatus = (complaint: Complaint) => {
+    if (customUpdateStatus) {
+      customUpdateStatus(complaint)
+    } else {
+      onSelectComplaint(complaint._id, "status")
+    }
+  }
 
   return (
     <>
@@ -97,7 +124,7 @@ export function ComplaintsTable({
               return (
                 <tr
                   key={complaint._id}
-                  onClick={() => onSelectComplaint(complaint._id, "details")}
+                  onClick={() => onViewDetails(complaint)}
                   className="group cursor-pointer transition hover:bg-slate-50/80"
                 >
                   {/* ID */}
@@ -168,60 +195,59 @@ export function ComplaintsTable({
 
                   {/* Action */}
                   <td className="py-3.5 pl-3 pr-5 text-center">
-                    <div className="relative inline-block text-left" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setOpenDropdownId((prev) => (prev === complaint._id ? null : complaint._id))
-                        }
-                        className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs transition hover:border-[#0F5F45] hover:bg-[#0F5F45]/5 hover:text-[#0F5F45]"
-                        aria-label="Actions"
-                        aria-haspopup="true"
-                        aria-expanded={openDropdownId === complaint._id}
-                      >
-                        <MoreVertical size={16} />
-                      </button>
-
-                      {openDropdownId === complaint._id && (
-                        <div
-                          className="absolute right-0 z-30 mt-1 w-44 origin-top-right rounded-lg border border-slate-200 bg-white py-1 shadow-lg ring-1 ring-black/5"
-                          onClick={(e) => e.stopPropagation()}
+                    <div
+                      className="inline-block text-left"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-900 active:scale-95"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                            <span className="sr-only">Open actions</span>
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="end"
+                          className="w-52 z-50 bg-white shadow-lg border border-slate-200 rounded-xl p-1"
                         >
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setOpenDropdownId(null)
-                              onSelectComplaint(complaint._id, "details")
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onViewDetails(complaint)
                             }}
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                            className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"
                           >
-                            <Eye size={14} className="text-slate-400" />
-                            View Details
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setOpenDropdownId(null)
-                              onSelectComplaint(complaint._id, "assign")
+                            <Eye className="h-4 w-4 text-slate-500" />
+                            <span>View Details</span>
+                          </DropdownMenuItem>
+
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onAssignTechnician(complaint)
                             }}
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                            className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-[#5542F6] hover:bg-indigo-50 rounded-lg cursor-pointer"
                           >
-                            <UserCheck size={14} className="text-slate-400" />
-                            Assign Technician
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setOpenDropdownId(null)
-                              onSelectComplaint(complaint._id, "status")
+                            <UserCheck className="h-4 w-4 text-[#5542F6]" />
+                            <span>Assign Technician</span>
+                          </DropdownMenuItem>
+
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onUpdateStatus(complaint)
                             }}
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                            className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"
                           >
-                            <Pencil size={14} className="text-slate-400" />
-                            edit
-                          </button>
-                        </div>
-                      )}
+                            <Pencil className="h-4 w-4 text-slate-500" />
+                            <span>Update Status / Cancel</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </td>
                 </tr>
@@ -258,7 +284,7 @@ export function ComplaintsTable({
           return (
             <article
               key={complaint._id}
-              onClick={() => onSelectComplaint(complaint._id, "details")}
+              onClick={() => onViewDetails(complaint)}
               className="cursor-pointer p-4 transition hover:bg-slate-50/70"
             >
               <div className="flex items-start justify-between gap-3">
@@ -276,60 +302,59 @@ export function ComplaintsTable({
                   </h2>
                 </div>
 
-                <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setOpenDropdownId((prev) => (prev === complaint._id ? null : complaint._id))
-                    }
-                    className="flex size-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs hover:border-[#0F5F45] hover:text-[#0F5F45]"
-                    aria-label="Actions"
-                    aria-haspopup="true"
-                    aria-expanded={openDropdownId === complaint._id}
-                  >
-                    <MoreVertical size={16} />
-                  </button>
-
-                  {openDropdownId === complaint._id && (
-                    <div
-                      className="absolute right-0 z-30 mt-1 w-44 origin-top-right rounded-lg border border-slate-200 bg-white py-1 shadow-lg ring-1 ring-black/5"
-                      onClick={(e) => e.stopPropagation()}
+                <div
+                  className="relative shrink-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-900 active:scale-95"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                        <span className="sr-only">Open actions</span>
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      className="w-52 z-50 bg-white shadow-lg border border-slate-200 rounded-xl p-1"
                     >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setOpenDropdownId(null)
-                          onSelectComplaint(complaint._id, "details")
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onViewDetails(complaint)
                         }}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                        className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"
                       >
-                        <Eye size={14} className="text-slate-400" />
-                        View Details
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setOpenDropdownId(null)
-                          onSelectComplaint(complaint._id, "assign")
+                        <Eye className="h-4 w-4 text-slate-500" />
+                        <span>View Details</span>
+                      </DropdownMenuItem>
+
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onAssignTechnician(complaint)
                         }}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                        className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-[#5542F6] hover:bg-indigo-50 rounded-lg cursor-pointer"
                       >
-                        <UserCheck size={14} className="text-slate-400" />
-                        Assign Technician
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setOpenDropdownId(null)
-                          onSelectComplaint(complaint._id, "status")
+                        <UserCheck className="h-4 w-4 text-[#5542F6]" />
+                        <span>Assign Technician</span>
+                      </DropdownMenuItem>
+
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onUpdateStatus(complaint)
                         }}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                        className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"
                       >
-                        <Pencil size={14} className="text-slate-400" />
-                        edit
-                      </button>
-                    </div>
-                  )}
+                        <Pencil className="h-4 w-4 text-slate-500" />
+                        <span>Update Status / Cancel</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
 

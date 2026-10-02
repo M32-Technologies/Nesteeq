@@ -476,6 +476,9 @@ export function FacilityComplaintsPage({
           <ComplaintsTable
             complaints={visibleComplaints}
             onSelectComplaint={handleSelectComplaint}
+            onViewDetails={(complaint) => handleSelectComplaint(complaint._id, "details")}
+            onAssignTechnician={(complaint) => handleSelectComplaint(complaint._id, "assign")}
+            onUpdateStatus={(complaint) => handleSelectComplaint(complaint._id, "status")}
           />
         )}
       </div>
