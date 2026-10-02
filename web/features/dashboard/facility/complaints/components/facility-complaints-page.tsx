@@ -122,7 +122,13 @@ function sortComplaints(complaints: Complaint[], sort: ComplaintSortKey) {
   })
 }
 
-export function FacilityComplaintsPage() {
+export interface FacilityComplaintsPageProps {
+  eyebrow?: string
+}
+
+export function FacilityComplaintsPage({
+  eyebrow = "Property Manager",
+}: FacilityComplaintsPageProps = {}) {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState("")
   const [status, setStatus] = useState<"all" | ComplaintStatus>("all")
@@ -417,43 +423,43 @@ export function FacilityComplaintsPage() {
         <ComplaintsStats stats={statsQuery.data} />
 
         <div className="mt-6 overflow-hidden rounded-lg border border-[#E2E8EE] bg-white">
-          <ComplaintsFilters
-            search={search}
-            status={status}
-            priority={priority}
-            category={category}
-            sort={sort}
-            onSearchChange={setSearch}
-            onStatusChange={setStatus}
-            onPriorityChange={setPriority}
-            onCategoryChange={setCategory}
-            onSortChange={setSort}
-          />
+        <ComplaintsFilters
+          search={search}
+          status={status}
+          priority={priority}
+          category={category}
+          sort={sort}
+          onSearchChange={setSearch}
+          onStatusChange={setStatus}
+          onPriorityChange={setPriority}
+          onCategoryChange={setCategory}
+          onSortChange={setSort}
+        />
 
-          {complaintsQuery.isPending ? (
-            <LoadingRows />
-          ) : complaintsQuery.isError ? (
-            <ErrorState
-              title="Unable to load complaints"
-              message={getApiErrorMessage(
-                complaintsQuery.error,
-                "The complaints list could not be loaded."
-              )}
-              isRetrying={complaintsQuery.isFetching}
-              onRetry={() => void complaintsQuery.refetch()}
-            />
-          ) : visibleComplaints.length === 0 ? (
-            <EmptyState
-              title="No complaints found"
-              message="There are no complaints matching the current view."
-            />
-          ) : (
-            <ComplaintsTable
-              complaints={visibleComplaints}
-              onSelectComplaint={setSelectedComplaintId}
-            />
-          )}
-        </div>
+        {complaintsQuery.isPending ? (
+          <LoadingRows />
+        ) : complaintsQuery.isError ? (
+          <ErrorState
+            title="Unable to load complaints"
+            message={getApiErrorMessage(
+              complaintsQuery.error,
+              "The complaints list could not be loaded."
+            )}
+            isRetrying={complaintsQuery.isFetching}
+            onRetry={() => void complaintsQuery.refetch()}
+          />
+        ) : visibleComplaints.length === 0 ? (
+          <EmptyState
+            title="No complaints found"
+            message="There are no complaints matching the current view."
+          />
+        ) : (
+          <ComplaintsTable
+            complaints={visibleComplaints}
+            onSelectComplaint={setSelectedComplaintId}
+          />
+        )}
+      </div>
       </div>
 
       <ComplaintDetailsDrawer
