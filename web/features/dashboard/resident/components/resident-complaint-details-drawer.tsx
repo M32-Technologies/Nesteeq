@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import {
   X,
   Clock,
@@ -69,7 +69,6 @@ export interface ResidentComplaintItem {
   } | null;
   completionOtp?: string | null;
   images?: string[];
-  photos?: string[];
   attachments?: string[];
   createdAt: string;
   updatedAt?: string;
@@ -119,36 +118,6 @@ export function ResidentComplaintDetailsDrawer({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isDrawerOpen, selectedPhoto, onClose]);
 
-  const uniquePhotos: string[] = useMemo(() => {
-    if (!complaint) return [];
-    const candidateList =
-      Array.isArray(complaint.images) && complaint.images.length > 0
-        ? complaint.images
-        : Array.isArray(complaint.photos) && complaint.photos.length > 0
-        ? complaint.photos
-        : Array.isArray(complaint.attachments)
-        ? complaint.attachments
-        : [];
-
-    const seen = new Set<string>();
-    const result: string[] = [];
-
-    for (const raw of candidateList) {
-      if (!raw) continue;
-      const resolved = getMediaUrl(String(raw).trim());
-      if (!resolved) continue;
-
-      const key = resolved.split("/").pop()?.split("?")[0]?.toLowerCase() || resolved;
-
-      if (!seen.has(key)) {
-        seen.add(key);
-        result.push(resolved);
-      }
-    }
-
-    return result.length > 0 ? result : Array.from(new Set(candidateList.filter(Boolean)));
-  }, [complaint]);
-
   if (!isDrawerOpen || !complaint) return null;
 
   const locationMatch = complaint.description.match(/\[Location:\s*([^\]]+)\]/i);
@@ -163,6 +132,11 @@ export function ResidentComplaintDetailsDrawer({
     .replace(/\[Location:\s*[^\]]+\]/gi, "")
     .replace(/\[Attached Photo Reference:[^\]]+\]/gi, "")
     .trim();
+
+  const rawImages: string[] = [
+    ...(Array.isArray(complaint.images) ? complaint.images : []),
+    ...(Array.isArray(complaint.attachments) ? complaint.attachments : []),
+  ].filter(Boolean);
 
   const status = (complaint.status || "PENDING").toUpperCase();
   const isTerminalNegative = status === "REJECTED" || status === "CANCELLED";
@@ -469,17 +443,17 @@ export function ResidentComplaintDetailsDrawer({
             )}
 
             {/* Attached Photos / Proof */}
-            {uniquePhotos.length > 0 ? (
+            {rawImages.length > 0 ? (
               <section className="space-y-2.5 border-t border-[#EEF1F4] pt-5">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-[#7C8782]">
-                    ATTACHED PHOTOS / PROOF ({uniquePhotos.length})
+                    Attached Photos / Proof ({rawImages.length})
                   </h4>
                   <span className="text-[11px] text-[#7C8782]">Click photo to enlarge</span>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {uniquePhotos.map((img, idx) => {
+                  {rawImages.map((img, idx) => {
                     const resolved = getMediaUrl(img);
                     return (
                       <div
@@ -505,7 +479,7 @@ export function ResidentComplaintDetailsDrawer({
             ) : parsedPhotoRef ? (
               <section className="space-y-2.5 border-t border-[#EEF1F4] pt-5">
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-[#7C8782]">
-                  ATTACHED PHOTOS / PROOF (1)
+                  Attached Photos / Proof
                 </h4>
                 <div className="rounded-xl border border-[#DDE3DF] bg-[#F7F8F5] p-4 flex flex-col sm:flex-row items-center gap-4">
                   <div className="relative aspect-video w-full sm:w-44 overflow-hidden rounded-lg border border-slate-200 bg-gradient-to-br from-slate-100 to-slate-200 flex flex-col items-center justify-center text-slate-500 shadow-2xs">
