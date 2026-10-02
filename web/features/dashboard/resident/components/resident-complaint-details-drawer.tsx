@@ -134,27 +134,26 @@ export function ResidentComplaintDetailsDrawer({
     .trim();
 
   const uniquePhotos: string[] = useMemo(() => {
-    const rawList: string[] = [
-      ...(Array.isArray(complaint.images) ? complaint.images : []),
-      ...(Array.isArray(complaint.attachments) ? complaint.attachments : []),
-    ]
-      .filter(Boolean)
-      .map((item) => String(item).trim())
-      .filter((item) => item.length > 0);
+    // Prefer images array if present; otherwise fallback to attachments
+    const candidateList =
+      Array.isArray(complaint.images) && complaint.images.length > 0
+        ? complaint.images
+        : Array.isArray(complaint.attachments) && complaint.attachments.length > 0
+        ? complaint.attachments
+        : [];
 
-    const seenUrls = new Set<string>();
-    const seenFilenames = new Set<string>();
+    const seen = new Set<string>();
     const result: string[] = [];
 
-    for (const raw of rawList) {
-      const resolved = getMediaUrl(raw);
+    for (const raw of candidateList) {
+      if (!raw) continue;
+      const resolved = getMediaUrl(String(raw).trim());
       if (!resolved) continue;
 
-      const filename = resolved.split("/").pop()?.split("?")[0]?.toLowerCase() || resolved;
+      const key = resolved.split("/").pop()?.split("?")[0]?.toLowerCase() || resolved;
 
-      if (!seenUrls.has(resolved) && !seenFilenames.has(filename)) {
-        seenUrls.add(resolved);
-        seenFilenames.add(filename);
+      if (!seen.has(key)) {
+        seen.add(key);
         result.push(resolved);
       }
     }
