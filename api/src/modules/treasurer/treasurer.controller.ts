@@ -10,6 +10,7 @@ import {
   processMaintenancePayoutService,
   getDefaultersReportService,
   getExpenseBreakdownReportService,
+  exportTreasurerReportCsvService,
 } from "./treasurer.service.js";
 
 const getApartmentId = (req: Request) =>
@@ -142,4 +143,37 @@ export const getExpenseBreakdownReport = catchAsync(
     });
   }
 );
+
+export const exportTreasurerReportCsv = catchAsync(
+  async (req: Request, res: Response) => {
+    const apartmentId = getApartmentId(req);
+    const type = (req.query.type as "summary" | "defaulters" | "expenses") || "summary";
+    const year = req.query.year ? Number(req.query.year) : undefined;
+    const month = req.query.month ? Number(req.query.month) : undefined;
+    const days = req.query.days ? Number(req.query.days) : undefined;
+    const overdueDays = req.query.overdueDays ? Number(req.query.overdueDays) : undefined;
+    const search = req.query.search as string | undefined;
+    const startDate = req.query.startDate as string | undefined;
+    const endDate = req.query.endDate as string | undefined;
+
+    const { csvContent, filename } = await exportTreasurerReportCsvService(
+      apartmentId,
+      {
+        type,
+        year,
+        month,
+        days,
+        overdueDays,
+        search,
+        startDate,
+        endDate,
+      }
+    );
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.status(200).send(csvContent);
+  }
+);
+
 

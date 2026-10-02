@@ -1,4 +1,7 @@
-import { Eye } from "lucide-react"
+"use client"
+
+import { useEffect, useState } from "react"
+import { Eye, MoreVertical, Pencil, UserCheck } from "lucide-react"
 
 import type { Maintenance } from "@/features/dashboard/facility/maintenance/types/maintenance.types"
 import {
@@ -15,11 +18,28 @@ export function MaintenanceTable({
   onSelectMaintenance,
 }: {
   maintenance: Maintenance[]
-  onSelectMaintenance: (id: string) => void
+  onSelectMaintenance: (id: string, mode?: "details" | "assign" | "edit") => void
 }) {
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null)
+
+  const handleOpenDrawer = (
+    item: Maintenance,
+    mode: "details" | "assign" | "edit" = "details"
+  ) => {
+    onSelectMaintenance(item._id, mode)
+  }
+
+  useEffect(() => {
+    const handleOutsideClick = () => setActiveMenuId(null)
+    if (activeMenuId) {
+      document.addEventListener("click", handleOutsideClick)
+      return () => document.removeEventListener("click", handleOutsideClick)
+    }
+  }, [activeMenuId])
+
   return (
     <>
-      <div className="hidden overflow-x-auto lg:block">
+      <div className="hidden min-h-[300px] overflow-x-auto pb-28 lg:block">
         <table className="w-full min-w-[1240px] text-left">
           <thead className="bg-[#FBFCFD] text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8793A0]">
             <tr>
@@ -38,7 +58,8 @@ export function MaintenanceTable({
             {maintenance.map((item) => (
               <tr
                 key={item._id}
-                className="text-[13px] text-[#26313D] transition hover:bg-[#FBFCFD]"
+                onClick={() => handleOpenDrawer(item, "details")}
+                className="cursor-pointer text-[13px] text-[#26313D] transition hover:bg-[#FBFCFD]"
               >
                 <td className="px-4 py-4 font-semibold text-[#111111]">
                   {formatId(item._id)}
@@ -52,13 +73,21 @@ export function MaintenanceTable({
                     {item.description}
                   </div>
                 </td>
-                <td className="px-4 py-4">{formatId(typeof item.assignedTo === 'object' ? item.assignedTo?._id : item.assignedTo)}</td>
+                <td className="px-4 py-4">
+                  {formatId(
+                    typeof item.assignedTo === "object"
+                      ? item.assignedTo?._id
+                      : item.assignedTo
+                  )}
+                </td>
                 <td className="px-4 py-4">
                   <PriorityBadge priority={item.priority} />
                 </td>
                 <td className="px-4 py-4 text-[12px] text-[#66737F]">
                   <div>Estimate: {formatCurrency(item.estimatedCost)}</div>
-                  <div className="mt-1">Actual: {formatCurrency(item.finalCost)}</div>
+                  <div className="mt-1">
+                    Actual: {formatCurrency(item.finalCost)}
+                  </div>
                 </td>
                 <td className="px-4 py-4">
                   <StatusBadge status={item.status} />
@@ -66,16 +95,54 @@ export function MaintenanceTable({
                 <td className="px-4 py-4 text-[12px] text-[#66737F]">
                   <div>{formatDate(item.createdAt)}</div>
                 </td>
-                <td className="px-4 py-4">
-                  <div className="flex justify-end">
+                <td className="px-4 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                  <div className="relative inline-block text-left" onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
-                      onClick={() => onSelectMaintenance(item._id)}
-                      className="inline-flex size-9 items-center justify-center rounded-lg border border-[#DDE5EC] text-[#5B6875] transition hover:border-[#07584F] hover:text-[#07584F]"
-                      aria-label="View maintenance"
+                      onClick={() => setActiveMenuId(activeMenuId === item._id ? null : item._id)}
+                      className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+                      aria-label="Actions"
                     >
-                      <Eye className="size-4" />
+                      <MoreVertical className="h-4 w-4" />
                     </button>
+
+                    {activeMenuId === item._id && (
+                      <div className="absolute right-0 z-50 mt-1 w-48 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveMenuId(null);
+                            handleOpenDrawer(item, "details");
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                          <Eye className="h-4 w-4 text-slate-500" />
+                          <span>View Details</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveMenuId(null);
+                            handleOpenDrawer(item, "assign");
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#5542F6] hover:bg-[#F5F3FF]"
+                        >
+                          <UserCheck className="h-4 w-4 text-[#5542F6]" />
+                          <span>Assign Technision</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveMenuId(null);
+                            handleOpenDrawer(item, "edit");
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                          <Pencil className="h-4 w-4 text-slate-500" />
+                          <span>Edit</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -84,9 +151,13 @@ export function MaintenanceTable({
         </table>
       </div>
 
-      <div className="divide-y divide-[#EEF2F5] lg:hidden">
+      <div className="divide-y divide-[#EEF2F5] pb-28 lg:hidden">
         {maintenance.map((item) => (
-          <article key={item._id} className="p-4">
+          <article
+            key={item._id}
+            onClick={() => handleOpenDrawer(item, "details")}
+            className="cursor-pointer p-4 transition hover:bg-[#FBFCFD]"
+          >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[12px] font-semibold text-[#07584F]">
@@ -96,14 +167,56 @@ export function MaintenanceTable({
                   {item.title}
                 </h2>
               </div>
-              <button
-                type="button"
-                onClick={() => onSelectMaintenance(item._id)}
-                className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-[#DDE5EC] text-[#5B6875]"
-                aria-label="View maintenance"
-              >
-                <Eye className="size-4" />
-              </button>
+              <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
+                <div className="relative inline-block text-left" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveMenuId(activeMenuId === item._id ? null : item._id)}
+                    className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+                    aria-label="Actions"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </button>
+
+                  {activeMenuId === item._id && (
+                    <div className="absolute right-0 z-50 mt-1 w-48 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveMenuId(null);
+                          handleOpenDrawer(item, "details");
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        <Eye className="h-4 w-4 text-slate-500" />
+                        <span>View Details</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveMenuId(null);
+                          handleOpenDrawer(item, "assign");
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#5542F6] hover:bg-[#F5F3FF]"
+                      >
+                        <UserCheck className="h-4 w-4 text-[#5542F6]" />
+                        <span>Assign Technision</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveMenuId(null);
+                          handleOpenDrawer(item, "edit");
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        <Pencil className="h-4 w-4 text-slate-500" />
+                        <span>Edit</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               <StatusBadge status={item.status} />

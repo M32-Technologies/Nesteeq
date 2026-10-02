@@ -56,6 +56,16 @@ export type MaintenanceQuery = {
   category?: string
   buildingId?: string
   assignedTo?: string
+  complaint?: string
+  complaintId?: string
+}
+
+export type MaintenanceTaskTemplate = {
+  id: string
+  title: string
+  category: string
+  description?: string
+  isSchedule?: boolean
 }
 
 export type MaintenanceListData = {

@@ -53,11 +53,12 @@ export async function fetchApartmentById(id: string): Promise<ApartmentDetail> {
  */
 export async function updateApartmentStatus(
   id: string,
-  status: "active" | "inactive"
+  status: "active" | "inactive",
+  reason?: string
 ): Promise<ApartmentItem> {
   const { data } = await api.patch<{ success: boolean; data: ApartmentItem }>(
     `/api/v1/admin/apartments/${id}/status`,
-    { status }
+    { status, reason }
   )
   return data.data
 }

@@ -12,6 +12,16 @@ export type BetterAuthUser = {
   phone?: string | null
   apartmentId?: string | null
   flatId?: string | null
+  apartmentName?: string | null
+  apartmentDetails?: {
+    id: string
+    name: string
+    address?: string
+    city?: string
+    state?: string
+    status?: string
+    totalUnits?: string | number
+  } | null
 }
 
 export type UserKpiStats = {

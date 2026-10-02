@@ -1,3 +1,5 @@
+import { env } from "../config/env.js";
+
 type EmailTemplate = {
   subject: string;
   html: string;
@@ -660,6 +662,291 @@ ${input.inviteLink}
 This invitation expires in 7 days.
 
 If you were not expecting this invitation, you can safely ignore this email.
+    `.trim(),
+  };
+}
+
+export function apartmentDeactivatedTemplate(input: {
+  managerName: string;
+  apartmentName: string;
+  reason?: string;
+  supportEmail?: string;
+}): EmailTemplate {
+  const reasonText = input.reason?.trim() || "Administrative review or subscription status.";
+  const supportEmail = input.supportEmail || env.brevoSenderEmail || "support@nesteeq.com";
+
+  return {
+    subject: `Important: ${input.apartmentName} has been temporarily deactivated on Nesteeq`,
+    html: layout(`
+      <div style="text-align: left;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <span style="
+            display: inline-block;
+            background-color: #FEF2F2;
+            border: 1px solid #FECACA;
+            color: #991B1B;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            padding: 5px 14px;
+            border-radius: 9999px;
+          ">
+            Apartment Deactivated
+          </span>
+        </div>
+
+        <h1 style="
+          margin: 0 0 16px;
+          color: ${COLORS.ink};
+          font-size: 20px;
+          font-weight: 700;
+          line-height: 1.4;
+          text-align: center;
+        ">
+          Community Access Temporarily Suspended
+        </h1>
+
+        <p style="
+          margin: 0 0 18px;
+          color: ${COLORS.text};
+          font-size: 14px;
+          line-height: 1.6;
+        ">
+          Hi ${input.managerName},
+        </p>
+
+        <p style="
+          margin: 0 0 22px;
+          color: ${COLORS.text};
+          font-size: 14px;
+          line-height: 1.6;
+        ">
+          We are writing to notify you that your apartment community, <strong>${input.apartmentName}</strong>, has been temporarily deactivated by the Nesteeq platform administration.
+        </p>
+
+        <!-- Information Card -->
+        <div style="
+          background-color: #FFF5F5;
+          border: 1px solid #FED7D7;
+          border-radius: 10px;
+          padding: 18px 20px;
+          margin-bottom: 22px;
+        ">
+          <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 13px; line-height: 1.6;">
+            <tr>
+              <td style="color: #742A2A; font-weight: 700; width: 110px; vertical-align: top; padding-bottom: 8px;">Apartment:</td>
+              <td style="color: #2D3748; font-weight: 600; padding-bottom: 8px;">${input.apartmentName}</td>
+            </tr>
+            <tr>
+              <td style="color: #742A2A; font-weight: 700; width: 110px; vertical-align: top; padding-bottom: 8px;">Status:</td>
+              <td style="color: #C53030; font-weight: 700; padding-bottom: 8px;">Inactive</td>
+            </tr>
+            <tr>
+              <td style="color: #742A2A; font-weight: 700; width: 110px; vertical-align: top; padding-bottom: 8px;">Reason:</td>
+              <td style="color: #4A5568; font-style: italic; padding-bottom: 8px;">${reasonText}</td>
+            </tr>
+            <tr>
+              <td style="color: #742A2A; font-weight: 700; width: 110px; vertical-align: top;">Impact:</td>
+              <td style="color: #4A5568;">Resident, staff, and management access is temporarily restricted.</td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Data Guarantee Note -->
+        <div style="
+          background-color: ${COLORS.surface};
+          border: 1px solid ${COLORS.border};
+          border-radius: 8px;
+          padding: 14px 16px;
+          margin-bottom: 26px;
+        ">
+          <p style="
+            margin: 0;
+            color: ${COLORS.muted};
+            font-size: 12px;
+            line-height: 1.5;
+          ">
+            <strong style="color: ${COLORS.text};">Data Safety Assurance:</strong> None of your community data has been deleted. All resident profiles, flat units, billing histories, and service records remain safely preserved and will be instantly available upon reactivation.
+          </p>
+        </div>
+
+        <div style="text-align: center; margin-bottom: 26px;">
+          <a
+            href="mailto:${supportEmail}?subject=Reactivation%20Inquiry%20-%20${encodeURIComponent(input.apartmentName)}"
+            style="
+              display: inline-block;
+              padding: 12px 28px;
+              background-color: ${COLORS.ink};
+              color: ${COLORS.white};
+              border-radius: 8px;
+              font-size: 14px;
+              font-weight: 700;
+              text-decoration: none;
+            "
+          >
+            Contact Support Team
+          </a>
+        </div>
+
+        <p style="
+          margin: 0;
+          color: ${COLORS.muted};
+          font-size: 12px;
+          line-height: 1.5;
+          text-align: center;
+        ">
+          Have questions? Reply directly to this email or reach us at <a href="mailto:${supportEmail}" style="color: ${COLORS.brand}; text-decoration: underline;">${supportEmail}</a>.
+        </p>
+      </div>
+    `),
+    text: `
+Important Notice: ${input.apartmentName} has been temporarily deactivated on Nesteeq
+
+Hi ${input.managerName},
+
+We are writing to notify you that your apartment community, "${input.apartmentName}", has been temporarily deactivated by the Nesteeq platform administration.
+
+Details:
+- Apartment: ${input.apartmentName}
+- Status: Inactive
+- Reason: ${reasonText}
+- Impact: Resident, staff, and management access is temporarily restricted.
+
+Data Safety Guarantee:
+All your community data, member profiles, billing records, and flat setups remain safely intact and will be immediately restored upon reactivation.
+
+To discuss reactivation or if you have any questions, please contact our support team at ${supportEmail}.
+    `.trim(),
+  };
+}
+
+export function apartmentReactivatedTemplate(input: {
+  managerName: string;
+  apartmentName: string;
+  loginUrl?: string;
+}): EmailTemplate {
+  const loginUrl = input.loginUrl || `${env.webUrl}/login`;
+
+  return {
+    subject: `Access Restored: ${input.apartmentName} is now active on Nesteeq`,
+    html: layout(`
+      <div style="text-align: left;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <span style="
+            display: inline-block;
+            background-color: #ECFDF5;
+            border: 1px solid #A7F3D0;
+            color: #065F46;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            padding: 5px 14px;
+            border-radius: 9999px;
+          ">
+            Apartment Active
+          </span>
+        </div>
+
+        <h1 style="
+          margin: 0 0 16px;
+          color: ${COLORS.ink};
+          font-size: 20px;
+          font-weight: 700;
+          line-height: 1.4;
+          text-align: center;
+        ">
+          Community Access Restored
+        </h1>
+
+        <p style="
+          margin: 0 0 18px;
+          color: ${COLORS.text};
+          font-size: 14px;
+          line-height: 1.6;
+        ">
+          Hi ${input.managerName},
+        </p>
+
+        <p style="
+          margin: 0 0 22px;
+          color: ${COLORS.text};
+          font-size: 14px;
+          line-height: 1.6;
+        ">
+          Great news! Your apartment community, <strong>${input.apartmentName}</strong>, has been reactivated on Nesteeq. Full platform access has been restored for you, your staff, and all residents.
+        </p>
+
+        <!-- Information Card -->
+        <div style="
+          background-color: #F0FDF4;
+          border: 1px solid #BBF7D0;
+          border-radius: 10px;
+          padding: 18px 20px;
+          margin-bottom: 26px;
+        ">
+          <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 13px; line-height: 1.6;">
+            <tr>
+              <td style="color: #166534; font-weight: 700; width: 110px; vertical-align: top; padding-bottom: 8px;">Apartment:</td>
+              <td style="color: #1F2937; font-weight: 600; padding-bottom: 8px;">${input.apartmentName}</td>
+            </tr>
+            <tr>
+              <td style="color: #166534; font-weight: 700; width: 110px; vertical-align: top; padding-bottom: 8px;">Status:</td>
+              <td style="color: #15803D; font-weight: 700; padding-bottom: 8px;">Active</td>
+            </tr>
+            <tr>
+              <td style="color: #166534; font-weight: 700; width: 110px; vertical-align: top;">Access:</td>
+              <td style="color: #374151;">All dashboards, resident portals, and staff features are fully operational.</td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="text-align: center; margin-bottom: 26px;">
+          <a
+            href="${loginUrl}"
+            style="
+              display: inline-block;
+              padding: 13px 30px;
+              background-color: ${COLORS.brand};
+              color: ${COLORS.white};
+              border-radius: 8px;
+              font-size: 14px;
+              font-weight: 700;
+              text-decoration: none;
+            "
+          >
+            Sign In to Dashboard
+          </a>
+        </div>
+
+        <p style="
+          margin: 0;
+          color: ${COLORS.muted};
+          font-size: 12px;
+          line-height: 1.5;
+          text-align: center;
+        ">
+          If you need any assistance, feel free to reach out to our support team at any time.
+        </p>
+      </div>
+    `),
+    text: `
+Access Restored: ${input.apartmentName} is now active on Nesteeq
+
+Hi ${input.managerName},
+
+Great news! Your apartment community, "${input.apartmentName}", has been reactivated on Nesteeq. Full platform access has been restored for you, your staff, and all residents.
+
+Details:
+- Apartment: ${input.apartmentName}
+- Status: Active
+- Access: All dashboards, resident portals, and management features are fully operational.
+
+You can sign in to your dashboard here:
+${loginUrl}
+
+Thank you for choosing Nesteeq!
     `.trim(),
   };
 }

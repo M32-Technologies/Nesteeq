@@ -54,6 +54,15 @@ const BILL_PRESETS = [
     description: "Elevator annual maintenance contracts, safety certification, and quarterly servicing.",
   },
   {
+    type: "LIFT_AMC",
+    label: "Lift AMC Contract",
+    badge: "Contract",
+    badgeColor: "bg-blue-50 text-blue-700 border-blue-200",
+    icon: ArrowUpCircle,
+    defaultName: "Lift AMC Contract",
+    description: "Annual maintenance contracts and quarterly elevator safety certification.",
+  },
+  {
     type: "SPECIAL_REPAIR",
     label: "Special / One-Time Repair",
     badge: "One-Time",

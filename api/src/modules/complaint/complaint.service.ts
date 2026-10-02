@@ -38,6 +38,7 @@ const sameId = (id1: any, id2: any): boolean => {
 };
 
 import { Complaint, type ComplaintDocument } from "./complaint.model.js";
+import { Maintenance } from "../maintenance/maintenance.model.js";
 import { Staff } from "../staff/staff.model.js";
 import { Technician } from "../technician/technician.model.js";
 import { Apartment } from "../apartment/apartment.model.js";
@@ -1451,6 +1452,70 @@ export const confirmComplaintResolution = async (
   );
 
 
+
+  return updatedComplaint;
+};
+
+export const reviewComplaintExpense = async (
+  complaintId: string,
+  action: "APPROVE" | "REJECT",
+  reason: string | undefined,
+  user: AuthenticatedComplaintUser
+) => {
+  await ensureCurrentUserExists(user);
+
+  const complaint = await getComplaintOrThrow(complaintId);
+  assertManagerCanManageComplaint(user, complaint);
+
+  const now = new Date();
+  const isApproved = action === "APPROVE";
+  const newStatus = isApproved ? "APPROVED" : "REJECTED";
+  const remarkText = isApproved
+    ? `Maintenance expense approved (₹${complaint.expenseAmount ?? 0})`
+    : `Maintenance expense rejected${reason ? `: ${reason}` : ""}`;
+
+  const set: Record<string, unknown> = {
+    expenseStatus: newStatus,
+    expenseReviewedAt: now,
+    expenseReviewedBy: user.id,
+  };
+
+  if (!isApproved && reason) {
+    set.expenseRejectionReason = reason;
+  }
+
+  const updatedComplaint = await updateComplaintDocument(
+    complaintId,
+    set,
+    createRemark(remarkText, user)
+  );
+
+  try {
+    await Maintenance.updateMany(
+      { complaint: complaint._id },
+      {
+        $set: {
+          expenseStatus: newStatus,
+          expenseReviewedAt: now,
+          expenseReviewedBy: user.id,
+          ...(isApproved ? {} : { expenseRejectionReason: reason || null }),
+          ...(isApproved && {
+            "costReview.status": "APPROVED",
+            "costReview.reviewedBy": user.id,
+            "costReview.reviewedAt": now,
+          }),
+          ...(!isApproved && {
+            "costReview.status": "REJECTED",
+            "costReview.reviewedBy": user.id,
+            "costReview.reviewedAt": now,
+            "costReview.rejectionReason": reason || null,
+          }),
+        },
+      }
+    );
+  } catch {
+    // Non-fatal if maintenance sync fails
+  }
 
   return updatedComplaint;
 };

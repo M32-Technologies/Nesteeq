@@ -9,6 +9,7 @@ import {
 type AuthSessionResponse = {
   user?: {
     role?: string | null;
+    apartmentStatus?: string | null;
   } | null;
 } | null;
 
@@ -16,7 +17,7 @@ function getAuthBaseUrl() {
   return process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? null;
 }
 
-async function getCurrentUserRole(request: NextRequest) {
+async function getCurrentUserSession(request: NextRequest) {
   const baseUrl = getAuthBaseUrl();
   const cookieHeader = request.headers.get("cookie");
 
@@ -43,7 +44,10 @@ async function getCurrentUserRole(request: NextRequest) {
 
   const session = (await response.json()) as AuthSessionResponse;
 
-  return session?.user?.role ?? null;
+  return {
+    role: session?.user?.role ?? null,
+    apartmentStatus: session?.user?.apartmentStatus ?? null,
+  };
 }
 
 function isAdmin(role?: string | null): boolean {
@@ -51,7 +55,7 @@ function isAdmin(role?: string | null): boolean {
   return role.trim().toLowerCase() === "admin";
 }
 
-export default  async function proxy(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
@@ -65,12 +69,16 @@ export default  async function proxy(request: NextRequest) {
 
   if (isAuthRoute) {
     if (sessionCookie) {
-      const rawRole = await getCurrentUserRole(request);
-      if (rawRole) {
-        if (isAdmin(rawRole)) {
+      const userSession = await getCurrentUserSession(request);
+      if (userSession?.role) {
+        if (isAdmin(userSession.role)) {
           return NextResponse.redirect(new URL("/admin/dashboard", request.url));
         }
-        const userRole = normalizeDashboardRole(rawRole);
+        // If apartment is inactive, do not redirect to dashboard, stay on login
+        if (userSession.apartmentStatus === "inactive") {
+          return NextResponse.next();
+        }
+        const userRole = normalizeDashboardRole(userSession.role);
         const homeSegment = getDashboardRoleRouteSegment(userRole);
         return NextResponse.redirect(new URL(`/${homeSegment}`, request.url));
       }
@@ -83,7 +91,8 @@ export default  async function proxy(request: NextRequest) {
     if (!sessionCookie) {
       return NextResponse.redirect(new URL("/login?from=pricing", request.url));
     }
-    const rawRole = await getCurrentUserRole(request);
+    const sessionInfo = await getCurrentUserSession(request);
+    const rawRole = sessionInfo?.role;
     if (isAdmin(rawRole)) {
       return NextResponse.redirect(new URL("/admin/dashboard", request.url));
     }
@@ -102,7 +111,8 @@ export default  async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  const rawRole = await getCurrentUserRole(request);
+  const sessionInfo = await getCurrentUserSession(request);
+  const rawRole = sessionInfo?.role;
 
   if (!rawRole) {
     if (pathname.startsWith("/admin")) {

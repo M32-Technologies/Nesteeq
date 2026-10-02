@@ -6,10 +6,12 @@ import { toast } from "sonner"
 
 import {
   approveComplaint,
+  approveComplaintExpense,
   assignComplaint,
   cancelComplaint,
   createMaintenance,
   rejectComplaint,
+  rejectComplaintExpense,
   updateComplaint,
   updateComplaintStatus,
 } from "@/features/dashboard/facility/complaints/api/complaints.api"
@@ -56,20 +58,7 @@ export const standardComplaintLifecycleStatuses: ComplaintStatus[] = [
   "RESOLVED",
   "CLOSED",
   "REJECTED",
-];
-
-const complaintManagerTransitions: Partial<
-  Record<ComplaintStatus, ComplaintStatus[]>
-> = {
-  PENDING: ["UNDER_REVIEW", "IN_PROGRESS"],
-  UNDER_REVIEW: ["ASSIGNED", "IN_PROGRESS"],
-  ASSIGNED: ["IN_PROGRESS"],
-  IN_PROGRESS: ["WORK_COMPLETED"],
-  WORK_COMPLETED: ["APPROVED", "CLOSED"],
-  AWAITING_APPROVAL: ["APPROVED", "CLOSED"],
-  APPROVED: ["CLOSED"],
-  REJECTED: ["ASSIGNED", "IN_PROGRESS"],
-};
+]
 
 export const cancellableComplaintStatuses = new Set<ComplaintStatus>([
   "PENDING",
@@ -176,8 +165,6 @@ export function FacilityComplaintsPage() {
   const handleSuccess = async (message?: string) => {
     toast.success(message || "Complaint updated")
     await queryClient.invalidateQueries({ queryKey: ["facility-complaints"] })
-    await queryClient.invalidateQueries({ queryKey: ["resident", "complaints"] })
-    await queryClient.invalidateQueries({ queryKey: ["resident", "dashboard", "complaints"] })
   }
 
   const assignMutation = useMutation({
@@ -268,6 +255,22 @@ export function FacilityComplaintsPage() {
     onSuccess: () => void handleSuccess("Maintenance task created"),
     onError: (error) =>
       toast.error(getApiErrorMessage(error, "Unable to create maintenance")),
+  })
+
+  const approveExpenseMutation = useMutation({
+    mutationFn: ({ id, remarks }: { id: string; remarks?: string }) =>
+      approveComplaintExpense(id, { remarks }),
+    onSuccess: () => void handleSuccess("Maintenance expense approved"),
+    onError: (error) =>
+      toast.error(getApiErrorMessage(error, "Unable to approve expense")),
+  })
+
+  const rejectExpenseMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      rejectComplaintExpense(id, { reason }),
+    onSuccess: () => void handleSuccess("Maintenance expense rejected"),
+    onError: (error) =>
+      toast.error(getApiErrorMessage(error, "Unable to reject expense")),
   })
 
   const handleAssign = (event: FormEvent<HTMLFormElement>) => {
@@ -475,6 +478,16 @@ export function FacilityComplaintsPage() {
         onReject={handleReject}
         onCancel={handleCancel}
         onCreateMaintenance={handleCreateMaintenance}
+        onApproveExpense={() => {
+          if (!selectedComplaint) return
+          approveExpenseMutation.mutate({ id: selectedComplaint._id })
+        }}
+        onRejectExpense={(reason?: string) => {
+          if (!selectedComplaint) return
+          rejectExpenseMutation.mutate({ id: selectedComplaint._id, reason })
+        }}
+        isApprovingExpense={approveExpenseMutation.isPending}
+        isRejectingExpense={rejectExpenseMutation.isPending}
         isAssigning={assignMutation.isPending}
         isUpdatingStatus={statusMutation.isPending}
         isUpdating={updateMutation.isPending}

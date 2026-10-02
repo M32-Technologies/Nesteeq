@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 
 import {
   createExpenseService,
+  exportExpensesCsvService,
   getExpenseByIdService,
   getExpenseSummaryService,
   getExpensesService,
@@ -71,6 +72,33 @@ export const getExpenses = catchAsync(
     });
   }
 );
+
+export const exportExpensesCsv = catchAsync(
+  async (req: Request, res: Response) => {
+    const authenticatedApartmentId = getAuthenticatedApartmentId(req);
+    if (req.query.apartmentId) {
+      ensureApartmentAccess(req, req.query.apartmentId as string);
+    }
+
+    const { csvContent, filename } = await exportExpensesCsvService({
+      apartmentId: authenticatedApartmentId,
+      category: req.query.category as ExpenseCategory,
+      status: req.query.status as ExpenseStatus,
+      search: req.query.search as string,
+      startDate: req.query.startDate
+        ? new Date(req.query.startDate as string)
+        : undefined,
+      endDate: req.query.endDate
+        ? new Date(req.query.endDate as string)
+        : undefined,
+    });
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.status(200).send(csvContent);
+  }
+);
+
 
 export const getExpenseSummary = catchAsync(
   async (req: Request, res: Response) => {

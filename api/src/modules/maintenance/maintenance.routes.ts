@@ -12,6 +12,7 @@ import {
   createMaintenanceHandler,
   getMaintenanceByIdHandler,
   getMaintenanceHandler,
+  getMaintenanceTypesHandler,
   rejectMaintenanceHandler,
   rejectMaintenanceCostHandler,
   startMaintenanceHandler,
@@ -51,6 +52,11 @@ router.get(
   "/maintenance",
   zodValidate(getMaintenanceSchema),
   getMaintenanceHandler
+);
+
+router.get(
+  "/maintenance/types",
+  getMaintenanceTypesHandler
 );
 
 router.get(

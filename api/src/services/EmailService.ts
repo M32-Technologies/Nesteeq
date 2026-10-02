@@ -2,6 +2,8 @@ import { BrevoClient } from "@getbrevo/brevo";
 import { env } from "../config/env.js";
 
 import {
+  apartmentDeactivatedTemplate,
+  apartmentReactivatedTemplate,
   emailVerificationOtpTemplate,
   loginOtpTemplate,
   passwordResetTemplate,
@@ -109,4 +111,31 @@ export const emailService = {
       ...residentInviteTemplate(input),
     });
   },
-}
+  sendApartmentDeactivated: async (
+    email: string,
+    input: {
+      managerName: string;
+      apartmentName: string;
+      reason?: string;
+      supportEmail?: string;
+    },
+  ): Promise<void> => {
+    await sendEmail({
+      to: email,
+      ...apartmentDeactivatedTemplate(input),
+    });
+  },
+  sendApartmentReactivated: async (
+    email: string,
+    input: {
+      managerName: string;
+      apartmentName: string;
+      loginUrl?: string;
+    },
+  ): Promise<void> => {
+    await sendEmail({
+      to: email,
+      ...apartmentReactivatedTemplate(input),
+    });
+  },
+};

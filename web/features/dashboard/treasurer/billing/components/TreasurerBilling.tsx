@@ -108,9 +108,8 @@ const ITEMS_PER_PAGE = 8;
 const BILL_CATEGORY_FILTERS = [
   { value: "ALL", label: "All Bills" },
   { value: "MONTHLY_MAINTENANCE", label: "Maintenance" },
-  { value: "WATER", label: "Water" },
-  { value: "COMMON_ELECTRICITY", label: "Electricity" },
-  { value: "LIFT_MAINTENANCE", label: "Lift AMC" },
+  { value: "LIFT_MAINTENANCE", label: "Lift Maintenance" },
+  { value: "LIFT_AMC", label: "Lift AMC" },
   { value: "SPECIAL_REPAIR", label: "Special Repair" },
   { value: "PARKING_MAINTENANCE", label: "Parking" },
   { value: "OTHER", label: "Other" },
