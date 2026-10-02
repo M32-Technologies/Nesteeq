@@ -21,4 +21,3 @@ export {
 export * from "./components/notification-skeleton";
 export * from "./components/notification-socket-listener";
 export * from "./components/emergency-alert-modal";
-export * from "./hooks/use-web-push";

@@ -17,6 +17,8 @@ export type UserRole =
   | "treasurer"
   | "security_staff"
   | "maintenance_technician"
+  | "technician"
+  | "maintenance_staff"
   | "resident"
   | "owner"
   | "tenant";

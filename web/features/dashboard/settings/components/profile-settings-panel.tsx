@@ -20,7 +20,6 @@ import {
   dashboardRoleLabels,
   type DashboardRole,
 } from "@/features/dashboard/config/sidebar-navigation"
-import { PushNotificationSettings } from "@/components/profile/shared/PushNotificationSettings"
 
 type UserProfile = {
   id?: string
@@ -348,8 +347,6 @@ export function ProfileSettingsPanel({
           </div>
         </form>
       </div>
-
-      <PushNotificationSettings />
     </div>
   )
 }
