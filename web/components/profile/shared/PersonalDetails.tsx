@@ -12,6 +12,7 @@ import {
   UserRound,
 } from "lucide-react"
 import { ProfileAvatar } from "./ProfileAvatar"
+import { PushNotificationSettings } from "./PushNotificationSettings"
 
 export interface PersonalDetailsData {
   name: string
@@ -81,7 +82,8 @@ export function PersonalDetails({
   }
 
   return (
-    <div className="rounded-2xl border border-[#E2E8F0] bg-white p-6 sm:p-7 shadow-xs">
+    <>
+      <div className="rounded-2xl border border-[#E2E8F0] bg-white p-6 sm:p-7 shadow-xs">
       {/* Hidden file upload input */}
       <input
         ref={fileInputRef}
@@ -301,5 +303,8 @@ export function PersonalDetails({
         </div>
       </form>
     </div>
+
+    <PushNotificationSettings />
+    </>
   )
 }
