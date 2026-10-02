@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import {
   X,
   Clock,
@@ -133,33 +133,29 @@ export function ResidentComplaintDetailsDrawer({
     .replace(/\[Attached Photo Reference:[^\]]+\]/gi, "")
     .trim();
 
-  const uniquePhotos: string[] = useMemo(() => {
-    // Prefer images array if present; otherwise fallback to attachments
-    const candidateList =
-      Array.isArray(complaint.images) && complaint.images.length > 0
-        ? complaint.images
-        : Array.isArray(complaint.attachments) && complaint.attachments.length > 0
-        ? complaint.attachments
-        : [];
+  // Prefer images array if present; otherwise fallback to attachments
+  const candidateList =
+    Array.isArray(complaint.images) && complaint.images.length > 0
+      ? complaint.images
+      : Array.isArray(complaint.attachments) && complaint.attachments.length > 0
+      ? complaint.attachments
+      : [];
 
-    const seen = new Set<string>();
-    const result: string[] = [];
+  const seen = new Set<string>();
+  const uniquePhotos: string[] = [];
 
-    for (const raw of candidateList) {
-      if (!raw) continue;
-      const resolved = getMediaUrl(String(raw).trim());
-      if (!resolved) continue;
+  for (const raw of candidateList) {
+    if (!raw) continue;
+    const resolved = getMediaUrl(String(raw).trim());
+    if (!resolved) continue;
 
-      const key = resolved.split("/").pop()?.split("?")[0]?.toLowerCase() || resolved;
+    const key = resolved.split("/").pop()?.split("?")[0]?.toLowerCase() || resolved;
 
-      if (!seen.has(key)) {
-        seen.add(key);
-        result.push(resolved);
-      }
+    if (!seen.has(key)) {
+      seen.add(key);
+      uniquePhotos.push(resolved);
     }
-
-    return result;
-  }, [complaint.images, complaint.attachments]);
+  }
 
   const status = (complaint.status || "PENDING").toUpperCase();
   const isTerminalNegative = status === "REJECTED" || status === "CANCELLED";
