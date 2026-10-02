@@ -74,11 +74,13 @@ export const createTechnicianBodySchema = z
 export const updateTechnicianBodySchema = z
   .object({
     fullName: nonEmptyText("Full name", 120).optional(),
+    name: nonEmptyText("Name", 120).optional(),
     email: z.string().trim().email("Invalid email address").max(180).optional(),
     phone: optionalText("Phone", 30),
     apartmentId: optionalText("Apartment ID", 80),
     employeeCode: optionalText("Employee code", 40),
     specializations: z.array(z.enum(complaintCategories)).max(8).optional(),
+    specialization: z.array(z.string()).optional(),
     shift: optionalText("Shift", 80),
     notes: optionalText("Notes", 1000),
   })
@@ -126,7 +128,12 @@ export const updateTechnicianTaskStatusBodySchema = z
 
 export const getTechniciansQuerySchema = z
   .object({
-    status: z.enum(technicianStatuses).optional(),
+    status: z
+      .string()
+      .trim()
+      .transform((val) => (val.toLowerCase() === "all" ? undefined : val.toUpperCase()))
+      .pipe(z.enum(technicianStatuses).optional())
+      .optional(),
     specialization: z.enum(complaintCategories).optional(),
     apartmentId: z.string().trim().min(1, "Apartment ID cannot be empty").optional(),
     search: z.string().trim().max(120, "Search is too long").optional(),

@@ -3,6 +3,7 @@ export const complaintStatuses = [
   "UNDER_REVIEW",
   "ASSIGNED",
   "IN_PROGRESS",
+  "RESOLVED",
   "WORK_COMPLETED",
   "AWAITING_APPROVAL",
   "APPROVED",
@@ -106,6 +107,7 @@ export type ApprovalDetails = {
 export type StatusPayload = {
   status: string
   notes?: string
+  remarks?: string
 }
 
 export type ReasonPayload = {
@@ -118,9 +120,11 @@ export type RequiredReasonPayload = {
 }
 
 export type AssignPayload = {
+  assignedStaff?: string
   assignedTo?: string
   technicianId?: string
   scheduledDate?: string
   estimatedDurationHours?: number
   notes?: string
+  remarks?: string
 }

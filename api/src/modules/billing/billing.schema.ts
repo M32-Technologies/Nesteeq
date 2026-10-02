@@ -23,8 +23,6 @@ const additionalChargeSchema = z.object({
 
 export const billTypeEnum = z.enum([
   "MONTHLY_MAINTENANCE",
-  "WATER",
-  "COMMON_ELECTRICITY",
   "LIFT_MAINTENANCE",
   "LIFT_AMC",
   "SPECIAL_REPAIR",
@@ -34,7 +32,7 @@ export const billTypeEnum = z.enum([
 
 export const createBillSchema = z.object({
   body: z.object({
-    apartmentId: objectIdSchema,
+    apartmentId: objectIdSchema.optional(),
 
     residentId: objectIdSchema.optional(),
 
@@ -72,7 +70,7 @@ export const createBillSchema = z.object({
 
 export const createCommonBillSchema = z.object({
   body: z.object({
-    apartmentId: objectIdSchema,
+    apartmentId: objectIdSchema.optional(),
     title: z.string().trim().min(2, "Bill title must be at least 2 characters"),
     billType: billTypeEnum,
     billingPeriod: z
@@ -123,9 +121,16 @@ export const getBillByIdSchema = z.object({
 });
 
 export const getBillingSummarySchema = z.object({
-  params: z.object({
-    apartmentId: objectIdSchema,
-  }),
+  params: z
+    .object({
+      apartmentId: objectIdSchema.optional(),
+    })
+    .optional(),
+  query: z
+    .object({
+      apartmentId: objectIdSchema.optional(),
+    })
+    .optional(),
 });
 
 export const updateBillSchema = z.object({
@@ -192,4 +197,14 @@ export const payResidentBillSchema = z.object({
     description: z.string().trim().max(255).optional(),
   }),
 });
+
+export const payAllResidentBillsSchema = z.object({
+  body: z.object({
+    paymentMethod: z.string().trim().max(50).optional(),
+    referenceNo: z.string().trim().max(100).optional(),
+    description: z.string().trim().max(255).optional(),
+    billIds: z.array(objectIdSchema).optional(),
+  }),
+});
+
 

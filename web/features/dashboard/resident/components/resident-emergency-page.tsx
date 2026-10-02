@@ -228,10 +228,10 @@ export function ResidentEmergencyPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-center">
+        <div className="flex items-center gap-2 w-full sm:w-auto self-start sm:self-center">
           <a
             href="tel:112"
-            className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50/80 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50/80 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 transition shadow-2xs"
           >
             <PhoneCall className="size-3.5" />
             <span>Call 112 (National Emergency)</span>
@@ -271,7 +271,7 @@ export function ResidentEmergencyPage() {
             <button
               type="button"
               onClick={() => setLastDispatched(null)}
-              className="self-end sm:self-center text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-red-100 transition"
+              className="self-end sm:self-center text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-red-100 transition cursor-pointer"
             >
               <X className="size-4" />
             </button>
@@ -305,7 +305,7 @@ export function ResidentEmergencyPage() {
                       key={category.type}
                       type="button"
                       onClick={() => handleSelectCategory(category.type)}
-                      className={`flex flex-col items-start p-3 rounded-xl border text-left transition-all ${
+                      className={`flex flex-col items-start p-3 rounded-xl border text-left transition-all cursor-pointer last:col-span-2 sm:last:col-span-1 ${
                         isSelected
                           ? category.activeRing
                           : "border-slate-200 hover:border-slate-300 hover:bg-slate-50/80"
@@ -522,12 +522,12 @@ export function ResidentEmergencyPage() {
               </div>
             )}
 
-            <div className="mt-5 flex gap-2 justify-end">
+            <div className="mt-5 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setIsConfirmModalOpen(false)}
                 disabled={isSubmitting}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                className="w-full sm:w-auto rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer text-center"
               >
                 Cancel
               </button>
@@ -535,7 +535,7 @@ export function ResidentEmergencyPage() {
                 type="button"
                 onClick={handleDispatch}
                 disabled={isSubmitting}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-red-600 px-5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-50 transition"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-xl bg-red-600 px-5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-50 transition cursor-pointer text-center"
               >
                 {isSubmitting ? (
                   <>

@@ -30,6 +30,7 @@ import {
   getMonthlyFinance,
   getDefaultersReport,
   getExpenseBreakdownReport,
+  type ExpenseCategoryBreakdown,
 } from "../../services/treasurer.service";
 import {
   formatCurrency,
@@ -201,15 +202,45 @@ export default function TreasurerReports() {
 
   const expenseBreakdownData = expenseBreakdownQuery.data;
   const expenseCategoryBreakdown = useMemo(() => {
-    return (expenseBreakdownData?.categories ?? []).map((cat) => ({
-      category: cat.category,
-      total: cat.totalAmount,
-      count: cat.count,
-      percentage: cat.percentage,
-    }));
+    if (!expenseBreakdownData) return [];
+    const categories = expenseBreakdownData.categories;
+    if (Array.isArray(categories)) {
+      return categories.map((cat) => ({
+        category: cat.category,
+        total: cat.totalAmount ?? (cat as unknown as { total?: number }).total ?? 0,
+        count: cat.count ?? 0,
+        percentage: cat.percentage ?? 0,
+      }));
+    }
+    if (categories && typeof categories === "object") {
+      const totalSum =
+        expenseBreakdownData.totalApprovedAmount ??
+        (expenseBreakdownData as unknown as { totalAmount?: number }).totalAmount ??
+        0;
+      return Object.entries(categories).map(([category, val]) => {
+        const entry = val as { total?: number; totalAmount?: number; count?: number } | number;
+        const total =
+          typeof entry === "object" && entry !== null
+            ? entry.total ?? entry.totalAmount ?? 0
+            : Number(entry) || 0;
+        const count =
+          typeof entry === "object" && entry !== null ? entry.count ?? 0 : 0;
+        const percentage = totalSum > 0 ? (total / totalSum) * 100 : 0;
+        return {
+          category: category as ExpenseCategoryBreakdown["category"],
+          total,
+          count,
+          percentage,
+        };
+      });
+    }
+    return [];
   }, [expenseBreakdownData]);
 
-  const totalFilteredExpenseAmount = expenseBreakdownData?.totalApprovedAmount ?? 0;
+  const totalFilteredExpenseAmount =
+    expenseBreakdownData?.totalApprovedAmount ??
+    (expenseBreakdownData as unknown as { totalAmount?: number })?.totalAmount ??
+    0;
 
   // CSV Export
   const exportCsv = () => {
@@ -315,7 +346,7 @@ export default function TreasurerReports() {
           <div className="text-right text-xs text-slate-600">
             <p>Report: {activeTab === "summary" ? "Financial Summary" : activeTab === "defaulters" ? "Defaulters Report" : "Expense Breakdown"}</p>
             <p>Period: {selectedMonth ? `${monthLabels[selectedMonth - 1]} ` : ""}{selectedYear}</p>
-            <p>Generated: {new Date().toLocaleDateString()}</p>
+            <p suppressHydrationWarning>Generated: {new Date().toLocaleDateString()}</p>
           </div>
         </div>
       </div>

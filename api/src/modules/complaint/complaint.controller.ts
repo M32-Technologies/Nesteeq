@@ -29,11 +29,15 @@ import type {
 } from "./compliaint.schema.js";
 
 const getAuthenticatedUser = (req: Request): AuthenticatedComplaintUser => {
+  const user = req.user as Record<string, unknown> | undefined;
+  const rawApartmentId = user?.apartmentId ?? user?.apartment ?? null;
+  const rawFlatId = user?.flatId ?? user?.flat ?? null;
+
   return {
-    id: req.user?.id!,
-    role: req.user?.role!,
-    apartmentId: req.user?.apartmentId ?? null,
-    flatId: req.user?.flatId ?? null,
+    id: req.user?.id ? String(req.user.id).trim() : "",
+    role: req.user?.role ? String(req.user.role).trim() : "",
+    apartmentId: rawApartmentId ? String(rawApartmentId).trim() : null,
+    flatId: rawFlatId ? String(rawFlatId).trim() : null,
   };
 };
 

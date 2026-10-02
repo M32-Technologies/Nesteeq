@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { ManagementProfile } from "@/components/profile/management/ManagementProfile"
 import { StaffProfile } from "@/components/profile/staff/StaffProfile"
+import ResidentProfilePage from "@/features/dashboard/resident/components/resident-profile-page"
 import { getCurrentDashboardSession } from "@/lib/dashboard-auth"
 
 export const metadata: Metadata = {
@@ -14,6 +15,10 @@ export default async function ProfilePage() {
 
   if (role === "security_staff" || role === "maintenance_technician") {
     return <StaffProfile />
+  }
+
+  if (role === "resident") {
+    return <ResidentProfilePage />
   }
 
   return <ManagementProfile />

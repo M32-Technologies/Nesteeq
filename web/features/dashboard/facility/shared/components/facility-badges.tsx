@@ -15,6 +15,7 @@ const statusTone: Record<string, string> = {
   WORK_COMPLETED: "border-[#BFD8F7] bg-[#EEF6FF] text-[#2E639B]",
   AWAITING_APPROVAL: "border-[#D5C4F0] bg-[#F6F0FF] text-[#65459B]",
   APPROVED: "border-[#B6DEC5] bg-[#EDF8F0] text-[#26733E]",
+  RESOLVED: "border-[#B6DEC5] bg-[#EDF8F0] text-[#26733E]",
   REJECTED: "border-[#F0C0C0] bg-[#FFF0F0] text-[#A23D3D]",
   CANCELLED: "border-[#D6DCE3] bg-[#F3F5F7] text-[#687481]",
   RESCHEDULED: "border-[#D5C4F0] bg-[#F6F0FF] text-[#65459B]",

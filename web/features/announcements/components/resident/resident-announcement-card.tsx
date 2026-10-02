@@ -8,7 +8,6 @@ import {
   FileText,
   AlertOctagon,
   ArrowRight,
-  Download,
   Calendar,
   Sparkles,
   ShieldCheck,
@@ -225,7 +224,7 @@ export function ResidentAnnouncementCard({
           </div>
 
           <div className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 group-hover:translate-x-0.5 transition-transform">
-            <span>{isReport ? "Download" : "Read"}</span>
+            <span>Read</span>
             <ArrowRight className="size-3.5" />
           </div>
         </div>
@@ -311,17 +310,10 @@ export function ResidentAnnouncementCard({
 
         {/* Action Button */}
         <div className="shrink-0 pl-3">
-          {isReport ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 border border-emerald-200/80 shadow-2xs group-hover:bg-emerald-100 transition-colors">
-              <span>Download</span>
-              <Download className="size-3.5" />
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50/80 px-3 py-1.5 text-xs font-bold text-indigo-600 border border-indigo-100/80 shadow-2xs group-hover:bg-indigo-600 group-hover:text-white transition-all duration-200">
-              <span>Read Notice</span>
-              <ArrowRight className="size-3.5 transition-transform duration-200 group-hover:translate-x-1" />
-            </span>
-          )}
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50/80 px-3 py-1.5 text-xs font-bold text-indigo-600 border border-indigo-100/80 shadow-2xs group-hover:bg-indigo-600 group-hover:text-white transition-all duration-200">
+            <span>{isReport ? "Read Report" : "Read Notice"}</span>
+            <ArrowRight className="size-3.5 transition-transform duration-200 group-hover:translate-x-1" />
+          </span>
         </div>
       </div>
     </div>

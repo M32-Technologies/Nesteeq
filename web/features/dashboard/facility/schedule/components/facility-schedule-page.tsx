@@ -53,6 +53,7 @@ import {
   TextArea,
   TextInput,
   Toolbar,
+  TechnicianSelect,
 } from "@/features/dashboard/facility/shared/components/facility-ui"
 
 export function FacilitySchedulePage() {
@@ -123,12 +124,28 @@ export function FacilitySchedulePage() {
     event.preventDefault()
     const formData = new FormData(event.currentTarget)
 
+    const techId =
+      readFormString(formData, "technicianId") ||
+      readFormString(formData, "assignedStaff") ||
+      readFormString(formData, "assignedTo") ||
+      readFormString(formData, "technician")
+
+    if (!techId) {
+      toast.error("Please select a technician")
+      return
+    }
+
     createMutation.mutate({
       title: readRequiredFormString(formData, "title"),
       description: readFormString(formData, "description"),
       workType: readRequiredFormString(formData, "workType") as ScheduleWorkType,
-      assignedTo: readFormString(formData, "assignedTo"),
+      technician: techId,
+      technicianId: techId,
+      assignedStaff: techId,
+      assignedTo: techId,
       scheduledDate: readRequiredFormString(formData, "scheduledDate"),
+      startTime: readFormString(formData, "startTime") || "09:00",
+      endTime: readFormString(formData, "endTime") || "10:00",
     })
   }
 
@@ -236,12 +253,20 @@ export function FacilitySchedulePage() {
           <FormLabel label="Work Type">
             <FormSelect name="workType" options={["complaint", "maintenance"]} required />
           </FormLabel>
-          <FormLabel label="Technician ID">
-            <TextInput name="assignedTo" placeholder="64f..." />
+          <FormLabel label="Select Technician">
+            <TechnicianSelect required />
           </FormLabel>
           <FormLabel label="Scheduled Date">
             <TextInput name="scheduledDate" type="date" required />
           </FormLabel>
+          <div className="grid grid-cols-2 gap-3">
+            <FormLabel label="Start Time">
+              <TextInput name="startTime" type="time" defaultValue="09:00" required />
+            </FormLabel>
+            <FormLabel label="End Time">
+              <TextInput name="endTime" type="time" defaultValue="10:00" required />
+            </FormLabel>
+          </div>
           <div className="pt-2">
             <SubmitButton isLoading={createMutation.isPending}>Create Schedule</SubmitButton>
           </div>

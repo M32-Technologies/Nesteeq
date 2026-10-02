@@ -16,8 +16,6 @@ const normalizeOptionalString = (value: string | null | undefined): string | und
   return trimmed === "" ? undefined : trimmed;
 };
 
-
-
 type AuthUserRecord = {
   _id?: ObjectId;
   id?: string;
@@ -53,6 +51,24 @@ export const assertCanViewReports = (user: AuthenticatedReportUser): void => {
   }
 };
 
+export const addOrToFilter = (
+  filter: ReportFilter,
+  clauses: Record<string, unknown>[]
+): void => {
+  if (filter.$or) {
+    if (!filter.$and) {
+      filter.$and = [];
+    }
+    (filter.$and as Record<string, unknown>[]).push({ $or: filter.$or });
+    (filter.$and as Record<string, unknown>[]).push({ $or: clauses });
+    delete filter.$or;
+  } else if (filter.$and) {
+    (filter.$and as Record<string, unknown>[]).push({ $or: clauses });
+  } else {
+    filter.$or = clauses;
+  }
+};
+
 export const applyApartmentScope = (
   filter: ReportFilter,
   field: string,
@@ -62,20 +78,31 @@ export const applyApartmentScope = (
   const role = normalizeRole(user.role);
   const userApartmentId = normalizeOptionalString(user.apartmentId);
 
-  if (!isGlobalReportRole(role)) {
-    if (!userApartmentId) {
-      throw new AppError("User must be linked to an apartment to view reports", 403);
-    }
+  const targetApt = !isGlobalReportRole(role) ? userApartmentId : (query.apartment || userApartmentId);
 
-    if (query.apartment && query.apartment !== userApartmentId) {
+  if (!isGlobalReportRole(role)) {
+    if (query.apartment && userApartmentId && query.apartment !== userApartmentId) {
       throw new AppError("You do not have permission to view reports for this apartment", 403);
     }
-
-    filter[field] = userApartmentId;
-    return;
   }
 
-  if (query.apartment) {
-    filter[field] = query.apartment;
+  if (targetApt) {
+    const aptValues: unknown[] = [targetApt];
+    if (ObjectId.isValid(targetApt)) {
+      aptValues.push(new ObjectId(targetApt));
+    }
+
+    if (field === "apartment") {
+      addOrToFilter(filter, [
+        { apartment: { $in: aptValues } },
+        { apartmentId: { $in: aptValues } },
+      ]);
+    } else {
+      addOrToFilter(filter, [
+        { [field]: { $in: aptValues } },
+        { apartment: { $in: aptValues } },
+        { apartmentId: { $in: aptValues } },
+      ]);
+    }
   }
 };

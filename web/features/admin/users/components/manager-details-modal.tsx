@@ -166,6 +166,7 @@ export default function ManagerDetailsModal({
                 alt={user.name || user.email}
                 width={80}
                 height={80}
+                unoptimized
                 className="h-full w-full object-cover"
               />
             ) : (

@@ -34,13 +34,26 @@ export type Complaint = {
     email?: string
     phone?: string
   } | string
-  assignedTo?: {
-    _id: string
-    name: string
+  assignedStaff?: {
+    _id?: string
+    name?: string
+    fullName?: string
+    email?: string
+    phone?: string
     role?: string
-  } | string
+  } | string | null
+  assignedTo?: {
+    _id?: string
+    name?: string
+    fullName?: string
+    email?: string
+    phone?: string
+    role?: string
+  } | string | null
+  assignedTechnicianName?: string
   maintenanceId?: string
   attachments?: string[]
+  images?: string[]
   rejectionReason?: string
   activityNotes?: ActivityNote[]
   completionDetails?: CompletionDetails

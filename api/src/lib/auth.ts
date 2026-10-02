@@ -101,18 +101,23 @@ export const auth = betterAuth({
       disableSignUp: false,
       sendVerificationOnSignUp: true,
       sendVerificationOTP: async ({ email, otp, type }) => {
+        console.log(`\n=========================================`)
+        console.log(`🔑 [DEV OTP] Type: ${type}`)
+        console.log(`📧 Email: ${email}`)
+        console.log(`🔢 Code:  ${otp}`)
+        console.log(`=========================================\n`)
         if (type == "sign-in") {
           await emailService.sendLoginOtp(email, otp)
         } else if (type == "email-verification") {
           await emailService.sendVerificationOtp(email, otp)
         }
-      },  
+      },
     }),
     admin({
       defaultRole: "resident",
       adminRoles: ["admin"],
     }),
-    
+
   ],
   user: {
     additionalFields: {

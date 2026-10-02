@@ -20,7 +20,10 @@ import {
     type AnnouncementCreatedJobData,
     type NotificationJobPayload,
 } from "../queues/notification.queue.js";
-import { sendRealtimeNotification } from "../../socket/socket.js";
+import {
+    sendRealtimeNotification,
+    sendRealtimeNotificationToApartment,
+} from "../../socket/socket.js";
 
 export const BATCH_SIZE = 500;
 
@@ -149,8 +152,12 @@ export const processAnnouncementCreatedJob = async (
     const severity: NotificationSeverity = isEmergency ? "ERROR" : "INFO";
 
     // 3. Resolve target resident query filter
+    const aptCondition = Types.ObjectId.isValid(apartmentId)
+        ? { $in: [new Types.ObjectId(apartmentId), apartmentId] }
+        : apartmentId;
+
     const residentFilter: Record<string, unknown> = {
-        apartmentId: new Types.ObjectId(apartmentId),
+        apartmentId: aptCondition,
         status: "active",
         userId: { $exists: true, $ne: null },
     };
@@ -234,6 +241,19 @@ export const processAnnouncementCreatedJob = async (
     console.log(
         `[NotificationWorker] Announcement ${announcementId} processed: ${totalProcessed} residents notified across ${batchIndex} batch(es) (${totalUpserted} newly inserted).`
     );
+
+    // Broadcast apartment-wide real-time notification to ensure all connected residents/managers receive live feeds
+    sendRealtimeNotificationToApartment(apartmentId, {
+        apartment: apartmentId,
+        type: notificationType,
+        severity,
+        title: announcement.title,
+        message: announcement.message,
+        relatedResourceType: "ANNOUNCEMENT",
+        relatedResourceId: announcementId,
+        readAt: null,
+        createdAt: new Date(),
+    });
 
     return {
         success: true,

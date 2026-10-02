@@ -7,12 +7,16 @@ export type { TechnicianStatus } from "@/features/dashboard/facility/shared/type
 
 export type Technician = {
   _id: string
+  id?: string
+  userId?: string
   name: string
+  fullName?: string
   email?: string
   phone?: string
   role?: string
   status: TechnicianStatus
   specialization?: string[]
+  specializations?: string[]
   assignedTaskCount?: number
   createdAt: string
   updatedAt: string

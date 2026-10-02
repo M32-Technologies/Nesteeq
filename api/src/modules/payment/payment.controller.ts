@@ -6,12 +6,20 @@ import {
 } from "./payment.service.js";
 import { PaymentSource } from "./payment.interface.js";
 import { catchAsync } from "../../utils/catchAsync.js";
-import { getAuthenticatedApartmentId } from "../../middlewares/authMiddleware.js";
+import {
+  ensureApartmentAccess,
+  getAuthenticatedApartmentId,
+} from "../../middlewares/authMiddleware.js";
 
 export const getPayments = catchAsync(
   async (req: Request, res: Response) => {
+    const authenticatedApartmentId = getAuthenticatedApartmentId(req);
+    if (req.query.apartmentId) {
+      ensureApartmentAccess(req, req.query.apartmentId as string);
+    }
+
     const payments = await getPaymentsService({
-      apartmentId: req.query.apartmentId as string,
+      apartmentId: authenticatedApartmentId,
       billId: req.query.billId as string | undefined,
       residentId: req.query.residentId as string | undefined,
       source: req.query.source as PaymentSource | undefined,

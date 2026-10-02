@@ -266,7 +266,7 @@ export const markNotificationAsRead = async ({
       $set: { readAt: new Date() },
     },
     {
-      new: true,
+      returnDocument: "after",
     }
   )
     .select("-__v")

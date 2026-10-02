@@ -427,11 +427,11 @@ export function CreateVisitorPassModal({
               </div>
 
               {/* Action Buttons */}
-              <div className="pt-3 border-t border-[#DDE3DF] flex items-center justify-end gap-2.5">
+              <div className="pt-3 border-t border-[#DDE3DF] flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-2.5">
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="rounded-lg border border-[#DDE3DF] bg-white px-4 py-2 text-xs font-semibold text-[#111111] hover:bg-slate-50 transition cursor-pointer"
+                  className="w-full sm:w-auto rounded-lg border border-[#DDE3DF] bg-white px-4 py-2 text-xs font-semibold text-[#111111] hover:bg-slate-50 transition cursor-pointer text-center"
                 >
                   Cancel
                 </button>
@@ -439,7 +439,7 @@ export function CreateVisitorPassModal({
                 <button
                   type="submit"
                   disabled={createPassMutation.isPending}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#07584F] px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#064C44] transition active:scale-95 disabled:opacity-60 cursor-pointer"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-[#07584F] px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#064C44] transition active:scale-95 disabled:opacity-60 cursor-pointer text-center"
                 >
                   <QrCode className="size-4" />
                   <span>
@@ -582,7 +582,7 @@ export function CreateVisitorPassModal({
               </div>
 
               {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-2.5 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() =>
@@ -591,7 +591,7 @@ export function CreateVisitorPassModal({
                       activeQrModalPass.visitorName
                     )
                   }
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#DDE3DF] bg-white py-2 text-xs font-semibold text-[#111111] hover:bg-slate-50 transition cursor-pointer"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#DDE3DF] bg-white py-2 text-xs font-semibold text-[#111111] hover:bg-slate-50 transition cursor-pointer w-full"
                 >
                   <Download className="size-3.5 text-[#07584F]" />
                   <span>Download QR</span>
@@ -600,7 +600,7 @@ export function CreateVisitorPassModal({
                 <button
                   type="button"
                   onClick={() => handleSharePass(activeQrModalPass)}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#07584F] py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#064C44] transition cursor-pointer"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#07584F] py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#064C44] transition cursor-pointer w-full"
                 >
                   <Share2 className="size-3.5" />
                   <span>Share Pass</span>

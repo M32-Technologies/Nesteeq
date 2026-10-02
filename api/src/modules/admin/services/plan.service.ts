@@ -143,7 +143,7 @@ export const updateSubscriptionPlan = async (planId: string, data: UpdatePlanBod
     const updated = await SubscriptionPlan.findByIdAndUpdate(
         planId,
         { $set: data },
-        { new: true, runValidators: true }
+        { returnDocument: "after", runValidators: true }
     ).lean();
 
     return updated;

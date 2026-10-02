@@ -36,7 +36,6 @@ export default function CreateBillModal({
   const [unitId, setUnitId] = useState("");
   const [billType, setBillType] = useState("MONTHLY_MAINTENANCE");
   const [title, setTitle] = useState("");
-  const [billingPeriod, setBillingPeriod] = useState("");
   const [description, setDescription] = useState("");
   const [baseAmount, setBaseAmount] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -87,7 +86,6 @@ export default function CreateBillModal({
     setUnitId("");
     setBillType("MONTHLY_MAINTENANCE");
     setTitle("");
-    setBillingPeriod("");
     setDescription("");
     setBaseAmount("");
     setDueDate("");
@@ -162,7 +160,6 @@ export default function CreateBillModal({
       ...(residentId ? { residentId } : {}),
       title: title.trim() || undefined,
       billType,
-      billingPeriod: billingPeriod.trim() || undefined,
       description: description.trim() || undefined,
       baseAmount: parsedBaseAmount,
       dueDate,
@@ -186,15 +183,15 @@ export default function CreateBillModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-xl rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-2 sm:p-4 backdrop-blur-xs">
+      <div className="relative flex max-h-[92dvh] w-full max-w-xl flex-col rounded-2xl bg-white shadow-2xl overflow-hidden my-auto">
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-200 px-4 py-4 sm:px-6 sm:py-5 bg-white">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">
+            <h2 className="text-base sm:text-lg font-semibold text-slate-900">
               Create Bill
             </h2>
 
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
               Create a maintenance bill for a resident account.
             </p>
           </div>
@@ -203,14 +200,14 @@ export default function CreateBillModal({
             type="button"
             onClick={handleClose}
             aria-label="Close create bill modal"
-            className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100"
+            className="rounded-lg p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-5 p-6 sm:grid-cols-2">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2">
             {error ? (
               <p className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700 sm:col-span-2">
                 {error}
@@ -354,24 +351,6 @@ export default function CreateBillModal({
               />
             </div>
 
-            <div>
-              <label
-                htmlFor="billingPeriod"
-                className="mb-2 block text-sm font-medium text-slate-700"
-              >
-                Billing Period (YYYY-MM)
-              </label>
-
-              <input
-                id="billingPeriod"
-                type="text"
-                pattern="^\d{4}-(0[1-9]|1[0-2])$"
-                value={billingPeriod}
-                onChange={(e) => setBillingPeriod(e.target.value)}
-                placeholder="e.g. 2026-09"
-                className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400"
-              />
-            </div>
 
             <div className="sm:col-span-2">
               <label
@@ -525,11 +504,11 @@ export default function CreateBillModal({
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
+          <div className="shrink-0 flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50/80 px-4 py-3 sm:px-6 sm:py-4">
             <button
               type="button"
               onClick={handleClose}
-              className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 shadow-sm"
             >
               Cancel
             </button>
@@ -537,7 +516,7 @@ export default function CreateBillModal({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 shadow-sm"
             >
               {isSubmitting ? "Creating..." : "Create Bill"}
             </button>

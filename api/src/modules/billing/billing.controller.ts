@@ -11,24 +11,44 @@ import {
   getCommonBillsService,
   getMyResidentBillsService,
   payResidentBillService,
+  payAllResidentBillsService,
   recordBillPaymentService,
   updateBillService,
   waiveLateFeeService,
 } from "./billing.service.js";
 
 import { BillStatus } from "./billing.interface.js";
+import { Billing } from "./billing.model.js";
 
 import { catchAsync } from "../../utils/catchAsync.js";
-import { getAuthenticatedApartmentId } from "../../middlewares/authMiddleware.js";
+import { AppError } from "../../utils/AppError.js";
+import {
+  ensureApartmentAccess,
+  getAuthenticatedApartmentId,
+} from "../../middlewares/authMiddleware.js";
 
 const getAuditActor = (req: Request) => ({
   userId: req.user!.id,
 });
 
+const checkBillAccess = async (req: Request, billId: string) => {
+  const bill = await Billing.findById(billId).select("apartmentId").lean();
+  if (!bill) {
+    throw new AppError("Bill not found", 404);
+  }
+  ensureApartmentAccess(req, bill.apartmentId);
+  return bill;
+};
+
 export const createBill = catchAsync(
   async (req: Request, res: Response) => {
+    const apartmentId = req.body.apartmentId || getAuthenticatedApartmentId(req);
+    if (req.body.apartmentId) {
+      ensureApartmentAccess(req, req.body.apartmentId);
+    }
+
     const bill = await createBillService(
-      { ...req.body, createdBy: req.user!.id },
+      { ...req.body, apartmentId, createdBy: req.user!.id },
       getAuditActor(req)
     );
 
@@ -44,6 +64,9 @@ export const createCommonBill = catchAsync(
   async (req: Request, res: Response) => {
     const apartmentId =
       req.body.apartmentId || getAuthenticatedApartmentId(req);
+    if (req.body.apartmentId) {
+      ensureApartmentAccess(req, req.body.apartmentId);
+    }
 
     const result = await createCommonBillService(
       {
@@ -64,8 +87,13 @@ export const createCommonBill = catchAsync(
 
 export const getBills = catchAsync(
   async (req: Request, res: Response) => {
+    const authenticatedApartmentId = getAuthenticatedApartmentId(req);
+    if (req.query.apartmentId) {
+      ensureApartmentAccess(req, req.query.apartmentId as string);
+    }
+
     const bills = await getBillsService({
-      apartmentId: req.query.apartmentId as string | undefined,
+      apartmentId: authenticatedApartmentId,
       residentId: req.query.residentId as string | undefined,
       unitId: req.query.unitId as string | undefined,
       commonBillId: req.query.commonBillId as string | undefined,
@@ -82,10 +110,12 @@ export const getBills = catchAsync(
 
 export const getCommonBills = catchAsync(
   async (req: Request, res: Response) => {
-    const apartmentId =
-      (req.query.apartmentId as string) || getAuthenticatedApartmentId(req);
+    const authenticatedApartmentId = getAuthenticatedApartmentId(req);
+    if (req.query.apartmentId) {
+      ensureApartmentAccess(req, req.query.apartmentId as string);
+    }
 
-    const commonBills = await getCommonBillsService(apartmentId, {
+    const commonBills = await getCommonBillsService(authenticatedApartmentId, {
       billType: req.query.billType as string | undefined,
       status: req.query.status as string | undefined,
     });
@@ -99,9 +129,11 @@ export const getCommonBills = catchAsync(
 
 export const getBillRecipients = catchAsync(
   async (req: Request, res: Response) => {
-    const apartmentId =
-      (req.query.apartmentId as string) || getAuthenticatedApartmentId(req);
-    const recipients = await getBillRecipientsService(apartmentId);
+    const authenticatedApartmentId = getAuthenticatedApartmentId(req);
+    if (req.query.apartmentId) {
+      ensureApartmentAccess(req, req.query.apartmentId as string);
+    }
+    const recipients = await getBillRecipientsService(authenticatedApartmentId);
 
     res.status(200).json({
       success: true,
@@ -116,6 +148,8 @@ export const getBillById = catchAsync(
       req.params.id as string
     );
 
+    ensureApartmentAccess(req, bill.apartmentId);
+
     res.status(200).json({
       success: true,
       data: bill,
@@ -125,7 +159,8 @@ export const getBillById = catchAsync(
 
 export const getBillingSummary = catchAsync(
   async (req: Request, res: Response) => {
-    const apartmentId = (req.params.apartmentId || req.query.apartmentId || req.user?.apartmentId) as string;
+    const apartmentId = (req.params.apartmentId || req.query.apartmentId || getAuthenticatedApartmentId(req)) as string;
+    ensureApartmentAccess(req, apartmentId);
     const summary = await getBillingSummaryService(apartmentId);
 
     res.status(200).json({
@@ -137,6 +172,7 @@ export const getBillingSummary = catchAsync(
 
 export const updateBill = catchAsync(
   async (req: Request, res: Response) => {
+    await checkBillAccess(req, req.params.id as string);
     const bill = await updateBillService(
       req.params.id as string,
       req.body,
@@ -153,6 +189,7 @@ export const updateBill = catchAsync(
 
 export const recordBillPayment = catchAsync(
   async (req: Request, res: Response) => {
+    await checkBillAccess(req, req.params.id as string);
     const bill = await recordBillPaymentService(
       req.params.id as string,
       req.body.amount,
@@ -174,6 +211,7 @@ export const recordBillPayment = catchAsync(
 
 export const waiveLateFee = catchAsync(
   async (req: Request, res: Response) => {
+    await checkBillAccess(req, req.params.id as string);
     const bill = await waiveLateFeeService(
       req.params.id as string,
       req.body.amount,
@@ -227,8 +265,25 @@ export const payResidentBill = catchAsync(
   }
 );
 
+export const payAllResidentBills = catchAsync(
+  async (req: Request, res: Response) => {
+    const user = {
+      id: req.user!.id,
+      name: req.user!.name,
+      role: req.user?.role || "resident",
+      apartmentId: req.user!.apartmentId ?? null,
+      flatId: req.user!.flatId ?? null,
+    };
+
+    const result = await payAllResidentBillsService(user, req.body);
+
+    res.status(200).json(result);
+  }
+);
+
 export const deleteBill = catchAsync(
   async (req: Request, res: Response) => {
+    await checkBillAccess(req, req.params.id as string);
     const reason = (req.body?.reason || req.query?.reason) as string | undefined;
     const result = await deleteBillService(
       req.params.id as string,

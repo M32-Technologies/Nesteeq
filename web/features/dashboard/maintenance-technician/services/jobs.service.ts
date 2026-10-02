@@ -35,6 +35,7 @@ export type JobDetails = {
     status: string
     createdAt: string
     complaintImage?: string
+    complaintImages?: string[]
   }
   locationInfo: {
     block: string

@@ -1229,23 +1229,66 @@ export const getMyResidentBillsService = async (user: {
     }
   }
 
+  const billObjectIds = bills.map((b) => b._id);
+  const paymentQueryConditions: any[] = [...queryConditions];
+  if (billObjectIds.length > 0) {
+    paymentQueryConditions.push({ billId: { $in: billObjectIds } });
+  }
+
   const paymentsRaw = await Payment.find({
     apartmentId: aptObjectId,
     reversed: { $ne: true },
-    $or: queryConditions,
+    $or: paymentQueryConditions,
   })
     .sort({ paidAt: -1 })
-    .limit(20)
+    .limit(100)
     .lean();
 
-  const recentPayments = paymentsRaw.map((p) => ({
-    _id: p._id.toString(),
-    billId: p.billId?.toString(),
-    amount: p.amount,
-    source: p.source,
-    description: p.description,
-    paidAt: p.paidAt,
-  }));
+  const handledBillIds = new Set<string>();
+  const recentPayments: any[] = paymentsRaw.map((p) => {
+    if (p.billId) handledBillIds.add(p.billId.toString());
+    return {
+      _id: p._id.toString(),
+      billId: p.billId?.toString(),
+      receiptNumber: p.receiptNumber || `REC-${p._id.toString().slice(-6).toUpperCase()}`,
+      amount: p.amount,
+      source: p.source,
+      paymentMethod: p.paymentMethod || "ONLINE",
+      referenceNo: p.referenceNo,
+      description: p.description,
+      paidAt: p.paidAt,
+    };
+  });
+
+  // Also include completed / paid bills that don't have a distinct Payment record
+  for (const b of formattedBills) {
+    const isCompleted =
+      b.status === "PAID" ||
+      (b.balanceAmount === 0 && b.totalAmount > 0) ||
+      (b.paidAmount > 0 && b.balanceAmount === 0);
+
+    if (isCompleted && !handledBillIds.has(b._id)) {
+      recentPayments.push({
+        _id: b._id,
+        billId: b._id,
+        receiptNumber: `REC-${b._id.slice(-6).toUpperCase()}`,
+        amount: b.paidAmount > 0 ? b.paidAmount : b.totalAmount,
+        source: b.isCommonBill ? "SOCIETY COMMON" : "DIRECT / TREASURER",
+        paymentMethod: "TREASURER SETTLED",
+        referenceNo: `BILL-${b._id.slice(-6).toUpperCase()}`,
+        description: b.description || `${b.title} - Settled in full`,
+        paidAt: b.dueDate || b.createdAt,
+      });
+      handledBillIds.add(b._id);
+    }
+  }
+
+  // Sort receipts by paidAt desc
+  recentPayments.sort((a, b) => {
+    const timeA = a.paidAt ? new Date(a.paidAt).getTime() : 0;
+    const timeB = b.paidAt ? new Date(b.paidAt).getTime() : 0;
+    return timeB - timeA;
+  });
 
   return {
     summary: {
@@ -1398,6 +1441,191 @@ export const payResidentBillService = async (
     success: true,
     message: `Payment of ₹${payAmount} recorded successfully!`,
     bill: result,
+  };
+};
+
+export const payAllResidentBillsService = async (
+  user: {
+    id: string;
+    role: string;
+    name?: string;
+    apartmentId?: string | null;
+    flatId?: string | null;
+  },
+  payload: {
+    paymentMethod?: string;
+    referenceNo?: string;
+    description?: string;
+    billIds?: string[];
+  }
+) => {
+  let apartmentId = user.apartmentId;
+  let flatId = user.flatId;
+  let residentRecord: any = null;
+
+  // Resolve apartment and resident profile from DB if not present in session
+  if (!apartmentId && Types.ObjectId.isValid(user.id)) {
+    residentRecord = await ResidentModel.findOne({
+      $or: [
+        { userId: user.id },
+        { _id: new Types.ObjectId(user.id) },
+      ],
+      status: { $ne: "inactive" },
+    }).lean();
+
+    if (residentRecord) {
+      apartmentId = residentRecord.apartmentId?.toString();
+      flatId = residentRecord.flatId?.toString();
+    }
+  } else if (apartmentId && Types.ObjectId.isValid(apartmentId)) {
+    residentRecord = await ResidentModel.findOne({
+      apartmentId: new Types.ObjectId(apartmentId),
+      $or: [
+        { userId: user.id },
+        ...(Types.ObjectId.isValid(user.id) ? [{ _id: new Types.ObjectId(user.id) }] : []),
+      ],
+      status: { $ne: "inactive" },
+    }).lean();
+
+    if (residentRecord && !flatId) {
+      flatId = residentRecord.flatId?.toString();
+    }
+  }
+
+  if (!flatId && user.flatId) {
+    flatId = user.flatId;
+  }
+
+  if (!apartmentId) {
+    throw new AppError("Apartment association required to settle bills", 400);
+  }
+
+  const aptObjectId = new Types.ObjectId(apartmentId);
+
+  // Build query conditions for this resident's bills
+  const queryConditions: any[] = [];
+  if (flatId && Types.ObjectId.isValid(flatId)) {
+    queryConditions.push({ unitId: new Types.ObjectId(flatId) });
+  }
+  if (residentRecord?._id) {
+    queryConditions.push({ residentId: residentRecord._id });
+  }
+  if (Types.ObjectId.isValid(user.id)) {
+    queryConditions.push({ residentId: new Types.ObjectId(user.id) });
+  }
+
+  if (queryConditions.length === 0) {
+    throw new AppError("No resident profile or unit found", 400);
+  }
+
+  // Find candidate unpaid bills
+  const billFilter: any = {
+    apartmentId: aptObjectId,
+    $or: queryConditions,
+    status: { $in: ["PENDING", "OVERDUE", "PARTIALLY_PAID"] },
+  };
+
+  if (payload.billIds && payload.billIds.length > 0) {
+    billFilter._id = { $in: payload.billIds.map((id) => toObjectId(id, "billId")) };
+  }
+
+  const unpaidBills = await Billing.find(billFilter).sort({ dueDate: 1, createdAt: 1 });
+
+  if (!unpaidBills || unpaidBills.length === 0) {
+    throw new AppError("No outstanding bills found to pay", 400);
+  }
+
+  // Filter bills that actually have remaining balance > 0
+  const actionableBills = unpaidBills.filter((b) => {
+    const vals = calculateBillValues(b);
+    return vals.balanceAmount > 0;
+  });
+
+  if (actionableBills.length === 0) {
+    throw new AppError("All selected bills are already fully settled", 400);
+  }
+
+  const totalOutstanding = roundMoney(
+    actionableBills.reduce((acc, b) => acc + calculateBillValues(b).balanceAmount, 0)
+  );
+
+  const actor: AuditActor = {
+    userId: user.id,
+  };
+
+  const isWalletPayment = payload.paymentMethod === "WALLET";
+  let resolvedResidentId = residentRecord?._id?.toString() || user.id;
+
+  if (isWalletPayment) {
+    let wallet = await Wallet.findOne({
+      apartmentId: aptObjectId,
+      residentId: new Types.ObjectId(resolvedResidentId),
+    });
+
+    if (!wallet && residentRecord?._id) {
+      wallet = await Wallet.findOne({
+        apartmentId: aptObjectId,
+        residentId: residentRecord._id,
+      });
+    }
+
+    if (!wallet) {
+      throw new AppError(
+        "No advance wallet found for this resident. Please deposit advance funds first.",
+        404
+      );
+    }
+
+    if (wallet.balance < totalOutstanding) {
+      throw new AppError(
+        `Insufficient wallet balance (Available: ₹${wallet.balance}, Required: ₹${totalOutstanding})`,
+        400
+      );
+    }
+
+    resolvedResidentId = wallet.residentId.toString();
+  }
+
+  const batchRef =
+    payload.referenceNo?.trim() || `BULK-${Date.now().toString().slice(-6)}`;
+  const paidBillIds: string[] = [];
+
+  for (const bill of actionableBills) {
+    const vals = calculateBillValues(bill);
+    const payAmount = vals.balanceAmount;
+    if (payAmount <= 0) continue;
+
+    if (isWalletPayment) {
+      if (bill.residentId.toString() !== resolvedResidentId) {
+        bill.residentId = new Types.ObjectId(resolvedResidentId);
+        await bill.save();
+      }
+
+      await deductWalletFundsService(
+        bill.apartmentId.toString(),
+        resolvedResidentId,
+        bill._id.toString(),
+        payAmount,
+        payload.description || `Bulk settlement: ${bill.title || "Bill"}`,
+        actor
+      );
+    } else {
+      await recordBillPaymentService(bill._id.toString(), payAmount, actor, {
+        paymentMethod: payload.paymentMethod || "UPI",
+        referenceNo: batchRef,
+        description: payload.description || `Total bill payment (${bill.title || "Bill"})`,
+      });
+    }
+
+    paidBillIds.push(bill._id.toString());
+  }
+
+  return {
+    success: true,
+    message: `Payment of ₹${totalOutstanding} settled successfully for ${paidBillIds.length} bills!`,
+    totalAmount: totalOutstanding,
+    paidCount: paidBillIds.length,
+    paidBillIds,
   };
 };
 

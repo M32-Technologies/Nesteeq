@@ -134,7 +134,7 @@ export const updateCurrentApartment = async (
     const apartment = await Apartment.findByIdAndUpdate(
         apartmentId,
         { $set: data },
-        { new: true, runValidators: true }
+        { returnDocument: "after", runValidators: true }
     );
 
     if (!apartment) {

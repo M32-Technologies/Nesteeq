@@ -3,30 +3,61 @@ import { z } from "zod";
 const objectIdPattern = /^[0-9a-fA-F]{24}$/;
 
 export const getTreasurerDashboardSchema = z.object({
-  params: z.object({
-    apartmentId: z
-      .string()
-      .regex(objectIdPattern, "Invalid apartmentId format"),
-  }),
+  params: z
+    .object({
+      apartmentId: z
+        .string()
+        .regex(objectIdPattern, "Invalid apartmentId format")
+        .optional(),
+    })
+    .optional(),
+  query: z
+    .object({
+      apartmentId: z
+        .string()
+        .regex(objectIdPattern, "Invalid apartmentId format")
+        .optional(),
+    })
+    .optional(),
 });
 
 export const getTreasurerChartSchema = z.object({
-  params: z.object({
-    apartmentId: z
-      .string()
-      .regex(objectIdPattern, "Invalid apartmentId format"),
-  }),
-  query: z.object({
-    year: z.coerce.number().int().min(2000).max(2100).optional(),
-  }),
+  params: z
+    .object({
+      apartmentId: z
+        .string()
+        .regex(objectIdPattern, "Invalid apartmentId format")
+        .optional(),
+    })
+    .optional(),
+  query: z
+    .object({
+      apartmentId: z
+        .string()
+        .regex(objectIdPattern, "Invalid apartmentId format")
+        .optional(),
+      year: z.coerce.number().int().min(2000).max(2100).optional(),
+    })
+    .optional(),
 });
 
 export const updateTreasurerSettingsSchema = z.object({
-  params: z.object({
-    apartmentId: z
-      .string()
-      .regex(objectIdPattern, "Invalid apartmentId format"),
-  }),
+  params: z
+    .object({
+      apartmentId: z
+        .string()
+        .regex(objectIdPattern, "Invalid apartmentId format")
+        .optional(),
+    })
+    .optional(),
+  query: z
+    .object({
+      apartmentId: z
+        .string()
+        .regex(objectIdPattern, "Invalid apartmentId format")
+        .optional(),
+    })
+    .optional(),
   body: z.object({
     defaultLateFeePerDay: z.number().min(0).optional(),
     gracePeriodDays: z.number().int().min(0).max(30).optional(),
@@ -38,22 +69,42 @@ export const updateTreasurerSettingsSchema = z.object({
 });
 
 export const getMaintenancePayoutsSchema = z.object({
-  params: z.object({
-    apartmentId: z
-      .string()
-      .regex(objectIdPattern, "Invalid apartmentId format"),
-  }),
+  params: z
+    .object({
+      apartmentId: z
+        .string()
+        .regex(objectIdPattern, "Invalid apartmentId format")
+        .optional(),
+    })
+    .optional(),
+  query: z
+    .object({
+      apartmentId: z
+        .string()
+        .regex(objectIdPattern, "Invalid apartmentId format")
+        .optional(),
+    })
+    .optional(),
 });
 
 export const processMaintenancePayoutSchema = z.object({
   params: z.object({
     apartmentId: z
       .string()
-      .regex(objectIdPattern, "Invalid apartmentId format"),
+      .regex(objectIdPattern, "Invalid apartmentId format")
+      .optional(),
     jobId: z
       .string()
       .regex(objectIdPattern, "Invalid jobId format"),
   }),
+  query: z
+    .object({
+      apartmentId: z
+        .string()
+        .regex(objectIdPattern, "Invalid apartmentId format")
+        .optional(),
+    })
+    .optional(),
   body: z.object({
     paymentMethod: z.string().trim().optional(),
     paymentReference: z.string().trim().optional(),

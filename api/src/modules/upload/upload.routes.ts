@@ -1,28 +1,40 @@
-import { Router, type Request, type Response } from "express"
-import { protect } from "../../middlewares/authMiddleware.js"
-import { uploadAvatarMiddleware } from "../../middlewares/uploadMiddleware.js"
-import { AppError } from "../../utils/AppError.js"
-import { env } from "../../config/env.js"
+import { Router, type Request, type Response, type NextFunction } from "express";
+import { uploadImageMiddleware } from "../../middlewares/uploadMiddleware.js";
+import { AppError } from "../../utils/AppError.js";
 
-const router = Router()
+const router = Router();
 
 router.post(
-  "/avatar",
-  protect,
-  uploadAvatarMiddleware,
-  (req: Request, res: Response) => {
-    if (!req.file) {
-      throw new AppError("No avatar file provided", 400)
+  "/",
+  uploadImageMiddleware,
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const file = req.file || (req.files && Array.isArray(req.files) ? req.files[0] : null);
+
+      if (!file) {
+        return next(new AppError("No file uploaded. Please attach an image file.", 400));
+      }
+
+      const host = req.get("host") || `localhost:${process.env.PORT || 6001}`;
+      const protocol = req.protocol || "http";
+      const fileUrl = `${protocol}://${host}/uploads/${file.filename}`;
+      const relativePath = `/uploads/${file.filename}`;
+
+      return res.status(200).json({
+        success: true,
+        message: "Image uploaded successfully",
+        data: {
+          url: fileUrl,
+          path: relativePath,
+          filename: file.filename,
+          size: file.size,
+          mimetype: file.mimetype,
+        },
+      });
+    } catch (error) {
+      return next(error);
     }
-
-    const fileUrl = `${env.betterAuthUrl}/uploads/avatars/${req.file.filename}`
-
-    res.status(200).json({
-      success: true,
-      url: fileUrl,
-      filename: req.file.filename,
-    })
   }
-)
+);
 
-export default router
+export default router;

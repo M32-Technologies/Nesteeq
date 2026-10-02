@@ -652,7 +652,7 @@ export const registerVehicleService = async (
             notes: data.notes?.trim() || null,
             status: "ACTIVE",
         },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
+        { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
     );
 
     return {

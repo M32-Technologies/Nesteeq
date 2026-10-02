@@ -51,12 +51,12 @@ const statusFilters: Array<{
   label: string
   value: EmergencyAlertStatus
 }> = [
-  { label: "All", value: "ALL" },
-  { label: "Active", value: "ACTIVE" },
-  { label: "Acknowledged", value: "ACKNOWLEDGED" },
-  { label: "Responding", value: "RESPONDING" },
-  { label: "Resolved", value: "RESOLVED" },
-]
+    { label: "All", value: "ALL" },
+    { label: "Active", value: "ACTIVE" },
+    { label: "Acknowledged", value: "ACKNOWLEDGED" },
+    { label: "Responding", value: "RESPONDING" },
+    { label: "Resolved", value: "RESOLVED" },
+  ]
 
 export function EmergencyAlerts() {
   const [status, setStatus] =

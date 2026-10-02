@@ -199,12 +199,12 @@ export function ResidentParkingPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 self-start sm:self-auto">
+        <div className="flex items-center gap-2.5 w-full sm:w-auto">
           <button
             type="button"
             onClick={handleOpenRegisterModal}
             disabled={hasNoSlotsAssigned || isSlotLimitReached}
-            className={`inline-flex h-9 items-center gap-2 rounded-lg px-4 text-xs sm:text-sm font-medium shadow-xs transition-colors ${
+            className={`inline-flex h-9 items-center justify-center gap-2 rounded-lg px-4 text-xs sm:text-sm font-medium shadow-xs transition-colors w-full sm:w-auto ${
               hasNoSlotsAssigned || isSlotLimitReached
                 ? "bg-slate-200 text-slate-500 cursor-not-allowed"
                 : "bg-[#07584F] text-white hover:bg-[#064C44] cursor-pointer active:scale-95"
@@ -704,18 +704,18 @@ export function ResidentParkingPage() {
               </label>
 
               {/* Modal Actions */}
-              <div className="flex justify-end gap-2.5 border-t border-slate-100 pt-3">
+              <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 border-t border-slate-100 pt-3">
                 <button
                   type="button"
                   onClick={() => setIsRegisterModalOpen(false)}
-                  className="rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                  className="w-full sm:w-auto rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer text-center"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={registerMutation.isPending}
-                  className="rounded-lg bg-[#07584F] px-4 py-2 text-xs font-semibold text-white hover:bg-[#064C44] transition cursor-pointer disabled:opacity-50"
+                  className="w-full sm:w-auto rounded-lg bg-[#07584F] px-4 py-2 text-xs font-semibold text-white hover:bg-[#064C44] transition cursor-pointer disabled:opacity-50 text-center"
                 >
                   {registerMutation.isPending ? "Registering..." : "Register Vehicle"}
                 </button>
@@ -749,11 +749,11 @@ export function ResidentParkingPage() {
               Are you sure you want to unregister <strong>{vehicleToDelete.vehicleNumber}</strong> ({vehicleToDelete.makeModel})? Its RFID gate clearance will be revoked immediately.
             </p>
 
-            <div className="flex justify-end gap-2.5 pt-2">
+            <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setVehicleToDelete(null)}
-                className="rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                className="w-full sm:w-auto rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer text-center"
               >
                 Keep Vehicle
               </button>
@@ -761,7 +761,7 @@ export function ResidentParkingPage() {
                 type="button"
                 disabled={deleteMutation.isPending}
                 onClick={() => deleteMutation.mutate(vehicleToDelete._id)}
-                className="rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 transition cursor-pointer disabled:opacity-50"
+                className="w-full sm:w-auto rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 transition cursor-pointer disabled:opacity-50 text-center"
               >
                 {deleteMutation.isPending ? "Removing..." : "Yes, Unregister"}
               </button>

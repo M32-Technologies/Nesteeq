@@ -14,7 +14,7 @@ export interface AnnouncementCreatedJobData {
 
 export type NotificationJobPayload =
   | AnnouncementCreatedJobData
-  | { message?: string; [key: string]: unknown };
+  | { message?: string;[key: string]: unknown };
 
 export const notificationQueue = new Queue<NotificationJobPayload>(
   NOTIFICATION_QUEUE_NAME,

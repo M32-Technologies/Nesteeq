@@ -12,8 +12,14 @@ import {
   ExpenseCategory,
   ExpenseStatus,
 } from "./expense.interface.js";
+import { Expense } from "./expense.model.js";
 
 import { catchAsync } from "../../utils/catchAsync.js";
+import { AppError } from "../../utils/AppError.js";
+import {
+  ensureApartmentAccess,
+  getAuthenticatedApartmentId,
+} from "../../middlewares/authMiddleware.js";
 
 const getAuditActor = (req: Request) => ({
   userId: req.user!.id,
@@ -21,8 +27,13 @@ const getAuditActor = (req: Request) => ({
 
 export const createExpense = catchAsync(
   async (req: Request, res: Response) => {
+    const apartmentId = req.body.apartmentId || getAuthenticatedApartmentId(req);
+    if (req.body.apartmentId) {
+      ensureApartmentAccess(req, req.body.apartmentId);
+    }
+
     const expense = await createExpenseService(
-      req.body,
+      { ...req.body, apartmentId },
       getAuditActor(req)
     );
 
@@ -36,8 +47,13 @@ export const createExpense = catchAsync(
 
 export const getExpenses = catchAsync(
   async (req: Request, res: Response) => {
+    const authenticatedApartmentId = getAuthenticatedApartmentId(req);
+    if (req.query.apartmentId) {
+      ensureApartmentAccess(req, req.query.apartmentId as string);
+    }
+
     const expenses = await getExpensesService({
-      apartmentId: req.query.apartmentId as string,
+      apartmentId: authenticatedApartmentId,
       category: req.query.category as ExpenseCategory,
       status: req.query.status as ExpenseStatus,
       search: req.query.search as string,
@@ -58,9 +74,12 @@ export const getExpenses = catchAsync(
 
 export const getExpenseSummary = catchAsync(
   async (req: Request, res: Response) => {
-    const summary = await getExpenseSummaryService(
-      req.query.apartmentId as string
-    );
+    const authenticatedApartmentId = getAuthenticatedApartmentId(req);
+    if (req.query.apartmentId) {
+      ensureApartmentAccess(req, req.query.apartmentId as string);
+    }
+
+    const summary = await getExpenseSummaryService(authenticatedApartmentId);
 
     res.status(200).json({
       success: true,
@@ -75,6 +94,8 @@ export const getExpenseById = catchAsync(
       req.params.id as string
     );
 
+    ensureApartmentAccess(req, expense.apartmentId);
+
     res.status(200).json({
       success: true,
       data: expense,
@@ -84,6 +105,12 @@ export const getExpenseById = catchAsync(
 
 export const updateExpense = catchAsync(
   async (req: Request, res: Response) => {
+    const existing = await Expense.findById(req.params.id as string).select("apartmentId").lean();
+    if (!existing) {
+      throw new AppError("Expense not found", 404);
+    }
+    ensureApartmentAccess(req, existing.apartmentId);
+
     const expense = await updateExpenseService(
       req.params.id as string,
       req.body,

@@ -1,10 +1,5 @@
-import SettingsPage from "@/features/dashboard/settings/components/settings-page"
-
-export const metadata = {
-  title: "Account Settings | Nesteeq",
-  description: "Manage your treasurer profile and account settings.",
-}
+import { redirect } from "next/navigation"
 
 export default function TreasurerSettingsPage() {
-  return <SettingsPage />
+  redirect("/profile")
 }

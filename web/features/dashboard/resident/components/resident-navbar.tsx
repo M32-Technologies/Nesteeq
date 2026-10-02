@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -37,7 +37,30 @@ export function ResidentNavbar({ user }: ResidentNavbarProps) {
   const router = useRouter();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
   const { flatUnitName, residentRole, apartmentName } = useResidentDashboard();
+
+  useEffect(() => {
+    setAvatarError(false);
+  }, [user.image]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        profileDropdownRef.current &&
+        !profileDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsProfileOpen(false);
+      }
+    }
+    if (isProfileOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isProfileOpen]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -193,22 +216,26 @@ export function ResidentNavbar({ user }: ResidentNavbarProps) {
             </NotificationDropdown>
 
             {/* Profile Dropdown */}
-            <div className="relative">
+            <div ref={profileDropdownRef} className="relative">
               <button
                 type="button"
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
                 className="flex items-center gap-2 rounded-lg border border-[#DDE3DF] bg-white p-1 pr-2.5 hover:bg-[#F7F8F5] transition-colors cursor-pointer"
               >
-                {user.image ? (
-                  <Image
-                    src={user.image}
-                    alt={user.name}
-                    width={28}
-                    height={28}
-                    className="size-7 rounded-md object-cover ring-1 ring-slate-200"
-                  />
+                {user.image && !avatarError ? (
+                  <span className="relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md ring-1 ring-slate-200">
+                    <Image
+                      src={user.image}
+                      alt={user.name}
+                      width={28}
+                      height={28}
+                      unoptimized
+                      onError={() => setAvatarError(true)}
+                      className="size-full object-cover"
+                    />
+                  </span>
                 ) : (
-                  <div className="flex size-7 items-center justify-center rounded-md bg-[#07584F] text-xs font-bold text-white">
+                  <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-[#07584F] text-xs font-bold text-white">
                     {getInitials(user.name)}
                   </div>
                 )}

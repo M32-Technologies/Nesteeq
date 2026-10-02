@@ -289,7 +289,7 @@ export const updateTreasurerSettingsService = async (
   const settings = await TreasurerSetting.findOneAndUpdate(
     { apartmentId: id },
     { $set: updateData },
-    { new: true, upsert: true }
+    { returnDocument: "after", upsert: true }
   );
   return settings;
 };
@@ -399,7 +399,7 @@ export const processMaintenancePayoutService = async (
         "costReview.forwardedToRole": "SETTLED",
       },
     },
-    { new: false }
+    { returnDocument: "before" }
   );
 
   if (!job) {
@@ -612,37 +612,55 @@ export const getDefaultersReportService = async (
   const start = (page - 1) * limit;
   const paginated = processed.slice(start, start + limit);
 
+  const totalOverdueAmount = roundMoney(
+    processed.reduce((sum, b) => sum + (b.balanceAmount || 0), 0)
+  );
+
   return {
     defaulters: paginated,
+    totalOverdueAmount,
+    defaulterCount: total,
     pagination: {
       total,
       page,
       limit,
       totalPages,
+      pages: totalPages,
     },
   };
 };
 
 export const getExpenseBreakdownReportService = async (
   apartmentId: string,
-  year: number,
-  month?: number
+  year?: number,
+  month?: number,
+  startDateInput?: string,
+  endDateInput?: string
 ) => {
   const aptId = getApartmentObjectId(apartmentId);
 
-  const startDate = month && month > 0
-    ? new Date(Date.UTC(year, month - 1, 1))
-    : new Date(Date.UTC(year, 0, 1));
-  const endDate = month && month > 0
-    ? new Date(Date.UTC(year, month, 1))
-    : new Date(Date.UTC(year + 1, 0, 1));
+  let startDate: Date;
+  let endDate: Date;
+
+  if (startDateInput && endDateInput) {
+    startDate = new Date(startDateInput);
+    endDate = new Date(endDateInput);
+  } else {
+    const yr = year || new Date().getFullYear();
+    startDate = month && month > 0
+      ? new Date(Date.UTC(yr, month - 1, 1))
+      : new Date(Date.UTC(yr, 0, 1));
+    endDate = month && month > 0
+      ? new Date(Date.UTC(yr, month, 1))
+      : new Date(Date.UTC(yr + 1, 0, 1));
+  }
 
   const aggregation = await Expense.aggregate([
     {
       $match: {
         apartmentId: aptId,
         status: { $in: ["APPROVED", "PAID"] },
-        expenseDate: { $gte: startDate, $lt: endDate },
+        expenseDate: { $gte: startDate, $lte: endDate },
       },
     },
     {
@@ -657,22 +675,33 @@ export const getExpenseBreakdownReportService = async (
     },
   ]);
 
-  const categories: Record<string, { total: number; count: number }> = {};
   let totalAmount = 0;
   let totalCount = 0;
 
   for (const item of aggregation) {
-    const cat = item._id || "OTHER";
-    categories[cat] = { total: item.total, count: item.count };
-    totalAmount += item.total;
-    totalCount += item.count;
+    totalAmount += item.total || 0;
+    totalCount += item.count || 0;
   }
 
+  const categories = aggregation.map((item) => {
+    const cat = item._id || "OTHER";
+    const total = item.total || 0;
+    const percentage = totalAmount > 0 ? (total / totalAmount) * 100 : 0;
+    return {
+      category: cat,
+      totalAmount: total,
+      total,
+      count: item.count || 0,
+      percentage: Number(percentage.toFixed(2)),
+    };
+  });
+
   return {
-    categories,
+    totalApprovedAmount: totalAmount,
     totalAmount,
     totalCount,
-    year,
+    categories,
+    year: year || startDate.getFullYear(),
     month: month || null,
   };
 };

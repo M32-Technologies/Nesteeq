@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   useMutation,
   useQuery,
@@ -241,7 +241,7 @@ export default function TreasurerPayments() {
     if (datePreset === "THIS_WEEK") {
       const day = now.getDay();
       const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Monday
-      const start = new Date(now.setDate(diff));
+      const start = new Date(now.getFullYear(), now.getMonth(), diff);
       start.setHours(0, 0, 0, 0);
       return { start, end: new Date() };
     }
@@ -337,10 +337,18 @@ export default function TreasurerPayments() {
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(filteredPayments.length / ITEMS_PER_PAGE));
+  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const paginatedPayments = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    const start = (validCurrentPage - 1) * ITEMS_PER_PAGE;
     return filteredPayments.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredPayments, currentPage]);
+  }, [filteredPayments, validCurrentPage]);
 
   // CSV Export Handler
   const handleExportCSV = () => {

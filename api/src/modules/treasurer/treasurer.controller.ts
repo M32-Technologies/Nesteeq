@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { catchAsync } from "../../utils/catchAsync.js";
+import { getAuthenticatedApartmentId } from "../../middlewares/authMiddleware.js";
 import {
   getTreasurerDashboardService,
   getTreasurerChartService,
@@ -11,9 +12,12 @@ import {
   getExpenseBreakdownReportService,
 } from "./treasurer.service.js";
 
+const getApartmentId = (req: Request) =>
+  (req.params.apartmentId || req.query.apartmentId || getAuthenticatedApartmentId(req)) as string;
+
 export const getTreasurerDashboard = catchAsync(
   async (req: Request, res: Response) => {
-    const apartmentId = req.params.apartmentId as string;
+    const apartmentId = getApartmentId(req);
     const data = await getTreasurerDashboardService(apartmentId);
 
     res.status(200).json({
@@ -25,7 +29,7 @@ export const getTreasurerDashboard = catchAsync(
 
 export const getTreasurerChart = catchAsync(
   async (req: Request, res: Response) => {
-    const apartmentId = req.params.apartmentId as string;
+    const apartmentId = getApartmentId(req);
     const year = req.query.year ? Number(req.query.year) : undefined;
     const data = await getTreasurerChartService(apartmentId, year);
 
@@ -38,7 +42,7 @@ export const getTreasurerChart = catchAsync(
 
 export const getTreasurerSettings = catchAsync(
   async (req: Request, res: Response) => {
-    const apartmentId = req.params.apartmentId as string;
+    const apartmentId = getApartmentId(req);
     const data = await getTreasurerSettingsService(apartmentId);
 
     res.status(200).json({
@@ -50,7 +54,7 @@ export const getTreasurerSettings = catchAsync(
 
 export const updateTreasurerSettings = catchAsync(
   async (req: Request, res: Response) => {
-    const apartmentId = req.params.apartmentId as string;
+    const apartmentId = getApartmentId(req);
     const data = await updateTreasurerSettingsService(apartmentId, req.body);
 
     res.status(200).json({
@@ -63,7 +67,7 @@ export const updateTreasurerSettings = catchAsync(
 
 export const getMaintenancePayouts = catchAsync(
   async (req: Request, res: Response) => {
-    const apartmentId = req.params.apartmentId as string;
+    const apartmentId = getApartmentId(req);
     const data = await getMaintenancePayoutsService(apartmentId);
 
     res.status(200).json({
@@ -75,7 +79,7 @@ export const getMaintenancePayouts = catchAsync(
 
 export const processMaintenancePayout = catchAsync(
   async (req: Request, res: Response) => {
-    const apartmentId = req.params.apartmentId as string;
+    const apartmentId = getApartmentId(req);
     const jobId = req.params.jobId as string;
     const user = req.user as
       | { id?: string; _id?: { toString: () => string }; name?: string }
@@ -99,11 +103,11 @@ export const processMaintenancePayout = catchAsync(
 
 export const getDefaultersReport = catchAsync(
   async (req: Request, res: Response) => {
-    const apartmentId = (req.params.apartmentId || req.query.apartmentId || req.user?.apartmentId) as string;
-    const { overdueDays, search, page, limit } = req.query;
+    const apartmentId = getApartmentId(req);
+    const { overdueDays, days, search, page, limit } = req.query;
 
     const data = await getDefaultersReportService(apartmentId, {
-      overdueDays: overdueDays ? Number(overdueDays) : undefined,
+      overdueDays: overdueDays ? Number(overdueDays) : days ? Number(days) : undefined,
       search: search as string | undefined,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
@@ -118,11 +122,19 @@ export const getDefaultersReport = catchAsync(
 
 export const getExpenseBreakdownReport = catchAsync(
   async (req: Request, res: Response) => {
-    const apartmentId = (req.params.apartmentId || req.query.apartmentId || req.user?.apartmentId) as string;
-    const year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
+    const apartmentId = getApartmentId(req);
+    const startDate = req.query.startDate as string | undefined;
+    const endDate = req.query.endDate as string | undefined;
+    const year = req.query.year ? Number(req.query.year) : undefined;
     const month = req.query.month ? Number(req.query.month) : undefined;
 
-    const data = await getExpenseBreakdownReportService(apartmentId, year, month);
+    const data = await getExpenseBreakdownReportService(
+      apartmentId,
+      year,
+      month,
+      startDate,
+      endDate
+    );
 
     res.status(200).json({
       success: true,

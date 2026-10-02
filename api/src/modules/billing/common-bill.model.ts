@@ -2,8 +2,6 @@ import mongoose, { Schema, type Document, type Types } from "mongoose";
 
 export enum BillType {
   MONTHLY_MAINTENANCE = "MONTHLY_MAINTENANCE",
-  WATER = "WATER",
-  COMMON_ELECTRICITY = "COMMON_ELECTRICITY",
   LIFT_MAINTENANCE = "LIFT_MAINTENANCE",
   LIFT_AMC = "LIFT_AMC",
   SPECIAL_REPAIR = "SPECIAL_REPAIR",

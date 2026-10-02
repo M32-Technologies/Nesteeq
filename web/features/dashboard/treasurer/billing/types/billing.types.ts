@@ -74,6 +74,9 @@ export interface ResidentPaymentItem {
   source: string;
   description?: string;
   paidAt: string;
+  receiptNumber?: string;
+  paymentMethod?: string;
+  referenceNo?: string;
 }
 
 export interface ResidentBillsResponse {
