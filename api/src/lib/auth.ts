@@ -142,7 +142,7 @@ export const auth = betterAuth({
       },
     }),
     admin({
-      defaultRole: "resident",
+      defaultRole: "user",
       adminRoles: ["admin"],
     }),
     customSession(async ({ user, session }) => {
@@ -152,17 +152,18 @@ export const auth = betterAuth({
 
       const rawUser = user as { role?: string; apartmentId?: string; id?: string };
       const userRole = (rawUser.role ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+      let resolvedApartmentId = rawUser.apartmentId;
+
       if (userRole !== "admin" && userRole !== "super_admin") {
-        let apartmentId = rawUser.apartmentId;
-        if (!apartmentId && userRole === "property_manager" && rawUser.id) {
+        if (!resolvedApartmentId && (userRole === "property_manager" || userRole === "user") && rawUser.id) {
           const apt = await Apartment.findOne({ managerId: rawUser.id }).select("_id status name inactiveReason");
           if (apt) {
-            apartmentId = apt._id.toString();
+            resolvedApartmentId = apt._id.toString();
           }
         }
 
-        if (apartmentId && isValidObjectId(apartmentId)) {
-          const apt = await Apartment.findById(apartmentId).select("name status inactiveReason");
+        if (resolvedApartmentId && isValidObjectId(resolvedApartmentId)) {
+          const apt = await Apartment.findById(resolvedApartmentId).select("name status inactiveReason");
           if (apt) {
             apartmentStatus = apt.status;
             inactiveReason = apt.inactiveReason ?? null;
@@ -174,6 +175,7 @@ export const auth = betterAuth({
       return {
         user: {
           ...user,
+          apartmentId: resolvedApartmentId ?? null,
           apartmentStatus,
           inactiveReason,
           apartmentName,

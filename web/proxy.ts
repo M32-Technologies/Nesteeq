@@ -78,6 +78,9 @@ export default async function proxy(request: NextRequest) {
         if (userSession.apartmentStatus === "inactive") {
           return NextResponse.next();
         }
+        if (userSession.role?.trim().toLowerCase() === "user") {
+          return NextResponse.redirect(new URL("/pricing", request.url));
+        }
         const userRole = normalizeDashboardRole(userSession.role);
         const homeSegment = getDashboardRoleRouteSegment(userRole);
         return NextResponse.redirect(new URL(`/${homeSegment}`, request.url));
@@ -131,6 +134,9 @@ export default async function proxy(request: NextRequest) {
 
   // 5. Block Normal Users from Admin Routes
   if (pathname.startsWith("/admin")) {
+    if (rawRole?.trim().toLowerCase() === "user") {
+      return NextResponse.redirect(new URL("/pricing", request.url));
+    }
     const userRole = normalizeDashboardRole(rawRole);
     const homeSegment = getDashboardRoleRouteSegment(userRole);
     return NextResponse.redirect(new URL(`/${homeSegment}`, request.url));
@@ -142,6 +148,10 @@ export default async function proxy(request: NextRequest) {
 
   if (!requiredRole) {
     return NextResponse.next();
+  }
+
+  if (rawRole?.trim().toLowerCase() === "user") {
+    return NextResponse.redirect(new URL("/pricing", request.url));
   }
 
   const userRole = normalizeDashboardRole(rawRole);

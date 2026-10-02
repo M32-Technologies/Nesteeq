@@ -91,6 +91,11 @@ export async function getCurrentDashboardSession() {
     return null
   }
 
+  const rawRole = (data.user.role ?? "").trim().toLowerCase()
+  if (rawRole === "user") {
+    return null
+  }
+
   const role = normalizeDashboardRole(data.user.role)
   const name =
     data.user.name || data.user.email?.split("@")[0] || "Dashboard user"

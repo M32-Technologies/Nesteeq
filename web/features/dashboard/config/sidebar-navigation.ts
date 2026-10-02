@@ -461,6 +461,9 @@ export function getUserDashboardHref(role?: string | null): string {
   if (role && role.trim().toLowerCase() === "admin") {
     return "/admin/dashboard"
   }
+  if (role && role.trim().toLowerCase() === "user") {
+    return "/pricing"
+  }
 
   return `/${getDashboardRoleRouteSegment(normalizeDashboardRole(role))}`
 }
