@@ -11,14 +11,18 @@ import { Block } from "../block/block.model.js"
 import { Apartment } from "../apartment/apartment.model.js"
 
 export type AssignedJob = {
+  _id?: string
   jobId: string
   title: string
+  issueDetails?: string
   category: string
   block: string
   flat: string
   priority: "High" | "Medium" | "Low"
   status: "ASSIGNED" | "IN_PROGRESS" | "COMPLETED"
   assignedDate: string
+  createdAt?: string
+  jobType?: "MAINTENANCE" | "COMPLAINT"
   location?: string
   area?: string
   flatNumber?: string
@@ -479,10 +483,33 @@ export const getAssignedJobs = async (
     const s = status.toUpperCase()
     if (s === "ACTIVE") {
       complaintFilter.status = {
-        $in: ["PENDING", "UNDER_REVIEW", "ASSIGNED", "IN_PROGRESS"],
+        $in: [
+          "PENDING",
+          "UNDER_REVIEW",
+          "ASSIGNED",
+          "IN_PROGRESS",
+          "pending",
+          "under_review",
+          "assigned",
+          "in_progress",
+        ],
       }
       maintenanceFilter.status = {
-        $in: ["SCHEDULED", "PENDING", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"],
+        $in: [
+          "SCHEDULED",
+          "PENDING",
+          "ASSIGNED",
+          "IN_PROGRESS",
+          "ON_HOLD",
+          "scheduled",
+          "pending",
+          "assigned",
+          "in_progress",
+          "on_hold",
+          "Active",
+          "ACTIVE",
+          "Assigned",
+        ],
       }
     } else if (s === "COMPLETED" || s === "WORK_COMPLETED") {
       complaintFilter.status = {
@@ -504,42 +531,42 @@ export const getAssignedJobs = async (
         ],
       }
     } else if (s === "ASSIGNED" || s === "PENDING" || s === "SCHEDULED") {
-      complaintFilter.status = { $in: ["PENDING", "UNDER_REVIEW", "ASSIGNED"] }
-      maintenanceFilter.status = { $in: ["SCHEDULED", "PENDING", "ASSIGNED"] }
+      complaintFilter.status = {
+        $in: [
+          "PENDING",
+          "UNDER_REVIEW",
+          "ASSIGNED",
+          "pending",
+          "under_review",
+          "assigned",
+        ],
+      }
+      maintenanceFilter.status = {
+        $in: [
+          "SCHEDULED",
+          "PENDING",
+          "ASSIGNED",
+          "scheduled",
+          "pending",
+          "assigned",
+          "Assigned",
+        ],
+      }
     } else if (s === "IN_PROGRESS") {
-      complaintFilter.status = "IN_PROGRESS"
-      maintenanceFilter.status = { $in: ["IN_PROGRESS", "ON_HOLD"] }
+      complaintFilter.status = { $in: ["IN_PROGRESS", "in_progress"] }
+      maintenanceFilter.status = {
+        $in: ["IN_PROGRESS", "ON_HOLD", "in_progress", "on_hold"],
+      }
     } else {
       complaintFilter.status = s
       maintenanceFilter.status = s
     }
   } else {
     complaintFilter.status = {
-      $in: [
-        "PENDING",
-        "UNDER_REVIEW",
-        "ASSIGNED",
-        "IN_PROGRESS",
-        "WORK_COMPLETED",
-        "AWAITING_APPROVAL",
-        "RESOLVED",
-        "APPROVED",
-        "CLOSED",
-      ],
+      $nin: ["CANCELLED", "cancelled", "REJECTED", "rejected"],
     }
     maintenanceFilter.status = {
-      $in: [
-        "SCHEDULED",
-        "PENDING",
-        "ASSIGNED",
-        "IN_PROGRESS",
-        "ON_HOLD",
-        "WORK_COMPLETED",
-        "COMPLETED",
-        "AWAITING_APPROVAL",
-        "APPROVED",
-        "CLOSED",
-      ],
+      $nin: ["CANCELLED", "cancelled", "REJECTED", "rejected"],
     }
   }
 
@@ -633,24 +660,30 @@ export const getAssignedJobs = async (
     seenComplaintIds.add(idStr)
     const rawDateVal = doc.assignedAt || doc.createdAt || new Date()
     const assignedDate = new Date(rawDateVal).toISOString().split("T")[0]
+    const createdAtStr = doc.createdAt
+      ? new Date(doc.createdAt).toISOString()
+      : new Date(rawDateVal).toISOString()
 
     const loc = resolveDocLocation(doc, flatMap, blockMap, apartmentMap)
 
     jobs.push({
+      _id: idStr,
       jobId: idStr,
       title: doc.title || "Complaint Request",
+      issueDetails: doc.title || doc.description || "Complaint Request",
       category: doc.category || "General Maintenance",
       block: loc.displayBlock,
       flat: loc.displayFlat,
       priority: mapPriority(doc.priority),
       status: mapStatus(doc.status),
       assignedDate,
+      createdAt: createdAtStr,
+      jobType: "COMPLAINT",
       flatNumber: loc.flatNumber,
       unitNumber: loc.unitNumber,
       blockName: loc.blockName,
       location: loc.location,
       area: loc.area,
-      ...({ _timestamp: new Date(rawDateVal).getTime() || 0 } as any),
     })
   }
 
@@ -662,38 +695,53 @@ export const getAssignedJobs = async (
       continue
     }
 
+    const idStr = doc._id.toString()
     const rawDateVal = doc.assignedAt || doc.createdAt || new Date()
     const assignedDate = new Date(rawDateVal).toISOString().split("T")[0]
+    const createdAtStr = doc.createdAt
+      ? new Date(doc.createdAt).toISOString()
+      : new Date(rawDateVal).toISOString()
 
     const loc = resolveDocLocation(doc, flatMap, blockMap, apartmentMap)
 
+    const locationText =
+      typeof doc.location === "string" &&
+      doc.location.trim() !== "" &&
+      !isHexObjectId(doc.location)
+        ? doc.location.trim()
+        : loc.location || "Building Common Area"
+
+    const titleText = doc.title || doc.type || "Routine Maintenance"
+
     jobs.push({
-      jobId: doc._id.toString(),
-      title: doc.title || "Maintenance Request",
-      category: doc.category || "General Maintenance",
-      block: loc.displayBlock,
-      flat: loc.displayFlat,
+      _id: idStr,
+      jobId: idStr,
+      title: titleText,
+      issueDetails: titleText,
+      category: doc.type || doc.category || "MAINTENANCE",
+      block: loc.displayBlock || "Building",
+      flat:
+        loc.displayFlat && loc.displayFlat !== "Unit"
+          ? loc.displayFlat
+          : locationText,
       priority: mapPriority(doc.priority),
       status: mapStatus(doc.status),
       assignedDate,
+      createdAt: createdAtStr,
+      jobType: "MAINTENANCE",
       flatNumber: loc.flatNumber,
       unitNumber: loc.unitNumber,
       blockName: loc.blockName,
-      location: loc.location,
+      location: locationText,
       area: loc.area,
-      ...({ _timestamp: new Date(rawDateVal).getTime() || 0 } as any),
     })
   }
 
-  jobs.sort(
-    (a, b) =>
-      ((b as any)._timestamp || new Date(b.assignedDate).getTime() || 0) -
-      ((a as any)._timestamp || new Date(a.assignedDate).getTime() || 0)
-  )
-
-  for (const job of jobs) {
-    delete (job as any)._timestamp
-  }
+  jobs.sort((a, b) => {
+    const timeA = new Date(a.createdAt || a.assignedDate).getTime() || 0
+    const timeB = new Date(b.createdAt || b.assignedDate).getTime() || 0
+    return timeB - timeA
+  })
 
   return jobs
 }

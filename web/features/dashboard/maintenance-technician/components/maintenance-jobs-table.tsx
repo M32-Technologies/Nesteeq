@@ -226,8 +226,8 @@ export default function MaintenanceJobsTable({
 
                     {/* Issue / Title */}
                     <td className="px-4 py-4 align-middle">
-                      <p className="truncate text-sm font-medium text-slate-900" title={job.title}>
-                        {job.title}
+                      <p className="truncate text-sm font-medium text-slate-900" title={job.title || job.issueDetails}>
+                        {job.title || job.issueDetails}
                       </p>
                     </td>
 

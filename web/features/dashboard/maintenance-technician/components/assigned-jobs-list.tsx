@@ -39,10 +39,13 @@ export default function AssignedJobsList() {
       const matchesSearch =
         search.trim() === "" ||
         job.jobId.toLowerCase().includes(search.toLowerCase()) ||
+        (job._id && job._id.toLowerCase().includes(search.toLowerCase())) ||
         job.title.toLowerCase().includes(search.toLowerCase()) ||
+        (job.issueDetails && job.issueDetails.toLowerCase().includes(search.toLowerCase())) ||
         job.category.toLowerCase().includes(search.toLowerCase()) ||
         job.flat.toLowerCase().includes(search.toLowerCase()) ||
-        job.block.toLowerCase().includes(search.toLowerCase())
+        job.block.toLowerCase().includes(search.toLowerCase()) ||
+        (job.location && job.location.toLowerCase().includes(search.toLowerCase()))
 
       const matchesStatus =
         statusFilter === "ALL"

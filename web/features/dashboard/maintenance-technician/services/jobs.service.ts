@@ -15,14 +15,18 @@ type ApiErrorResponse = {
 }
 
 export type AssignedJob = {
+  _id?: string
   jobId: string
   title: string
+  issueDetails?: string
   category: string
   block: string
   flat: string
   priority: "High" | "Medium" | "Low"
   status: "ASSIGNED" | "IN_PROGRESS" | "COMPLETED"
   assignedDate: string
+  createdAt?: string
+  jobType?: "MAINTENANCE" | "COMPLAINT"
   location?: string
   area?: string
   flatNumber?: string
