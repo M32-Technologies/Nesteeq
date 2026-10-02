@@ -36,7 +36,7 @@ export function MetricCard({
   tone = "green",
 }: {
   title: string
-  value?: number
+  value?: number | string
   icon: LucideIcon
   tone?: "green" | "blue" | "amber" | "rose" | "gray"
 }) {
