@@ -44,7 +44,7 @@ export function ComplaintsTable({
         <table className="w-full min-w-[1120px] text-left">
           <thead className="bg-[#FBFCFD] text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8793A0]">
             <tr>
-              <th className="px-4 py-3">Complaint ID</th>
+              <th className="px-4 py-3">Sl No</th>
               <th className="px-4 py-3">Resident</th>
               <th className="px-4 py-3">Category</th>
               <th className="px-4 py-3">Description</th>
@@ -56,14 +56,14 @@ export function ComplaintsTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-[#EEF2F5]">
-            {complaints.map((complaint) => (
+            {complaints.map((complaint, index) => (
               <tr
                 key={complaint._id}
                 onClick={() => handleOpenDrawer(complaint)}
                 className="cursor-pointer text-[13px] text-[#26313D] transition hover:bg-[#FBFCFD]"
               >
                 <td className="px-4 py-4 font-semibold text-[#111111]">
-                  {formatId(complaint._id)}
+                  {index + 1}
                 </td>
                 <td className="px-4 py-4">{formatId(typeof complaint.residentId === "object" ? complaint.residentId?.name : complaint.residentId)}</td>
                 <td className="px-4 py-4">{formatLabel(complaint.category)}</td>
@@ -145,7 +145,7 @@ export function ComplaintsTable({
       </div>
 
       <div className="divide-y divide-[#EEF2F5] pb-28 lg:hidden">
-        {complaints.map((complaint) => (
+        {complaints.map((complaint, index) => (
           <article
             key={complaint._id}
             onClick={() => handleOpenDrawer(complaint, "details")}
@@ -154,7 +154,7 @@ export function ComplaintsTable({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[12px] font-semibold text-[#07584F]">
-                  {formatId(complaint._id)}
+                  #{index + 1}
                 </p>
                 <h2 className="mt-1 line-clamp-2 text-[15px] font-semibold text-[#111111]">
                   {complaint.title}
