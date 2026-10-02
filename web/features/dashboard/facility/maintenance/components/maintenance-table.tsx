@@ -43,7 +43,7 @@ export function MaintenanceTable({
         <table className="w-full min-w-[1240px] text-left">
           <thead className="bg-[#FBFCFD] text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8793A0]">
             <tr>
-              <th className="px-4 py-3">Maintenance ID</th>
+              <th className="px-4 py-3">Sl No</th>
               <th className="px-4 py-3">Category</th>
               <th className="px-4 py-3">Description</th>
               <th className="px-4 py-3">Technician</th>
@@ -55,14 +55,14 @@ export function MaintenanceTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-[#EEF2F5]">
-            {maintenance.map((item) => (
+            {maintenance.map((item, index) => (
               <tr
                 key={item._id}
                 onClick={() => handleOpenDrawer(item, "details")}
                 className="cursor-pointer text-[13px] text-[#26313D] transition hover:bg-[#FBFCFD]"
               >
                 <td className="px-4 py-4 font-semibold text-[#111111]">
-                  {formatId(item._id)}
+                  {index + 1}
                 </td>
                 <td className="px-4 py-4">{formatLabel(item.category)}</td>
                 <td className="max-w-[260px] px-4 py-4">
@@ -152,7 +152,7 @@ export function MaintenanceTable({
       </div>
 
       <div className="divide-y divide-[#EEF2F5] pb-28 lg:hidden">
-        {maintenance.map((item) => (
+        {maintenance.map((item, index) => (
           <article
             key={item._id}
             onClick={() => handleOpenDrawer(item, "details")}
@@ -161,7 +161,7 @@ export function MaintenanceTable({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[12px] font-semibold text-[#07584F]">
-                  {formatId(item._id)}
+                  #{index + 1}
                 </p>
                 <h2 className="mt-1 line-clamp-2 text-[15px] font-semibold text-[#111111]">
                   {item.title}
