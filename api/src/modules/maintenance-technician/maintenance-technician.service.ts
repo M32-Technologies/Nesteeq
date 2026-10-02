@@ -406,12 +406,14 @@ export const buildTechnicianScope = (ids: string[]): Record<string, unknown> => 
   return {
     $or: [
       { assignedStaff: { $in: allPossibleIdValues } },
+      { assignedStaffId: { $in: allPossibleIdValues } },
       { assignedTo: { $in: allPossibleIdValues } },
       { "assignedTo._id": { $in: allPossibleIdValues } },
       { "assignedTo.id": { $in: ids } },
       { "assignedTo.userId": { $in: ids } },
       { assignedTechnicianId: { $in: allPossibleIdValues } },
       { technician: { $in: allPossibleIdValues } },
+      { technicianId: { $in: allPossibleIdValues } },
       { "technician._id": { $in: allPossibleIdValues } },
       { "technician.id": { $in: ids } },
       { "technician.userId": { $in: ids } },
@@ -629,8 +631,8 @@ export const getAssignedJobs = async (
   for (const doc of complaintDocs as any[]) {
     const idStr = doc._id.toString()
     seenComplaintIds.add(idStr)
-    const assignedDateVal = doc.assignedAt || doc.createdAt || new Date()
-    const assignedDate = new Date(assignedDateVal).toISOString().split("T")[0]
+    const rawDateVal = doc.assignedAt || doc.createdAt || new Date()
+    const assignedDate = new Date(rawDateVal).toISOString().split("T")[0]
 
     const loc = resolveDocLocation(doc, flatMap, blockMap, apartmentMap)
 
@@ -648,6 +650,7 @@ export const getAssignedJobs = async (
       blockName: loc.blockName,
       location: loc.location,
       area: loc.area,
+      ...({ _timestamp: new Date(rawDateVal).getTime() || 0 } as any),
     })
   }
 
@@ -659,8 +662,8 @@ export const getAssignedJobs = async (
       continue
     }
 
-    const assignedDateVal = doc.assignedAt || doc.createdAt || new Date()
-    const assignedDate = new Date(assignedDateVal).toISOString().split("T")[0]
+    const rawDateVal = doc.assignedAt || doc.createdAt || new Date()
+    const assignedDate = new Date(rawDateVal).toISOString().split("T")[0]
 
     const loc = resolveDocLocation(doc, flatMap, blockMap, apartmentMap)
 
@@ -678,7 +681,18 @@ export const getAssignedJobs = async (
       blockName: loc.blockName,
       location: loc.location,
       area: loc.area,
+      ...({ _timestamp: new Date(rawDateVal).getTime() || 0 } as any),
     })
+  }
+
+  jobs.sort(
+    (a, b) =>
+      ((b as any)._timestamp || new Date(b.assignedDate).getTime() || 0) -
+      ((a as any)._timestamp || new Date(a.assignedDate).getTime() || 0)
+  )
+
+  for (const job of jobs) {
+    delete (job as any)._timestamp
   }
 
   return jobs
