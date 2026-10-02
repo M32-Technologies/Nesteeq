@@ -311,9 +311,8 @@ export default function CreateBillModal({
                   if (!title) {
                     const labels: Record<string, string> = {
                       MONTHLY_MAINTENANCE: "Monthly Maintenance",
-                      WATER: "Water Bill",
-                      COMMON_ELECTRICITY: "Common Electricity",
                       LIFT_MAINTENANCE: "Lift Maintenance AMC",
+                      LIFT_AMC: "Lift AMC",
                       SPECIAL_REPAIR: "Special Repair Charge",
                       PARKING_MAINTENANCE: "Parking Maintenance",
                       OTHER: "Individual Fee",
@@ -324,9 +323,8 @@ export default function CreateBillModal({
                 className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
               >
                 <option value="MONTHLY_MAINTENANCE">Monthly Maintenance</option>
-                <option value="WATER">Water Supply</option>
-                <option value="COMMON_ELECTRICITY">Electricity</option>
                 <option value="LIFT_MAINTENANCE">Lift Maintenance AMC</option>
+                <option value="LIFT_AMC">Lift AMC</option>
                 <option value="SPECIAL_REPAIR">Special Repair / Repair Fine</option>
                 <option value="PARKING_MAINTENANCE">Parking Maintenance</option>
                 <option value="OTHER">Custom / Other</option>

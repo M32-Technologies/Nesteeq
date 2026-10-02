@@ -26,6 +26,7 @@ import {
 import { toast } from "sonner";
 
 import {
+  exportTreasurerReportCsv,
   getFinanceSummary,
   getMonthlyFinance,
   getDefaultersReport,
@@ -243,90 +244,45 @@ export default function TreasurerReports() {
     0;
 
   // CSV Export
-  const exportCsv = () => {
-    let header: string[] = [];
-    let csvRows: (string | number)[][] = [];
-    let filename = "";
-
-    if (activeTab === "summary") {
-      if (rows.length === 0) {
-        toast.error("No report rows available to export.");
-        return;
+  const exportCsv = async () => {
+    try {
+      if (activeTab === "summary") {
+        if (rows.length === 0) {
+          toast.error("No report rows available to export.");
+          return;
+        }
+        await exportTreasurerReportCsv({
+          type: "summary",
+          year: selectedYear,
+          month: selectedMonth ? selectedMonth : undefined,
+        });
+      } else if (activeTab === "defaulters") {
+        if (paginatedDefaulters.length === 0) {
+          toast.error("No defaulters data available to export.");
+          return;
+        }
+        await exportTreasurerReportCsv({
+          type: "defaulters",
+          days: daysParam,
+          search: defaulterSearch.trim() || undefined,
+        });
+      } else if (activeTab === "expenses") {
+        if (expenseCategoryBreakdown.length === 0) {
+          toast.error("No expense category data available to export.");
+          return;
+        }
+        await exportTreasurerReportCsv({
+          type: "expenses",
+          year: selectedYear,
+          month: selectedMonth ? selectedMonth : undefined,
+          startDate,
+          endDate,
+        });
       }
-      header = [
-        "Month",
-        "Year",
-        "Collection",
-        "Expenses",
-        "Outstanding",
-        "Late Fees",
-        "Balance",
-      ];
-      csvRows = rows.map((row) => [
-        monthLabels[row.month - 1],
-        row.year,
-        row.collection,
-        row.expenses,
-        row.outstanding,
-        row.lateFees,
-        row.balance,
-      ]);
-      filename = `financial-summary-${selectedYear}${
-        selectedMonth ? `-${selectedMonth}` : ""
-      }.csv`;
-    } else if (activeTab === "defaulters") {
-      if (paginatedDefaulters.length === 0) {
-        toast.error("No defaulters data available to export.");
-        return;
-      }
-      header = [
-        "Flat",
-        "Resident",
-        "Due Amount (INR)",
-        "Due Date",
-        "Overdue Days",
-        "Status",
-      ];
-      csvRows = paginatedDefaulters.map((d) => [
-        d.flatNumber ? `Flat ${d.flatNumber}` : d.unitName || "N/A",
-        d.residentName || "Resident",
-        d.balanceAmount,
-        d.dueDate ? d.dueDate.slice(0, 10) : "N/A",
-        d.overdueDays,
-        d.status,
-      ]);
-      filename = `defaulters-report-${new Date().toISOString().slice(0, 10)}.csv`;
-    } else if (activeTab === "expenses") {
-      if (expenseCategoryBreakdown.length === 0) {
-        toast.error("No expense category data available to export.");
-        return;
-      }
-      header = ["Category", "Amount (INR)", "Expense Count", "Share (%)"];
-      csvRows = expenseCategoryBreakdown.map((c) => [
-        categoryLabels[c.category] || c.category,
-        c.total,
-        c.count,
-        `${c.percentage.toFixed(1)}%`,
-      ]);
-      filename = `expense-breakdown-${selectedYear}${
-        selectedMonth ? `-${selectedMonth}` : ""
-      }.csv`;
+      toast.success("Report CSV exported successfully.");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to export report CSV.");
     }
-
-    const csv = [header, ...csvRows]
-      .map((row) => row.map((value) => `"${value}"`).join(","))
-      .join("\n");
-    const blob = new Blob([csv], {
-      type: "text/csv;charset=utf-8",
-    });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.click();
-    URL.revokeObjectURL(url);
-    toast.success("Report CSV exported successfully.");
   };
 
   // Print / PDF Trigger

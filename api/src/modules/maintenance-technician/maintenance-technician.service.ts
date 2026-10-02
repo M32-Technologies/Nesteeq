@@ -846,65 +846,6 @@ export const getJobById = async (
     }
   }
 
-<<<<<<< HEAD
-  const assignedDateVal = doc.assignedAt || doc.createdAt || new Date()
-  const createdDateVal = doc.createdAt || new Date()
-  const mappedStatus = mapStatus(doc.status)
-  const mappedPriority = mapPriority(doc.priority)
-  let complaintObj: any =
-    doc.complaint && typeof doc.complaint === "object" ? doc.complaint : null
-
-  if (!complaintObj && (doc.complaint || doc.complaintId)) {
-    const cid = doc.complaint || doc.complaintId
-    if (Types.ObjectId.isValid(cid)) {
-      complaintObj = await Complaint.findById(cid).lean().catch(() => null)
-    }
-  }
-
-  const resolvedImages: string[] = [
-    ...(Array.isArray(complaintObj?.images) ? complaintObj.images : []),
-    ...(Array.isArray(complaintObj?.attachments) ? complaintObj.attachments : []),
-    ...(Array.isArray(doc.images) ? doc.images : []),
-    ...(Array.isArray(doc.attachments) ? doc.attachments : []),
-    ...(complaintObj?.image ? [complaintObj.image] : []),
-    ...(doc.image ? [doc.image] : []),
-  ].filter(Boolean)
-
-  const primaryImage =
-    resolvedImages[0] ||
-    "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&auto=format&fit=crop&q=80"
-
-  return {
-    jobId: doc._id.toString(),
-    complaintInfo: {
-      title: doc.title || complaintObj?.title || "Maintenance Request",
-      description:
-        doc.description ||
-        complaintObj?.description ||
-        "General maintenance and inspection required for this unit.",
-      category: doc.category || complaintObj?.category || "General Maintenance",
-      priority: mappedPriority,
-      status: mappedStatus,
-      createdAt: new Date(createdDateVal).toISOString(),
-      complaintImage: primaryImage,
-      complaintImages: resolvedImages,
-    },
-    locationInfo: {
-      block: doc.apartment || "Block A",
-      flat: doc.flat || "N/A",
-      floor: deriveFloor(doc.flat),
-    },
-    residentInfo: {
-      name: doc.resident || complaintObj?.resident || "Resident",
-      residentType: "Resident",
-      contactNumber: complaintObj?.phone || "+91 98000 00000",
-    },
-    assignmentInfo: {
-      assignedBy: doc.assignedBy || "Facility Manager",
-      assignedDate: new Date(assignedDateVal).toISOString(),
-      currentStatus: mappedStatus,
-    },
-=======
   // Next try Complaint collection
   const complaintDoc: any = await Complaint.findOne(query).lean()
 
@@ -975,7 +916,6 @@ export const getJobById = async (
       },
       expenseInfo,
     }
->>>>>>> fef34cd6bfcc577bd0e799f9a2dbda5ba478ae3e
   }
 
   throw new AppError("Maintenance job not found", 404)
@@ -1005,14 +945,9 @@ export const startJob = async (jobId: string, technicianUserId: string) => {
           createdAt: now,
         },
       },
-<<<<<<< HEAD
-      { returnDocument: "after" }
-    )
-=======
     },
     { new: true }
   )
->>>>>>> fef34cd6bfcc577bd0e799f9a2dbda5ba478ae3e
 
   if (maintJob) {
     if (maintJob.complaint) {

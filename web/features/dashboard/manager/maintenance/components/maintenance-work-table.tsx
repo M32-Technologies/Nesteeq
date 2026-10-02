@@ -231,16 +231,23 @@ export default function MaintenanceWorkTable({
             <p>Loading ongoing work progress...</p>
           </div>
         ) : paginatedOrders.length > 0 ? (
-          <table className="w-full min-w-[1050px] border-collapse text-left">
+          <table className="w-full min-w-[950px] table-fixed border-collapse text-left">
+            <colgroup>
+              <col className="w-[28%]" />
+              <col className="w-[15%]" />
+              <col className="w-[20%]" />
+              <col className="w-[16%]" />
+              <col className="w-[11%]" />
+              <col className="w-[10%]" />
+            </colgroup>
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/80 text-xs font-semibold uppercase text-slate-500">
                 <th className="px-5 py-3.5">Work / Job</th>
                 <th className="px-4 py-3.5">Location</th>
                 <th className="px-4 py-3.5">Assigned Worker</th>
                 <th className="px-4 py-3.5">Status & Progress</th>
-                <th className="px-4 py-3.5">Priority</th>
-                <th className="px-4 py-3.5">Target Timeline</th>
-                <th className="px-5 py-3.5 text-right">Action</th>
+                <th className="px-4 pl-6 py-3.5">Priority</th>
+                <th className="px-4 py-3.5 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
@@ -251,7 +258,7 @@ export default function MaintenanceWorkTable({
                       <span className="font-mono text-xs font-semibold text-[#0F5F45]">
                         {order.jobId}
                       </span>
-                      <p className="font-medium text-slate-900 truncate max-w-[220px]">
+                      <p className="font-medium text-slate-900 truncate">
                         {order.title}
                       </p>
                       <span className="text-xs text-slate-500">
@@ -260,7 +267,7 @@ export default function MaintenanceWorkTable({
                     </div>
                   </td>
 
-                  <td className="px-4 py-4 font-medium text-slate-800">
+                  <td className="px-4 py-4 font-medium text-slate-800 truncate">
                     {order.location}
                   </td>
 
@@ -288,8 +295,8 @@ export default function MaintenanceWorkTable({
                   </td>
 
                   {/* Work Status & Visual Progress Bar */}
-                  <td className="px-4 py-4 w-[190px]">
-                    <div className="space-y-1.5">
+                  <td className="px-4 py-4">
+                    <div className="space-y-1.5 max-w-[145px]">
                       <div className="flex items-center justify-between text-xs">
                         <span
                           className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${stageBadgeStyles[order.stage]}`}
@@ -309,7 +316,7 @@ export default function MaintenanceWorkTable({
                     </div>
                   </td>
 
-                  <td className="px-4 py-4">
+                  <td className="px-4 pl-6 py-4">
                     <span
                       className={`inline-flex rounded-full px-2.5 py-0.5 text-xs ${priorityBadgeStyles[order.priority]}`}
                     >
@@ -317,16 +324,7 @@ export default function MaintenanceWorkTable({
                     </span>
                   </td>
 
-                  <td className="px-4 py-4 text-xs text-slate-600">
-                    <p className="font-medium text-slate-800">
-                      {formatDate(order.estimatedCompletion)}
-                    </p>
-                    <p className="text-slate-400">
-                      Target Completion
-                    </p>
-                  </td>
-
-                  <td className="px-5 py-4 text-right">
+                  <td className="px-4 py-4 text-right">
                     <button
                       type="button"
                       onClick={() => onViewWorkOrder(order)}

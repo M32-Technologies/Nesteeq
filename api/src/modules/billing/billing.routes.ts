@@ -15,6 +15,7 @@ import {
   recordBillPayment,
   updateBill,
   waiveLateFee,
+  downloadReceiptFile,
 } from "./billing.controller.js";
 
 import {
@@ -42,6 +43,7 @@ const router = Router();
 router.use(protect);
 
 router.get("/my-bills", getMyResidentBills);
+router.get("/receipt/:id/download", downloadReceiptFile);
 router.post("/pay-all", zodValidate(payAllResidentBillsSchema), payAllResidentBills);
 router.post("/:id/pay", zodValidate(payResidentBillSchema), payResidentBill);
 

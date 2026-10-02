@@ -9,6 +9,7 @@ import {
   processMaintenancePayout,
   getDefaultersReport,
   getExpenseBreakdownReport,
+  exportTreasurerReportCsv,
 } from "./treasurer.controller.js";
 import {
   getTreasurerDashboardSchema,
@@ -71,6 +72,11 @@ router.get(
 router.get(
   "/reports/expense-breakdown",
   getExpenseBreakdownReport
+);
+
+router.get(
+  "/reports/export-csv",
+  exportTreasurerReportCsv
 );
 
 export default router;

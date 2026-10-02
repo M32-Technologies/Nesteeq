@@ -39,7 +39,6 @@ import { TechnicianSelect } from "@/features/dashboard/facility/shared/component
 import { ComplaintExpenseCard } from "@/features/dashboard/facility/complaints/components/complaint-expense-card"
 import { ComplaintMaintenanceSection } from "@/features/dashboard/facility/complaints/components/complaint-maintenance-section"
 
-<<<<<<< HEAD
 function getMediaUrl(url: string) {
   if (!url) return ""
   if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("blob:")) {
@@ -48,9 +47,8 @@ function getMediaUrl(url: string) {
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:6001"
   return `${baseUrl.replace(/\/$/, "")}/${url.replace(/^\//, "")}`
 }
-=======
+
 export type ComplaintDrawerMode = "details" | "assign" | "edit" | "status"
->>>>>>> fef34cd6bfcc577bd0e799f9a2dbda5ba478ae3e
 
 export function ComplaintDetailsDrawer({
   open,
@@ -183,92 +181,6 @@ export function ComplaintDetailsDrawer({
                 )}
               </section>
 
-<<<<<<< HEAD
-          {(() => {
-            const complaintImages = [
-              ...(Array.isArray(complaint.images) ? complaint.images : []),
-              ...(Array.isArray(complaint.attachments) ? complaint.attachments : []),
-            ].filter(Boolean)
-
-            if (complaintImages.length === 0) return null
-
-            return (
-              <section className="border-b border-[#E8EDF2] py-5">
-                <h3 className="text-[15px] font-semibold text-[#111111] mb-3">
-                  Attached Photos ({complaintImages.length})
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {complaintImages.map((img, idx) => {
-                    const resolved = getMediaUrl(img)
-                    return (
-                      <a
-                        key={idx}
-                        href={resolved}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group relative block aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-50 transition-all hover:ring-2 hover:ring-primary/50"
-                      >
-                        <img
-                          src={resolved}
-                          alt={`Complaint photo ${idx + 1}`}
-                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        />
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center">
-                          <span className="opacity-0 group-hover:opacity-100 text-[11px] font-medium text-white bg-black/70 px-2 py-1 rounded shadow-sm transition-opacity">
-                            View full
-                          </span>
-                        </div>
-                      </a>
-                    )
-                  })}
-                </div>
-              </section>
-            )
-          })()}
-
-          <section className="border-b border-[#E8EDF2] py-5">
-            <h3 className="text-[15px] font-semibold text-[#111111]">
-              Complaint Information
-            </h3>
-            <div className="mt-4">
-              <InfoGrid
-                items={[
-                  {
-                    label: "Complaint ID",
-                    value: complaint._id,
-                  },
-                  {
-                    label: "Resident",
-                    value: formatId(typeof complaint.residentId === "object" ? complaint.residentId?.name : complaint.residentId),
-                  },
-                  {
-                    label: "Category",
-                    value: formatLabel(complaint.category),
-                  },
-                  {
-                    label: "Assigned technician",
-                    value: (() => {
-                      const staff = typeof complaint.assignedStaff === "object" ? complaint.assignedStaff : null
-                      const to = typeof complaint.assignedTo === "object" ? complaint.assignedTo : null
-                      const techName =
-                        staff?.name ||
-                        staff?.fullName ||
-                        complaint.assignedTechnicianName ||
-                        to?.name ||
-                        to?.fullName
-                      return techName || "Not assigned"
-                    })(),
-                  },
-                  {
-                    label: "Created",
-                    value: formatDate(complaint.createdAt),
-                  },
-                  {
-                    label: "Updated",
-                    value: formatDate(complaint.updatedAt),
-                  },
-                ]}
-=======
               <section className="border-b border-[#E8EDF2] pb-5">
                 <h3 className="text-[15px] font-semibold text-[#111111]">
                   Complaint Information
@@ -332,30 +244,47 @@ export function ComplaintDetailsDrawer({
               </section>
 
               {/* Attached Photos / Evidence */}
-              {complaint.attachments && complaint.attachments.length > 0 && (
-                <section className="border-b border-[#E8EDF2] pb-5">
-                  <h3 className="text-[15px] font-semibold text-[#111111]">
-                    Attached Photos
-                  </h3>
-                  <div className="mt-3 flex flex-wrap gap-3">
-                    {complaint.attachments.map((url, idx) => (
-                      <a
-                        key={idx}
-                        href={url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="group relative flex size-20 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 transition hover:border-[#07584F]"
-                      >
-                        <img
-                          src={url}
-                          alt={`Evidence ${idx + 1}`}
-                          className="size-full object-cover transition group-hover:scale-105"
-                        />
-                      </a>
-                    ))}
-                  </div>
-                </section>
-              )}
+              {(() => {
+                const complaintImages = [
+                  ...(Array.isArray(complaint.images) ? complaint.images : []),
+                  ...(Array.isArray(complaint.attachments) ? complaint.attachments : []),
+                ].filter(Boolean)
+
+                if (complaintImages.length === 0) return null
+
+                return (
+                  <section className="border-b border-[#E8EDF2] py-5">
+                    <h3 className="text-[15px] font-semibold text-[#111111] mb-3">
+                      Attached Photos ({complaintImages.length})
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {complaintImages.map((img, idx) => {
+                        const resolved = getMediaUrl(img)
+                        return (
+                          <a
+                            key={idx}
+                            href={resolved}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="group relative block aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-50 transition-all hover:ring-2 hover:ring-primary/50"
+                          >
+                            <img
+                              src={resolved}
+                              alt={`Complaint photo ${idx + 1}`}
+                              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center">
+                              <span className="opacity-0 group-hover:opacity-100 text-[11px] font-medium text-white bg-black/70 px-2 py-1 rounded shadow-sm transition-opacity">
+                                View full
+                              </span>
+                            </div>
+                          </a>
+                        )
+                      })}
+                    </div>
+                  </section>
+                )
+              })()}
 
               {/* Linked Maintenance Section */}
               <ComplaintMaintenanceSection
@@ -365,7 +294,6 @@ export function ComplaintDetailsDrawer({
                 canCreateMaintenance={canCreateMaintenance}
                 onCreateMaintenance={onCreateMaintenance}
                 isCreatingMaintenance={isCreatingMaintenance}
->>>>>>> fef34cd6bfcc577bd0e799f9a2dbda5ba478ae3e
               />
 
               {/* Submitted Expense (if any) */}

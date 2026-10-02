@@ -269,15 +269,17 @@ export default function WorkProgressDrawer({
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-slate-500">
-                    <Calendar size={13} className="text-slate-400" />
-                    Target Completion:
-                  </span>
-                  <span className="font-medium text-slate-800">
-                    {formatDate(workOrder.estimatedCompletion)}
-                  </span>
-                </div>
+                {workOrder.estimatedCompletion && (
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-slate-500">
+                      <Calendar size={13} className="text-slate-400" />
+                      Target Completion:
+                    </span>
+                    <span className="font-medium text-slate-800">
+                      {formatDate(workOrder.estimatedCompletion)}
+                    </span>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-1.5 text-slate-500">

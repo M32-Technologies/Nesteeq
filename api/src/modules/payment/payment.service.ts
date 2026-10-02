@@ -357,3 +357,42 @@ export const reversePaymentService = async (
     await session.endSession();
   }
 };
+
+export const exportPaymentsCsvService = async (filters: PaymentFilters) => {
+  const payments = await getPaymentsService({ ...filters, limit: 10000 });
+
+  const headers = [
+    "Receipt Number",
+    "Date",
+    "Flat",
+    "Resident Name",
+    "Payment Purpose / Bill",
+    "Payment Mode",
+    "Reference / UTR",
+    "Amount (INR)",
+    "Status",
+    "Reversal Reason",
+  ];
+
+  const escapeCsv = (val: unknown) => {
+    if (val === null || val === undefined) return '""';
+    return `"${String(val).replace(/"/g, '""')}"`;
+  };
+
+  const rows = payments.map((p) => [
+    escapeCsv(p.receiptNumber || `REC-${String(p._id).slice(-6).toUpperCase()}`),
+    escapeCsv(new Date(p.paidAt).toLocaleString("en-IN")),
+    escapeCsv(p.unitName || (p.flatNumber ? `Flat ${p.flatNumber}` : "Unit")),
+    escapeCsv(p.residentName || "Resident"),
+    escapeCsv(p.billTitle || "Maintenance"),
+    escapeCsv(p.paymentMethod || p.source),
+    escapeCsv(p.referenceNo || ""),
+    p.amount,
+    p.reversed ? "REVERSED" : "COMPLETED",
+    escapeCsv(p.reversalReason || ""),
+  ]);
+
+  const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+  const filename = `Nesteeq_Collection_Register_${new Date().toISOString().split("T")[0]}.csv`;
+  return { csvContent, filename };
+};
