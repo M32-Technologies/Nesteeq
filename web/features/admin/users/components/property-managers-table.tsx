@@ -180,8 +180,7 @@ export default function PropertyManagersTable({
       const email = (user.email || "").toLowerCase()
       const phone = (user.phone || "").toLowerCase()
       const role = (user.role || "").toLowerCase()
-      const apt = (user.apartmentId || "").toLowerCase()
-      const flat = (user.flatId || "").toLowerCase()
+      const apt = (user.apartmentName || user.apartmentId || "").toLowerCase()
       const query = searchTerm.toLowerCase().trim()
 
       const matchesSearch =
@@ -190,8 +189,7 @@ export default function PropertyManagersTable({
         email.includes(query) ||
         phone.includes(query) ||
         role.includes(query) ||
-        apt.includes(query) ||
-        flat.includes(query)
+        apt.includes(query)
 
       if (!matchesSearch) return false
 
@@ -495,20 +493,16 @@ export default function PropertyManagersTable({
 
                       {/* Assigned Property */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        {user.apartmentId ? (
-                          <div className="flex flex-col gap-0.5">
-                            <span className="inline-flex items-center gap-1.5 rounded-lg border border-[#EEF1EF] bg-[#F8FAF8] px-2.5 py-1 text-xs font-medium text-[#334155] w-fit">
-                              <Building2 className="h-3 w-3 text-[#07584F]" />
-                              <span className="font-mono text-[11px] truncate max-w-[120px]">
-                                {user.apartmentId}
-                              </span>
+                        {user.apartmentName || user.apartmentId ? (
+                          <span
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-[#EEF1EF] bg-[#F8FAF8] px-2.5 py-1 text-xs font-medium text-[#1E293B]"
+                            title={user.apartmentName || user.apartmentId || ""}
+                          >
+                            <Building2 className="h-3.5 w-3.5 text-[#07584F] shrink-0" />
+                            <span className="truncate max-w-[150px]">
+                              {user.apartmentName || user.apartmentId}
                             </span>
-                            {user.flatId && (
-                              <span className="text-[10.5px] text-[#64748B] pl-1 font-mono">
-                                Flat: {user.flatId}
-                              </span>
-                            )}
-                          </div>
+                          </span>
                         ) : (
                           <span className="inline-flex items-center rounded-md bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-500">
                             Unassigned

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { Search, Bell, ChevronDown, LogOut, Settings, Menu, Shield, Home } from "lucide-react"
+import { Bell, ChevronDown, LogOut, Settings, Menu, Shield, Home } from "lucide-react"
 import { toast } from "sonner"
 
 import { authClient, useSession } from "@/lib/auth-client"
@@ -97,18 +97,8 @@ export default function AdminNavbar({ onMenuClick }: AdminNavbarProps) {
         </div>
       </div>
 
-      {/* 2. RIGHT: Normal Search Bar + Notification Bell + Profile */}
+      {/* 2. RIGHT: Home Button + Notification Bell + Profile */}
       <div className="flex items-center gap-2.5 sm:gap-3 shrink-0 ml-4">
-        {/* Normal Search Bar (Requested by user: "the serch bar normal type ok") */}
-        <div className="relative hidden md:flex items-center w-[200px] lg:w-[240px]">
-          <Search className="pointer-events-none absolute left-3.5 h-3.5 w-3.5 text-[#94A3B8]" />
-          <input
-            type="text"
-            placeholder="Search..."
-            aria-label="Search"
-            className="h-10 w-full rounded-2xl border border-slate-200/80 bg-white pl-9 pr-3.5 text-xs text-[#0F172A] placeholder:text-[#94A3B8] shadow-2xs outline-none focus:border-[#07584F] focus:ring-1 focus:ring-[#07584F] transition-all"
-          />
-        </div>
 
         {/* Go to Home Screen Button */}
         <Link

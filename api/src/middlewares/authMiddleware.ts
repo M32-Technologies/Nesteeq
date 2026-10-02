@@ -3,6 +3,9 @@ import { auth } from "../lib/auth.js";
 import { fromNodeHeaders } from "better-auth/node";
 import { AppError } from "../utils/AppError.js";
 import { catchAsync } from "../utils/catchAsync.js";
+import { verifyApartmentActive } from "./apartmentStatusMiddleware.js";
+
+export { requireActiveApartment } from "./apartmentStatusMiddleware.js";
 
 type ApartmentIdValue = | string | { toString: () => string } | null | undefined;
 
@@ -26,12 +29,13 @@ export const protect = catchAsync(async (req: Request, res: Response, next: Next
     headers: fromNodeHeaders(req.headers),
   });
 
-
   if (!session) {
     throw new AppError("Authentication required", 401);
   }
-  req.user = session.user
-  req.session = session.session
+  req.user = session.user;
+  req.session = session.session;
+
+  await verifyApartmentActive(req);
 
   next();
 });

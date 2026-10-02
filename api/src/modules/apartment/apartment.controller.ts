@@ -1,5 +1,7 @@
 import { Request , Response } from "express";
 import { catchAsync } from "../../utils/catchAsync.js";
+import { AppError } from "../../utils/AppError.js";
+import { Apartment } from "./apartment.model.js";
 import {
     createApartment,
     getCurrentApartment,
@@ -56,3 +58,41 @@ export const updateCurrentApartmentHandler = catchAsync(
         })
     }
 )
+
+export const getApartmentStatusHandler = catchAsync(
+    async (req: Request, res: Response) => {
+        let apartmentId = req.user?.apartmentId ?? undefined;
+        if (!apartmentId && req.user?.role === "property_manager" && req.user?.id) {
+            const apt = await Apartment.findOne({ managerId: req.user.id }).select("_id");
+            if (apt) apartmentId = apt._id.toString();
+        }
+
+        if (!apartmentId) {
+            return res.status(200).json({
+                success: true,
+                data: {
+                    hasApartment: false,
+                    status: null,
+                    name: null,
+                    inactiveReason: null,
+                }
+            });
+        }
+
+        const apartment = await Apartment.findById(apartmentId).select("_id name status inactiveReason");
+        if (!apartment) {
+            throw new AppError("Apartment not found", 404);
+        }
+
+        res.status(200).json({
+            success: true,
+            data: {
+                hasApartment: true,
+                apartmentId: apartment._id.toString(),
+                name: apartment.name,
+                status: apartment.status,
+                inactiveReason: apartment.inactiveReason ?? null,
+            }
+        });
+    }
+);

@@ -32,6 +32,34 @@ api.interceptors.response.use(
       }
     }
 
+    // Intercept APARTMENT_INACTIVE error code
+    const errorData = error.response?.data as {
+      code?: string;
+      message?: string;
+      details?: {
+        apartmentId?: string;
+        apartmentName?: string;
+        status?: string;
+        inactiveReason?: string;
+      };
+    } | undefined;
+
+    if (
+      (error.response?.status === 403 || error.response?.status === 400) &&
+      errorData?.code === "APARTMENT_INACTIVE" &&
+      typeof window !== "undefined"
+    ) {
+      window.dispatchEvent(
+        new CustomEvent("nesteeq:apartment_inactive", {
+          detail: {
+            apartmentName: errorData.details?.apartmentName,
+            reason: errorData.details?.inactiveReason || errorData.message,
+            apartmentId: errorData.details?.apartmentId,
+          },
+        })
+      );
+    }
+
     // Populate human-readable error message from backend API response
     const backendMessage =
       error.response?.data?.message || error.response?.data?.error;

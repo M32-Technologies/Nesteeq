@@ -10,7 +10,7 @@ export const getAllApartmentsQueryObjectSchema = z.object({
     .number()
     .int()
     .min(1)
-    .max(100)
+    .max(1000)
     .default(10),
   search: z
     .string()
@@ -34,7 +34,8 @@ export const getAllApartmentsQueryObjectSchema = z.object({
 
 export const updateStatusSchema = z.object({
   body: z.object({
-    status: z.enum(["active", "inactive"])
+    status: z.enum(["active", "inactive"]),
+    reason: z.string().trim().max(500).optional(),
   })
 })
 export const getAllApartmentsQuerySchema = z.object({

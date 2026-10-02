@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useSession } from "@/lib/auth-client";
+import { authClient, useSession } from "@/lib/auth-client";
 import { getSocket, disconnectSocket } from "@/lib/socket";
 import { notificationQueryKeys } from "../hooks/use-notifications";
 import type { NotificationItem, UnreadNotificationCountResponse } from "../types";
@@ -15,6 +15,8 @@ import type { NotificationItem, UnreadNotificationCountResponse } from "../types
  *    - Updates the Security UI instantly without page refresh (alerts table, summary cards, activity).
  *    - Increments the unread notification badge count in cache.
  *    - Displays a direct toast notification showing the emergency and flat details.
+ * 3. When a user is suspended / force logged out by an admin:
+ *    - Immediately disconnects socket, revokes local auth session, and redirects to /login.
  */
 export function NotificationSocketListener() {
   const { data: session } = useSession();
@@ -25,6 +27,41 @@ export function NotificationSocketListener() {
     const user = session?.user;
     if (!user?.id) {
       disconnectSocket();
+      return;
+    }
+
+    const handleForceLogout = async (data?: {
+      reason?: string;
+      banned?: boolean;
+    }) => {
+      disconnectSocket();
+
+      const reason =
+        data?.reason ||
+        "Your account has been suspended by an administrator. Please contact support.";
+
+      toast.error("Account Suspended", {
+        id: "account-suspended",
+        description: reason,
+        duration: 10000,
+      });
+
+      try {
+        await authClient.signOut();
+      } catch (err) {
+        console.error("Error signing out during forced logout:", err);
+      }
+
+      if (typeof window !== "undefined") {
+        window.location.assign("/login");
+      }
+    };
+
+    // If session already marks user as banned, force logout immediately
+    if ((user as { banned?: boolean })?.banned) {
+      handleForceLogout({
+        reason: "Your account has been suspended by an administrator.",
+      });
       return;
     }
 
@@ -122,15 +159,82 @@ export function NotificationSocketListener() {
       queryClient.invalidateQueries({ queryKey: ["resident", "alerts"] });
     };
 
+    const handleApartmentDeactivated = (data: {
+      apartmentId?: string;
+      status?: string;
+      reason?: string;
+      apartmentName?: string;
+    }) => {
+      if (userRole === "admin" || userRole === "super_admin") {
+        return;
+      }
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("nesteeq:apartment_inactive", {
+            detail: {
+              apartmentName: data?.apartmentName,
+              reason: data?.reason,
+              apartmentId: data?.apartmentId,
+            },
+          })
+        );
+      }
+    };
+
+    const handleApartmentStatusChanged = (data: {
+      apartmentId?: string;
+      status?: string;
+      reason?: string;
+      apartmentName?: string;
+    }) => {
+      if (data?.status === "inactive") {
+        handleApartmentDeactivated(data);
+      }
+    };
+
+    // Tab visibility fallback: check if user session was revoked while tab was hidden
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === "visible") {
+        try {
+          const { data: currentSession } = await authClient.getSession();
+          if (!currentSession?.user) {
+            if (user?.id) {
+              handleForceLogout({
+                reason: "Your session has ended. Please log in again.",
+              });
+            }
+          } else if ((currentSession.user as { banned?: boolean })?.banned) {
+            handleForceLogout({
+              reason: "Your account has been suspended by an administrator.",
+            });
+          }
+        } catch {
+          // ignore transient network check errors
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     socket.on("notification", handleIncomingNotification);
     socket.on("sos_alert", handleSosAlert);
     socket.on("sos_alert_updated", handleSosAlertUpdated);
+    socket.on("apartment_deactivated", handleApartmentDeactivated);
+    socket.on("apartment:status_changed", handleApartmentStatusChanged);
+    socket.on("user:force_logout", handleForceLogout);
+    socket.on("user_banned", handleForceLogout);
 
     return () => {
       socket.off("connect", joinRooms);
       socket.off("notification", handleIncomingNotification);
       socket.off("sos_alert", handleSosAlert);
       socket.off("sos_alert_updated", handleSosAlertUpdated);
+      socket.off("apartment_deactivated", handleApartmentDeactivated);
+      socket.off("apartment:status_changed", handleApartmentStatusChanged);
+      socket.off("user:force_logout", handleForceLogout);
+      socket.off("user_banned", handleForceLogout);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [session?.user, queryClient]);
 

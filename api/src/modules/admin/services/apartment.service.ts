@@ -3,9 +3,15 @@ import { PipelineStage, Types } from "mongoose";
 import { GetAllApartmentsQuery, ApartmentAnalyticsQuery } from "../validation/apartment.validation.js";
 import { Apartment } from "../../apartment/apartment.model.js";
 import { Subscription } from "../../subscription/subscription.model.js";
+import { Staff } from "../../staff/staff.model.js";
+import { emailService } from "../../../services/EmailService.js";
+import { env } from "../../../config/env.js";
+import { ObjectId } from "mongodb";
 import { getAuthDB } from "../../../config/auth-db.js";
 import { escapeRegExp } from "../../../utils/regex.js";
 import { AuthUserDoc, ApartmentStats, MonthlyRegistration, ApartmentAnalyticsData } from "../types.js";
+import { emitApartmentStatusChanged } from "../../../socket/socket.js";
+import { getCurrentApartment } from "../../apartment/apartment.service.js";
 
 export const getAllApartment = async (query: GetAllApartmentsQuery) => {
     if (!query) {
@@ -101,20 +107,31 @@ export const getAllApartment = async (query: GetAllApartmentsQuery) => {
 
 
 export const getSingleApartment = async (apartmentId: string) => {
-    if (!apartmentId || !Types.ObjectId.isValid(apartmentId)) {
-        throw new AppError("Invalid apartment ID", 400);
+    const apartment = await getCurrentApartment(apartmentId);
+    let user: AuthUserDoc | null = null;
+    const authDb = getAuthDB();
+
+    if (apartment.managerId) {
+        const managerFilters: Record<string, unknown>[] = [{ id: apartment.managerId }];
+        if (ObjectId.isValid(apartment.managerId)) {
+            managerFilters.push({ _id: new ObjectId(apartment.managerId) });
+        }
+        user = await authDb.collection<AuthUserDoc>("user").findOne(
+            { $or: managerFilters },
+            {
+                projection: {
+                    password: 0,
+                },
+            }
+        );
     }
 
-    const apartment = await Apartment.findById(apartmentId);
-    if (!apartment) {
-        throw new AppError("Apartment not found", 404);
-    }
-    let managerId = new Types.ObjectId(apartment.managerId)
-    let user: AuthUserDoc | null = null;
-    if (apartment.managerId) {
-        const authDb = getAuthDB();
+    if (!user && apartment._id) {
         user = await authDb.collection<AuthUserDoc>("user").findOne(
-            { _id: managerId },
+            {
+                apartmentId: apartment._id.toString(),
+                role: { $in: ["property_manager", "propertymanager", "manager"] },
+            },
             {
                 projection: {
                     password: 0,
@@ -134,7 +151,76 @@ export const getSingleApartment = async (apartmentId: string) => {
     };
 };
 
-export const updateStatusApartment = async (apartmentId: string, status: string) => {
+const notifyApartmentManagersStatusChange = async (
+    apartment: { _id: Types.ObjectId; managerId: string; name: string },
+    newStatus: "active" | "inactive",
+    reason?: string
+) => {
+    try {
+        const candidateUserIds = new Set<string>();
+        if (apartment.managerId) {
+            candidateUserIds.add(apartment.managerId.toString());
+        }
+        try {
+            const staffManagers = await Staff.find({
+                apartmentId: apartment._id,
+                role: "property_manager",
+                status: "active",
+            }).select("userId").lean();
+
+            for (const staff of staffManagers) {
+                if (staff.userId) {
+                    candidateUserIds.add(staff.userId.toString());
+                }
+            }
+        } catch (err) {
+            console.error("[notifyApartmentManagersStatusChange] Error querying staff property managers:", err);
+        }
+
+        if (candidateUserIds.size === 0) {
+            return;
+        }
+        const authDb = getAuthDB();
+        const userFilters: Record<string, unknown>[] = [];
+        for (const userId of candidateUserIds) {
+            userFilters.push({ id: userId });
+            if (ObjectId.isValid(userId)) {
+                userFilters.push({ _id: new ObjectId(userId) });
+            }
+        }
+
+        const users = await authDb
+            .collection<AuthUserDoc>("user")
+            .find({ $or: userFilters }, { projection: { email: 1, name: 1 } })
+            .toArray();
+
+        for (const user of users) {
+            if (!user.email) continue;
+            const managerName = user.name || "Property Manager";
+
+            try {
+                if (newStatus === "inactive") {
+                    await emailService.sendApartmentDeactivated(user.email, {
+                        managerName,
+                        apartmentName: apartment.name,
+                        reason,
+                    });
+                } else if (newStatus === "active") {
+                    await emailService.sendApartmentReactivated(user.email, {
+                        managerName,
+                        apartmentName: apartment.name,
+                    });
+                }
+            } catch (err) {
+                console.error(`[notifyApartmentManagersStatusChange] Failed to send ${newStatus} email to manager ${user.email}:`, err);
+            }
+        }
+    } catch (error) {
+        console.error("[notifyApartmentManagersStatusChange] Error processing manager notifications:", error);
+    }
+};
+
+export const updateStatusApartment = async (apartmentId: string, status: string, reason?: string) => {
     
     if (!apartmentId || !Types.ObjectId.isValid(apartmentId)) {
         throw new AppError("Invalid apartment ID", 400);
@@ -154,7 +240,31 @@ export const updateStatusApartment = async (apartmentId: string, status: string)
     }
 
     apartment.status = status;
+    if (status === "inactive") {
+        apartment.inactiveReason = reason?.trim() || "Temporarily deactivated by administrator.";
+    } else if (status === "active") {
+        apartment.inactiveReason = undefined;
+    }
     await apartment.save();
+
+    emitApartmentStatusChanged(apartment._id.toString(), {
+        apartmentId: apartment._id.toString(),
+        status: status as "active" | "inactive",
+        reason: apartment.inactiveReason,
+        apartmentName: apartment.name,
+    });
+
+    if (status === "inactive" || status === "active") {
+        void notifyApartmentManagersStatusChange(
+            {
+                _id: apartment._id,
+                managerId: apartment.managerId,
+                name: apartment.name,
+            },
+            status as "active" | "inactive",
+            apartment.inactiveReason
+        );
+    }
 
     return apartment.toObject();
 };

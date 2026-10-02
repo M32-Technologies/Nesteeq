@@ -35,6 +35,7 @@ export type ApartmentItem = {
   contactNumber: string
   emergencyContact?: string
   status: "pending_payment" | "active" | "inactive"
+  inactiveReason?: string
   createdAt: string | Date
   updatedAt: string | Date
   currentSubscription?: ApartmentSubscription
