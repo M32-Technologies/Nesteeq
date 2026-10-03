@@ -16,6 +16,8 @@ import type { GetMaintenanceQuery } from "./maintenance.schema.js";
 import type { AuthenticatedMaintenanceUser } from "./maintenance.service.js";
 import type { MaintenanceDocument } from "./maintenance.model.js";
 
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const normalizeOptionalString = (value: unknown): string | undefined => {
   if (value === null || value === undefined) return undefined;
   let str: string;
@@ -188,6 +190,36 @@ const applySharedFilters = (
 
   if (query.costStatus) {
     filter["costReview.status"] = query.costStatus;
+  }
+
+  if (query.search && query.search.trim()) {
+    const rawSearch = query.search.trim();
+    const searchRegex = new RegExp(escapeRegex(rawSearch), "i");
+    const orConditions: Array<Record<string, unknown>> = [
+      { title: searchRegex },
+      { description: searchRegex },
+      { location: searchRegex },
+      { category: searchRegex },
+      { priority: searchRegex },
+      { status: searchRegex },
+      { assignedWorkerName: searchRegex },
+    ];
+
+    const cleanId = rawSearch.toUpperCase().startsWith("JOB-")
+      ? rawSearch.slice(4).trim()
+      : rawSearch;
+    if (Types.ObjectId.isValid(cleanId)) {
+      orConditions.push({ _id: new Types.ObjectId(cleanId) });
+    }
+
+    if (Array.isArray(filter.$and)) {
+      filter.$and.push({ $or: orConditions });
+    } else if (filter.$or) {
+      filter.$and = [{ $or: filter.$or }, { $or: orConditions }];
+      delete filter.$or;
+    } else {
+      filter.$or = orConditions;
+    }
   }
 };
 

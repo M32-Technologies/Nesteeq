@@ -57,6 +57,7 @@ export interface GetManagerBillsParams {
   residentId?: string;
   unitId?: string;
   status?: BillStatusFilter;
+  search?: string;
 }
 
 export interface GetManagerPaymentsParams {
@@ -64,4 +65,5 @@ export interface GetManagerPaymentsParams {
   residentId?: string;
   source?: PaymentSourceFilter;
   limit?: number;
+  search?: string;
 }

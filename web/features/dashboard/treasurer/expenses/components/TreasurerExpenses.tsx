@@ -133,7 +133,15 @@ export default function TreasurerExpenses() {
   const [payoutRef, setPayoutRef] = useState("");
   const [payoutNotes, setPayoutNotes] = useState("");
   const [maintenanceSearch, setMaintenanceSearch] = useState("");
+  const [debouncedMaintenanceSearch, setDebouncedMaintenanceSearch] = useState("");
   const [maintenancePage, setMaintenancePage] = useState(1);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedMaintenanceSearch(maintenanceSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [maintenanceSearch]);
 
   // Sync tab with URL parameter if opened with ?tab=maintenance_payouts
   useEffect(() => {
@@ -186,7 +194,14 @@ export default function TreasurerExpenses() {
   ]);
 
   const expensesQuery = useQuery({
-    queryKey: ["treasurer", "expenses", debouncedSearch, statusFilter, categoryFilter],
+    queryKey: [
+      "treasurer",
+      "expenses",
+      debouncedSearch,
+      statusFilter,
+      categoryFilter,
+      currentPage,
+    ],
     queryFn: () =>
       getExpenses({
         search: debouncedSearch.trim() || undefined,
@@ -198,6 +213,8 @@ export default function TreasurerExpenses() {
           categoryFilter === "ALL"
             ? undefined
             : (categoryFilter as ExpenseCategory),
+        page: currentPage,
+        limit: ITEMS_PER_PAGE,
       }),
   });
 
@@ -207,8 +224,11 @@ export default function TreasurerExpenses() {
   });
 
   const maintenancePayoutsQuery = useQuery({
-    queryKey: ["treasurer", "maintenance-payouts"],
-    queryFn: () => getMaintenancePayouts(),
+    queryKey: ["treasurer", "maintenance-payouts", debouncedMaintenanceSearch],
+    queryFn: () =>
+      getMaintenancePayouts({
+        search: debouncedMaintenanceSearch.trim() || undefined,
+      }),
   });
 
   const maintenancePayouts = maintenancePayoutsQuery.data ?? [];
@@ -306,7 +326,19 @@ export default function TreasurerExpenses() {
     await createMutation.mutateAsync(newExpense);
   };
 
-  const expenses = expensesQuery.data ?? [];
+  const expensesData = expensesQuery.data;
+  const expenses: Expense[] = useMemo(() => {
+    if (!expensesData) return [];
+    if (Array.isArray(expensesData)) return expensesData;
+    return expensesData.expenses || [];
+  }, [expensesData]);
+
+  const totalExpensesCount = useMemo(() => {
+    if (!expensesData) return 0;
+    if (Array.isArray(expensesData)) return expensesData.length;
+    return expensesData.pagination?.total ?? expenses.length;
+  }, [expensesData, expenses.length]);
+
   const summary = summaryQuery.data ?? {
     totalExpenses: 0,
     approvedExpenses: 0,
@@ -342,12 +374,14 @@ export default function TreasurerExpenses() {
   ];
 
   // Paginated Expenses
-  const totalPages = Math.ceil(expenses.length / ITEMS_PER_PAGE) || 1;
+  const totalPages = useMemo(() => {
+    if (!expensesData) return 1;
+    if (Array.isArray(expensesData))
+      return Math.ceil(expensesData.length / ITEMS_PER_PAGE) || 1;
+    return expensesData.pagination?.totalPages ?? 1;
+  }, [expensesData]);
   const validCurrentPage = Math.min(currentPage, totalPages);
-  const paginatedExpenses = useMemo(() => {
-    const start = (validCurrentPage - 1) * ITEMS_PER_PAGE;
-    return expenses.slice(start, start + ITEMS_PER_PAGE);
-  }, [expenses, validCurrentPage]);
+  const paginatedExpenses = expenses;
 
   // Keep pagination in sync when data changes
   useEffect(() => {
@@ -357,19 +391,7 @@ export default function TreasurerExpenses() {
   }, [currentPage, totalPages]);
 
   // Filtered & Paginated Maintenance Payouts
-  const filteredMaintenancePayouts = useMemo(() => {
-    return maintenancePayouts.filter((item) => {
-      if (!maintenanceSearch.trim()) return true;
-      const q = maintenanceSearch.toLowerCase();
-      return (
-        item.title.toLowerCase().includes(q) ||
-        (item.technicianName && item.technicianName.toLowerCase().includes(q)) ||
-        (item.category && item.category.toLowerCase().includes(q)) ||
-        (item.flatNumber && item.flatNumber.toLowerCase().includes(q)) ||
-        (item.reviewedByName && item.reviewedByName.toLowerCase().includes(q))
-      );
-    });
-  }, [maintenancePayouts, maintenanceSearch]);
+  const filteredMaintenancePayouts = maintenancePayouts;
 
   const totalMaintenancePages =
     Math.ceil(filteredMaintenancePayouts.length / ITEMS_PER_PAGE) || 1;
@@ -387,7 +409,7 @@ export default function TreasurerExpenses() {
 
   // CSV Export
   const handleExportCSV = async () => {
-    if (expenses.length === 0) {
+    if (totalExpensesCount === 0) {
       toast.error("No expenses to export.");
       return;
     }
@@ -961,18 +983,30 @@ export default function TreasurerExpenses() {
                               ) : null}
 
                               {expense.status === "APPROVED" ? (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setPayExpense(expense);
-                                    setPaymentMethod("Bank Transfer");
-                                    setPaymentRefNo("");
-                                    setPaymentDate(getTodayDateString());
-                                  }}
-                                  className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-700"
-                                >
-                                  Mark Paid
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setPayExpense(expense);
+                                      setPaymentMethod("Bank Transfer");
+                                      setPaymentRefNo("");
+                                      setPaymentDate(getTodayDateString());
+                                    }}
+                                    className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-700"
+                                  >
+                                    Mark Paid
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setRejectReason("");
+                                      setRejectExpense(expense);
+                                    }}
+                                    className="rounded-md bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 border border-red-200 hover:bg-red-100"
+                                  >
+                                    Reject
+                                  </button>
+                                </>
                               ) : null}
 
                               {expense.status === "PAID" ? (
@@ -996,12 +1030,12 @@ export default function TreasurerExpenses() {
                 )}
 
                 {/* Pagination */}
-                {expenses.length > ITEMS_PER_PAGE ? (
+                {totalExpensesCount > ITEMS_PER_PAGE ? (
                   <div className="flex items-center justify-between border-t border-slate-100 pt-4 text-xs text-slate-500">
                     <p>
                       Showing{" "}
                       <span className="font-semibold text-slate-800">
-                        {expenses.length === 0
+                        {totalExpensesCount === 0
                           ? 0
                           : (validCurrentPage - 1) * ITEMS_PER_PAGE + 1}
                       </span>{" "}
@@ -1009,12 +1043,12 @@ export default function TreasurerExpenses() {
                       <span className="font-semibold text-slate-800">
                         {Math.min(
                           validCurrentPage * ITEMS_PER_PAGE,
-                          expenses.length
+                          totalExpensesCount
                         )}
                       </span>{" "}
                       of{" "}
                       <span className="font-semibold text-slate-800">
-                        {expenses.length}
+                        {totalExpensesCount}
                       </span>{" "}
                       expenses
                     </p>

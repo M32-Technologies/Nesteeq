@@ -202,13 +202,38 @@ export const broadcastEmergency = async (
   }
 };
 
-export const getResidentFeed = async (): Promise<AnnouncementItem[]> => {
+export interface PaginatedResidentFeedResponse {
+  announcements: AnnouncementItem[];
+  counts: {
+    all: number;
+    maintenance: number;
+    emergency: number;
+    events: number;
+    society: number;
+  };
+  criticalNotice: AnnouncementItem | null;
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  allNoticesCount: number;
+}
+
+export const getResidentFeed = async (params?: {
+  tab?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}): Promise<PaginatedResidentFeedResponse | AnnouncementItem[]> => {
   try {
-    const response = await api.get<ApiResponse<AnnouncementItem[]>>(
-      "/api/v1/announcements/resident-feed"
+    const response = await api.get<ApiResponse<any>>(
+      "/api/v1/announcements/resident-feed",
+      { params }
     );
 
-    if (response.data.success && Array.isArray(response.data.data)) {
+    if (response.data.success && response.data.data) {
       return response.data.data;
     }
   } catch {

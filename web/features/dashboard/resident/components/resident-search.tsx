@@ -21,7 +21,10 @@ import { useResidentDashboard } from "../hooks/use-resident-dashboard";
 import {
   fetchResidentBills,
   fetchResidentParkingInfo,
+  fetchResidentComplaints,
+  fetchResidentGuestPasses,
 } from "../api/resident-dashboard.api";
+import { getResidentFeed } from "@/features/announcements/api/announcements.api";
 
 export type SearchCategory =
   | "ALL"
@@ -60,12 +63,20 @@ export function ResidentSearch({
 }: ResidentSearchProps) {
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<SearchCategory>("ALL");
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   // 1. Core resident hook data (Passes, Complaints, Announcements, Unit Context)
   const {
@@ -89,6 +100,83 @@ export function ResidentSearch({
     queryFn: fetchResidentParkingInfo,
     staleTime: 60 * 1000,
   });
+
+  const hasQuery = Boolean(debouncedQuery.trim());
+
+  // Backend queries driven by search term
+  const { data: searchPassesData } = useQuery({
+    queryKey: ["resident", "search", "passes", debouncedQuery],
+    queryFn: () =>
+      fetchResidentGuestPasses({
+        search: debouncedQuery.trim(),
+        limit: 50,
+      }),
+    enabled: isOpen && hasQuery,
+    staleTime: 30 * 1000,
+  });
+
+  const { data: searchComplaintsData } = useQuery({
+    queryKey: ["resident", "search", "complaints", debouncedQuery],
+    queryFn: () =>
+      fetchResidentComplaints({
+        search: debouncedQuery.trim(),
+        limit: 50,
+      }),
+    enabled: isOpen && hasQuery,
+    staleTime: 30 * 1000,
+  });
+
+  const { data: searchAnnouncementsData } = useQuery({
+    queryKey: ["resident", "search", "announcements", debouncedQuery],
+    queryFn: () =>
+      getResidentFeed({
+        search: debouncedQuery.trim(),
+        limit: 50,
+      }),
+    enabled: isOpen && hasQuery,
+    staleTime: 30 * 1000,
+  });
+
+  const { data: searchBillsData } = useQuery({
+    queryKey: ["resident", "search", "bills", debouncedQuery],
+    queryFn: () =>
+      fetchResidentBills({
+        search: debouncedQuery.trim(),
+        limit: 50,
+      }),
+    enabled: isOpen && hasQuery,
+    staleTime: 30 * 1000,
+  });
+
+  const passesList = useMemo(() => {
+    if (hasQuery && searchPassesData) {
+      return searchPassesData.guestPasses || [];
+    }
+    return guestPasses;
+  }, [hasQuery, searchPassesData, guestPasses]);
+
+  const complaints = useMemo(() => {
+    if (hasQuery && searchComplaintsData) {
+      return searchComplaintsData.complaints || [];
+    }
+    return complaintsList;
+  }, [hasQuery, searchComplaintsData, complaintsList]);
+
+  const notices = useMemo(() => {
+    if (hasQuery && searchAnnouncementsData) {
+      return Array.isArray(searchAnnouncementsData)
+        ? searchAnnouncementsData
+        : (searchAnnouncementsData as any)?.announcements || [];
+    }
+    return announcements;
+  }, [hasQuery, searchAnnouncementsData, announcements]);
+
+  const bills = useMemo(() => {
+    if (hasQuery && searchBillsData) {
+      return searchBillsData.bills || [];
+    }
+    return billsData?.bills || [];
+  }, [hasQuery, searchBillsData, billsData]);
 
   // Global keyboard shortcut: Ctrl+K or / to focus search
   useEffect(() => {
@@ -248,7 +336,7 @@ export function ResidentSearch({
     }
 
     // --- Search Visitor Passes ---
-    for (const pass of guestPasses) {
+    for (const pass of passesList) {
       const code = pass._id ? pass._id.slice(-4).toLowerCase() : "";
       const passMatches =
         pass.visitorName?.toLowerCase().includes(q) ||
@@ -295,7 +383,7 @@ export function ResidentSearch({
     }
 
     // --- Search Complaints & Helpdesk Tickets ---
-    for (const ticket of complaintsList) {
+    for (const ticket of complaints) {
       const tNumber = ticket.ticketNumber || `#REQ-${ticket._id.slice(-4).toUpperCase()}`;
       const ticketMatches =
         ticket.title?.toLowerCase().includes(q) ||
@@ -332,7 +420,7 @@ export function ResidentSearch({
     }
 
     // --- Search Announcements & Bulletins ---
-    for (const notice of announcements) {
+    for (const notice of notices) {
       const noticeMatches =
         notice.title?.toLowerCase().includes(q) ||
         notice.message?.toLowerCase().includes(q) ||
@@ -362,7 +450,6 @@ export function ResidentSearch({
     }
 
     // --- Search Maintenance Bills ---
-    const bills = billsData?.bills || [];
     for (const bill of bills) {
       const amountStr = bill.totalAmount ? bill.totalAmount.toString() : "";
       const balanceStr = bill.balanceAmount ? bill.balanceAmount.toString() : "";
@@ -476,10 +563,10 @@ export function ResidentSearch({
   }, [
     query,
     pageNavItems,
-    guestPasses,
-    complaintsList,
-    announcements,
-    billsData,
+    passesList,
+    complaints,
+    notices,
+    bills,
     parkingData,
   ]);
 

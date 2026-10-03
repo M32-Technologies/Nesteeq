@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import VisitorHeader from "./visitor-header"
 import VisitorTableSection from "./visitor-table-section"
@@ -13,10 +13,20 @@ import {
 
 export default function VisitorPage() {
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null)
+  const [search, setSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [search])
 
   const { data: recordsData, isLoading } = useManagerVisitorsQuery({
     limit: 100,
     fetchAll: true,
+    search: debouncedSearch.trim() || undefined,
   })
   const { data: activeData } = useManagerActiveVisitorsQuery()
 
@@ -47,6 +57,8 @@ export default function VisitorPage() {
       <VisitorTableSection
         records={records}
         isLoading={isLoading}
+        search={search}
+        onSearchChange={setSearch}
         onViewRecord={(rec) => setSelectedVisitor(rec)}
       />
 

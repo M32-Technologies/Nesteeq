@@ -295,7 +295,10 @@ export const updateTreasurerSettingsService = async (
   return settings;
 };
 
-export const getMaintenancePayoutsService = async (apartmentId: string) => {
+export const getMaintenancePayoutsService = async (
+  apartmentId: string,
+  search?: string
+) => {
   const id = getApartmentObjectId(apartmentId);
   const aptValues: unknown[] = [apartmentId, String(apartmentId)];
   if (Types.ObjectId.isValid(apartmentId)) {
@@ -307,6 +310,59 @@ export const getMaintenancePayoutsService = async (apartmentId: string) => {
     "costReview.status": "APPROVED",
     "costReview.forwardedToRole": { $in: ["TREASURER", null] },
   };
+
+  if (search && search.trim()) {
+    const rawSearch = search.trim();
+    const safeSearch = rawSearch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const searchRegex = new RegExp(safeSearch, "i");
+
+    const matchedFlats = await Flat.find(
+      { apartmentId: id, flatNumber: searchRegex },
+      "_id"
+    ).lean();
+    const flatIds = matchedFlats.map((f) => f._id);
+
+    let matchedUserIds: string[] = [];
+    try {
+      const authUsers = await getAuthDB()
+        .collection("user")
+        .find({ name: searchRegex })
+        .project({ _id: 1, id: 1 })
+        .toArray();
+      matchedUserIds = authUsers
+        .map((u) => u.id || u._id.toString())
+        .filter(Boolean);
+    } catch {
+      // Ignore auth db lookup errors
+    }
+
+    const orConditions: Array<Record<string, unknown>> = [
+      { title: searchRegex },
+      { description: searchRegex },
+      { category: searchRegex },
+    ];
+
+    if (flatIds.length > 0) {
+      orConditions.push({ flat: { $in: flatIds } });
+    }
+
+    if (matchedUserIds.length > 0) {
+      orConditions.push(
+        { assignedStaff: { $in: matchedUserIds } },
+        { "costReview.submittedBy": { $in: matchedUserIds } },
+        { "costReview.reviewedBy": { $in: matchedUserIds } }
+      );
+    }
+
+    const cleanId = rawSearch.toUpperCase().startsWith("JOB-")
+      ? rawSearch.slice(4).trim()
+      : rawSearch;
+    if (Types.ObjectId.isValid(cleanId)) {
+      orConditions.push({ _id: new Types.ObjectId(cleanId) });
+    }
+
+    query.$or = orConditions;
+  }
 
   const jobs = await (Maintenance as any).find(query)
     .sort({ "costReview.forwardedAt": -1 })
@@ -359,7 +415,7 @@ export const getMaintenancePayoutsService = async (apartmentId: string) => {
     );
   }
 
-  return jobs.map((job: any) => {
+  const results = jobs.map((job: any) => {
     const flatNum = job.flat ? (flatMap.get(job.flat.toString()) || job.flat) : undefined;
     const techName =
       (job.costReview?.submittedBy ? userMap.get(job.costReview.submittedBy.toString()) : undefined) ||
@@ -383,6 +439,22 @@ export const getMaintenancePayoutsService = async (apartmentId: string) => {
       priority: job.priority,
     };
   });
+
+  if (search && search.trim()) {
+    const q = search.trim().toLowerCase();
+    return results.filter(
+      (item: any) =>
+        item.title?.toLowerCase().includes(q) ||
+        item.technicianName?.toLowerCase().includes(q) ||
+        item.category?.toLowerCase().includes(q) ||
+        item.flatNumber?.toLowerCase().includes(q) ||
+        item.reviewedByName?.toLowerCase().includes(q) ||
+        item.description?.toLowerCase().includes(q) ||
+        item._id?.toLowerCase().includes(q)
+    );
+  }
+
+  return results;
 };
 
 export const processMaintenancePayoutService = async (

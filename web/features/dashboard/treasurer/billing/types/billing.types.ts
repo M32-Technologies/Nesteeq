@@ -77,12 +77,44 @@ export interface ResidentPaymentItem {
   receiptNumber?: string;
   paymentMethod?: string;
   referenceNo?: string;
+  billTitle?: string;
+  billingPeriod?: string;
+  billScope?: string;
 }
 
 export interface ResidentBillsResponse {
   summary: ResidentBillsSummary;
   bills: ResidentBillItem[];
+  allBills?: ResidentBillItem[];
   recentPayments: ResidentPaymentItem[];
+  allRecentPayments?: ResidentPaymentItem[];
+  counts?: {
+    allBillsCount?: number;
+    commonBillsCount: number;
+    separateBillsCount: number;
+  };
+  pagination?: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  receiptsPagination?: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export interface FetchResidentBillsParams {
+  scope?: string;
+  category?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+  receiptsPage?: number;
+  receiptsLimit?: number;
 }
 
 export interface PayResidentBillPayload {

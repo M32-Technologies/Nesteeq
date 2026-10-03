@@ -508,10 +508,18 @@ export const deleteAnnouncementService = async (
   return { id: announcementId, deleted: true };
 };
 
+export interface ResidentAnnouncementsQuery {
+  tab?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
 export const getResidentAnnouncementsService = async (
   apartmentId: string,
-  userId: string
-): Promise<AnnouncementResponse[]> => {
+  userId: string,
+  query?: ResidentAnnouncementsQuery
+): Promise<any> => {
   assertApartmentAndAnnouncementIds(apartmentId);
 
   const residentBlockIds: string[] = [];
@@ -572,10 +580,71 @@ export const getResidentAnnouncementsService = async (
     .sort({ createdAt: -1 })
     .lean();
 
-  return enrichAnnouncements(
+  const allNotices = await enrichAnnouncements(
     apartmentId,
     rawAnnouncements as unknown as Array<IAnnouncement & { _id: Types.ObjectId }>
   );
+
+  const counts = {
+    all: allNotices.length,
+    maintenance: allNotices.filter((n: any) => n?.type === "MAINTENANCE").length,
+    emergency: allNotices.filter((n: any) => n?.type === "EMERGENCY").length,
+    events: allNotices.filter((n: any) => n?.type === "EVENTS_SOCIAL").length,
+    society: allNotices.filter(
+      (n: any) => n?.type === "COMMUNITY_COUNCIL" || n?.type === "GENERAL"
+    ).length,
+  };
+
+  const criticalNotice = allNotices.find(
+    (n: any) => n && (n.priority === "URGENT" || n.type === "EMERGENCY")
+  );
+
+  let filtered = allNotices;
+  if (query?.tab === "maintenance") {
+    filtered = filtered.filter((n: any) => n?.type === "MAINTENANCE");
+  } else if (query?.tab === "emergency") {
+    filtered = filtered.filter((n: any) => n?.type === "EMERGENCY");
+  } else if (query?.tab === "events") {
+    filtered = filtered.filter((n: any) => n?.type === "EVENTS_SOCIAL");
+  } else if (query?.tab === "society") {
+    filtered = filtered.filter(
+      (n: any) => n?.type === "COMMUNITY_COUNCIL" || n?.type === "GENERAL"
+    );
+  }
+
+  if (query?.search?.trim()) {
+    const q = query.search.toLowerCase().trim();
+    filtered = filtered.filter(
+      (n: any) =>
+        (n?.title && n.title.toLowerCase().includes(q)) ||
+        (n?.message && n.message.toLowerCase().includes(q)) ||
+        (n?.creator?.name && n.creator.name.toLowerCase().includes(q))
+    );
+  }
+
+  const page = Math.max(1, Number(query?.page) || 1);
+  const limit = Math.max(1, Number(query?.limit) || 4);
+  const total = filtered.length;
+  const paginated = query?.page
+    ? filtered.slice((page - 1) * limit, page * limit)
+    : filtered;
+
+  if (!query?.page && !query?.tab && !query?.search) {
+    return allNotices;
+  }
+
+  return {
+    announcements: paginated,
+    counts,
+    criticalNotice,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+    },
+    allNoticesCount: allNotices.length,
+  };
 };
 
 export const broadcastEmergencyService = async (

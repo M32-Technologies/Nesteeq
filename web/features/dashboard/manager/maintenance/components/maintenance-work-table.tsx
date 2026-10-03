@@ -23,6 +23,8 @@ import type {
 interface MaintenanceWorkTableProps {
   workOrders?: MaintenanceWorkOrder[]
   isLoading?: boolean
+  search?: string
+  onSearchChange?: (val: string) => void
   onViewWorkOrder: (order: MaintenanceWorkOrder) => void
 }
 
@@ -51,9 +53,13 @@ const priorityBadgeStyles: Record<WorkPriority, string> = {
 export default function MaintenanceWorkTable({
   workOrders = [],
   isLoading = false,
+  search: externalSearch,
+  onSearchChange: externalOnSearchChange,
   onViewWorkOrder,
 }: MaintenanceWorkTableProps) {
-  const [search, setSearch] = useState("")
+  const [internalSearch, setInternalSearch] = useState("")
+  const search = externalSearch !== undefined ? externalSearch : internalSearch
+  const setSearch = externalOnSearchChange || setInternalSearch
   const [stageFilter, setStageFilter] = useState<"ALL" | WorkProgressStage>(
     "ALL"
   )
@@ -74,23 +80,9 @@ export default function MaintenanceWorkTable({
       if (categoryFilter !== "ALL" && order.category !== categoryFilter)
         return false
 
-      if (search.trim()) {
-        const query = search.toLowerCase()
-        const titleMatch = order.title.toLowerCase().includes(query)
-        const jobIdMatch = order.jobId.toLowerCase().includes(query)
-        const locationMatch = order.location.toLowerCase().includes(query)
-        const workerMatch = order.assignedWorkerName
-          ?.toLowerCase()
-          .includes(query)
-
-        if (!titleMatch && !jobIdMatch && !locationMatch && !workerMatch) {
-          return false
-        }
-      }
-
       return true
     })
-  }, [workOrders, stageFilter, priorityFilter, categoryFilter, search])
+  }, [workOrders, stageFilter, priorityFilter, categoryFilter])
 
   const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize))
   const paginatedOrders = useMemo(() => {

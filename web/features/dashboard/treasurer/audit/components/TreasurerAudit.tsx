@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
@@ -162,15 +162,49 @@ export default function TreasurerAudit() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRecord, setSelectedRecord] = useState<AuditLog | null>(null);
 
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const auditQuery = useQuery({
-    queryKey: ["treasurer", "audit"],
-    queryFn: () => getAuditLogs(),
+    queryKey: [
+      "treasurer",
+      "audit",
+      debouncedSearch,
+      entityFilter,
+      actionCategory,
+      currentPage,
+    ],
+    queryFn: () =>
+      getAuditLogs({
+        search: debouncedSearch.trim() || undefined,
+        entityType: entityFilter !== "ALL" ? entityFilter : undefined,
+        actionCategory: actionCategory !== "ALL" ? actionCategory : undefined,
+        page: currentPage,
+        limit: ITEMS_PER_PAGE,
+      }),
   });
 
-  const auditLogs = auditQuery.data ?? [];
+  const auditLogsData = auditQuery.data;
+  const auditLogs: AuditLog[] = useMemo(() => {
+    if (!auditLogsData) return [];
+    if (Array.isArray(auditLogsData)) return auditLogsData;
+    return auditLogsData.logs || [];
+  }, [auditLogsData]);
+
+  const totalAuditCount = useMemo(() => {
+    if (!auditLogsData) return 0;
+    if (Array.isArray(auditLogsData)) return auditLogsData.length;
+    return auditLogsData.pagination?.total ?? auditLogs.length;
+  }, [auditLogsData, auditLogs.length]);
 
   // Metrics
-  const totalRecords = auditLogs.length;
+  const totalRecords = totalAuditCount;
   const billingCount = auditLogs.filter(
     (record) =>
       record.entityType === "Billing" || record.action.includes("BILL")
@@ -211,51 +245,23 @@ export default function TreasurerAudit() {
     },
   ];
 
-  // Filtering
-  const filteredLogs = useMemo(() => {
-    return auditLogs.filter((record) => {
-      // Entity Filter
-      if (entityFilter !== "ALL" && record.entityType !== entityFilter) {
-        return false;
-      }
-
-      // Action Category Filter
-      if (actionCategory !== "ALL") {
-        if (!record.action.toUpperCase().includes(actionCategory.toUpperCase())) {
-          return false;
-        }
-      }
-
-      // Search Query
-      if (search.trim()) {
-        const query = search.trim().toLowerCase();
-        const actor = (record.performedByName || "").toLowerCase();
-        const action = record.action.toLowerCase();
-        const resident = (record.residentName || "").toLowerCase();
-        const flat = (record.flatNumber || "").toLowerCase();
-        const desc = (record.description || "").toLowerCase();
-        const entity = record.entityType.toLowerCase();
-
-        return (
-          actor.includes(query) ||
-          action.includes(query) ||
-          resident.includes(query) ||
-          flat.includes(query) ||
-          desc.includes(query) ||
-          entity.includes(query)
-        );
-      }
-
-      return true;
-    });
-  }, [auditLogs, entityFilter, actionCategory, search]);
-
   // Pagination
-  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / ITEMS_PER_PAGE));
-  const paginatedLogs = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredLogs.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredLogs, currentPage]);
+  const totalPages = useMemo(() => {
+    if (!auditLogsData) return 1;
+    if (Array.isArray(auditLogsData))
+      return Math.max(1, Math.ceil(auditLogsData.length / ITEMS_PER_PAGE));
+    return auditLogsData.pagination?.totalPages ?? 1;
+  }, [auditLogsData]);
+
+  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedLogs = auditLogs;
 
   const resetFilters = () => {
     setSearch("");
@@ -429,7 +435,7 @@ export default function TreasurerAudit() {
                 Retry
               </button>
             </div>
-          ) : filteredLogs.length === 0 ? (
+          ) : auditLogs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
                 <FileClock className="h-6 w-6" />
@@ -576,20 +582,20 @@ export default function TreasurerAudit() {
           )}
 
           {/* Project Standard Pagination */}
-          {filteredLogs.length > ITEMS_PER_PAGE ? (
+          {totalAuditCount > ITEMS_PER_PAGE ? (
             <div className="flex items-center justify-between border-t border-slate-100 pt-4 text-xs text-slate-500">
               <p>
                 Showing{" "}
                 <span className="font-semibold text-slate-800">
-                  {(currentPage - 1) * ITEMS_PER_PAGE + 1}
+                  {(validCurrentPage - 1) * ITEMS_PER_PAGE + 1}
                 </span>{" "}
                 to{" "}
                 <span className="font-semibold text-slate-800">
-                  {Math.min(currentPage * ITEMS_PER_PAGE, filteredLogs.length)}
+                  {Math.min(validCurrentPage * ITEMS_PER_PAGE, totalAuditCount)}
                 </span>{" "}
                 of{" "}
                 <span className="font-semibold text-slate-800">
-                  {filteredLogs.length}
+                  {totalAuditCount}
                 </span>{" "}
                 records
               </p>
@@ -597,7 +603,7 @@ export default function TreasurerAudit() {
               <div className="flex items-center gap-1">
                 <button
                   type="button"
-                  disabled={currentPage === 1}
+                  disabled={validCurrentPage === 1}
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   className="rounded-md border border-slate-200 p-1.5 transition hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white"
                   aria-label="Previous Page"
@@ -605,11 +611,11 @@ export default function TreasurerAudit() {
                   <ChevronLeft className="h-4 w-4" />
                 </button>
                 <span className="px-2 text-xs font-semibold text-slate-700">
-                  Page {currentPage} of {totalPages}
+                  Page {validCurrentPage} of {totalPages}
                 </span>
                 <button
                   type="button"
-                  disabled={currentPage === totalPages}
+                  disabled={validCurrentPage >= totalPages}
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   className="rounded-md border border-slate-200 p-1.5 transition hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white"
                   aria-label="Next Page"

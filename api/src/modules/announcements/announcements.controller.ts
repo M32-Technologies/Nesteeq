@@ -166,7 +166,14 @@ export const getResidentAnnouncementsHandler = catchAsync(
     if (!userId) throw new AppError("Unauthorized", 401);
     if (!apartmentId) throw new AppError("Apartment context not found", 403);
 
-    const result = await getResidentAnnouncementsService(apartmentId, userId);
+    const query = {
+      tab: req.query.tab ? String(req.query.tab) : undefined,
+      search: req.query.search ? String(req.query.search) : undefined,
+      page: req.query.page ? Number(req.query.page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
+    };
+
+    const result = await getResidentAnnouncementsService(apartmentId, userId, query);
 
     res.status(200).json({
       success: true,

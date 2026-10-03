@@ -12,6 +12,7 @@ import { WalletTransactionType } from "../wallet/wallet.interface.js";
 import { createAuditLogService } from "../audit/audit.service.js";
 import { AuditAction } from "../audit/audit.interface.js";
 import { getAuthDB } from "../../config/auth-db.js";
+import { escapeRegExp } from "../../utils/regex.js";
 
 const getAuthUsersFilter = (userIds: string[]) => {
   const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
@@ -51,7 +52,9 @@ export interface PaymentFilters {
   startDate?: string;
   endDate?: string;
   search?: string;
+  status?: string;
   includeReversed?: boolean;
+  page?: number;
   limit?: number;
 }
 
@@ -130,7 +133,18 @@ export const getPaymentsService = async (filters: PaymentFilters) => {
   }
 
   if (filters.paymentMethod && filters.paymentMethod !== "ALL") {
-    query.paymentMethod = filters.paymentMethod;
+    const rawMethod = filters.paymentMethod.trim();
+    const upperMethod = rawMethod.toUpperCase().replace(/[\s_-]+/g, "");
+
+    if (upperMethod.includes("BANK") || upperMethod === "BANKTRANSFER") {
+      query.paymentMethod = {
+        $regex: /bank|neft|rtgs|imps/i,
+      };
+    } else {
+      query.paymentMethod = {
+        $regex: new RegExp(escapeRegExp(rawMethod).replace(/[_\s]+/g, "[\\s_]*"), "i"),
+      };
+    }
   }
 
   if (filters.startDate || filters.endDate) {
@@ -146,18 +160,164 @@ export const getPaymentsService = async (filters: PaymentFilters) => {
     query.paidAt = dateQuery;
   }
 
-  if (!filters.includeReversed) {
+  if (filters.status === "REVERSED") {
+    query.reversed = true;
+  } else if (filters.status === "VALID") {
+    query.reversed = { $ne: true };
+  } else if (!filters.includeReversed) {
     query.reversed = { $ne: true };
   }
 
   // If a text search query is provided
   if (filters.search && filters.search.trim()) {
-    const searchRegex = new RegExp(filters.search.trim(), "i");
-    query.$or = [
+    const rawSearch = filters.search.trim();
+    const safeSearch = escapeRegExp(rawSearch);
+    const searchRegex = new RegExp(safeSearch, "i");
+
+    const flatQuery: Record<string, unknown> = {
+      flatNumber: searchRegex,
+      apartmentId: aptObjectId,
+    };
+    const matchingFlats = await Flat.find(flatQuery, "_id").lean();
+    const matchingFlatIds = matchingFlats.map((f) => f._id);
+
+    let matchingResidentIds: Types.ObjectId[] = [];
+    try {
+      const authUsers = await getAuthDB()
+        .collection("user")
+        .find({ name: searchRegex })
+        .project({ _id: 1, id: 1 })
+        .toArray();
+      const matchedUserIds = authUsers
+        .map((u) => u.id || u._id.toString())
+        .filter(Boolean);
+
+      if (matchedUserIds.length > 0) {
+        const matchingResidents = await ResidentModel.find(
+          { userId: { $in: matchedUserIds }, apartmentId: aptObjectId },
+          "_id"
+        ).lean();
+        matchingResidentIds = matchingResidents.map((r) => r._id);
+      }
+    } catch {
+      // Ignore if auth DB lookup fails
+    }
+
+    const matchingBills = await Billing.find(
+      {
+        apartmentId: aptObjectId,
+        $or: [{ title: searchRegex }, { billType: searchRegex }],
+      },
+      "_id"
+    ).lean();
+    const matchingBillIds = matchingBills.map((b) => b._id);
+
+    const searchConditions: Array<Record<string, unknown>> = [
       { receiptNumber: searchRegex },
       { referenceNo: searchRegex },
       { description: searchRegex },
     ];
+    if (matchingFlatIds.length > 0) {
+      searchConditions.push({ unitId: { $in: matchingFlatIds } });
+    }
+    if (matchingResidentIds.length > 0) {
+      searchConditions.push({ residentId: { $in: matchingResidentIds } });
+    }
+    if (matchingBillIds.length > 0) {
+      searchConditions.push({ billId: { $in: matchingBillIds } });
+    }
+    if (Types.ObjectId.isValid(rawSearch)) {
+      searchConditions.push({ billId: new Types.ObjectId(rawSearch) });
+    }
+
+    query.$or = searchConditions;
+  }
+
+  if (filters.page) {
+    const total = await Payment.countDocuments(query);
+    const page = Math.max(1, filters.page);
+    const limit = Math.max(1, filters.limit || 8);
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    const [metricsResult, payments] = await Promise.all([
+      Payment.aggregate([
+        { $match: query },
+        {
+          $group: {
+            _id: null,
+            totalCount: { $sum: 1 },
+            validCount: {
+              $sum: { $cond: [{ $eq: ["$reversed", true] }, 0, 1] },
+            },
+            reversedCount: {
+              $sum: { $cond: [{ $eq: ["$reversed", true] }, 1, 0] },
+            },
+            totalCollected: {
+              $sum: {
+                $cond: [{ $eq: ["$reversed", true] }, 0, "$amount"],
+              },
+            },
+            cashCollected: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $ne: ["$reversed", true] },
+                      {
+                        $regexMatch: {
+                          input: { $ifNull: ["$paymentMethod", "$source"] },
+                          regex: "cash",
+                          options: "i",
+                        },
+                      },
+                    ],
+                  },
+                  "$amount",
+                  0,
+                ],
+              },
+            },
+          },
+        },
+      ]),
+      Payment.find(query)
+        .sort({ paidAt: -1, createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+    ]);
+
+    const populatedPayments = await populatePaymentEntities(payments);
+
+    const m = metricsResult?.[0] || {
+      totalCollected: 0,
+      cashCollected: 0,
+      validCount: 0,
+      reversedCount: 0,
+      totalCount: total,
+    };
+    const digitalCollected = Math.max(
+      0,
+      (m.totalCollected || 0) - (m.cashCollected || 0)
+    );
+
+    return {
+      payments: populatedPayments,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages,
+      },
+      metrics: {
+        totalCollected: m.totalCollected || 0,
+        digitalCollected,
+        cashCollected: m.cashCollected || 0,
+        totalCount: m.totalCount || total,
+        validCount: m.validCount || 0,
+        reversedCount: m.reversedCount || 0,
+      },
+    };
   }
 
   const payments = await Payment.find(query)
@@ -165,6 +325,10 @@ export const getPaymentsService = async (filters: PaymentFilters) => {
     .limit(Math.min(filters.limit ?? 100, 1000))
     .lean();
 
+  return populatePaymentEntities(payments);
+};
+
+const populatePaymentEntities = async (payments: any[]) => {
   if (payments.length === 0) {
     return [];
   }
@@ -359,7 +523,8 @@ export const reversePaymentService = async (
 };
 
 export const exportPaymentsCsvService = async (filters: PaymentFilters) => {
-  const payments = await getPaymentsService({ ...filters, limit: 10000 });
+  const result = await getPaymentsService({ ...filters, limit: 10000 });
+  const payments = Array.isArray(result) ? result : result.payments;
 
   const headers = [
     "Receipt Number",
@@ -379,7 +544,7 @@ export const exportPaymentsCsvService = async (filters: PaymentFilters) => {
     return `"${String(val).replace(/"/g, '""')}"`;
   };
 
-  const rows = payments.map((p) => [
+  const rows = payments.map((p: any) => [
     escapeCsv(p.receiptNumber || `REC-${String(p._id).slice(-6).toUpperCase()}`),
     escapeCsv(new Date(p.paidAt).toLocaleString("en-IN")),
     escapeCsv(p.unitName || (p.flatNumber ? `Flat ${p.flatNumber}` : "Unit")),
@@ -392,7 +557,7 @@ export const exportPaymentsCsvService = async (filters: PaymentFilters) => {
     escapeCsv(p.reversalReason || ""),
   ]);
 
-  const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+  const csvContent = [headers.join(","), ...rows.map((r: any) => r.join(","))].join("\n");
   const filename = `Nesteeq_Collection_Register_${new Date().toISOString().split("T")[0]}.csv`;
   return { csvContent, filename };
 };

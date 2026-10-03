@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   CreditCard,
   CheckCircle2,
@@ -121,8 +121,17 @@ export function ResidentBillsPage() {
   const [selectedScope, setSelectedScope] = useState<"ALL" | "COMMON" | "SEPARATE">("ALL");
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
   const [invoicesPage, setInvoicesPage] = useState(1);
   const [receiptsPage, setReceiptsPage] = useState(1);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setInvoicesPage(1);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
   const [selectedBill, setSelectedBill] = useState<ResidentBillItem | null>(null);
   const [payingBill, setPayingBill] = useState<ResidentBillItem | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<
@@ -479,8 +488,25 @@ export function ResidentBillsPage() {
     isError,
     refetch,
   } = useQuery({
-    queryKey: ["resident", "bills"],
-    queryFn: fetchResidentBills,
+    queryKey: [
+      "resident",
+      "bills",
+      selectedScope,
+      selectedCategory,
+      debouncedSearch,
+      invoicesPage,
+      receiptsPage,
+    ],
+    queryFn: () =>
+      fetchResidentBills({
+        scope: selectedScope !== "ALL" ? selectedScope : undefined,
+        category: selectedCategory !== "ALL" ? selectedCategory : undefined,
+        search: debouncedSearch.trim() || undefined,
+        page: invoicesPage,
+        limit: ITEMS_PER_PAGE,
+        receiptsPage: receiptsPage,
+        receiptsLimit: ITEMS_PER_PAGE,
+      }),
   });
 
   const summary = billsData?.summary || {
@@ -491,11 +517,26 @@ export function ResidentBillsPage() {
     lateFees: 0,
   };
 
-  const bills = billsData?.bills || [];
-  const recentPayments = billsData?.recentPayments || [];
+  const paginatedBills = billsData?.bills || [];
+  const allBills = billsData?.allBills || billsData?.bills || [];
+  const paginatedReceipts = billsData?.recentPayments || [];
+  const allReceipts = billsData?.allRecentPayments || billsData?.recentPayments || [];
+
+  const totalInvoicesCount = billsData?.pagination?.total ?? paginatedBills.length;
+  const totalInvoicePages = billsData?.pagination?.totalPages ?? 1;
+
+  const totalReceiptsCount = billsData?.receiptsPagination?.total ?? paginatedReceipts.length;
+  const totalReceiptPages = billsData?.receiptsPagination?.totalPages ?? 1;
+
+  const commonBillsCount =
+    billsData?.counts?.commonBillsCount ??
+    allBills.filter((b) => b.isCommonBill || b.billScope === "COMMON").length;
+  const separateBillsCount =
+    billsData?.counts?.separateBillsCount ??
+    allBills.filter((b) => !b.isCommonBill && b.billScope !== "COMMON").length;
 
   const handleOpenReceiptForBill = (bill: ResidentBillItem) => {
-    const existingPayment = recentPayments.find((p) => p.billId === bill._id);
+    const existingPayment = allReceipts.find((p) => p.billId === bill._id);
     const receiptItem: ResidentPaymentItem & {
       billTitle?: string;
       billingPeriod?: string;
@@ -519,150 +560,7 @@ export function ResidentBillsPage() {
     setSelectedReceipt(receiptItem);
   };
 
-  const allReceipts = useMemo(() => {
-    const receiptsList: Array<
-      ResidentPaymentItem & {
-        billTitle?: string;
-        billingPeriod?: string;
-        billScope?: string;
-      }
-    > = [];
-    const handledBillIds = new Set<string>();
 
-    // 1. Add all recent payments recorded in the ledger
-    for (const payment of recentPayments) {
-      const matchedBill = bills.find((b) => b._id === payment.billId);
-      if (payment.billId) {
-        handledBillIds.add(payment.billId);
-      }
-      receiptsList.push({
-        ...payment,
-        billTitle: matchedBill?.title,
-        billingPeriod: matchedBill?.billingPeriod,
-        billScope: matchedBill?.billScope,
-      });
-    }
-
-    // 2. Add all completed / settled bills that don't have a distinct recentPayment record
-    for (const bill of bills) {
-      const isCompleted =
-        bill.status === "PAID" ||
-        (bill.balanceAmount === 0 && bill.totalAmount > 0) ||
-        (bill.paidAmount > 0 && bill.balanceAmount === 0);
-
-      if (isCompleted && !handledBillIds.has(bill._id)) {
-        receiptsList.push({
-          _id: bill._id,
-          billId: bill._id,
-          amount: bill.paidAmount > 0 ? bill.paidAmount : bill.totalAmount,
-          source:
-            bill.isCommonBill || bill.billScope === "COMMON"
-              ? "SOCIETY COMMON"
-              : "TREASURER SETTLED",
-          description:
-            bill.description ||
-            `${bill.title || "Maintenance"} - Settled in full`,
-          paidAt: bill.dueDate || bill.createdAt,
-          billTitle: bill.title,
-          billingPeriod: bill.billingPeriod,
-          billScope: bill.billScope,
-        });
-        handledBillIds.add(bill._id);
-      }
-    }
-
-    // Sort receipts by date descending (most recent first)
-    return receiptsList.sort((a, b) => {
-      const timeA = a.paidAt ? new Date(a.paidAt).getTime() : 0;
-      const timeB = b.paidAt ? new Date(b.paidAt).getTime() : 0;
-      return timeB - timeA;
-    });
-  }, [recentPayments, bills]);
-
-  const commonBillsCount = useMemo(
-    () => bills.filter((b) => b.isCommonBill || b.billScope === "COMMON").length,
-    [bills]
-  );
-  const separateBillsCount = useMemo(
-    () => bills.filter((b) => !b.isCommonBill && b.billScope !== "COMMON").length,
-    [bills]
-  );
-
-  const filteredBills = useMemo(() => {
-    return bills
-      .filter((b) => {
-        // 1. Scope filter (Common vs Separate)
-        if (selectedScope === "COMMON" && !b.isCommonBill && b.billScope !== "COMMON") {
-          return false;
-        }
-        if (selectedScope === "SEPARATE" && (b.isCommonBill || b.billScope === "COMMON")) {
-          return false;
-        }
-        // 2. Category filter
-        if (selectedCategory !== "ALL") {
-          const type = b.billType || "MONTHLY_MAINTENANCE";
-          if (type !== selectedCategory) return false;
-        }
-        // 3. Search query filter
-        if (searchQuery.trim()) {
-          const q = searchQuery.toLowerCase().trim();
-          const title = (b.title || "").toLowerCase();
-          const period = (b.billingPeriod || "").toLowerCase();
-          const desc = (b.description || "").toLowerCase();
-          const type = (b.billType || "").toLowerCase();
-          const typeLabel = (BILL_TYPE_CONFIG[b.billType || ""]?.label || "").toLowerCase();
-          const id = (b._id || "").toLowerCase();
-          const shortId = id.slice(-6);
-
-          const matches =
-            title.includes(q) ||
-            period.includes(q) ||
-            desc.includes(q) ||
-            type.includes(q) ||
-            typeLabel.includes(q) ||
-            id.includes(q) ||
-            shortId.includes(q);
-
-          if (!matches) return false;
-        }
-        return true;
-      })
-      .sort((a, b) => {
-        const isUnpaidA =
-          a.status !== "PAID" &&
-          (a.balanceAmount > 0 ||
-            a.status === "PENDING" ||
-            a.status === "OVERDUE" ||
-            a.status === "PARTIALLY_PAID");
-        const isUnpaidB =
-          b.status !== "PAID" &&
-          (b.balanceAmount > 0 ||
-            b.status === "PENDING" ||
-            b.status === "OVERDUE" ||
-            b.status === "PARTIALLY_PAID");
-
-        // 1. Unpaid / payable bills come first
-        if (isUnpaidA && !isUnpaidB) return -1;
-        if (!isUnpaidA && isUnpaidB) return 1;
-
-        // 2. Within the same group, newest created bills come first
-        const timeA = new Date(a.createdAt || a.dueDate || 0).getTime();
-        const timeB = new Date(b.createdAt || b.dueDate || 0).getTime();
-        return timeB - timeA;
-      });
-  }, [bills, selectedScope, selectedCategory, searchQuery]);
-
-  const totalInvoicePages = Math.ceil(filteredBills.length / ITEMS_PER_PAGE) || 1;
-  const paginatedBills = useMemo(() => {
-    const start = (invoicesPage - 1) * ITEMS_PER_PAGE;
-    return filteredBills.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredBills, invoicesPage]);
-
-  const totalReceiptPages = Math.ceil(allReceipts.length / ITEMS_PER_PAGE) || 1;
-  const paginatedReceipts = useMemo(() => {
-    const start = (receiptsPage - 1) * ITEMS_PER_PAGE;
-    return allReceipts.slice(start, start + ITEMS_PER_PAGE);
-  }, [allReceipts, receiptsPage]);
 
   const payMutation = useMutation({
     mutationFn: async ({
@@ -719,12 +617,12 @@ export function ResidentBillsPage() {
   };
 
   const unpaidBills = useMemo(() => {
-    return bills.filter(
+    return allBills.filter(
       (b) =>
         (b.status === "PENDING" || b.status === "OVERDUE" || b.status === "PARTIALLY_PAID") &&
         b.balanceAmount > 0
     );
-  }, [bills]);
+  }, [allBills]);
 
   const totalOutstandingSum = useMemo(() => {
     return unpaidBills.reduce((acc, b) => acc + (b.balanceAmount || 0), 0);
@@ -955,7 +853,7 @@ export function ResidentBillsPage() {
                     : "text-slate-600 hover:text-slate-900"
                 }`}
               >
-                All Bills ({bills.length})
+                All Bills ({billsData?.counts?.allBillsCount ?? allBills.length})
               </button>
               <button
                 type="button"
@@ -1036,7 +934,7 @@ export function ResidentBillsPage() {
             All Categories
           </button>
           {Object.entries(BILL_TYPE_CONFIG).map(([typeKey, cfg]) => {
-            const count = bills.filter((b) => {
+            const count = allBills.filter((b) => {
               if (selectedScope === "COMMON" && !b.isCommonBill && b.billScope !== "COMMON") return false;
               if (selectedScope === "SEPARATE" && (b.isCommonBill || b.billScope === "COMMON")) return false;
               return (b.billType || "MONTHLY_MAINTENANCE") === typeKey;
@@ -1072,7 +970,7 @@ export function ResidentBillsPage() {
           <div className="p-8 text-center text-sm text-red-600">
             Unable to fetch billing statements. Please check your network or try again later.
           </div>
-        ) : bills.length === 0 ? (
+        ) : allBills.length === 0 ? (
           <div className="p-10 text-center space-y-2">
             <CheckCircle2 className="size-8 text-emerald-600 mx-auto" />
             <p className="text-base font-semibold text-[#111111]">
@@ -1273,7 +1171,7 @@ export function ResidentBillsPage() {
             </table>
 
             {/* Standard Pagination for Invoices */}
-            {filteredBills.length > ITEMS_PER_PAGE ? (
+            {totalInvoicesCount > ITEMS_PER_PAGE ? (
               <div className="flex items-center justify-between border-t border-slate-100 p-4 text-xs text-slate-500">
                 <p>
                   Showing{" "}
@@ -1282,11 +1180,11 @@ export function ResidentBillsPage() {
                   </span>{" "}
                   to{" "}
                   <span className="font-semibold text-slate-800">
-                    {Math.min(invoicesPage * ITEMS_PER_PAGE, filteredBills.length)}
+                    {Math.min(invoicesPage * ITEMS_PER_PAGE, totalInvoicesCount)}
                   </span>{" "}
                   of{" "}
                   <span className="font-semibold text-slate-800">
-                    {filteredBills.length}
+                    {totalInvoicesCount}
                   </span>{" "}
                   invoices
                 </p>
@@ -1423,7 +1321,7 @@ export function ResidentBillsPage() {
             </table>
 
             {/* Standard Pagination for Receipts */}
-            {allReceipts.length > ITEMS_PER_PAGE ? (
+            {totalReceiptsCount > ITEMS_PER_PAGE ? (
               <div className="flex items-center justify-between border-t border-slate-100 p-4 text-xs text-slate-500">
                 <p>
                   Showing{" "}
@@ -1432,11 +1330,11 @@ export function ResidentBillsPage() {
                   </span>{" "}
                   to{" "}
                   <span className="font-semibold text-slate-800">
-                    {Math.min(receiptsPage * ITEMS_PER_PAGE, allReceipts.length)}
+                    {Math.min(receiptsPage * ITEMS_PER_PAGE, totalReceiptsCount)}
                   </span>{" "}
                   of{" "}
                   <span className="font-semibold text-slate-800">
-                    {allReceipts.length}
+                    {totalReceiptsCount}
                   </span>{" "}
                   receipts
                 </p>

@@ -33,6 +33,7 @@ import {
   updateBill,
   waiveLateFee,
   type Bill,
+  type BillStatus,
   type CommonBill,
   type CreateBillPayload,
   type CreateCommonBillPayload,
@@ -170,14 +171,38 @@ export default function TreasurerBilling() {
     null,
   );
 
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   const billsQuery = useQuery({
-    queryKey: ["treasurer", "bills", selectedCategoryFilter],
+    queryKey: [
+      "treasurer",
+      "bills",
+      selectedCategoryFilter,
+      selectedStatusFilter,
+      debouncedSearch,
+      currentPage,
+    ],
     queryFn: () =>
-      getBills(
-        selectedCategoryFilter !== "ALL"
-          ? { billType: selectedCategoryFilter }
-          : undefined,
-      ),
+      getBills({
+        billType:
+          selectedCategoryFilter !== "ALL"
+            ? selectedCategoryFilter
+            : undefined,
+        status:
+          selectedStatusFilter !== "ALL"
+            ? (selectedStatusFilter as BillStatus)
+            : undefined,
+        search: debouncedSearch.trim() || undefined,
+        page: currentPage,
+        limit: ITEMS_PER_PAGE,
+      }),
   });
 
   const commonBillsQuery = useQuery({
@@ -454,34 +479,26 @@ export default function TreasurerBilling() {
     });
   };
 
-  const bills = billsQuery.data ?? [];
-  const filteredBills = useMemo(() => {
-    let result = bills;
+  const billsData = billsQuery.data;
+  const bills: Bill[] = useMemo(() => {
+    if (!billsData) return [];
+    if (Array.isArray(billsData)) return billsData;
+    return billsData.bills || [];
+  }, [billsData]);
 
-    if (selectedStatusFilter !== "ALL") {
-      result = result.filter((b) => b.status === selectedStatusFilter);
-    }
+  const totalBillsCount = useMemo(() => {
+    if (!billsData) return 0;
+    if (Array.isArray(billsData)) return billsData.length;
+    return billsData.pagination?.total ?? bills.length;
+  }, [billsData, bills.length]);
 
-    if (searchTerm.trim()) {
-      const q = searchTerm.toLowerCase().trim();
-      result = result.filter((b) => {
-        const flat = (b.unitName || b.flatNumber || "").toLowerCase();
-        const resident = (b.residentName || "").toLowerCase();
-        const title = (b.title || "").toLowerCase();
-        const period = (b.billingPeriod || "").toLowerCase();
-        return (
-          flat.includes(q) ||
-          resident.includes(q) ||
-          title.includes(q) ||
-          period.includes(q)
-        );
-      });
-    }
+  const totalPages = useMemo(() => {
+    if (!billsData) return 1;
+    if (Array.isArray(billsData))
+      return Math.ceil(billsData.length / ITEMS_PER_PAGE) || 1;
+    return billsData.pagination?.totalPages ?? 1;
+  }, [billsData]);
 
-    return result;
-  }, [bills, selectedStatusFilter, searchTerm]);
-
-  const totalPages = Math.ceil(filteredBills.length / ITEMS_PER_PAGE) || 1;
   const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
 
   useEffect(() => {
@@ -490,10 +507,7 @@ export default function TreasurerBilling() {
     }
   }, [currentPage, totalPages]);
 
-  const paginatedBills = useMemo(() => {
-    const start = (validCurrentPage - 1) * ITEMS_PER_PAGE;
-    return filteredBills.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredBills, validCurrentPage]);
+  const paginatedBills = bills;
 
   const CAMPAIGNS_PER_PAGE = 6;
   const rawCampaigns = commonBillsQuery.data ?? [];
@@ -941,7 +955,7 @@ export default function TreasurerBilling() {
               <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {getSafeErrorMessage(billsQuery.error)}
               </p>
-            ) : filteredBills.length === 0 ? (
+            ) : bills.length === 0 ? (
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                 No bills found matching your search or filters.
               </p>
@@ -1088,7 +1102,7 @@ export default function TreasurerBilling() {
               </table>
 
               {/* Standard Project Pagination */}
-              {filteredBills.length > 0 && (
+              {totalBillsCount > ITEMS_PER_PAGE && (
                 <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between text-xs text-slate-500">
                   <p className="font-medium">
                     Showing{" "}
@@ -1097,11 +1111,11 @@ export default function TreasurerBilling() {
                     </span>{" "}
                     to{" "}
                     <span className="font-semibold text-slate-800">
-                      {Math.min(validCurrentPage * ITEMS_PER_PAGE, filteredBills.length)}
+                      {Math.min(validCurrentPage * ITEMS_PER_PAGE, totalBillsCount)}
                     </span>{" "}
                     of{" "}
                     <span className="font-semibold text-slate-800">
-                      {filteredBills.length}
+                      {totalBillsCount}
                     </span>{" "}
                     bills
                   </p>

@@ -38,18 +38,18 @@ export interface ResidentComplaintsResponse {
     category: string;
     priority: "LOW" | "NORMAL" | "HIGH" | "URGENT";
     status:
-      | "PENDING"
-      | "UNDER_REVIEW"
-      | "ASSIGNED"
-      | "IN_PROGRESS"
-      | "WORK_COMPLETED"
-      | "AWAITING_APPROVAL"
-      | "APPROVED"
-      | "REJECTED"
-      | "CANCELLED"
-      | "CLOSED"
-      | "RESOLVED"
-      | string;
+    | "PENDING"
+    | "UNDER_REVIEW"
+    | "ASSIGNED"
+    | "IN_PROGRESS"
+    | "WORK_COMPLETED"
+    | "AWAITING_APPROVAL"
+    | "APPROVED"
+    | "REJECTED"
+    | "CANCELLED"
+    | "CLOSED"
+    | "RESOLVED"
+    | string;
     assignedStaff?: {
       _id: string;
       name: string;
@@ -133,28 +133,55 @@ export async function fetchCurrentResidentProfile(
   }
 }
 
+export interface ResidentGuestPassesResponse {
+  guestPasses: GuestPassItem[];
+  counts?: {
+    total: number;
+    activePassesCount: number;
+    usedPassesCount: number;
+    expiredPassesCount: number;
+  };
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
+}
+
 export async function fetchResidentGuestPasses(params?: {
   status?: string;
   page?: number;
   limit?: number;
   search?: string;
-}) {
+}): Promise<ResidentGuestPassesResponse> {
   try {
     const res = await api.get<{
       success: boolean;
-      data: {
-        guestPasses: GuestPassItem[];
-        counts?: {
-          total: number;
-          activePassesCount: number;
-          usedPassesCount: number;
-          expiredPassesCount: number;
-        };
-        pagination: { total: number };
-      };
+      data: ResidentGuestPassesResponse;
     }>("/api/v1/residents/passes", { params });
 
-    return res.data?.data?.guestPasses || [];
+    return (
+      res.data?.data || {
+        guestPasses: [],
+        counts: {
+          total: 0,
+          activePassesCount: 0,
+          usedPassesCount: 0,
+          expiredPassesCount: 0,
+        },
+        pagination: {
+          page: params?.page || 1,
+          limit: params?.limit || 20,
+          total: 0,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        },
+      }
+    );
   } catch {
     try {
       const fallbackRes = await api.get<{
@@ -165,9 +192,44 @@ export async function fetchResidentGuestPasses(params?: {
         };
       }>("/api/v1/visitors/passes", { params });
 
-      return fallbackRes.data?.data?.guestPasses || [];
+      const fallbackPasses = fallbackRes.data?.data?.guestPasses || [];
+      const total = fallbackRes.data?.data?.pagination?.total ?? fallbackPasses.length;
+
+      return {
+        guestPasses: fallbackPasses,
+        counts: {
+          total,
+          activePassesCount: fallbackPasses.filter((p) => p.status === "ACTIVE").length,
+          usedPassesCount: fallbackPasses.filter((p) => p.status === "USED").length,
+          expiredPassesCount: fallbackPasses.filter((p) => p.status === "EXPIRED").length,
+        },
+        pagination: {
+          page: params?.page || 1,
+          limit: params?.limit || 20,
+          total,
+          totalPages: Math.ceil(total / (params?.limit || 20)) || 1,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        },
+      };
     } catch {
-      return [];
+      return {
+        guestPasses: [],
+        counts: {
+          total: 0,
+          activePassesCount: 0,
+          usedPassesCount: 0,
+          expiredPassesCount: 0,
+        },
+        pagination: {
+          page: params?.page || 1,
+          limit: params?.limit || 20,
+          total: 0,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        },
+      };
     }
   }
 }
