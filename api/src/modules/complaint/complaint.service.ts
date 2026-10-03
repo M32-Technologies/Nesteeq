@@ -780,10 +780,10 @@ export const resolveFacilityManagerApartmentId = async (
 
 const resolveManagerApartmentId = resolveFacilityManagerApartmentId;
 
-const applySharedFilters = (
+const applySharedFilters = async (
   filter: ComplaintFilter,
   query: GetComplaintsQuery
-): void => {
+): Promise<void> => {
   if (query.status) {
     const rawStatuses = Array.isArray(query.status)
       ? query.status
@@ -849,14 +849,51 @@ const applySharedFilters = (
 
   const querySearch = (query as any).search || query.search;
   if (querySearch && typeof querySearch === "string" && querySearch.trim()) {
-    const searchRegex = new RegExp(escapeRegex(querySearch.trim()), "i");
-    addOrCondition(filter, [
+    const rawSearch = querySearch.trim();
+    const searchRegex = new RegExp(escapeRegex(rawSearch), "i");
+    const orConditions: Array<Record<string, unknown>> = [
       { title: searchRegex },
       { description: searchRegex },
       { ticketNumber: searchRegex },
-    ]);
-  }
+      { category: searchRegex },
+      { priority: searchRegex },
+      { status: searchRegex },
+      { assignedTechnicianName: searchRegex },
+    ];
 
+    if (Types.ObjectId.isValid(rawSearch)) {
+      orConditions.push({ _id: new Types.ObjectId(rawSearch) });
+    }
+
+    try {
+      const userDocs = await getAuthDB()
+        .collection("user")
+        .find({ name: searchRegex })
+        .project({ _id: 1, id: 1 })
+        .toArray();
+      const matchedUserIds = userDocs
+        .flatMap((u) => [u.id, u._id?.toString()])
+        .filter(Boolean);
+
+      if (matchedUserIds.length > 0) {
+        const idObjects = matchedUserIds
+          .filter((id) => Types.ObjectId.isValid(id))
+          .map((id) => new Types.ObjectId(id));
+        const allUserMatchValues = [...matchedUserIds, ...idObjects];
+
+        orConditions.push(
+          { resident: { $in: allUserMatchValues } },
+          { residentId: { $in: allUserMatchValues } },
+          { assignedStaff: { $in: allUserMatchValues } },
+          { assignedTo: { $in: allUserMatchValues } }
+        );
+      }
+    } catch {
+      // ignore
+    }
+
+    addOrCondition(filter, orConditions);
+  }
 };
 
 const applyManagerFilters = async (
@@ -1064,7 +1101,7 @@ export const getComplaints = async (
   const role = normalizeRole(user.role);
   const filter: ComplaintFilter = {};
 
-  applySharedFilters(filter, query);
+  await applySharedFilters(filter, query);
 
   if (managementRoles.has(role)) {
     await applyManagerFilters(filter, query, user, authUser);

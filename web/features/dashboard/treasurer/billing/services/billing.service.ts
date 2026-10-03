@@ -2,6 +2,7 @@ import api from "@/lib/axios";
 import type {
   ResidentBillsResponse,
   PayResidentBillPayload,
+  FetchResidentBillsParams,
 } from "../types/billing.types";
 
 export {
@@ -16,12 +17,15 @@ export {
   waiveLateFee,
 } from "../../services/treasurer.service";
 
-export async function fetchResidentBills(): Promise<ResidentBillsResponse> {
+export async function fetchResidentBills(
+  params?: FetchResidentBillsParams | any
+): Promise<ResidentBillsResponse> {
+  const queryParams = params && !("queryKey" in params) ? params : undefined;
   try {
     const res = await api.get<{
       success: boolean;
       data: ResidentBillsResponse;
-    }>("/api/v1/bills/my-bills");
+    }>("/api/v1/bills/my-bills", { params: queryParams });
     return (
       res.data?.data || {
         summary: {

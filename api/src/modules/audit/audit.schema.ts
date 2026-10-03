@@ -13,6 +13,10 @@ export const getAuditLogsSchema = z.object({
     action: z.nativeEnum(AuditAction).optional(),
     entityType: z.string().trim().optional(),
     entityId: objectIdSchema.optional(),
+    actionCategory: z.string().trim().optional(),
+    search: z.string().trim().optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
   }),
 });
 

@@ -53,6 +53,8 @@ export const getExpensesSchema = z.object({
     search: z.string().trim().optional(),
     startDate: z.coerce.date().optional(),
     endDate: z.coerce.date().optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
   }),
 });
 

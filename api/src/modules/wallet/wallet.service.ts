@@ -243,9 +243,24 @@ export const getWalletsService = async (
     );
   }
 
-  if (query?.page && query?.limit) {
-    const start = (query.page - 1) * query.limit;
-    return mappedWallets.slice(start, start + query.limit);
+  if (query?.page) {
+    const total = mappedWallets.length;
+    const page = Math.max(1, query.page);
+    const limit = Math.max(1, query.limit || 8);
+    const totalPages = Math.ceil(total / limit) || 1;
+    const paginatedWallets = mappedWallets.slice(
+      (page - 1) * limit,
+      page * limit
+    );
+    return {
+      wallets: paginatedWallets,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages,
+      },
+    };
   }
 
   return mappedWallets;

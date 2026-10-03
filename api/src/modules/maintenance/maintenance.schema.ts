@@ -214,6 +214,7 @@ export const getMaintenanceQuerySchema = z
     resident: userIdSchema.optional(),
     assignedStaff: userIdSchema.optional(),
     costStatus: z.enum(maintenanceCostStatuses).optional(),
+    search: z.string().trim().optional(),
     page: z.coerce.number().int("Page must be a whole number").min(1).default(1),
     limit: z.coerce.number().int("Limit must be a whole number").min(1).max(100).default(20),
   })

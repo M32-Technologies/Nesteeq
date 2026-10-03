@@ -64,6 +64,8 @@ export const getExpenses = catchAsync(
       endDate: req.query.endDate
         ? new Date(req.query.endDate as string)
         : undefined,
+      page: req.query.page ? Number(req.query.page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
     });
 
     res.status(200).json({

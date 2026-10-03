@@ -69,7 +69,8 @@ export const updateTreasurerSettings = catchAsync(
 export const getMaintenancePayouts = catchAsync(
   async (req: Request, res: Response) => {
     const apartmentId = getApartmentId(req);
-    const data = await getMaintenancePayoutsService(apartmentId);
+    const search = typeof req.query.search === "string" ? req.query.search : undefined;
+    const data = await getMaintenancePayoutsService(apartmentId, search);
 
     res.status(200).json({
       success: true,

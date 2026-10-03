@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   useFinanceSummaryQuery,
   useManagerBillsQuery,
@@ -29,11 +29,27 @@ export default function PaymentHistoryPage() {
   
   // Bills Filters
   const [billsSearch, setBillsSearch] = useState("");
+  const [debouncedBillsSearch, setDebouncedBillsSearch] = useState("");
   const [billsStatus, setBillsStatus] = useState<BillStatusFilter>("ALL");
   
   // Transactions Filters
   const [txSearch, setTxSearch] = useState("");
+  const [debouncedTxSearch, setDebouncedTxSearch] = useState("");
   const [txSource, setTxSource] = useState<PaymentSourceFilter>("ALL");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedBillsSearch(billsSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [billsSearch]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedTxSearch(txSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [txSearch]);
 
   // Selection
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
@@ -54,6 +70,7 @@ export default function PaymentHistoryPage() {
     error: billsError,
   } = useManagerBillsQuery({
     status: billsStatus === "ALL" ? undefined : billsStatus,
+    search: debouncedBillsSearch.trim() || undefined,
   });
 
   const {
@@ -63,6 +80,7 @@ export default function PaymentHistoryPage() {
     error: paymentsError,
   } = useManagerPaymentsQuery({
     source: txSource === "ALL" ? undefined : txSource,
+    search: debouncedTxSearch.trim() || undefined,
     limit: 100, // Matching the existing treasurer logic to fetch latest 100
   });
 
@@ -101,34 +119,6 @@ export default function PaymentHistoryPage() {
   const resolveFlatNumber = useCallback((id: string) => {
     return flatMap.get(id) ?? `Unit #${id.slice(-6).toUpperCase()}`;
   }, [flatMap]);
-
-  // Local Search Filters
-  const filteredBills = useMemo(() => {
-    if (!billsSearch.trim()) return billsData;
-    const query = billsSearch.toLowerCase();
-    
-    return billsData.filter((bill) => {
-      const resName = resolveResidentName(bill.residentId).toLowerCase();
-      const flatName = resolveFlatNumber(bill.unitId).toLowerCase();
-      return resName.includes(query) || flatName.includes(query);
-    });
-  }, [billsData, billsSearch, resolveResidentName, resolveFlatNumber]);
-
-  const filteredPayments = useMemo(() => {
-    if (!txSearch.trim()) return paymentsData;
-    const query = txSearch.toLowerCase();
-
-    return paymentsData.filter((payment) => {
-      const resName = resolveResidentName(payment.residentId).toLowerCase();
-      const flatName = resolveFlatNumber(payment.unitId).toLowerCase();
-      const billRef = payment.billId.slice(-6).toLowerCase();
-      return (
-        resName.includes(query) ||
-        flatName.includes(query) ||
-        billRef.includes(query)
-      );
-    });
-  }, [paymentsData, txSearch, resolveResidentName, resolveFlatNumber]);
 
   const handleCloseDetails = () => {
     setSelectedBill(null);
@@ -186,7 +176,7 @@ export default function PaymentHistoryPage() {
 
       {activeTab === "bills" ? (
         <BillsDuesTable
-          bills={filteredBills}
+          bills={billsData}
           isLoading={isBillsLoading}
           isError={isBillsError}
           error={billsError}
@@ -200,7 +190,7 @@ export default function PaymentHistoryPage() {
         />
       ) : (
         <TransactionsTable
-          payments={filteredPayments}
+          payments={paymentsData}
           isLoading={isPaymentsLoading}
           isError={isPaymentsError}
           error={paymentsError}

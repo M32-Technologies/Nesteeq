@@ -48,6 +48,8 @@ interface ExpenseFilters {
   search?: string;
   startDate?: Date;
   endDate?: Date;
+  page?: number;
+  limit?: number;
 }
 
 const validateObjectId = (id: string) => {
@@ -68,6 +70,7 @@ const allowedStatusTransitions: Record<
   [ExpenseStatus.APPROVED]: [
     ExpenseStatus.APPROVED,
     ExpenseStatus.PAID,
+    ExpenseStatus.REJECTED,
   ],
   [ExpenseStatus.PAID]: [ExpenseStatus.PAID],
   [ExpenseStatus.REJECTED]: [ExpenseStatus.REJECTED],
@@ -228,6 +231,27 @@ export const getExpensesService = async (
       dateQuery.$lte = endOfDay;
     }
     query.expenseDate = dateQuery;
+  }
+
+  if (filters.page) {
+    const total = await Expense.countDocuments(query);
+    const page = Math.max(1, filters.page);
+    const limit = Math.max(1, filters.limit || 8);
+    const totalPages = Math.ceil(total / limit) || 1;
+    const expenses = await Expense.find(query)
+      .sort({ expenseDate: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    return {
+      expenses,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages,
+      },
+    };
   }
 
   return Expense.find(query).sort({
@@ -436,7 +460,8 @@ export const getExpenseSummaryService = async (
 };
 
 export const exportExpensesCsvService = async (filters: ExpenseFilters) => {
-  const expenses = await getExpensesService(filters);
+  const result = await getExpensesService(filters);
+  const expenses = Array.isArray(result) ? result : result.expenses;
 
   const headers = [
     "Title",
@@ -464,7 +489,7 @@ export const exportExpensesCsvService = async (filters: ExpenseFilters) => {
     return Number.isNaN(d.getTime()) ? "" : d.toISOString().split("T")[0];
   };
 
-  const rows = expenses.map((e) => [
+  const rows = expenses.map((e: any) => [
     escapeCsv(e.title || ""),
     escapeCsv(e.invoiceRef || ""),
     escapeCsv(e.category || ""),
@@ -479,7 +504,7 @@ export const exportExpensesCsvService = async (filters: ExpenseFilters) => {
     escapeCsv(e.description || ""),
   ]);
 
-  const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+  const csvContent = [headers.join(","), ...rows.map((r: any) => r.join(","))].join("\n");
   const filename = `nesteeq-expenses-${new Date().toISOString().split("T")[0]}.csv`;
   return { csvContent, filename };
 };

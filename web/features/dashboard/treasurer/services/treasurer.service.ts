@@ -141,6 +141,19 @@ export interface GetBillsParams {
   commonBillId?: string;
   billType?: string;
   status?: BillStatus;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface PaginatedBillsResponse {
+  bills: Bill[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }
 
 export interface Payment {
@@ -381,7 +394,8 @@ const toQuery = (params: object) => {
   Object.entries(params as Record<string, unknown>).forEach(([key, value]) => {
     if (
       (typeof value === "string" ||
-        typeof value === "number") &&
+        typeof value === "number" ||
+        typeof value === "boolean") &&
       value !== ""
     ) {
       searchParams.set(key, String(value));
@@ -392,8 +406,17 @@ const toQuery = (params: object) => {
   return query ? `?${query}` : "";
 };
 
-export const getBills = (params: GetBillsParams = {}) =>
-  request<Bill[]>(`/api/bills${toQuery(params)}`);
+export function getBills(
+  params: GetBillsParams & { page: number },
+): Promise<PaginatedBillsResponse>;
+export function getBills(
+  params?: GetBillsParams,
+): Promise<Bill[]>;
+export function getBills(
+  params: GetBillsParams = {},
+): Promise<Bill[] | PaginatedBillsResponse> {
+  return request<Bill[] | PaginatedBillsResponse>(`/api/bills${toQuery(params)}`);
+}
 
 export const getBillRecipients = (params: { apartmentId?: string } = {}) =>
   request<BillRecipient[]>(`/api/bills/recipients${toQuery(params)}`);
@@ -462,20 +485,54 @@ export const deleteBill = (billId: string, reason?: string) =>
     },
   );
 
-export const getPayments = (
-  params: {
-    apartmentId?: string;
-    billId?: string;
-    residentId?: string;
-    source?: PaymentSource;
-    paymentMethod?: string;
-    startDate?: string;
-    endDate?: string;
-    search?: string;
-    includeReversed?: boolean;
-    limit?: number;
-  } = {},
-) => request<Payment[]>(`/api/payments${toQuery(params)}`);
+export interface PaymentMetrics {
+  totalCollected: number;
+  digitalCollected: number;
+  cashCollected: number;
+  totalCount: number;
+  validCount: number;
+  reversedCount: number;
+}
+
+export interface PaginatedPaymentsResponse {
+  payments: Payment[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  metrics?: PaymentMetrics;
+}
+
+export interface GetPaymentsParams {
+  apartmentId?: string;
+  billId?: string;
+  residentId?: string;
+  source?: PaymentSource;
+  paymentMethod?: string;
+  startDate?: string;
+  endDate?: string;
+  search?: string;
+  status?: string;
+  includeReversed?: boolean;
+  page?: number;
+  limit?: number;
+}
+
+export function getPayments(
+  params: GetPaymentsParams & { page: number },
+): Promise<PaginatedPaymentsResponse>;
+export function getPayments(
+  params?: GetPaymentsParams,
+): Promise<Payment[]>;
+export function getPayments(
+  params: GetPaymentsParams = {},
+): Promise<Payment[] | PaginatedPaymentsResponse> {
+  return request<Payment[] | PaginatedPaymentsResponse>(
+    `/api/payments${toQuery(params)}`,
+  );
+}
 
 export const reversePayment = (paymentId: string, reason: string) =>
   request<{ success: boolean; message: string; data: Payment }>(
@@ -496,16 +553,40 @@ export const getMonthlyFinance = (
     `/api/finance/monthly${toQuery(params)}`,
   );
 
-export const getExpenses = (
-  params: {
-    apartmentId?: string;
-    category?: ExpenseCategory;
-    status?: ExpenseStatus;
-    search?: string;
-    startDate?: string;
-    endDate?: string;
-  } = {},
-) => request<Expense[]>(`/api/expenses${toQuery(params)}`);
+export interface PaginatedExpensesResponse {
+  expenses: Expense[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export interface GetExpensesParams {
+  apartmentId?: string;
+  category?: ExpenseCategory;
+  status?: ExpenseStatus;
+  search?: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  limit?: number;
+}
+
+export function getExpenses(
+  params: GetExpensesParams & { page: number },
+): Promise<PaginatedExpensesResponse>;
+export function getExpenses(
+  params?: GetExpensesParams,
+): Promise<Expense[]>;
+export function getExpenses(
+  params: GetExpensesParams = {},
+): Promise<Expense[] | PaginatedExpensesResponse> {
+  return request<Expense[] | PaginatedExpensesResponse>(
+    `/api/expenses${toQuery(params)}`,
+  );
+}
 
 export const getExpenseSummary = (
   params: { apartmentId?: string } = {},
@@ -529,7 +610,36 @@ export const updateExpense = (
     },
   );
 
-export const getWallets = () => request<Wallet[]>("/api/wallets");
+export interface PaginatedWalletsResponse {
+  wallets: Wallet[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export interface GetWalletsParams {
+  search?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+}
+
+export function getWallets(
+  params: GetWalletsParams & { page: number },
+): Promise<PaginatedWalletsResponse>;
+export function getWallets(
+  params?: GetWalletsParams,
+): Promise<Wallet[]>;
+export function getWallets(
+  params: GetWalletsParams = {},
+): Promise<Wallet[] | PaginatedWalletsResponse> {
+  return request<Wallet[] | PaginatedWalletsResponse>(
+    `/api/wallets${toQuery(params)}`,
+  );
+}
 
 export const creditWallet = (payload: {
   residentId: string;
@@ -565,15 +675,41 @@ export const deductWallet = (payload: {
     },
   );
 
-export const getAuditLogs = (
-  params: {
-    apartmentId?: string;
-    performedBy?: string;
-    action?: string;
-    entityType?: string;
-    entityId?: string;
-  } = {},
-) => request<AuditLog[]>(`/api/audit${toQuery(params)}`);
+export interface PaginatedAuditLogsResponse {
+  logs: AuditLog[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export interface GetAuditLogsParams {
+  apartmentId?: string;
+  performedBy?: string;
+  action?: string;
+  actionCategory?: string;
+  entityType?: string;
+  entityId?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export function getAuditLogs(
+  params: GetAuditLogsParams & { page: number },
+): Promise<PaginatedAuditLogsResponse>;
+export function getAuditLogs(
+  params?: GetAuditLogsParams,
+): Promise<AuditLog[]>;
+export function getAuditLogs(
+  params: GetAuditLogsParams = {},
+): Promise<AuditLog[] | PaginatedAuditLogsResponse> {
+  return request<AuditLog[] | PaginatedAuditLogsResponse>(
+    `/api/audit${toQuery(params)}`,
+  );
+}
 
 export interface MaintenancePayout {
   _id: string;
@@ -589,8 +725,16 @@ export interface MaintenancePayout {
   priority?: string;
 }
 
-export const getMaintenancePayouts = () =>
-  request<MaintenancePayout[]>("/api/treasurer/maintenance-payouts");
+export function getMaintenancePayouts(params?: { search?: string }): Promise<MaintenancePayout[]>;
+export function getMaintenancePayouts(...args: any[]): Promise<MaintenancePayout[]> {
+  const params = args[0];
+  const searchParam =
+    params && typeof params === "object" && typeof params.search === "string"
+      ? params.search
+      : undefined;
+  const query = searchParam ? `?search=${encodeURIComponent(searchParam)}` : "";
+  return request<MaintenancePayout[]>(`/api/treasurer/maintenance-payouts${query}`);
+}
 
 export const processMaintenancePayout = (
   jobId: string,
