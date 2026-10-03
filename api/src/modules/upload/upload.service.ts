@@ -5,6 +5,7 @@ import { AppError } from "../../utils/AppError.js";
 import { S3Service } from "./s3.service.js";
 import { Maintenance } from "../maintenance/maintenance.model.js";
 import { Complaint } from "../complaint/complaint.model.js";
+import { Resident } from "../resident/resident.model.js";
 import type { AuthUser } from "../../types/express.js";
 import {
   DEFAULT_UPLOAD_EXPIRY_SECONDS,
@@ -57,7 +58,21 @@ export class UploadService {
       }
 
       case "complaint": {
-        const targetApartmentId = context.apartmentId || userApartmentId;
+        let targetApartmentId = context.apartmentId || userApartmentId;
+        if (!targetApartmentId) {
+          try {
+            const residentDoc = await Resident.findOne({
+              userId: user.id,
+              status: "active",
+            }).lean();
+            if (residentDoc?.apartmentId) {
+              targetApartmentId = residentDoc.apartmentId.toString();
+            }
+          } catch {
+            // ignore resolution errors
+          }
+        }
+
         if (!targetApartmentId) {
           throw new AppError("Apartment context is required for complaint uploads", 400);
         }
@@ -307,7 +322,22 @@ export class UploadService {
         const moduleType = parts[2];
         const resourceId = parts[3];
 
-        if (!userApartmentId || userApartmentId !== fileApartmentId) {
+        let resolvedUserApartmentId = userApartmentId;
+        if (!resolvedUserApartmentId) {
+          try {
+            const residentDoc = await Resident.findOne({
+              userId: user.id,
+              status: "active",
+            }).lean();
+            if (residentDoc?.apartmentId) {
+              resolvedUserApartmentId = residentDoc.apartmentId.toString();
+            }
+          } catch {
+            // ignore resolution errors
+          }
+        }
+
+        if (!resolvedUserApartmentId || resolvedUserApartmentId !== fileApartmentId) {
           throw new AppError("You do not have permission to view files for this apartment", 403);
         }
 

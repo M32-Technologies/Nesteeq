@@ -157,11 +157,8 @@ export function CreateComplaintModal({
         }
       }
 
-      const locationPrefix = `[Location: ${values.location}]\n\n`;
-      let fullDescription = `${locationPrefix}${values.description.trim()}`;
-      if (selectedFile) {
-        fullDescription += `\n\n[Attached Photo Reference: ${selectedFile.name} (${(selectedFile.size / 1024).toFixed(1)} KB)]`;
-      }
+      const locationPrefix = values.location ? `[Location: ${values.location}]\n\n` : "";
+      const fullDescription = `${locationPrefix}${values.description.trim()}`;
 
       await createResidentComplaint({
         title: values.title.trim(),
@@ -169,7 +166,7 @@ export function CreateComplaintModal({
         category: values.category as CreateResidentComplaintPayload["category"],
         priority: values.priority as CreateResidentComplaintPayload["priority"],
         images: uploadedImageUrl ? [uploadedImageUrl] : [],
-        attachments: uploadedImageUrl ? [uploadedImageUrl] : [],
+        attachments: [],
       });
 
       toast.success("Complaint registered successfully! The facility team will review it.");

@@ -101,6 +101,5 @@ export async function uploadComplaintImageToS3(
     throw new Error(`Failed to upload image to AWS S3: ${uploadRes.statusText}`);
   }
 
-  const s3Url = uploadUrl.split("?")[0];
-  return s3Url || key;
+  return key;
 }

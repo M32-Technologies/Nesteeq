@@ -175,8 +175,11 @@ export function ComplaintDetailsDrawer({
                   {complaint.title}
                 </h2>
                 {complaint.description && (
-                  <p className="mt-2 text-[14px] leading-6 text-[#4E5B67]">
-                    {complaint.description}
+                  <p className="mt-2 text-[14px] leading-6 text-[#4E5B67] whitespace-pre-line">
+                    {complaint.description
+                      .replace(/\[Attached Photo Reference:[^\]]+\]/gi, "")
+                      .replace(/\[Image:\s*[^\]]+\]/gi, "")
+                      .trim()}
                   </p>
                 )}
               </section>
@@ -245,10 +248,12 @@ export function ComplaintDetailsDrawer({
 
               {/* Attached Photos / Evidence */}
               {(() => {
-                const complaintImages = [
-                  ...(Array.isArray(complaint.images) ? complaint.images : []),
-                  ...(Array.isArray(complaint.attachments) ? complaint.attachments : []),
-                ].filter(Boolean)
+                const complaintImages = Array.from(
+                  new Set([
+                    ...(Array.isArray(complaint.images) ? complaint.images : []),
+                    ...(Array.isArray(complaint.attachments) ? complaint.attachments : []),
+                  ].filter(Boolean))
+                )
 
                 if (complaintImages.length === 0) return null
 
@@ -272,6 +277,9 @@ export function ComplaintDetailsDrawer({
                               src={resolved}
                               alt={`Complaint photo ${idx + 1}`}
                               className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLElement).style.opacity = "0.4"
+                              }}
                             />
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center">
                               <span className="opacity-0 group-hover:opacity-100 text-[11px] font-medium text-white bg-black/70 px-2 py-1 rounded shadow-sm transition-opacity">
