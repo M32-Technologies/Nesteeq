@@ -38,18 +38,18 @@ export interface ResidentComplaintsResponse {
     category: string;
     priority: "LOW" | "NORMAL" | "HIGH" | "URGENT";
     status:
-      | "PENDING"
-      | "UNDER_REVIEW"
-      | "ASSIGNED"
-      | "IN_PROGRESS"
-      | "WORK_COMPLETED"
-      | "AWAITING_APPROVAL"
-      | "APPROVED"
-      | "REJECTED"
-      | "CANCELLED"
-      | "CLOSED"
-      | "RESOLVED"
-      | string;
+    | "PENDING"
+    | "UNDER_REVIEW"
+    | "ASSIGNED"
+    | "IN_PROGRESS"
+    | "WORK_COMPLETED"
+    | "AWAITING_APPROVAL"
+    | "APPROVED"
+    | "REJECTED"
+    | "CANCELLED"
+    | "CLOSED"
+    | "RESOLVED"
+    | string;
     assignedStaff?: {
       _id: string;
       name: string;
@@ -183,23 +183,54 @@ export async function fetchResidentGuestPasses(params?: {
       }
     );
   } catch {
-    return {
-      guestPasses: [],
-      counts: {
-        total: 0,
-        activePassesCount: 0,
-        usedPassesCount: 0,
-        expiredPassesCount: 0,
-      },
-      pagination: {
-        page: params?.page || 1,
-        limit: params?.limit || 20,
-        total: 0,
-        totalPages: 1,
-        hasNextPage: false,
-        hasPreviousPage: false,
-      },
-    };
+    try {
+      const fallbackRes = await api.get<{
+        success: boolean;
+        data: {
+          guestPasses: GuestPassItem[];
+          pagination: { total: number };
+        };
+      }>("/api/v1/visitors/passes", { params });
+
+      const fallbackPasses = fallbackRes.data?.data?.guestPasses || [];
+      const total = fallbackRes.data?.data?.pagination?.total ?? fallbackPasses.length;
+
+      return {
+        guestPasses: fallbackPasses,
+        counts: {
+          total,
+          activePassesCount: fallbackPasses.filter((p) => p.status === "ACTIVE").length,
+          usedPassesCount: fallbackPasses.filter((p) => p.status === "USED").length,
+          expiredPassesCount: fallbackPasses.filter((p) => p.status === "EXPIRED").length,
+        },
+        pagination: {
+          page: params?.page || 1,
+          limit: params?.limit || 20,
+          total,
+          totalPages: Math.ceil(total / (params?.limit || 20)) || 1,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        },
+      };
+    } catch {
+      return {
+        guestPasses: [],
+        counts: {
+          total: 0,
+          activePassesCount: 0,
+          usedPassesCount: 0,
+          expiredPassesCount: 0,
+        },
+        pagination: {
+          page: params?.page || 1,
+          limit: params?.limit || 20,
+          total: 0,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        },
+      };
+    }
   }
 }
 
@@ -216,7 +247,7 @@ export async function markResidentVisitorDeparted(passIdOrVisitId: string) {
       success: boolean;
       message: string;
       visit?: any;
-    }>(`/api/visitors/passes/${encodeURIComponent(passIdOrVisitId)}/depart-flat`);
+    }>(`/api/v1/visitors/passes/${encodeURIComponent(passIdOrVisitId)}/depart-flat`);
     return fallbackRes.data;
   }
 }
@@ -501,7 +532,7 @@ export async function createResidentGuestPass(payload: CreateResidentGuestPassPa
     return res.data;
   } catch (error) {
     const fallbackRes = await api.post<CreateResidentGuestPassResponse>(
-      "/api/visitors/passes",
+      "/api/v1/visitors/passes",
       payload
     );
     return fallbackRes.data;
@@ -519,7 +550,7 @@ export async function cancelResidentGuestPass(passId: string) {
     const fallbackRes = await api.patch<{
       success: boolean;
       message?: string;
-    }>(`/api/visitors/passes/${encodeURIComponent(passId)}/cancel`);
+    }>(`/api/v1/visitors/passes/${encodeURIComponent(passId)}/cancel`);
     return fallbackRes.data;
   }
 }

@@ -46,7 +46,6 @@ router.post("/passes", zodValidate(createResidentGuestPassSchema), createResiden
 router.get("/passes", zodValidate(listResidentGuestPassesQuerySchema), getResidentGuestPassesHandler)
 router.get("/passes/:guestPassId", zodValidate(guestPassIdParamsSchema), getGuestPassById)
 router.patch("/passes/:passId/cancel", zodValidate(residentGuestPassParamsSchema), cancelResidentGuestPassHandler)
-router.patch("/passes/:guestPassId/cancel", zodValidate(guestPassIdParamsSchema), cancelResidentGuestPassHandler)
 router.patch("/passes/:passId/depart-flat", zodValidate(residentGuestPassParamsSchema), markVisitorDepartedHandler)
 router.patch("/visits/:visitId/depart-flat", zodValidate(visitorVisitIdParamsSchema), markVisitorDepartedHandler)
 router.post("/visits/check-in", requireRole("security_staff"), zodValidate(checkInVisitorSchema), checkInVisitor)

@@ -118,15 +118,17 @@ export const updateMaintenanceStatusBodySchema = z
     status: z.enum(maintenanceStatuses, {
       error: "Maintenance status is required",
     }),
-    remarks: z.string().trim().max(1000).optional(),
-    notes: z.string().trim().max(1000).optional(),
-  });
+    notes: z.string().optional().nullable(),
+    remarks: z.string().optional().nullable(),
+  })
+  .passthrough();
 
 export const startMaintenanceBodySchema = z
   .object({
-    remarks: nonEmptyText("Remarks", 1000).optional(),
+    notes: z.string().optional().nullable(),
+    remarks: z.string().optional().nullable(),
   })
-  .strict();
+  .passthrough();
 
 export const updateMaintenanceProgressBodySchema = z
   .object({
@@ -136,9 +138,10 @@ export const updateMaintenanceProgressBodySchema = z
       .min(5, "Progress details must be at least 5 characters")
       .max(3000, "Progress details cannot exceed 3000 characters"),
     status: z.enum(["IN_PROGRESS", "ON_HOLD"]).optional(),
-    remarks: nonEmptyText("Remarks", 1000).optional(),
+    notes: z.string().optional().nullable(),
+    remarks: z.string().optional().nullable(),
   })
-  .strict();
+  .passthrough();
 
 export const completeMaintenanceBodySchema = z
   .object({
@@ -149,47 +152,55 @@ export const completeMaintenanceBodySchema = z
       .max(3000, "Completion details cannot exceed 3000 characters"),
     finalCost: costSchema.optional(),
     workNotes: nonEmptyText("Work notes", 3000).optional(),
-    remarks: nonEmptyText("Remarks", 1000).optional(),
+    notes: z.string().optional().nullable(),
+    remarks: z.string().optional().nullable(),
   })
-  .strict();
+  .passthrough();
 
 export const approveMaintenanceBodySchema = z
   .object({
-    remarks: nonEmptyText("Approval remarks", 1000).optional(),
+    notes: z.string().optional().nullable(),
+    remarks: z.string().optional().nullable(),
   })
-  .strict();
+  .passthrough();
 
 export const rejectMaintenanceBodySchema = z
   .object({
-    reason: nonEmptyText("Rejection reason", 1000),
-    remarks: nonEmptyText("Remarks", 1000).optional(),
+    reason: nonEmptyText("Rejection reason", 1000).optional().nullable(),
+    notes: z.string().optional().nullable(),
+    remarks: z.string().optional().nullable(),
   })
-  .strict();
+  .passthrough();
 
 export const cancelMaintenanceBodySchema = z
   .object({
-    reason: nonEmptyText("Cancellation reason", 1000).optional(),
+    reason: nonEmptyText("Cancellation reason", 1000).optional().nullable(),
+    notes: z.string().optional().nullable(),
+    remarks: z.string().optional().nullable(),
   })
-  .strict();
+  .passthrough();
 
 export const closeMaintenanceBodySchema = z
   .object({
-    remarks: nonEmptyText("Closing remarks", 1000).optional(),
+    notes: z.string().optional().nullable(),
+    remarks: z.string().optional().nullable(),
   })
-  .strict();
+  .passthrough();
 
 export const approveMaintenanceCostBodySchema = z
   .object({
-    remarks: nonEmptyText("Cost approval remarks", 1000).optional(),
+    notes: z.string().optional().nullable(),
+    remarks: z.string().optional().nullable(),
   })
-  .strict();
+  .passthrough();
 
 export const rejectMaintenanceCostBodySchema = z
   .object({
-    reason: nonEmptyText("Cost rejection reason", 1000),
-    remarks: nonEmptyText("Remarks", 1000).optional(),
+    reason: nonEmptyText("Cost rejection reason", 1000).optional().nullable(),
+    notes: z.string().optional().nullable(),
+    remarks: z.string().optional().nullable(),
   })
-  .strict();
+  .passthrough();
 
 export const getMaintenanceQuerySchema = z
   .object({
@@ -280,6 +291,10 @@ export const rejectMaintenanceCostSchema = z.object({
   params: maintenanceIdParamsSchema,
   body: rejectMaintenanceCostBodySchema,
 });
+
+export const approveExpenseSchema = approveMaintenanceCostSchema;
+export const approveExpenseBodySchema = approveMaintenanceCostBodySchema;
+export const updateExpenseStatusSchema = updateMaintenanceStatusSchema;
 
 export type MaintenanceIdParams = z.infer<typeof maintenanceIdParamsSchema>;
 export type CreateMaintenanceInput = z.infer<typeof createMaintenanceBodySchema>;

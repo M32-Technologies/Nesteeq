@@ -11,14 +11,19 @@ import { Block } from "../block/block.model.js"
 import { Apartment } from "../apartment/apartment.model.js"
 
 export type AssignedJob = {
+  _id?: string
   jobId: string
   title: string
+  issueDetails?: string
   category: string
   block: string
   flat: string
   priority: "High" | "Medium" | "Low"
   status: "ASSIGNED" | "IN_PROGRESS" | "COMPLETED"
   assignedDate: string
+  createdAt?: string
+  type?: "MAINTENANCE" | "COMPLAINT" | string
+  jobType?: "MAINTENANCE" | "COMPLAINT"
   location?: string
   area?: string
   flatNumber?: string
@@ -406,12 +411,14 @@ export const buildTechnicianScope = (ids: string[]): Record<string, unknown> => 
   return {
     $or: [
       { assignedStaff: { $in: allPossibleIdValues } },
+      { assignedStaffId: { $in: allPossibleIdValues } },
       { assignedTo: { $in: allPossibleIdValues } },
       { "assignedTo._id": { $in: allPossibleIdValues } },
       { "assignedTo.id": { $in: ids } },
       { "assignedTo.userId": { $in: ids } },
       { assignedTechnicianId: { $in: allPossibleIdValues } },
       { technician: { $in: allPossibleIdValues } },
+      { technicianId: { $in: allPossibleIdValues } },
       { "technician._id": { $in: allPossibleIdValues } },
       { "technician.id": { $in: ids } },
       { "technician.userId": { $in: ids } },
@@ -465,7 +472,9 @@ export const getDashboardStats = async (
 export const getAssignedJobs = async (
   status: string | undefined,
   technicianUserId: string,
-  extraTechnicianId?: string | null
+  extraTechnicianId?: string | null,
+  sortBy: string = "createdAt",
+  order: string = "desc"
 ): Promise<AssignedJob[]> => {
   const ids = await resolveTechnicianIds(technicianUserId, extraTechnicianId)
   const scopeFilter = buildTechnicianScope(ids)
@@ -477,10 +486,33 @@ export const getAssignedJobs = async (
     const s = status.toUpperCase()
     if (s === "ACTIVE") {
       complaintFilter.status = {
-        $in: ["PENDING", "UNDER_REVIEW", "ASSIGNED", "IN_PROGRESS"],
+        $in: [
+          "PENDING",
+          "UNDER_REVIEW",
+          "ASSIGNED",
+          "IN_PROGRESS",
+          "pending",
+          "under_review",
+          "assigned",
+          "in_progress",
+        ],
       }
       maintenanceFilter.status = {
-        $in: ["SCHEDULED", "PENDING", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"],
+        $in: [
+          "SCHEDULED",
+          "PENDING",
+          "ASSIGNED",
+          "IN_PROGRESS",
+          "ON_HOLD",
+          "scheduled",
+          "pending",
+          "assigned",
+          "in_progress",
+          "on_hold",
+          "Active",
+          "ACTIVE",
+          "Assigned",
+        ],
       }
     } else if (s === "COMPLETED" || s === "WORK_COMPLETED") {
       complaintFilter.status = {
@@ -502,42 +534,42 @@ export const getAssignedJobs = async (
         ],
       }
     } else if (s === "ASSIGNED" || s === "PENDING" || s === "SCHEDULED") {
-      complaintFilter.status = { $in: ["PENDING", "UNDER_REVIEW", "ASSIGNED"] }
-      maintenanceFilter.status = { $in: ["SCHEDULED", "PENDING", "ASSIGNED"] }
+      complaintFilter.status = {
+        $in: [
+          "PENDING",
+          "UNDER_REVIEW",
+          "ASSIGNED",
+          "pending",
+          "under_review",
+          "assigned",
+        ],
+      }
+      maintenanceFilter.status = {
+        $in: [
+          "SCHEDULED",
+          "PENDING",
+          "ASSIGNED",
+          "scheduled",
+          "pending",
+          "assigned",
+          "Assigned",
+        ],
+      }
     } else if (s === "IN_PROGRESS") {
-      complaintFilter.status = "IN_PROGRESS"
-      maintenanceFilter.status = { $in: ["IN_PROGRESS", "ON_HOLD"] }
+      complaintFilter.status = { $in: ["IN_PROGRESS", "in_progress"] }
+      maintenanceFilter.status = {
+        $in: ["IN_PROGRESS", "ON_HOLD", "in_progress", "on_hold"],
+      }
     } else {
       complaintFilter.status = s
       maintenanceFilter.status = s
     }
   } else {
     complaintFilter.status = {
-      $in: [
-        "PENDING",
-        "UNDER_REVIEW",
-        "ASSIGNED",
-        "IN_PROGRESS",
-        "WORK_COMPLETED",
-        "AWAITING_APPROVAL",
-        "RESOLVED",
-        "APPROVED",
-        "CLOSED",
-      ],
+      $nin: ["CANCELLED", "cancelled", "REJECTED", "rejected"],
     }
     maintenanceFilter.status = {
-      $in: [
-        "SCHEDULED",
-        "PENDING",
-        "ASSIGNED",
-        "IN_PROGRESS",
-        "ON_HOLD",
-        "WORK_COMPLETED",
-        "COMPLETED",
-        "AWAITING_APPROVAL",
-        "APPROVED",
-        "CLOSED",
-      ],
+      $nin: ["CANCELLED", "cancelled", "REJECTED", "rejected"],
     }
   }
 
@@ -629,20 +661,28 @@ export const getAssignedJobs = async (
   for (const doc of complaintDocs as any[]) {
     const idStr = doc._id.toString()
     seenComplaintIds.add(idStr)
-    const assignedDateVal = doc.assignedAt || doc.createdAt || new Date()
-    const assignedDate = new Date(assignedDateVal).toISOString().split("T")[0]
+    const rawDateVal = doc.assignedAt || doc.createdAt || new Date()
+    const assignedDate = new Date(rawDateVal).toISOString()
+    const createdAtStr = doc.createdAt
+      ? new Date(doc.createdAt).toISOString()
+      : new Date(rawDateVal).toISOString()
 
     const loc = resolveDocLocation(doc, flatMap, blockMap, apartmentMap)
 
     jobs.push({
+      _id: idStr,
       jobId: idStr,
       title: doc.title || "Complaint Request",
+      issueDetails: doc.title || doc.description || "Complaint Request",
       category: doc.category || "General Maintenance",
       block: loc.displayBlock,
       flat: loc.displayFlat,
       priority: mapPriority(doc.priority),
       status: mapStatus(doc.status),
       assignedDate,
+      createdAt: createdAtStr,
+      type: "COMPLAINT",
+      jobType: "COMPLAINT",
       flatNumber: loc.flatNumber,
       unitNumber: loc.unitNumber,
       blockName: loc.blockName,
@@ -659,27 +699,63 @@ export const getAssignedJobs = async (
       continue
     }
 
-    const assignedDateVal = doc.assignedAt || doc.createdAt || new Date()
-    const assignedDate = new Date(assignedDateVal).toISOString().split("T")[0]
+    const idStr = doc._id.toString()
+    const rawDateVal = doc.assignedAt || doc.createdAt || new Date()
+    const assignedDate = new Date(rawDateVal).toISOString()
+    const createdAtStr = doc.createdAt
+      ? new Date(doc.createdAt).toISOString()
+      : new Date(rawDateVal).toISOString()
 
     const loc = resolveDocLocation(doc, flatMap, blockMap, apartmentMap)
 
+    const locationText =
+      typeof doc.location === "string" &&
+      doc.location.trim() !== "" &&
+      !isHexObjectId(doc.location)
+        ? doc.location.trim()
+        : loc.location || "Building Common Area"
+
+    const titleText = doc.title || doc.type || "Routine Maintenance"
+
     jobs.push({
-      jobId: doc._id.toString(),
-      title: doc.title || "Maintenance Request",
-      category: doc.category || "General Maintenance",
-      block: loc.displayBlock,
-      flat: loc.displayFlat,
+      _id: idStr,
+      jobId: idStr,
+      title: titleText,
+      issueDetails: titleText,
+      category: doc.type || doc.category || "MAINTENANCE",
+      block: loc.displayBlock || "Building",
+      flat:
+        loc.displayFlat && loc.displayFlat !== "Unit"
+          ? loc.displayFlat
+          : locationText,
       priority: mapPriority(doc.priority),
       status: mapStatus(doc.status),
       assignedDate,
+      createdAt: createdAtStr,
+      type: "MAINTENANCE",
+      jobType: "MAINTENANCE",
       flatNumber: loc.flatNumber,
       unitNumber: loc.unitNumber,
       blockName: loc.blockName,
-      location: loc.location,
+      location: locationText,
       area: loc.area,
     })
   }
+
+  const isAsc = String(order || "desc").toLowerCase() === "asc"
+  jobs.sort((a, b) => {
+    const dateFieldA =
+      sortBy === "assignedDate"
+        ? a.assignedDate || a.createdAt
+        : a.createdAt || a.assignedDate
+    const dateFieldB =
+      sortBy === "assignedDate"
+        ? b.assignedDate || b.createdAt
+        : b.createdAt || b.assignedDate
+    const timeA = new Date(dateFieldA || 0).getTime()
+    const timeB = new Date(dateFieldB || 0).getTime()
+    return isAsc ? timeA - timeB : timeB - timeA
+  })
 
   return jobs
 }

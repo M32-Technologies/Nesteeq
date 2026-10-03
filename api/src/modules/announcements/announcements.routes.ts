@@ -60,20 +60,20 @@ router.get(
   getAnnouncementByIdHandler
 );
 
-// Update announcement
-router.patch(
-  "/:announcementId",
-  requireRole("property_manager", "facility_manager", "security_staff"),
-  zodValidate(updateAnnouncementSchema),
-  updateAnnouncementHandler
-);
-
 // Quick update status (draft, published, archived)
 router.patch(
   "/:announcementId/status",
   requireRole("property_manager", "facility_manager", "security_staff"),
   zodValidate(updateAnnouncementStatusSchema),
   updateAnnouncementStatusHandler
+);
+
+// Update announcement
+router.patch(
+  "/:announcementId",
+  requireRole("property_manager", "facility_manager", "security_staff"),
+  zodValidate(updateAnnouncementSchema),
+  updateAnnouncementHandler
 );
 
 // Delete announcement (Property manager, facility manager, and security staff)

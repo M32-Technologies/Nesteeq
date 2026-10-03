@@ -49,12 +49,27 @@ export const getAssignedJobsController = catchAsync(
     const technicianId = getAuthenticatedTechnicianId(req)
     const extraTechId = getExtraTechnicianId(req)
     const status = req.query.status ? String(req.query.status) : undefined
-    const data = await getAssignedJobs(status, technicianId, extraTechId)
+    const sortBy = req.query.sortBy ? String(req.query.sortBy) : "createdAt"
+    const order = req.query.order ? String(req.query.order) : "desc"
+
+    const allJobs = await getAssignedJobs(status, technicianId, extraTechId, sortBy, order)
+
+    const totalItems = allJobs.length
+    const limitNum = req.query.limit ? parseInt(req.query.limit as string) : 10;
+    const pageNum = req.query.page ? parseInt(req.query.page as string) : 1;
+    const startIndex = (pageNum - 1) * limitNum;
+    const paginatedJobs = allJobs.slice(startIndex, startIndex + limitNum);
 
     res.status(200).json({
       success: true,
       message: "Assigned jobs fetched successfully",
-      data,
+      data: paginatedJobs,
+      pagination: {
+        total: totalItems,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(totalItems / limitNum) || 1,
+      },
     })
   }
 )
@@ -115,7 +130,16 @@ export const uploadEvidenceController = catchAsync(
     const technicianId = getAuthenticatedTechnicianId(req)
     const extraTechId = getExtraTechnicianId(req)
     const jobId = String(req.params.jobId)
-    const data = await uploadEvidence(jobId, req.file, technicianId, extraTechId)
+
+    const files = req.files as Record<string, Express.Multer.File[]> | undefined
+    const file =
+      req.file ||
+      files?.file?.[0] ||
+      files?.evidence?.[0] ||
+      files?.receipt?.[0] ||
+      (Array.isArray(req.files) ? req.files[0] : undefined)
+
+    const data = await uploadEvidence(jobId, file, technicianId, extraTechId)
 
     res.status(200).json({
       success: true,
