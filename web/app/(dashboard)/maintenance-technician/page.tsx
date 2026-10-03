@@ -15,7 +15,7 @@ export default function MaintenanceTechnicianPage() {
 
       <MaintenanceStats />
 
-      <AssignedJobsList />
+      <AssignedJobsList isOverview={true} limit={5} />
     </div>
   )
 }

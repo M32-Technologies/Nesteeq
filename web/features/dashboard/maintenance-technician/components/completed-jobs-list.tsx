@@ -44,17 +44,19 @@ export default function CompletedJobsList() {
   const [openActionJobId, setOpenActionJobId] = useState<string | null>(null)
 
   const {
-    data: jobs = [],
+    data,
     isLoading,
     isError,
     error,
   } = useQuery({
     queryKey: completedJobsQueryKeys.all(session?.user?.id),
-    queryFn: () => getAssignedJobs("COMPLETED"),
+    queryFn: () => getAssignedJobs("COMPLETED", "desc", "createdAt", 1, 100),
     staleTime: 0,
     refetchOnWindowFocus: true,
     refetchOnMount: "always",
   })
+
+  const jobs = data?.jobs ?? []
 
   // Ensure only COMPLETED jobs are shown
   const completedJobs = useMemo(() => {

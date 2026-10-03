@@ -49,14 +49,27 @@ export const getAssignedJobsController = catchAsync(
     const technicianId = getAuthenticatedTechnicianId(req)
     const extraTechId = getExtraTechnicianId(req)
     const status = req.query.status ? String(req.query.status) : undefined
-    const sortBy = req.query.sortBy ? String(req.query.sortBy) : undefined
-    const order = req.query.order ? String(req.query.order) : undefined
-    const data = await getAssignedJobs(status, technicianId, extraTechId, sortBy, order)
+    const sortBy = req.query.sortBy ? String(req.query.sortBy) : "createdAt"
+    const order = req.query.order ? String(req.query.order) : "desc"
+
+    const allJobs = await getAssignedJobs(status, technicianId, extraTechId, sortBy, order)
+
+    const totalItems = allJobs.length
+    const pageNum = parseInt(req.query.page as string) || 1
+    const limitNum = parseInt(req.query.limit as string) || 10
+    const startIndex = (pageNum - 1) * limitNum
+    const paginatedJobs = allJobs.slice(startIndex, startIndex + limitNum)
 
     res.status(200).json({
       success: true,
       message: "Assigned jobs fetched successfully",
-      data,
+      data: paginatedJobs,
+      pagination: {
+        total: totalItems,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(totalItems / limitNum) || 1,
+      },
     })
   }
 )

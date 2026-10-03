@@ -2,10 +2,23 @@ import { isAxiosError } from "axios"
 
 import api from "@/lib/axios"
 
+export type PaginationInfo = {
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+}
+
+export type PaginatedJobsResult = {
+  jobs: AssignedJob[]
+  pagination: PaginationInfo
+}
+
 type ApiResponse<T> = {
   success: boolean
   message?: string
   data: T
+  pagination?: PaginationInfo
 }
 
 type ApiErrorResponse = {
@@ -85,12 +98,16 @@ const getApiErrorMessage = (error: unknown, fallback: string) => {
 export const getAssignedJobs = async (
   status?: string,
   order: "desc" | "asc" = "desc",
-  sortBy: string = "createdAt"
-): Promise<AssignedJob[]> => {
+  sortBy: string = "createdAt",
+  page: number = 1,
+  limit: number = 10
+): Promise<PaginatedJobsResult> => {
   try {
-    const params: Record<string, string> = {
+    const params: Record<string, string | number> = {
       order,
       sortBy,
+      page,
+      limit,
     }
     if (status && status !== "ALL") {
       params.status = status
@@ -105,7 +122,18 @@ export const getAssignedJobs = async (
       throw new Error(response.data.message || "Failed to fetch assigned jobs")
     }
 
-    return response.data.data || []
+    const jobs = response.data.data || []
+    const pagination = response.data.pagination || {
+      total: jobs.length,
+      page,
+      limit,
+      totalPages: Math.ceil(jobs.length / limit) || 1,
+    }
+
+    return {
+      jobs,
+      pagination,
+    }
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Failed to fetch assigned jobs"))
   }
