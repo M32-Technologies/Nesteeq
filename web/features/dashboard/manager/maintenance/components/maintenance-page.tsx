@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 
 import MaintenanceHeader from "./maintenance-header"
@@ -61,10 +61,23 @@ function getProgressPercentage(item: any, stage: WorkProgressStage): number {
 export default function MaintenancePage() {
   const [selectedWorkOrder, setSelectedWorkOrder] =
     useState<MaintenanceWorkOrder | null>(null)
+  const [search, setSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [search])
 
   const { data, isLoading } = useQuery({
-    queryKey: ["manager-maintenance"],
-    queryFn: () => fetchMaintenance({ limit: 100 }),
+    queryKey: ["manager-maintenance", debouncedSearch],
+    queryFn: () =>
+      fetchMaintenance({
+        limit: 100,
+        search: debouncedSearch.trim() || undefined,
+      }),
     staleTime: 30 * 1000,
   })
 
@@ -142,6 +155,8 @@ export default function MaintenancePage() {
       <MaintenanceWorkTable
         workOrders={workOrders}
         isLoading={isLoading}
+        search={search}
+        onSearchChange={setSearch}
         onViewWorkOrder={(order) => setSelectedWorkOrder(order)}
       />
 

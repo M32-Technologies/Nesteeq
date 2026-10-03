@@ -101,6 +101,9 @@ interface BillFilters {
   commonBillId?: string;
   billType?: string;
   status?: BillStatus;
+  search?: string;
+  page?: number;
+  limit?: number;
 }
 
 type BillingDocument = HydratedDocument<IBilling>;
@@ -474,45 +477,10 @@ export const createBillService = async (
   return getBillByIdService(finalBill._id.toString());
 };
 
-export const getBillsService = async (
-  filters: BillFilters
-) => {
-  const query: Record<string, unknown> = {};
+const escapeRegex = (str: string) =>
+  str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-  if (filters.apartmentId) {
-    query.apartmentId = toObjectId(
-      filters.apartmentId,
-      "apartmentId"
-    );
-  }
-
-  if (filters.residentId) {
-    query.residentId = toObjectId(
-      filters.residentId,
-      "residentId"
-    );
-  }
-
-  if (filters.unitId) {
-    query.unitId = toObjectId(filters.unitId, "unitId");
-  }
-
-  if (filters.commonBillId) {
-    query.commonBillId = toObjectId(filters.commonBillId, "commonBillId");
-  }
-
-  if (filters.billType) {
-    query.billType = filters.billType;
-  }
-
-  if (filters.status) {
-    query.status = filters.status;
-  }
-
-  const bills = await Billing.find(query)
-    .sort({ createdAt: -1 })
-    .lean();
-
+const populateBillEntities = async (bills: any[]) => {
   if (bills.length === 0) {
     return [];
   }
@@ -567,6 +535,126 @@ export const getBillsService = async (
       residentName,
     };
   });
+};
+
+export const getBillsService = async (
+  filters: BillFilters
+) => {
+  const query: Record<string, unknown> = {};
+
+  if (filters.apartmentId) {
+    query.apartmentId = toObjectId(
+      filters.apartmentId,
+      "apartmentId"
+    );
+  }
+
+  if (filters.residentId) {
+    query.residentId = toObjectId(
+      filters.residentId,
+      "residentId"
+    );
+  }
+
+  if (filters.unitId) {
+    query.unitId = toObjectId(filters.unitId, "unitId");
+  }
+
+  if (filters.commonBillId) {
+    query.commonBillId = toObjectId(filters.commonBillId, "commonBillId");
+  }
+
+  if (filters.billType) {
+    query.billType = filters.billType;
+  }
+
+  if (filters.status) {
+    query.status = filters.status;
+  }
+
+  if (filters.search) {
+    const rawSearch = filters.search.trim();
+    const safeSearch = escapeRegex(rawSearch);
+    const searchRegex = new RegExp(safeSearch, "i");
+
+    const flatQuery: Record<string, unknown> = { flatNumber: searchRegex };
+    if (query.apartmentId) {
+      flatQuery.apartmentId = query.apartmentId;
+    }
+    const matchingFlats = await Flat.find(flatQuery, "_id").lean();
+    const matchingFlatIds = matchingFlats.map((f) => f._id);
+
+    let matchingResidentIds: Types.ObjectId[] = [];
+    try {
+      const authUsers = await getAuthDB()
+        .collection("user")
+        .find({ name: searchRegex })
+        .project({ _id: 1, id: 1 })
+        .toArray();
+      const matchedUserIds = authUsers
+        .map((u) => u.id || u._id.toString())
+        .filter(Boolean);
+
+      if (matchedUserIds.length > 0) {
+        const residentQuery: Record<string, unknown> = {
+          userId: { $in: matchedUserIds },
+        };
+        if (query.apartmentId) {
+          residentQuery.apartmentId = query.apartmentId;
+        }
+        const matchingResidents = await ResidentModel.find(residentQuery, "_id").lean();
+        matchingResidentIds = matchingResidents.map((r) => r._id);
+      }
+    } catch {
+      // Ignore if auth db lookup fails
+    }
+
+    const searchConditions: Array<Record<string, unknown>> = [
+      { title: searchRegex },
+      { billingPeriod: searchRegex },
+      { description: searchRegex },
+    ];
+
+    if (matchingFlatIds.length > 0) {
+      searchConditions.push({ unitId: { $in: matchingFlatIds } });
+    }
+    if (matchingResidentIds.length > 0) {
+      searchConditions.push({ residentId: { $in: matchingResidentIds } });
+    }
+
+    query.$or = searchConditions;
+  }
+
+  if (filters.page) {
+    const total = await Billing.countDocuments(query);
+    const page = Math.max(1, filters.page);
+    const limit = Math.max(1, filters.limit || 8);
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    const bills = await Billing.find(query)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+
+    const populatedBills = await populateBillEntities(bills);
+
+    return {
+      bills: populatedBills,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages,
+      },
+    };
+  }
+
+  const bills = await Billing.find(query)
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return populateBillEntities(bills);
 };
 
 export const getBillRecipientsService = async (apartmentId: string) => {
@@ -978,12 +1066,25 @@ export const getBillingSummaryService = async (
   };
 };
 
-export const getMyResidentBillsService = async (user: {
-  id: string;
-  role: string;
-  apartmentId?: string | null;
-  flatId?: string | null;
-}) => {
+export interface ResidentBillsQuery {
+  scope?: string;
+  category?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+  receiptsPage?: number;
+  receiptsLimit?: number;
+}
+
+export const getMyResidentBillsService = async (
+  user: {
+    id: string;
+    role: string;
+    apartmentId?: string | null;
+    flatId?: string | null;
+  },
+  query?: ResidentBillsQuery
+) => {
   let apartmentId = user.apartmentId;
   let flatId = user.flatId;
   let residentRecord: any = null;
@@ -1271,6 +1372,7 @@ export const getMyResidentBillsService = async (user: {
 
   const handledBillIds = new Set<string>();
   const recentPayments: any[] = paymentsRaw.map((p) => {
+    const matchedBill = formattedBills.find((b) => b._id === p.billId?.toString());
     if (p.billId) handledBillIds.add(p.billId.toString());
     return {
       _id: p._id.toString(),
@@ -1282,6 +1384,9 @@ export const getMyResidentBillsService = async (user: {
       referenceNo: p.referenceNo,
       description: p.description,
       paidAt: p.paidAt,
+      billTitle: matchedBill?.title,
+      billingPeriod: matchedBill?.billingPeriod,
+      billScope: matchedBill?.billScope,
     };
   });
 
@@ -1303,6 +1408,9 @@ export const getMyResidentBillsService = async (user: {
         referenceNo: `BILL-${b._id.slice(-6).toUpperCase()}`,
         description: b.description || `${b.title} - Settled in full`,
         paidAt: b.dueDate || b.createdAt,
+        billTitle: b.title,
+        billingPeriod: b.billingPeriod,
+        billScope: b.billScope,
       });
       handledBillIds.add(b._id);
     }
@@ -1315,6 +1423,80 @@ export const getMyResidentBillsService = async (user: {
     return timeB - timeA;
   });
 
+  const commonBillsCount = formattedBills.filter(
+    (b) => b.isCommonBill || b.billScope === "COMMON"
+  ).length;
+  const separateBillsCount = formattedBills.filter(
+    (b) => !b.isCommonBill && b.billScope !== "COMMON"
+  ).length;
+
+  let filteredBills = formattedBills;
+
+  if (query?.scope === "COMMON") {
+    filteredBills = filteredBills.filter(
+      (b) => b.isCommonBill || b.billScope === "COMMON"
+    );
+  } else if (query?.scope === "SEPARATE") {
+    filteredBills = filteredBills.filter(
+      (b) => !b.isCommonBill && b.billScope !== "COMMON"
+    );
+  }
+
+  if (query?.category && query.category !== "ALL") {
+    filteredBills = filteredBills.filter(
+      (b) => (b.billType || "MONTHLY_MAINTENANCE") === query.category
+    );
+  }
+
+  if (query?.search?.trim()) {
+    const q = query.search.toLowerCase().trim();
+    filteredBills = filteredBills.filter((b) => {
+      const title = (b.title || "").toLowerCase();
+      const period = (b.billingPeriod || "").toLowerCase();
+      const desc = (b.description || "").toLowerCase();
+      const type = (b.billType || "").toLowerCase();
+      const id = (b._id || "").toLowerCase();
+      const shortId = id.slice(-6);
+
+      return (
+        title.includes(q) ||
+        period.includes(q) ||
+        desc.includes(q) ||
+        type.includes(q) ||
+        id.includes(q) ||
+        shortId.includes(q)
+      );
+    });
+  }
+
+  const invoicesPage = Math.max(1, Number(query?.page) || 1);
+  const invoicesLimit = Math.max(1, Number(query?.limit) || 8);
+  const totalBills = filteredBills.length;
+  const paginatedBills = query?.page
+    ? filteredBills.slice((invoicesPage - 1) * invoicesLimit, invoicesPage * invoicesLimit)
+    : filteredBills;
+
+  const receiptsPage = Math.max(1, Number(query?.receiptsPage) || 1);
+  const receiptsLimit = Math.max(1, Number(query?.receiptsLimit) || 8);
+  const totalReceipts = recentPayments.length;
+  const paginatedReceipts = query?.receiptsPage
+    ? recentPayments.slice((receiptsPage - 1) * receiptsLimit, receiptsPage * receiptsLimit)
+    : recentPayments;
+
+  if (!query?.page && !query?.receiptsPage && !query?.scope && !query?.category && !query?.search) {
+    return {
+      summary: {
+        totalOutstanding: roundMoney(totalOutstanding),
+        totalPaid: roundMoney(totalPaid),
+        pendingCount,
+        overdueCount,
+        lateFees: roundMoney(totalLateFees),
+      },
+      bills: formattedBills,
+      recentPayments,
+    };
+  }
+
   return {
     summary: {
       totalOutstanding: roundMoney(totalOutstanding),
@@ -1323,8 +1505,27 @@ export const getMyResidentBillsService = async (user: {
       overdueCount,
       lateFees: roundMoney(totalLateFees),
     },
-    bills: formattedBills,
-    recentPayments,
+    bills: paginatedBills,
+    allBills: formattedBills,
+    recentPayments: paginatedReceipts,
+    allRecentPayments: recentPayments,
+    counts: {
+      allBillsCount: formattedBills.length,
+      commonBillsCount,
+      separateBillsCount,
+    },
+    pagination: {
+      total: totalBills,
+      page: invoicesPage,
+      limit: invoicesLimit,
+      totalPages: Math.ceil(totalBills / invoicesLimit) || 1,
+    },
+    receiptsPagination: {
+      total: totalReceipts,
+      page: receiptsPage,
+      limit: receiptsLimit,
+      totalPages: Math.ceil(totalReceipts / receiptsLimit) || 1,
+    },
   };
 };
 

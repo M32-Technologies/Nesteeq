@@ -95,10 +95,63 @@ export default function TreasurerPayments() {
   const [recordRefNo, setRecordRefNo] = useState("");
   const [recordDescription, setRecordDescription] = useState("");
 
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Date Filter Range Computation
+  const dateRangeBounds = useMemo(() => {
+    const now = new Date();
+    if (datePreset === "TODAY") {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      return { start, end: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999) };
+    }
+    if (datePreset === "THIS_WEEK") {
+      const day = now.getDay();
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Monday
+      const start = new Date(now.getFullYear(), now.getMonth(), diff);
+      start.setHours(0, 0, 0, 0);
+      return { start, end: new Date() };
+    }
+    if (datePreset === "THIS_MONTH") {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { start, end: new Date() };
+    }
+    if (datePreset === "LAST_MONTH") {
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+      return { start, end };
+    }
+    return null;
+  }, [datePreset]);
+
   // Data Queries
   const paymentsQuery = useQuery({
-    queryKey: ["treasurer", "payments-ledger"],
-    queryFn: () => getPayments({ limit: 500, includeReversed: true }),
+    queryKey: [
+      "treasurer",
+      "payments-ledger",
+      selectedMethod,
+      datePreset,
+      statusFilter,
+      debouncedSearch,
+      currentPage,
+    ],
+    queryFn: () =>
+      getPayments({
+        paymentMethod: selectedMethod !== "ALL" ? selectedMethod : undefined,
+        status: statusFilter,
+        includeReversed: statusFilter === "ALL" || statusFilter === "REVERSED",
+        startDate: dateRangeBounds ? dateRangeBounds.start.toISOString() : undefined,
+        endDate: dateRangeBounds ? dateRangeBounds.end.toISOString() : undefined,
+        search: debouncedSearch.trim() || undefined,
+        page: currentPage,
+        limit: ITEMS_PER_PAGE,
+      }),
   });
 
   const billsQuery = useQuery({
@@ -106,8 +159,19 @@ export default function TreasurerPayments() {
     queryFn: () => getBills(),
   });
 
-  const allPayments = paymentsQuery.data ?? [];
-  const allBills = billsQuery.data ?? [];
+  const paymentsData = paymentsQuery.data;
+  const allPayments: Payment[] = useMemo(() => {
+    if (!paymentsData) return [];
+    if (Array.isArray(paymentsData)) return paymentsData;
+    return paymentsData.payments || [];
+  }, [paymentsData]);
+
+  const rawBills = billsQuery.data;
+  const allBills: Bill[] = useMemo(() => {
+    if (!rawBills) return [];
+    if (Array.isArray(rawBills)) return rawBills;
+    return (rawBills as any).bills || [];
+  }, [rawBills]);
 
   // Filter bills that have unpaid balances for the quick record modal
   const unpaidBills = useMemo(() => {
@@ -232,86 +296,41 @@ export default function TreasurerPayments() {
     });
   };
 
-  // Date Filter Range Computation
-  const dateRangeBounds = useMemo(() => {
-    const now = new Date();
-    if (datePreset === "TODAY") {
-      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      return { start, end: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999) };
+  const totalPaymentsCount = useMemo(() => {
+    if (!paymentsData) return 0;
+    if (Array.isArray(paymentsData)) return paymentsData.length;
+    return paymentsData.pagination?.total ?? allPayments.length;
+  }, [paymentsData, allPayments.length]);
+
+  const totalPages = useMemo(() => {
+    if (!paymentsData) return 1;
+    if (Array.isArray(paymentsData))
+      return Math.max(1, Math.ceil(paymentsData.length / ITEMS_PER_PAGE));
+    return paymentsData.pagination?.totalPages ?? 1;
+  }, [paymentsData]);
+
+  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
     }
-    if (datePreset === "THIS_WEEK") {
-      const day = now.getDay();
-      const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Monday
-      const start = new Date(now.getFullYear(), now.getMonth(), diff);
-      start.setHours(0, 0, 0, 0);
-      return { start, end: new Date() };
-    }
-    if (datePreset === "THIS_MONTH") {
-      const start = new Date(now.getFullYear(), now.getMonth(), 1);
-      return { start, end: new Date() };
-    }
-    if (datePreset === "LAST_MONTH") {
-      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
-      return { start, end };
-    }
-    return null;
-  }, [datePreset]);
+  }, [currentPage, totalPages]);
 
-  // Filtered Payments
-  const filteredPayments = useMemo(() => {
-    return allPayments.filter((p) => {
-      // Status Filter
-      if (statusFilter === "VALID" && p.reversed) return false;
-      if (statusFilter === "REVERSED" && !p.reversed) return false;
+  const paginatedPayments = allPayments;
 
-      // Method Filter
-      if (selectedMethod !== "ALL") {
-        const methodUpper = (p.paymentMethod || p.source || "").toUpperCase();
-        const targetUpper = selectedMethod.toUpperCase();
-        if (!methodUpper.includes(targetUpper)) return false;
-      }
-
-      // Date Range Filter
-      if (dateRangeBounds) {
-        const pDate = new Date(p.paidAt);
-        if (pDate < dateRangeBounds.start || pDate > dateRangeBounds.end) return false;
-      }
-
-      // Search Query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const receiptNo = (p.receiptNumber || "").toLowerCase();
-        const resident = (p.residentName || "").toLowerCase();
-        const flat = (p.flatNumber || p.unitName || "").toLowerCase();
-        const refNo = (p.referenceNo || "").toLowerCase();
-        const desc = (p.description || "").toLowerCase();
-        const bill = (p.billTitle || "").toLowerCase();
-
-        const matches =
-          receiptNo.includes(q) ||
-          resident.includes(q) ||
-          flat.includes(q) ||
-          refNo.includes(q) ||
-          desc.includes(q) ||
-          bill.includes(q);
-
-        if (!matches) return false;
-      }
-
-      return true;
-    });
-  }, [allPayments, statusFilter, selectedMethod, dateRangeBounds, searchQuery]);
-
-  // Metrics (calculated from filtered valid payments)
+  // Metrics (from backend or calculated from valid payments)
   const metrics = useMemo(() => {
+    if (paymentsData && !Array.isArray(paymentsData) && paymentsData.metrics) {
+      return paymentsData.metrics;
+    }
     let totalCollected = 0;
     let digitalCollected = 0;
     let cashCollected = 0;
     let reversedCount = 0;
     let validCount = 0;
 
-    for (const p of filteredPayments) {
+    for (const p of allPayments) {
       if (p.reversed) {
         reversedCount++;
         continue;
@@ -330,30 +349,15 @@ export default function TreasurerPayments() {
       totalCollected,
       digitalCollected,
       cashCollected,
-      totalCount: filteredPayments.length,
+      totalCount: totalPaymentsCount,
       validCount,
       reversedCount,
     };
-  }, [filteredPayments]);
-
-  // Pagination
-  const totalPages = Math.max(1, Math.ceil(filteredPayments.length / ITEMS_PER_PAGE));
-  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
-
-  const paginatedPayments = useMemo(() => {
-    const start = (validCurrentPage - 1) * ITEMS_PER_PAGE;
-    return filteredPayments.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredPayments, validCurrentPage]);
+  }, [paymentsData, allPayments, totalPaymentsCount]);
 
   // CSV Export Handler
   const handleExportCSV = async () => {
-    if (filteredPayments.length === 0) {
+    if (totalPaymentsCount === 0) {
       toast.error("No transactions to export.");
       return;
     }
@@ -765,23 +769,23 @@ export default function TreasurerPayments() {
         {totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-xs">
             <span className="text-slate-500">
-              Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{" "}
-              {Math.min(currentPage * ITEMS_PER_PAGE, filteredPayments.length)} of{" "}
-              {filteredPayments.length} entries
+              Showing {(validCurrentPage - 1) * ITEMS_PER_PAGE + 1} to{" "}
+              {Math.min(validCurrentPage * ITEMS_PER_PAGE, totalPaymentsCount)} of{" "}
+              {totalPaymentsCount} entries
             </span>
             <div className="flex items-center gap-2">
               <button
-                disabled={currentPage === 1}
+                disabled={validCurrentPage === 1}
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 transition"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <span className="font-semibold text-slate-700">
-                Page {currentPage} of {totalPages}
+                Page {validCurrentPage} of {totalPages}
               </span>
               <button
-                disabled={currentPage === totalPages}
+                disabled={validCurrentPage >= totalPages}
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 transition"
               >

@@ -26,6 +26,10 @@ export const getAuditLogs = catchAsync(
       action: req.query.action as AuditAction,
       entityType: req.query.entityType as string,
       entityId: req.query.entityId as string,
+      actionCategory: req.query.actionCategory as string,
+      search: req.query.search as string,
+      page: req.query.page ? Number(req.query.page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
     });
 
     res.status(200).json({

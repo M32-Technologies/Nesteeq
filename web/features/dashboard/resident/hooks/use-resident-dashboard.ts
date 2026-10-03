@@ -93,7 +93,7 @@ export function useResidentDashboard() {
 
   // 5. Guest Passes & Visitors Query
   const {
-    data: guestPasses = [],
+    data: guestPassesData,
     isLoading: isVisitorsLoading,
     refetch: refetchVisitors,
   } = useQuery({
@@ -101,6 +101,10 @@ export function useResidentDashboard() {
     queryFn: () => fetchResidentGuestPasses({ limit: 10 }),
     staleTime: 30 * 1000,
   });
+
+  const guestPasses = Array.isArray(guestPassesData)
+    ? guestPassesData
+    : guestPassesData?.guestPasses || [];
 
   // 6. Complaints & Helpdesk Query
   const {

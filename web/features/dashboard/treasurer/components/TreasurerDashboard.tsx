@@ -30,7 +30,7 @@ export default function TreasurerDashboard() {
   // Query incoming approved maintenance bills forwarded by facility managers
   const payoutsQuery = useQuery({
     queryKey: ["treasurer", "maintenance-payouts"],
-    queryFn: getMaintenancePayouts,
+    queryFn: () => getMaintenancePayouts(),
   });
 
   const handleRefresh = async () => {

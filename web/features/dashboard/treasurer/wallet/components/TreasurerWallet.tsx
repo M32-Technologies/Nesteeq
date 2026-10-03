@@ -27,6 +27,7 @@ import {
   getBills,
   getWallets,
   getWalletSummary,
+  type Bill,
   type Wallet,
   type WalletTransaction,
 } from "../../services/treasurer.service";
@@ -65,9 +66,30 @@ export default function TreasurerWallet() {
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "ZERO">("ALL");
   const [currentPage, setCurrentPage] = useState(1);
 
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const walletsQuery = useQuery({
-    queryKey: ["treasurer", "wallets"],
-    queryFn: getWallets,
+    queryKey: [
+      "treasurer",
+      "wallets",
+      debouncedSearch,
+      statusFilter,
+      currentPage,
+    ],
+    queryFn: () =>
+      getWallets({
+        search: debouncedSearch.trim() || undefined,
+        status: statusFilter,
+        page: currentPage,
+        limit: ITEMS_PER_PAGE,
+      }),
   });
 
   const walletSummaryQuery = useQuery({
@@ -82,9 +104,11 @@ export default function TreasurerWallet() {
     enabled: Boolean(selectedWallet?.residentId),
   });
 
-  const unpaidBills = (residentBillsQuery.data ?? []).filter(
-    (b) => b.balanceAmount > 0
-  );
+  const unpaidBills: Bill[] = (
+    Array.isArray(residentBillsQuery.data)
+      ? residentBillsQuery.data
+      : (residentBillsQuery.data as any)?.bills ?? []
+  ).filter((b: Bill) => b.balanceAmount > 0);
   const selectedBill = unpaidBills.find((b) => b._id === billId);
 
   const invalidateWalletData = async () => {
@@ -148,7 +172,19 @@ export default function TreasurerWallet() {
     },
   });
 
-  const wallets = walletsQuery.data ?? [];
+  const walletsData = walletsQuery.data;
+  const wallets: Wallet[] = useMemo(() => {
+    if (!walletsData) return [];
+    if (Array.isArray(walletsData)) return walletsData;
+    return walletsData.wallets || [];
+  }, [walletsData]);
+
+  const totalWalletsCount = useMemo(() => {
+    if (!walletsData) return 0;
+    if (Array.isArray(walletsData)) return walletsData.length;
+    return walletsData.pagination?.total ?? wallets.length;
+  }, [walletsData, wallets.length]);
+
   const serverSummary = walletSummaryQuery.data;
 
   // Metrics Calculation from server summary with client fallback
@@ -195,26 +231,13 @@ export default function TreasurerWallet() {
     },
   ];
 
-  // Search & Status Filtering
-  const filteredWallets = useMemo(() => {
-    return wallets.filter((wallet) => {
-      const term = search.toLowerCase().trim();
-      const residentMatch = (wallet.residentName || "").toLowerCase().includes(term);
-      const flatMatch = (wallet.flatNumber || "").toLowerCase().includes(term);
-      const unitMatch = (wallet.unitName || "").toLowerCase().includes(term);
-      const matchesSearch = !term || residentMatch || flatMatch || unitMatch;
-
-      const matchesStatus =
-        statusFilter === "ALL" ||
-        (statusFilter === "ACTIVE" && wallet.balance > 0) ||
-        (statusFilter === "ZERO" && wallet.balance <= 0);
-
-      return matchesSearch && matchesStatus;
-    });
-  }, [wallets, search, statusFilter]);
-
   // Pagination
-  const totalPages = Math.max(1, Math.ceil(filteredWallets.length / ITEMS_PER_PAGE));
+  const totalPages = useMemo(() => {
+    if (!walletsData) return 1;
+    if (Array.isArray(walletsData))
+      return Math.max(1, Math.ceil(walletsData.length / ITEMS_PER_PAGE));
+    return walletsData.pagination?.totalPages ?? 1;
+  }, [walletsData]);
   const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
 
   useEffect(() => {
@@ -223,10 +246,7 @@ export default function TreasurerWallet() {
     }
   }, [currentPage, totalPages]);
 
-  const paginatedWallets = useMemo(() => {
-    const start = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
-    return filteredWallets.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredWallets, safeCurrentPage]);
+  const paginatedWallets = wallets;
 
   // Escape key listener for open modals
   useEffect(() => {
@@ -434,7 +454,7 @@ export default function TreasurerWallet() {
               <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {getSafeErrorMessage(walletsQuery.error)}
               </p>
-            ) : filteredWallets.length === 0 ? (
+            ) : wallets.length === 0 ? (
               <div className="rounded-lg border border-dashed border-slate-200 p-8 text-center">
                 <Search className="mx-auto h-8 w-8 text-slate-300" />
                 <p className="mt-2 text-sm font-medium text-slate-700">
@@ -555,7 +575,7 @@ export default function TreasurerWallet() {
             )}
 
             {/* Pagination */}
-            {filteredWallets.length > ITEMS_PER_PAGE ? (
+            {totalWalletsCount > ITEMS_PER_PAGE ? (
               <div className="flex items-center justify-between border-t border-slate-100 pt-4 text-xs text-slate-500">
                 <p>
                   Showing{" "}
@@ -564,11 +584,11 @@ export default function TreasurerWallet() {
                   </span>{" "}
                   to{" "}
                   <span className="font-semibold text-slate-800">
-                    {Math.min(safeCurrentPage * ITEMS_PER_PAGE, filteredWallets.length)}
+                    {Math.min(safeCurrentPage * ITEMS_PER_PAGE, totalWalletsCount)}
                   </span>{" "}
                   of{" "}
                   <span className="font-semibold text-slate-800">
-                    {filteredWallets.length}
+                    {totalWalletsCount}
                   </span>{" "}
                   wallets
                 </p>

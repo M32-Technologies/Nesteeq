@@ -98,16 +98,28 @@ export function ResidentVisitorsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 9;
 
-  // Fetch Passes
+  const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  // Fetch Passes with backend search, filter, and pagination
   const {
-    data: passes = [],
+    data: passesResponse,
     isLoading,
     refetch: refetchPasses,
   } = useQuery({
-    queryKey: ["resident", "passes", activeTab],
+    queryKey: ["resident", "passes", activeTab, debouncedSearch, currentPage],
     queryFn: () =>
       fetchResidentGuestPasses({
         status: activeTab === "ALL" ? undefined : activeTab,
+        search: debouncedSearch.trim() || undefined,
+        page: currentPage,
+        limit: PAGE_SIZE,
       }),
   });
 
@@ -295,30 +307,11 @@ export function ResidentVisitorsPage() {
     }
   };
 
-  // Filtered Passes
-  const filtered = passes.filter((p) => {
-    if (activeTab !== "ALL" && p.status !== activeTab) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return (
-        p.visitorName.toLowerCase().includes(q) ||
-        (p.purpose && p.purpose.toLowerCase().includes(q)) ||
-        (p.vehicleNumber && p.vehicleNumber.toLowerCase().includes(q)) ||
-        (p.visitorPhone && p.visitorPhone.toLowerCase().includes(q)) ||
-        (p.token && p.token.toLowerCase().includes(q))
-      );
-    }
-    return true;
-  });
-
-  const activePassesCount = passes.filter((p) => p.status === "ACTIVE").length;
-  const usedPassesCount = passes.filter((p) => p.status === "USED").length;
-
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
-  const paginatedPasses = filtered.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
-  );
+  const paginatedPasses = passesResponse?.guestPasses || [];
+  const activePassesCount = passesResponse?.counts?.activePassesCount ?? 0;
+  const usedPassesCount = passesResponse?.counts?.usedPassesCount ?? 0;
+  const totalPasses = passesResponse?.pagination?.total ?? 0;
+  const totalPages = passesResponse?.pagination?.totalPages ?? 1;
 
   return (
     <div className="w-full space-y-6 pb-14">
@@ -451,7 +444,7 @@ export function ResidentVisitorsPage() {
           <div className="size-6 border-2 border-[#07584F] border-t-transparent rounded-full animate-spin mx-auto" />
           <p>Loading visitor passes...</p>
         </div>
-      ) : filtered.length === 0 ? (
+      ) : paginatedPasses.length === 0 ? (
         /* Empty State */
         <div className="rounded-xl border border-dashed border-[#DDE3DF] bg-[#F7F8F5] p-12 text-center space-y-3">
           <div className="size-12 rounded-full bg-white border border-[#DDE3DF] flex items-center justify-center mx-auto text-[#7C8782] shadow-2xs">
@@ -656,9 +649,9 @@ export function ResidentVisitorsPage() {
       {totalPages > 1 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[#EEF1F4] pt-4">
           <p className="text-xs text-[#637083]">
-            Showing {(currentPage - 1) * PAGE_SIZE + 1} to{" "}
-            {Math.min(currentPage * PAGE_SIZE, filtered.length)} of{" "}
-            {filtered.length} passes
+            Showing {totalPasses === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1} to{" "}
+            {Math.min(currentPage * PAGE_SIZE, totalPasses)} of{" "}
+            {totalPasses} passes
           </p>
           <div className="flex items-center gap-2">
             <button

@@ -133,42 +133,73 @@ export async function fetchCurrentResidentProfile(
   }
 }
 
+export interface ResidentGuestPassesResponse {
+  guestPasses: GuestPassItem[];
+  counts?: {
+    total: number;
+    activePassesCount: number;
+    usedPassesCount: number;
+    expiredPassesCount: number;
+  };
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
+}
+
 export async function fetchResidentGuestPasses(params?: {
   status?: string;
   page?: number;
   limit?: number;
   search?: string;
-}) {
+}): Promise<ResidentGuestPassesResponse> {
   try {
     const res = await api.get<{
       success: boolean;
-      data: {
-        guestPasses: GuestPassItem[];
-        counts?: {
-          total: number;
-          activePassesCount: number;
-          usedPassesCount: number;
-          expiredPassesCount: number;
-        };
-        pagination: { total: number };
-      };
+      data: ResidentGuestPassesResponse;
     }>("/api/v1/residents/passes", { params });
 
-    return res.data?.data?.guestPasses || [];
+    return (
+      res.data?.data || {
+        guestPasses: [],
+        counts: {
+          total: 0,
+          activePassesCount: 0,
+          usedPassesCount: 0,
+          expiredPassesCount: 0,
+        },
+        pagination: {
+          page: params?.page || 1,
+          limit: params?.limit || 20,
+          total: 0,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        },
+      }
+    );
   } catch {
-    try {
-      const fallbackRes = await api.get<{
-        success: boolean;
-        data: {
-          guestPasses: GuestPassItem[];
-          pagination: { total: number };
-        };
-      }>("/api/visitors/passes", { params });
-
-      return fallbackRes.data?.data?.guestPasses || [];
-    } catch {
-      return [];
-    }
+    return {
+      guestPasses: [],
+      counts: {
+        total: 0,
+        activePassesCount: 0,
+        usedPassesCount: 0,
+        expiredPassesCount: 0,
+      },
+      pagination: {
+        page: params?.page || 1,
+        limit: params?.limit || 20,
+        total: 0,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
+    };
   }
 }
 

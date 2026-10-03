@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, type FormEvent } from "react"
+import { useEffect, useMemo, useState, type FormEvent } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
@@ -151,15 +151,25 @@ export function FacilityComplaintsPage({
     setDrawerMode(mode)
   }
 
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
   const complaintQuery = useMemo(
     () => ({
       status: status === "all" ? undefined : status,
       priority: priority === "all" ? undefined : priority,
       category: category === "all" ? undefined : category,
+      search: debouncedSearch.trim() || undefined,
       page: 1,
       limit: 100,
     }),
-    [category, priority, status]
+    [category, debouncedSearch, priority, status]
   )
 
   const complaintsQuery = useComplaints(complaintQuery)
@@ -171,12 +181,8 @@ export function FacilityComplaintsPage({
     [complaintsQuery.data?.complaints]
   )
   const visibleComplaints = useMemo(() => {
-    const filtered = complaints.filter((complaint) =>
-      matchesSearch(getComplaintSearchValues(complaint), search)
-    )
-
-    return sortComplaints(filtered, sort)
-  }, [complaints, search, sort])
+    return sortComplaints(complaints, sort)
+  }, [complaints, sort])
 
   const selectedComplaint = detailQuery.data ?? null
 

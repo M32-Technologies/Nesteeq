@@ -274,8 +274,44 @@ export const getVisitorRecordsService = async ({
     },
   ]
 
+  let matchingResidentFlatIds: Types.ObjectId[] = []
+  if (sRegex) {
+    try {
+      const authUsers = await getAuthDB()
+        .collection("user")
+        .find({ name: sRegex })
+        .project({ _id: 1, id: 1 })
+        .toArray()
+      const matchedUserIds = authUsers.map((u) => u.id || u._id.toString()).filter(Boolean)
+      if (matchedUserIds.length > 0) {
+        const matchingResidents = await ResidentModel.find(
+          { apartmentId: aptObjectId, userId: { $in: matchedUserIds } },
+          "flatId"
+        ).lean()
+        matchingResidentFlatIds = matchingResidents
+          .map((r) => r.flatId)
+          .filter((id): id is Types.ObjectId => Boolean(id) && Types.ObjectId.isValid(id as any))
+          .map((id) => new Types.ObjectId(id as any))
+      }
+    } catch {
+      // Ignore if auth db lookup fails
+    }
+  }
+
+  const searchOrConditions: Array<Record<string, unknown>> = [
+    { visitorName: sRegex },
+    { visitorPhone: sRegex },
+    { purpose: sRegex },
+    { vehicleNumber: sRegex },
+    { vehicleType: sRegex },
+    { "flat.flatNumber": sRegex },
+  ]
+  if (matchingResidentFlatIds.length > 0) {
+    searchOrConditions.push({ flatId: { $in: matchingResidentFlatIds } })
+  }
+
   const searchStage: PipelineStage.Match[] = sRegex
-    ? [{ $match: { $or: [{ visitorName: sRegex }, { visitorPhone: sRegex }, { purpose: sRegex }, { vehicleNumber: sRegex }, { vehicleType: sRegex }, { "flat.flatNumber": sRegex }] } }]
+    ? [{ $match: { $or: searchOrConditions } }]
     : []
 
   const visitMatch: Record<string, unknown> = { apartmentId: aptObjectId }
@@ -712,15 +748,19 @@ export const getResidentGuestPassesService = async (
   }
 
   if (query.search?.trim()) {
-    const regex = new RegExp(escapeRegExp(query.search.trim()), "i");
-    conditions.push({
-      $or: [
-        { visitorName: regex },
-        { purpose: regex },
-        { vehicleNumber: regex },
-        { visitorPhone: regex },
-      ],
-    });
+    const searchTrimmed = query.search.trim();
+    const regex = new RegExp(escapeRegExp(searchTrimmed), "i");
+    const searchOr: Record<string, unknown>[] = [
+      { visitorName: regex },
+      { purpose: regex },
+      { vehicleNumber: regex },
+      { visitorPhone: regex },
+      { rawToken: regex },
+    ];
+    if (Types.ObjectId.isValid(searchTrimmed)) {
+      searchOr.push({ _id: new Types.ObjectId(searchTrimmed) });
+    }
+    conditions.push({ $or: searchOr });
   }
 
   const filter = conditions.length > 1 ? { $and: conditions } : conditions[0] || {};

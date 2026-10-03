@@ -21,6 +21,8 @@ import type {
 interface VisitorTableSectionProps {
   records?: VisitorRecord[]
   isLoading?: boolean
+  search?: string
+  onSearchChange?: (val: string) => void
   onViewRecord: (record: VisitorRecord) => void
 }
 
@@ -41,9 +43,13 @@ const statusLabels: Record<VisitorStatus, string> = {
 export default function VisitorTableSection({
   records = [],
   isLoading = false,
+  search: externalSearch,
+  onSearchChange: externalOnSearchChange,
   onViewRecord,
 }: VisitorTableSectionProps) {
-  const [search, setSearch] = useState("")
+  const [internalSearch, setInternalSearch] = useState("")
+  const search = externalSearch !== undefined ? externalSearch : internalSearch
+  const setSearch = externalOnSearchChange || setInternalSearch
   const [statusFilter, setStatusFilter] = useState<"ALL" | VisitorStatus>("ALL")
   const [entryTypeFilter, setEntryTypeFilter] = useState<
     "ALL" | VisitorEntryType
@@ -70,29 +76,9 @@ export default function VisitorTableSection({
         }
       }
 
-      // Search query
-      if (search.trim()) {
-        const query = search.toLowerCase()
-        const nameMatch = rec.visitorName.toLowerCase().includes(query)
-        const phoneMatch = rec.visitorPhone?.toLowerCase().includes(query)
-        const flatMatch = rec.flatNumber.toLowerCase().includes(query)
-        const hostMatch = rec.residentName?.toLowerCase().includes(query)
-        const vehicleMatch = rec.vehicleNumber?.toLowerCase().includes(query)
-
-        if (
-          !nameMatch &&
-          !phoneMatch &&
-          !flatMatch &&
-          !hostMatch &&
-          !vehicleMatch
-        ) {
-          return false
-        }
-      }
-
       return true
     })
-  }, [records, statusFilter, entryTypeFilter, dateFilter, search])
+  }, [records, statusFilter, entryTypeFilter, dateFilter])
 
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / pageSize))
   const paginatedRecords = useMemo(() => {

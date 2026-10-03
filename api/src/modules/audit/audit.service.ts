@@ -27,8 +27,12 @@ interface AuditFilters {
   apartmentId?: string;
   performedBy?: string;
   action?: AuditAction;
+  actionCategory?: string;
   entityType?: string;
   entityId?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
 }
 
 const validateObjectId = (id: string) => {
@@ -164,8 +168,75 @@ export const getAuditLogsService = async (
     query.entityId = filters.entityId;
   }
 
-  const logs = await Audit.find(query).sort({ createdAt: -1 }).lean();
+  if (filters.actionCategory && filters.actionCategory !== "ALL") {
+    query.action = {
+      $regex: new RegExp(escapeRegex(filters.actionCategory), "i"),
+    };
+  }
 
+  if (filters.search && filters.search.trim()) {
+    const rawSearch = filters.search.trim();
+    const safeSearch = escapeRegex(rawSearch);
+    const searchRegex = new RegExp(safeSearch, "i");
+
+    let matchingUserIds: string[] = [];
+    try {
+      const authUsers = await getAuthDB()
+        .collection("user")
+        .find({ name: searchRegex })
+        .project({ _id: 1, id: 1 })
+        .toArray();
+      matchingUserIds = authUsers
+        .map((u) => u.id || u._id.toString())
+        .filter(Boolean);
+    } catch {
+      // Ignore if auth db lookup fails
+    }
+
+    const searchConditions: Array<Record<string, unknown>> = [
+      { description: searchRegex },
+      { action: searchRegex },
+      { entityType: searchRegex },
+    ];
+    if (matchingUserIds.length > 0) {
+      searchConditions.push({ performedBy: { $in: matchingUserIds } });
+    }
+    query.$or = searchConditions;
+  }
+
+  if (filters.page) {
+    const total = await Audit.countDocuments(query);
+    const page = Math.max(1, filters.page);
+    const limit = Math.max(1, filters.limit || 10);
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    const logs = await Audit.find(query)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+
+    const populatedLogs = await populateAuditEntities(logs);
+
+    return {
+      logs: populatedLogs,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages,
+      },
+    };
+  }
+
+  const logs = await Audit.find(query).sort({ createdAt: -1 }).lean();
+  return populateAuditEntities(logs);
+};
+
+const escapeRegex = (str: string) =>
+  str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const populateAuditEntities = async (logs: any[]) => {
   if (logs.length === 0) {
     return [];
   }
@@ -415,9 +486,11 @@ export const getAuditByIdService = async (
 ) => {
   validateObjectId(auditId);
 
-  const [enriched] = await getAuditLogsService({
+  const result = await getAuditLogsService({
     _id: auditId,
   });
+  const logs = Array.isArray(result) ? result : result.logs;
+  const enriched = logs[0];
 
   if (!enriched) {
     throw new AppError("Audit log not found", 404);

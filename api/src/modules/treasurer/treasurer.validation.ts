@@ -83,6 +83,7 @@ export const getMaintenancePayoutsSchema = z.object({
         .string()
         .regex(objectIdPattern, "Invalid apartmentId format")
         .optional(),
+      search: z.string().trim().optional(),
     })
     .optional(),
 });

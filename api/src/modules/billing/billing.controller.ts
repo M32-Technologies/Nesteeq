@@ -100,6 +100,9 @@ export const getBills = catchAsync(
       commonBillId: req.query.commonBillId as string | undefined,
       billType: req.query.billType as string | undefined,
       status: req.query.status as BillStatus | undefined,
+      search: req.query.search as string | undefined,
+      page: req.query.page ? Number(req.query.page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
     });
 
     res.status(200).json({
@@ -237,7 +240,17 @@ export const getMyResidentBills = catchAsync(
       flatId: req.user!.flatId ?? null,
     };
 
-    const data = await getMyResidentBillsService(user);
+    const query = {
+      scope: req.query.scope ? String(req.query.scope) : undefined,
+      category: req.query.category ? String(req.query.category) : undefined,
+      search: req.query.search ? String(req.query.search) : undefined,
+      page: req.query.page ? Number(req.query.page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
+      receiptsPage: req.query.receiptsPage ? Number(req.query.receiptsPage) : undefined,
+      receiptsLimit: req.query.receiptsLimit ? Number(req.query.receiptsLimit) : undefined,
+    };
+
+    const data = await getMyResidentBillsService(user, query);
 
     res.status(200).json({
       success: true,
