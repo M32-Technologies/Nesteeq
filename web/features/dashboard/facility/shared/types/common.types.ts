@@ -113,10 +113,13 @@ export type StatusPayload = {
 export type ReasonPayload = {
   reason?: string
   notes?: string
+  remarks?: string
 }
 
 export type RequiredReasonPayload = {
   reason: string
+  notes?: string
+  remarks?: string
 }
 
 export type AssignPayload = {

@@ -55,10 +55,10 @@ export const getAssignedJobsController = catchAsync(
     const allJobs = await getAssignedJobs(status, technicianId, extraTechId, sortBy, order)
 
     const totalItems = allJobs.length
-    const pageNum = parseInt(req.query.page as string) || 1
-    const limitNum = parseInt(req.query.limit as string) || 10
-    const startIndex = (pageNum - 1) * limitNum
-    const paginatedJobs = allJobs.slice(startIndex, startIndex + limitNum)
+    const limitNum = req.query.limit ? parseInt(req.query.limit as string) : 10;
+    const pageNum = req.query.page ? parseInt(req.query.page as string) : 1;
+    const startIndex = (pageNum - 1) * limitNum;
+    const paginatedJobs = allJobs.slice(startIndex, startIndex + limitNum);
 
     res.status(200).json({
       success: true,

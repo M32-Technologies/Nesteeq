@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react"
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
-import { AlertCircle, ArrowRight } from "lucide-react"
+import { AlertCircle } from "lucide-react"
 
 import { useSession } from "@/lib/auth-client"
 import { getAssignedJobs } from "../services/jobs.service"
@@ -115,23 +115,24 @@ export default function AssignedJobsList({
       return order === "asc" ? dateA - dateB : dateB - dateA
     })
 
-    return isOverview ? sorted.slice(0, pageSize) : sorted
-  }, [jobs, search, statusFilter, priorityFilter, order, isOverview, pageSize])
+    return sorted
+  }, [jobs, search, statusFilter, priorityFilter, order])
+
+  const displayedJobs = isOverview ? (jobs || []).slice(0, 5) : filteredJobs
 
   return (
     <div className="space-y-4">
       {isOverview && (
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Recent Assigned Jobs</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Recent Assigned Tasks</h2>
             <p className="text-xs text-slate-500">Showing the latest assigned tasks</p>
           </div>
           <Link
             href="/maintenance-technician/jobs"
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-slate-900 transition"
           >
-            <span>View All</span>
-            <ArrowRight size={14} />
+            <span>View All Jobs &rarr;</span>
           </Link>
         </div>
       )}
@@ -160,7 +161,7 @@ export default function AssignedJobsList({
         )}
 
         <MaintenanceJobsTable
-          jobs={filteredJobs}
+          jobs={displayedJobs}
           totalCount={pagination.total}
           totalPages={pagination.totalPages}
           page={page}

@@ -106,8 +106,28 @@ router.patch(
   zodValidate(approveMaintenanceSchema),
   approveMaintenanceHandler
 );
+router.post(
+  "/maintenance/:id/approve",
+  zodValidate(approveMaintenanceSchema),
+  approveMaintenanceHandler
+);
+router.patch(
+  "/maintenances/:id/approve",
+  zodValidate(approveMaintenanceSchema),
+  approveMaintenanceHandler
+);
+router.post(
+  "/maintenances/:id/approve",
+  zodValidate(approveMaintenanceSchema),
+  approveMaintenanceHandler
+);
 
 router.patch(
+  "/maintenance/:id/reject",
+  zodValidate(rejectMaintenanceSchema),
+  rejectMaintenanceHandler
+);
+router.post(
   "/maintenance/:id/reject",
   zodValidate(rejectMaintenanceSchema),
   rejectMaintenanceHandler
@@ -118,8 +138,38 @@ router.patch(
   zodValidate(approveMaintenanceCostSchema),
   approveMaintenanceCostHandler
 );
+router.post(
+  "/maintenance/:id/cost/approve",
+  zodValidate(approveMaintenanceCostSchema),
+  approveMaintenanceCostHandler
+);
+router.patch(
+  "/maintenances/:id/cost/approve",
+  zodValidate(approveMaintenanceCostSchema),
+  approveMaintenanceCostHandler
+);
+router.post(
+  "/maintenances/:id/cost/approve",
+  zodValidate(approveMaintenanceCostSchema),
+  approveMaintenanceCostHandler
+);
+router.patch(
+  "/maintenance/:id/expense/approve",
+  zodValidate(approveMaintenanceCostSchema),
+  approveMaintenanceCostHandler
+);
+router.post(
+  "/maintenance/:id/expense/approve",
+  zodValidate(approveMaintenanceCostSchema),
+  approveMaintenanceCostHandler
+);
 
 router.patch(
+  "/maintenance/:id/cost/reject",
+  zodValidate(rejectMaintenanceCostSchema),
+  rejectMaintenanceCostHandler
+);
+router.post(
   "/maintenance/:id/cost/reject",
   zodValidate(rejectMaintenanceCostSchema),
   rejectMaintenanceCostHandler
@@ -130,8 +180,18 @@ router.patch(
   zodValidate(cancelMaintenanceSchema),
   cancelMaintenanceHandler
 );
+router.post(
+  "/maintenance/:id/cancel",
+  zodValidate(cancelMaintenanceSchema),
+  cancelMaintenanceHandler
+);
 
 router.patch(
+  "/maintenance/:id/close",
+  zodValidate(closeMaintenanceSchema),
+  closeMaintenanceHandler
+);
+router.post(
   "/maintenance/:id/close",
   zodValidate(closeMaintenanceSchema),
   closeMaintenanceHandler

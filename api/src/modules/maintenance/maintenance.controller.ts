@@ -184,9 +184,10 @@ export const completeMaintenanceHandler = catchAsync(async (req: Request, res: R
 });
 
 export const approveMaintenanceHandler = catchAsync(async (req: Request, res: Response) => {
+  const approvalNotes = req.body.notes || req.body.remarks || '';
   const result = await approveMaintenance(
     getMaintenanceId(req),
-    req.body as ApproveMaintenanceInput,
+    { ...req.body, remarks: approvalNotes, notes: approvalNotes },
     getAuthenticatedUser(req)
   );
 
@@ -198,9 +199,10 @@ export const approveMaintenanceHandler = catchAsync(async (req: Request, res: Re
 });
 
 export const approveMaintenanceCostHandler = catchAsync(async (req: Request, res: Response) => {
+  const approvalNotes = req.body.notes || req.body.remarks || '';
   const result = await approveMaintenanceCost(
     getMaintenanceId(req),
-    req.body as ApproveMaintenanceCostInput,
+    { ...req.body, remarks: approvalNotes, notes: approvalNotes },
     getAuthenticatedUser(req)
   );
 
@@ -212,9 +214,10 @@ export const approveMaintenanceCostHandler = catchAsync(async (req: Request, res
 });
 
 export const rejectMaintenanceHandler = catchAsync(async (req: Request, res: Response) => {
+  const approvalNotes = req.body.notes || req.body.remarks || '';
   const result = await rejectMaintenance(
     getMaintenanceId(req),
-    req.body as RejectMaintenanceInput,
+    { ...req.body, remarks: approvalNotes, notes: approvalNotes },
     getAuthenticatedUser(req)
   );
 
@@ -226,9 +229,10 @@ export const rejectMaintenanceHandler = catchAsync(async (req: Request, res: Res
 });
 
 export const rejectMaintenanceCostHandler = catchAsync(async (req: Request, res: Response) => {
+  const approvalNotes = req.body.notes || req.body.remarks || '';
   const result = await rejectMaintenanceCost(
     getMaintenanceId(req),
-    req.body as RejectMaintenanceCostInput,
+    { ...req.body, remarks: approvalNotes, notes: approvalNotes },
     getAuthenticatedUser(req)
   );
 
@@ -254,9 +258,10 @@ export const cancelMaintenanceHandler = catchAsync(async (req: Request, res: Res
 });
 
 export const closeMaintenanceHandler = catchAsync(async (req: Request, res: Response) => {
+  const approvalNotes = req.body.notes || req.body.remarks || '';
   const result = await closeMaintenance(
     getMaintenanceId(req),
-    req.body as CloseMaintenanceInput,
+    { ...req.body, remarks: approvalNotes, notes: approvalNotes },
     getAuthenticatedUser(req)
   );
 
