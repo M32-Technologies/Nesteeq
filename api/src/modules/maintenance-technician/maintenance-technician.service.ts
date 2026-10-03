@@ -22,6 +22,7 @@ export type AssignedJob = {
   status: "ASSIGNED" | "IN_PROGRESS" | "COMPLETED"
   assignedDate: string
   createdAt?: string
+  type?: "MAINTENANCE" | "COMPLAINT" | string
   jobType?: "MAINTENANCE" | "COMPLAINT"
   location?: string
   area?: string
@@ -471,7 +472,9 @@ export const getDashboardStats = async (
 export const getAssignedJobs = async (
   status: string | undefined,
   technicianUserId: string,
-  extraTechnicianId?: string | null
+  extraTechnicianId?: string | null,
+  sortBy: string = "createdAt",
+  order: string = "desc"
 ): Promise<AssignedJob[]> => {
   const ids = await resolveTechnicianIds(technicianUserId, extraTechnicianId)
   const scopeFilter = buildTechnicianScope(ids)
@@ -678,6 +681,7 @@ export const getAssignedJobs = async (
       status: mapStatus(doc.status),
       assignedDate,
       createdAt: createdAtStr,
+      type: "COMPLAINT",
       jobType: "COMPLAINT",
       flatNumber: loc.flatNumber,
       unitNumber: loc.unitNumber,
@@ -728,6 +732,7 @@ export const getAssignedJobs = async (
       status: mapStatus(doc.status),
       assignedDate,
       createdAt: createdAtStr,
+      type: "MAINTENANCE",
       jobType: "MAINTENANCE",
       flatNumber: loc.flatNumber,
       unitNumber: loc.unitNumber,
@@ -737,10 +742,19 @@ export const getAssignedJobs = async (
     })
   }
 
+  const isAsc = String(order || "desc").toLowerCase() === "asc"
   jobs.sort((a, b) => {
-    const dateA = new Date(a.assignedDate || a.createdAt || 0).getTime()
-    const dateB = new Date(b.assignedDate || b.createdAt || 0).getTime()
-    return dateB - dateA
+    const dateFieldA =
+      sortBy === "assignedDate"
+        ? a.assignedDate || a.createdAt
+        : a.createdAt || a.assignedDate
+    const dateFieldB =
+      sortBy === "assignedDate"
+        ? b.assignedDate || b.createdAt
+        : b.createdAt || b.assignedDate
+    const timeA = new Date(dateFieldA || 0).getTime()
+    const timeB = new Date(dateFieldB || 0).getTime()
+    return isAsc ? timeA - timeB : timeB - timeA
   })
 
   return jobs

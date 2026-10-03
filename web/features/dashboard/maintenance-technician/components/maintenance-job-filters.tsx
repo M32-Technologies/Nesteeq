@@ -9,6 +9,8 @@ type MaintenanceJobFiltersProps = {
   onStatusChange: (value: string) => void
   priorityFilter: string
   onPriorityChange: (value: string) => void
+  order?: "desc" | "asc"
+  onOrderChange?: (value: "desc" | "asc") => void
 }
 
 export default function MaintenanceJobFilters({
@@ -18,6 +20,8 @@ export default function MaintenanceJobFilters({
   onStatusChange,
   priorityFilter,
   onPriorityChange,
+  order = "desc",
+  onOrderChange,
 }: MaintenanceJobFiltersProps) {
   return (
     <div className="border-b border-slate-200 px-5 py-4 sm:px-6">
@@ -67,6 +71,22 @@ export default function MaintenanceJobFilters({
             <option value="High">High</option>
             <option value="Medium">Medium</option>
             <option value="Low">Low</option>
+          </select>
+          <ChevronDown
+            size={14}
+            className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-600"
+          />
+        </div>
+
+        {/* Sort By Filter */}
+        <div className="relative w-full sm:w-[160px]">
+          <select
+            value={order}
+            onChange={(e) => onOrderChange?.(e.target.value as "desc" | "asc")}
+            className="h-10 w-full appearance-none rounded-lg border border-slate-300 bg-white pl-3 pr-9 text-sm font-medium text-slate-800 outline-none focus:border-[#0F5F45] focus:ring-2 focus:ring-[#0F5F45]/10"
+          >
+            <option value="desc">Newest First</option>
+            <option value="asc">Oldest First</option>
           </select>
           <ChevronDown
             size={14}

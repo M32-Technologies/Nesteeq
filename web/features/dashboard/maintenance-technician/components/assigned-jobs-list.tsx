@@ -11,8 +11,8 @@ import MaintenanceJobsTable from "./maintenance-jobs-table"
 
 export const jobsQueryKeys = {
   all: ["maintenance-technician", "jobs"] as const,
-  list: (status?: string, userId?: string) =>
-    [...jobsQueryKeys.all, "list", status ?? "ACTIVE", userId ?? "me"] as const,
+  list: (status?: string, order?: string, userId?: string) =>
+    [...jobsQueryKeys.all, "list", status ?? "ACTIVE", order ?? "desc", userId ?? "me"] as const,
 }
 
 export default function AssignedJobsList() {
@@ -20,6 +20,7 @@ export default function AssignedJobsList() {
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("ACTIVE")
   const [priorityFilter, setPriorityFilter] = useState<string>("ALL")
+  const [order, setOrder] = useState<"desc" | "asc">("desc")
 
   const {
     data: jobs = [],
@@ -27,8 +28,8 @@ export default function AssignedJobsList() {
     isError,
     error,
   } = useQuery({
-    queryKey: jobsQueryKeys.list(statusFilter, session?.user?.id),
-    queryFn: () => getAssignedJobs(statusFilter),
+    queryKey: jobsQueryKeys.list(statusFilter, order, session?.user?.id),
+    queryFn: () => getAssignedJobs(statusFilter, order),
     staleTime: 0,
     refetchOnWindowFocus: true,
     refetchOnMount: "always",
@@ -63,9 +64,9 @@ export default function AssignedJobsList() {
     return [...list].sort((a, b) => {
       const dateA = new Date(a.assignedDate || a.createdAt || 0).getTime()
       const dateB = new Date(b.assignedDate || b.createdAt || 0).getTime()
-      return dateB - dateA // Newest first
+      return order === "asc" ? dateA - dateB : dateB - dateA
     })
-  }, [jobs, search, statusFilter, priorityFilter])
+  }, [jobs, search, statusFilter, priorityFilter, order])
 
   return (
     <div className="space-y-4">
@@ -86,13 +87,15 @@ export default function AssignedJobsList() {
           onStatusChange={setStatusFilter}
           priorityFilter={priorityFilter}
           onPriorityChange={setPriorityFilter}
+          order={order}
+          onOrderChange={setOrder}
         />
 
         <MaintenanceJobsTable
           jobs={filteredJobs}
           totalCount={jobs.length}
           isLoading={isLoading}
-          hasFilters={Boolean(search || statusFilter !== "ACTIVE" || priorityFilter !== "ALL")}
+          hasFilters={Boolean(search || statusFilter !== "ACTIVE" || priorityFilter !== "ALL" || order !== "desc")}
         />
       </div>
     </div>

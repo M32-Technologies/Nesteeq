@@ -49,7 +49,9 @@ export const getAssignedJobsController = catchAsync(
     const technicianId = getAuthenticatedTechnicianId(req)
     const extraTechId = getExtraTechnicianId(req)
     const status = req.query.status ? String(req.query.status) : undefined
-    const data = await getAssignedJobs(status, technicianId, extraTechId)
+    const sortBy = req.query.sortBy ? String(req.query.sortBy) : undefined
+    const order = req.query.order ? String(req.query.order) : undefined
+    const data = await getAssignedJobs(status, technicianId, extraTechId, sortBy, order)
 
     res.status(200).json({
       success: true,

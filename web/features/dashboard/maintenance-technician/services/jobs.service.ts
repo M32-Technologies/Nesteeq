@@ -26,6 +26,7 @@ export type AssignedJob = {
   status: "ASSIGNED" | "IN_PROGRESS" | "COMPLETED"
   assignedDate: string
   createdAt?: string
+  type?: "MAINTENANCE" | "COMPLAINT" | string
   jobType?: "MAINTENANCE" | "COMPLAINT"
   location?: string
   area?: string
@@ -81,25 +82,30 @@ const getApiErrorMessage = (error: unknown, fallback: string) => {
   return error instanceof Error ? error.message : fallback
 }
 
-export const getAssignedJobs = async (status?: string): Promise<AssignedJob[]> => {
+export const getAssignedJobs = async (
+  status?: string,
+  order: "desc" | "asc" = "desc",
+  sortBy: string = "createdAt"
+): Promise<AssignedJob[]> => {
   try {
+    const params: Record<string, string> = {
+      order,
+      sortBy,
+    }
+    if (status && status !== "ALL") {
+      params.status = status
+    }
+
     const response = await api.get<ApiResponse<AssignedJob[]>>(
       "/api/maintenance-technician/jobs",
-      {
-        params: status && status !== "ALL" ? { status } : undefined,
-      }
+      { params }
     )
 
     if (!response.data.success) {
       throw new Error(response.data.message || "Failed to fetch assigned jobs")
     }
 
-    const allJobs = response.data.data || []
-    return allJobs.sort((a, b) => {
-      const dateA = new Date(a.assignedDate || a.createdAt || 0).getTime()
-      const dateB = new Date(b.assignedDate || b.createdAt || 0).getTime()
-      return dateB - dateA // Newest first
-    })
+    return response.data.data || []
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Failed to fetch assigned jobs"))
   }
