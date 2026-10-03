@@ -94,7 +94,7 @@ export function ProfileHeader({
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 size-full">
           {/* Left Column: Avatar & User Identity */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 min-w-0 max-w-full lg:max-w-[65%] xl:max-w-[68%]">
-            {/* Avatar with Camera upload trigger */}
+            {/* Avatar with Camera upload trigger and image preview */}
             <ProfileAvatar
               name={formattedName}
               avatarUrl={avatarUrl}
@@ -102,6 +102,8 @@ export function ProfileHeader({
               showUploadButton={Boolean(onAvatarChange)}
               onUploadClick={() => fileInputRef.current?.click()}
               isLoading={isUpdatingAvatar}
+              previewable={true}
+              subtitle={roleBadge}
             />
 
             {/* Identity Information */}

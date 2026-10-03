@@ -23,7 +23,7 @@ export const checkInVisitor = async (
   data: CheckInVisitorInput
 ) => {
   const response = await axiosInstance.post(
-    "/api/visitors/visits/check-in",
+    "/api/v1/visitors/visits/check-in",
     data
   )
 
@@ -34,7 +34,7 @@ export const registerManualVisitor = async (
   data: ManualVisitorInput
 ) => {
   const response = await axiosInstance.post(
-    "/api/visitors/visits/manual",
+    "/api/v1/visitors/visits/manual",
     data
   )
 
@@ -45,7 +45,7 @@ export const getVisitorRecords = async (
   params: VisitorRecordsParams
 ) => {
   const response = await axiosInstance.get(
-    "/api/visitors/visits",
+    "/api/v1/visitors/visits",
     {
       params,
     }
@@ -59,7 +59,7 @@ export const getActiveVisitors = async (
   limit = 10
 ) => {
   const response = await axiosInstance.get(
-    "/api/visitors/visits/active",
+    "/api/v1/visitors/visits/active",
     {
       params: {
         page,
@@ -73,7 +73,7 @@ export const getActiveVisitors = async (
 
 export const checkoutVisitor = async (visitId: string) => {
   const response = await axiosInstance.patch(
-    `/api/visitors/visits/${visitId}/check-out`
+    `/api/v1/visitors/visits/${visitId}/check-out`
   )
 
   return response.data.data as VisitorVisit
@@ -84,7 +84,7 @@ export const getVisitorHistory = async (
   limit = 10
 ) => {
   const response = await axiosInstance.get(
-    "/api/visitors/visits/history",
+    "/api/v1/visitors/visits/history",
     {
       params: {
         page,

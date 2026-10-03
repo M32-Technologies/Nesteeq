@@ -15,7 +15,7 @@ export const auth = betterAuth({
     client: getAuthMongoClient()
   }),
   baseURL: env.betterAuthUrl,
-  trustedOrigins: [env.webUrl],
+  trustedOrigins: env.corsOrigins,
   secret: env.betterAuthSecret,
   session: {
     expiresIn: 60 * 60 * 24 * 7,

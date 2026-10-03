@@ -8,7 +8,17 @@ let io: SocketIOServer | null = null;
 export const initSocket = (server: HttpServer): SocketIOServer => {
   io = new SocketIOServer(server, {
     cors: {
-      origin: env.webUrl || "http://localhost:3000",
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        const cleanOrigin = origin.replace(/\/$/, "");
+        if (
+          env.corsOrigins.includes(cleanOrigin) ||
+          cleanOrigin.endsWith(".vercel.app")
+        ) {
+          return callback(null, true);
+        }
+        return callback(new Error(`Origin ${origin} not allowed by CORS`));
+      },
       credentials: true,
     },
   });

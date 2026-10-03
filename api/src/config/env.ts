@@ -4,7 +4,20 @@ dotenv.config();
 const mongoUrl = (process.env.MONGO_URL || "").trim();
 const betterAuthSecret = (process.env.BETTER_AUTH_SECRET || "").trim();
 const betterAuthUrl = (process.env.BETTER_AUTH_URL || "").trim();
-const webUrl = (process.env.WEB_URL || "http://localhost:3000").trim();
+const rawWebUrls = process.env.WEB_URL || "http://localhost:3000";
+const parsedWebUrls = rawWebUrls
+  .split(",")
+  .map((url) => url.trim().replace(/\/$/, ""))
+  .filter(Boolean);
+
+const corsOrigins = Array.from(
+  new Set([
+    ...parsedWebUrls,
+    "http://localhost:3000",
+    "https://nesteeq.vercel.app",
+  ])
+);
+const webUrl = parsedWebUrls[0] || "http://localhost:3000";
 const brevoApiKey = (
   process.env.BREVO_API_KEY ||
   process.env.BRAVO_API_KEY ||
@@ -33,6 +46,7 @@ export const env = {
   betterAuthSecret,
   betterAuthUrl,
   webUrl,
+  corsOrigins,
   brevoApiKey,
   brevoSenderEmail,
   brevoSenderName,
