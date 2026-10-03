@@ -23,7 +23,7 @@ import {
   invitationIdParamSchema,
   validateInvitationParamSchema,
 } from "./invitation.validation.js"
-import { uploadInviteFile } from "../../middlewares/uplode.js"
+import { uploadInviteFile } from "../../middlewares/excelUpload.middleware.js"
 const router = express.Router()
 
 const managerOnly = requireRole("property_manager")
