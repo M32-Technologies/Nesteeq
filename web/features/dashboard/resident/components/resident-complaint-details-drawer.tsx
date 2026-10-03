@@ -128,15 +128,18 @@ export function ResidentComplaintDetailsDrawer({
   );
   const parsedPhotoRef = photoRefMatch ? photoRefMatch[1].trim() : null;
 
-  const cleanDescription = complaint.description
+  const cleanDescription = (complaint.description || "")
     .replace(/\[Location:\s*[^\]]+\]/gi, "")
     .replace(/\[Attached Photo Reference:[^\]]+\]/gi, "")
+    .replace(/\[Image:\s*[^\]]+\]/gi, "")
     .trim();
 
-  const rawImages: string[] = [
-    ...(Array.isArray(complaint.images) ? complaint.images : []),
-    ...(Array.isArray(complaint.attachments) ? complaint.attachments : []),
-  ].filter(Boolean);
+  const rawImages: string[] = Array.from(
+    new Set([
+      ...(Array.isArray(complaint.images) ? complaint.images : []),
+      ...(Array.isArray(complaint.attachments) ? complaint.attachments : []),
+    ].filter(Boolean))
+  );
 
   const status = (complaint.status || "PENDING").toUpperCase();
   const isTerminalNegative = status === "REJECTED" || status === "CANCELLED";
