@@ -124,11 +124,6 @@ export const sidebarNavigation: Record<
       title: "Reports",
       items: [
         {
-          title: "Analytics",
-          href: "/dashboard/reports",
-          icon: BarChart3,
-        },
-        {
           title: "Payment History",
           href: "/dashboard/payment-history",
           icon: ReceiptText,

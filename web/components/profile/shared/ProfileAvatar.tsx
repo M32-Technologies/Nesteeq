@@ -1,6 +1,9 @@
-import React from "react"
+"use client"
+
+import React, { useState } from "react"
 import Image from "next/image"
-import { Camera, Loader2 } from "lucide-react"
+import { Camera, Eye, Loader2 } from "lucide-react"
+import { AvatarPreviewModal } from "./AvatarPreviewModal"
 
 export interface ProfileAvatarProps {
   name: string
@@ -10,6 +13,8 @@ export interface ProfileAvatarProps {
   onUploadClick?: () => void
   isLoading?: boolean
   className?: string
+  previewable?: boolean
+  subtitle?: string
 }
 
 export function ProfileAvatar({
@@ -20,7 +25,11 @@ export function ProfileAvatar({
   onUploadClick,
   isLoading = false,
   className = "",
+  previewable = false,
+  subtitle,
 }: ProfileAvatarProps) {
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
+
   const getInitials = (str: string) => {
     if (!str || !str.trim()) return "U"
     const parts = str.trim().split(/\s+/)
@@ -51,76 +60,137 @@ export function ProfileAvatar({
     xl: "size-4",
   }
 
-  return (
-    <div className={`relative inline-block shrink-0 ${className}`}>
-      <div
-        className={`
-          relative
-          flex
-          items-center
-          justify-center
-          rounded-full
-          overflow-hidden
-          bg-gradient-to-br
-          from-[#08281E]
-          to-[#0F3E30]
-          text-white
-          tracking-wider
-          ring-4
-          ring-white
-          shadow-lg
-          select-none
-          ${sizeClasses[size]}
-        `}
-      >
-        {avatarUrl ? (
-          <Image
-            src={avatarUrl}
-            alt={name || "User Avatar"}
-            fill
-            sizes="128px"
-            unoptimized
-            className="object-cover size-full rounded-full"
-          />
-        ) : (
-          <span>{initials}</span>
-        )}
-      </div>
+  const canPreview = Boolean(previewable && avatarUrl)
 
-      {showUploadButton && (
-        <button
-          type="button"
-          onClick={onUploadClick}
-          disabled={isLoading}
-          title="Change profile picture"
-          aria-label="Change profile picture"
+  return (
+    <>
+      <div className={`relative inline-block shrink-0 ${className}`}>
+        <div
+          onClick={canPreview ? () => setIsPreviewOpen(true) : undefined}
+          onKeyDown={
+            canPreview
+              ? (e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault()
+                    setIsPreviewOpen(true)
+                  }
+                }
+              : undefined
+          }
+          role={canPreview ? "button" : undefined}
+          tabIndex={canPreview ? 0 : undefined}
+          aria-label={canPreview ? `View ${name}'s profile picture` : undefined}
           className={`
-            absolute
+            relative
             flex
             items-center
             justify-center
             rounded-full
-            bg-white
-            text-[#08281E]
-            shadow-md
-            ring-2
-            ring-[#E2E8F0]
-            hover:bg-[#F8FAFC]
-            hover:scale-105
-            active:scale-95
-            transition-all
-            duration-150
-            cursor-pointer
-            ${buttonSizeClasses[size]}
+            overflow-hidden
+            bg-gradient-to-br
+            from-[#08281E]
+            to-[#0F3E30]
+            text-white
+            tracking-wider
+            ring-4
+            ring-white
+            shadow-lg
+            select-none
+            ${sizeClasses[size]}
+            ${
+              canPreview
+                ? "cursor-pointer group hover:ring-[#0F8C5E]/40 transition-all duration-200"
+                : ""
+            }
           `}
         >
-          {isLoading ? (
-            <Loader2 className={`${iconSizes[size]} animate-spin text-[#08281E]`} />
+          {avatarUrl ? (
+            <>
+              <Image
+                src={avatarUrl}
+                alt={name || "User Avatar"}
+                fill
+                sizes="128px"
+                unoptimized
+                className="object-cover size-full rounded-full transition-transform duration-200 group-hover:scale-105"
+              />
+              {canPreview && (
+                <div
+                  className="
+                    absolute
+                    inset-0
+                    bg-black/35
+                    opacity-0
+                    group-hover:opacity-100
+                    transition-opacity
+                    duration-200
+                    flex
+                    items-center
+                    justify-center
+                    rounded-full
+                    pointer-events-none
+                  "
+                >
+                  <Eye className="size-5 sm:size-6 text-white drop-shadow-md transition-transform duration-200 group-hover:scale-110" />
+                </div>
+              )}
+            </>
           ) : (
-            <Camera className={`${iconSizes[size]} text-[#08281E] stroke-[2.2]`} />
+            <span>{initials}</span>
           )}
-        </button>
+        </div>
+
+        {showUploadButton && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onUploadClick?.()
+            }}
+            disabled={isLoading}
+            title="Change profile picture"
+            aria-label="Change profile picture"
+            className={`
+              absolute
+              flex
+              items-center
+              justify-center
+              rounded-full
+              bg-white
+              text-[#08281E]
+              shadow-md
+              ring-2
+              ring-[#E2E8F0]
+              hover:bg-[#F8FAFC]
+              hover:scale-105
+              active:scale-95
+              transition-all
+              duration-150
+              cursor-pointer
+              ${buttonSizeClasses[size]}
+            `}
+          >
+            {isLoading ? (
+              <Loader2 className={`${iconSizes[size]} animate-spin text-[#08281E]`} />
+            ) : (
+              <Camera className={`${iconSizes[size]} text-[#08281E] stroke-[2.2]`} />
+            )}
+          </button>
+        )}
+      </div>
+
+      {canPreview && (
+        <AvatarPreviewModal
+          isOpen={isPreviewOpen}
+          onClose={() => setIsPreviewOpen(false)}
+          name={name}
+          avatarUrl={avatarUrl}
+          subtitle={subtitle}
+          onUploadClick={showUploadButton ? onUploadClick : undefined}
+          isLoading={isLoading}
+        />
       )}
-    </div>
+    </>
   )
 }
+

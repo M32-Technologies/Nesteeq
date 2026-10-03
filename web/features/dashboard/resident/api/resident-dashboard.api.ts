@@ -163,7 +163,7 @@ export async function fetchResidentGuestPasses(params?: {
           guestPasses: GuestPassItem[];
           pagination: { total: number };
         };
-      }>("/api/visitors/passes", { params });
+      }>("/api/v1/visitors/passes", { params });
 
       return fallbackRes.data?.data?.guestPasses || [];
     } catch {
@@ -185,7 +185,7 @@ export async function markResidentVisitorDeparted(passIdOrVisitId: string) {
       success: boolean;
       message: string;
       visit?: any;
-    }>(`/api/visitors/passes/${encodeURIComponent(passIdOrVisitId)}/depart-flat`);
+    }>(`/api/v1/visitors/passes/${encodeURIComponent(passIdOrVisitId)}/depart-flat`);
     return fallbackRes.data;
   }
 }
@@ -470,7 +470,7 @@ export async function createResidentGuestPass(payload: CreateResidentGuestPassPa
     return res.data;
   } catch (error) {
     const fallbackRes = await api.post<CreateResidentGuestPassResponse>(
-      "/api/visitors/passes",
+      "/api/v1/visitors/passes",
       payload
     );
     return fallbackRes.data;
@@ -488,7 +488,7 @@ export async function cancelResidentGuestPass(passId: string) {
     const fallbackRes = await api.patch<{
       success: boolean;
       message?: string;
-    }>(`/api/visitors/passes/${encodeURIComponent(passId)}/cancel`);
+    }>(`/api/v1/visitors/passes/${encodeURIComponent(passId)}/cancel`);
     return fallbackRes.data;
   }
 }

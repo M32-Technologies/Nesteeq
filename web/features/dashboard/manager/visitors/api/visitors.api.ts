@@ -102,7 +102,7 @@ export const getManagerVisitorRecords = async (
     success: boolean
     message: string
     data: ApiVisitorRecordsResponse
-  }>("/api/visitors/visits", {
+  }>("/api/v1/visitors/visits", {
     params: queryParams,
   })
 
@@ -120,7 +120,7 @@ export const getManagerVisitorRecords = async (
           success: boolean
           message: string
           data: ApiVisitorRecordsResponse
-        }>("/api/visitors/visits", {
+        }>("/api/v1/visitors/visits", {
           params: {
             ...queryParams,
             page: p,
@@ -156,7 +156,7 @@ export const getManagerActiveVisitors = async (page = 1, limit = 100) => {
       visitors: ApiVisitorRecord[]
       pagination: { total: number }
     }
-  }>("/api/visitors/visits/active", {
+  }>("/api/v1/visitors/visits/active", {
     params: { page, limit },
   })
 

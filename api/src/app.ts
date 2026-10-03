@@ -53,7 +53,7 @@ app.use(express.json());
 app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")));
 
 app.use("/api/v1/uploads", uploadRoutes);
-app.use("/api/uploads", uploadRoutes);
+
 
 
 app.use("/api/v1/admin", adminRoutes)
@@ -67,37 +67,21 @@ app.use("/api/v1/blocks", BlockRoute);
 app.use("/api/v1/flats", FlatRoute);
 
 app.use("/api/v1/bills", billingRoutes);
-app.use("/api/bills", billingRoutes);
-
 app.use("/api/v1/payments", paymentRoutes);
-app.use("/api/payments", paymentRoutes);
-
 app.use("/api/v1/finance", financeRoutes);
-app.use("/api/finance", financeRoutes);
-
 app.use("/api/v1/expenses", expenseRoutes);
-app.use("/api/expenses", expenseRoutes);
-
 app.use("/api/v1/wallets", walletRoutes);
-app.use("/api/wallets", walletRoutes);
-
 app.use("/api/v1/audit", auditRoutes);
-app.use("/api/audit", auditRoutes);
-
 app.use("/api/v1/treasurer", treasurerRoutes);
-app.use("/api/treasurer", treasurerRoutes);
-app.use("/api/residents", ResidentRoute);
 
 app.use("/api/v1/parking", parkingRoutes);
 app.use("/api/security/parking", parkingRoutes);
 
 app.use("/api/v1/visitors", visitorsRoutes);
-app.use("/api/visitors", visitorsRoutes);
 app.use("/api/deliveries", deliveryRoutes);
 app.use("/api/security/deliveries", deliveryRoutes);
 app.use("/api/security/alerts", alertRoutes);
 app.use("/api/v1/announcements", announcementRoutes);
-app.use("/api/announcements", announcementRoutes);
 app.use("/api/security", securityRoutes);
 
 app.use("/api/v1/notifications", notificationRoutes);
