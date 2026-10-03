@@ -149,7 +149,7 @@ export const assertNotTerminal = (maintenance: MaintenanceDocument): void => {
 };
 
 export const createNote = (
-  message: string | undefined,
+  message: string | null | undefined,
   user: AuthenticatedMaintenanceUser
 ): MaintenanceNote | null => {
   const normalizedMessage = normalizeOptionalString(message);
@@ -167,7 +167,7 @@ export const createNote = (
 };
 
 export const createComplaintRemark = (
-  message: string | undefined,
+  message: string | null | undefined,
   user: AuthenticatedMaintenanceUser
 ): ComplaintRemark | null => {
   const normalizedMessage = normalizeOptionalString(message);
@@ -187,7 +187,7 @@ export const createComplaintRemark = (
 export const createProgressUpdate = (
   details: string,
   status: MaintenanceStatus,
-  remarks: string | undefined,
+  remarks: string | null | undefined,
   user: AuthenticatedMaintenanceUser
 ): MaintenanceProgressUpdate => ({
   details,

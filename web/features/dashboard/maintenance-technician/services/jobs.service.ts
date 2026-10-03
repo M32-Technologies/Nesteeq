@@ -2,10 +2,23 @@ import { isAxiosError } from "axios"
 
 import api from "@/lib/axios"
 
+export type PaginationInfo = {
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+}
+
+export type PaginatedJobsResult = {
+  jobs: AssignedJob[]
+  pagination: PaginationInfo
+}
+
 type ApiResponse<T> = {
   success: boolean
   message?: string
   data: T
+  pagination?: PaginationInfo
 }
 
 type ApiErrorResponse = {
@@ -15,14 +28,19 @@ type ApiErrorResponse = {
 }
 
 export type AssignedJob = {
+  _id?: string
   jobId: string
   title: string
+  issueDetails?: string
   category: string
   block: string
   flat: string
   priority: "High" | "Medium" | "Low"
   status: "ASSIGNED" | "IN_PROGRESS" | "COMPLETED"
   assignedDate: string
+  createdAt?: string
+  type?: "MAINTENANCE" | "COMPLAINT" | string
+  jobType?: "MAINTENANCE" | "COMPLAINT"
   location?: string
   area?: string
   flatNumber?: string
@@ -77,20 +95,45 @@ const getApiErrorMessage = (error: unknown, fallback: string) => {
   return error instanceof Error ? error.message : fallback
 }
 
-export const getAssignedJobs = async (status?: string): Promise<AssignedJob[]> => {
+export const getAssignedJobs = async (
+  status?: string,
+  order: "desc" | "asc" = "desc",
+  sortBy: string = "createdAt",
+  page: number = 1,
+  limit: number = 10
+): Promise<PaginatedJobsResult> => {
   try {
+    const params: Record<string, string | number> = {
+      order,
+      sortBy,
+      page,
+      limit,
+    }
+    if (status && status !== "ALL") {
+      params.status = status
+    }
+
     const response = await api.get<ApiResponse<AssignedJob[]>>(
       "/api/maintenance-technician/jobs",
-      {
-        params: status && status !== "ALL" ? { status } : undefined,
-      }
+      { params }
     )
 
     if (!response.data.success) {
       throw new Error(response.data.message || "Failed to fetch assigned jobs")
     }
 
-    return response.data.data
+    const jobs = response.data.data || []
+    const pagination = response.data.pagination || {
+      total: jobs.length,
+      page,
+      limit,
+      totalPages: Math.ceil(jobs.length / limit) || 1,
+    }
+
+    return {
+      jobs,
+      pagination,
+    }
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Failed to fetch assigned jobs"))
   }

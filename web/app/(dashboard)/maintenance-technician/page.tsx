@@ -1,4 +1,5 @@
 import MaintenanceStats from "@/features/dashboard/maintenance-technician/components/maintenance-stats"
+import AssignedJobsList from "@/features/dashboard/maintenance-technician/components/assigned-jobs-list"
 
 export default function MaintenanceTechnicianPage() {
   return (
@@ -13,6 +14,8 @@ export default function MaintenanceTechnicianPage() {
       </div>
 
       <MaintenanceStats />
+
+      <AssignedJobsList isOverview={true} limit={5} />
     </div>
   )
 }

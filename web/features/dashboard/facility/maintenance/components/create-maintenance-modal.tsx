@@ -44,6 +44,8 @@ export function CreateMaintenanceModal({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["facility-maintenance"] }),
         queryClient.invalidateQueries({ queryKey: ["facility-maintenance-stats"] }),
+        queryClient.invalidateQueries({ queryKey: ["maintenance-technician"] }),
+        queryClient.invalidateQueries({ queryKey: ["maintenance"] }),
       ])
       onClose()
     },

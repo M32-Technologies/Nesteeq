@@ -552,7 +552,7 @@ const syncComplaintFromMaintenance = async (
   maintenance: MaintenanceDocument,
   set: Record<string, unknown>,
   user: AuthenticatedMaintenanceUser,
-  remark?: string
+  remark?: string | null
 ): Promise<void> => {
   const rawComplaint = (maintenance as any).complaint || (maintenance as any).complaintId;
   if (!rawComplaint) {
@@ -1353,19 +1353,21 @@ export const approveMaintenance = async (
   }
 
   const now = new Date();
+  const approvalNote = data.remarks || (data as any).notes || null;
   const set: Record<string, unknown> = {
     status: "APPROVED",
     approvalDetails: {
       status: "APPROVED",
       reviewedBy: user.id,
       reviewedAt: now,
-      remarks: data.remarks ?? null,
+      remarks: approvalNote,
+      notes: approvalNote,
       rejectionReason: null,
     },
     updatedBy: user.id,
   };
 
-  const managerRemark = createNote(data.remarks, user);
+  const managerRemark = createNote(approvalNote || undefined, user);
   const updatedMaintenance = await updateMaintenanceDocument(
     maintenanceId,
     set,
@@ -1605,38 +1607,79 @@ export const approveMaintenanceCost = async (
   const maintenance = await getMaintenanceOrThrow(maintenanceId);
   assertManagerCanManageMaintenance(user, maintenance);
 
-  const costStatus = maintenance.costReview?.status ?? "NOT_SUBMITTED";
+  console.log("APPROVE RECORD DEBUG:", {
+    id: maintenance._id,
+    expenseStatus: maintenance.expenseStatus,
+    costReviewStatus: maintenance.costReview?.status,
+    expenseAmount: maintenance.expenseAmount,
+    cost: (maintenance as any).cost,
+    submittedAmount: maintenance.costReview?.submittedAmount,
+  });
 
-  if (costStatus !== "SUBMITTED") {
-    throw new AppError("Only submitted maintenance costs can be approved", 400);
+  const isAlreadyApproved =
+    maintenance.expenseStatus === "APPROVED" ||
+    maintenance.costReview?.status === "APPROVED";
+
+  if (isAlreadyApproved) {
+    throw new AppError("Maintenance cost has already been approved", 400);
   }
 
-  const submittedAmount = maintenance.costReview?.submittedAmount ?? maintenance.finalCost;
-
-  if (submittedAmount === null || submittedAmount === undefined) {
-    throw new AppError("Submitted cost amount is missing", 400);
-  }
+  const resolvedAmount =
+    maintenance.costReview?.submittedAmount ||
+    maintenance.expenseAmount ||
+    (maintenance as any).expense?.amount ||
+    (maintenance as any).finalCost ||
+    (maintenance as any).cost ||
+    (data as any)?.amount ||
+    0;
 
   const now = new Date();
-  const managerRemark = createNote(data.remarks, user);
+  const approvalNote = (data as any)?.notes || data?.remarks || null;
+  const managerRemark = createNote(approvalNote || undefined, user);
   const updatedMaintenance = await updateMaintenanceDocument(
     maintenanceId,
     {
+      expenseStatus: "APPROVED",
+      expenseApproved: true,
+      expenseReviewedAt: now,
+      expenseReviewedBy: user.id || (user as any)._id,
+      approvedAt: now,
+      approvedBy: user.id || (user as any)._id,
       costReview: {
         status: "APPROVED",
-        submittedAmount,
-        submittedBy: maintenance.costReview?.submittedBy ?? maintenance.assignedStaff ?? null,
-        submittedAt: maintenance.costReview?.submittedAt ?? maintenance.completedAt ?? now,
-        reviewedBy: user.id,
+        submittedAmount: resolvedAmount,
+        submittedBy:
+          maintenance.costReview?.submittedBy ??
+          maintenance.expenseSubmittedBy ??
+          maintenance.assignedStaff ??
+          null,
+        submittedAt:
+          maintenance.costReview?.submittedAt ??
+          maintenance.expenseSubmittedAt ??
+          maintenance.completedAt ??
+          now,
+        reviewedBy: user.id || (user as any)._id,
         reviewedAt: now,
-        remarks: data.remarks ?? null,
+        remarks: approvalNote,
+        notes: approvalNote,
         rejectionReason: null,
         forwardedToRole: "TREASURER",
         forwardedAt: now,
       },
-      updatedBy: user.id,
+      updatedBy: user.id || (user as any)._id,
     },
     managerRemark ? { managerRemarks: managerRemark } : undefined
+  );
+
+  await syncComplaintFromMaintenance(
+    updatedMaintenance,
+    {
+      expenseStatus: "APPROVED",
+      expenseReviewedAt: now,
+      expenseReviewedBy: user.id || (user as any)._id,
+    },
+    user,
+    approvalNote
   );
 
   await Promise.all([
@@ -1679,32 +1722,68 @@ export const rejectMaintenanceCost = async (
   const maintenance = await getMaintenanceOrThrow(maintenanceId);
   assertManagerCanManageMaintenance(user, maintenance);
 
-  const costStatus = maintenance.costReview?.status ?? "NOT_SUBMITTED";
+  const isAlreadyRejected =
+    maintenance.expenseStatus === "REJECTED" ||
+    maintenance.costReview?.status === "REJECTED";
 
-  if (costStatus !== "SUBMITTED") {
-    throw new AppError("Only submitted maintenance costs can be rejected", 400);
+  if (isAlreadyRejected) {
+    throw new AppError("Maintenance cost has already been rejected", 400);
   }
+
+  const resolvedAmount =
+    maintenance.costReview?.submittedAmount ||
+    maintenance.expenseAmount ||
+    (maintenance as any).expense?.amount ||
+    (maintenance as any).finalCost ||
+    (maintenance as any).cost ||
+    (data as any)?.amount ||
+    0;
 
   const now = new Date();
   const managerRemark = createNote(data.reason, user);
   const updatedMaintenance = await updateMaintenanceDocument(
     maintenanceId,
     {
+      expenseStatus: "REJECTED",
+      expenseApproved: false,
+      expenseReviewedAt: now,
+      expenseReviewedBy: user.id || (user as any)._id,
+      expenseRejectionReason: data.reason,
       costReview: {
         status: "REJECTED",
-        submittedAmount: maintenance.costReview?.submittedAmount ?? maintenance.finalCost ?? null,
-        submittedBy: maintenance.costReview?.submittedBy ?? maintenance.assignedStaff ?? null,
-        submittedAt: maintenance.costReview?.submittedAt ?? maintenance.completedAt ?? now,
-        reviewedBy: user.id,
+        submittedAmount: resolvedAmount,
+        submittedBy:
+          maintenance.costReview?.submittedBy ??
+          maintenance.expenseSubmittedBy ??
+          maintenance.assignedStaff ??
+          null,
+        submittedAt:
+          maintenance.costReview?.submittedAt ??
+          maintenance.expenseSubmittedAt ??
+          maintenance.completedAt ??
+          now,
+        reviewedBy: user.id || (user as any)._id,
         reviewedAt: now,
         remarks: data.remarks ?? null,
         rejectionReason: data.reason,
         forwardedToRole: null,
         forwardedAt: null,
       },
-      updatedBy: user.id,
+      updatedBy: user.id || (user as any)._id,
     },
     managerRemark ? { managerRemarks: managerRemark } : undefined
+  );
+
+  await syncComplaintFromMaintenance(
+    updatedMaintenance,
+    {
+      expenseStatus: "REJECTED",
+      expenseReviewedAt: now,
+      expenseReviewedBy: user.id || (user as any)._id,
+      expenseRejectionReason: data.reason,
+    },
+    user,
+    data.reason
   );
 
   if (updatedMaintenance.assignedStaff) {

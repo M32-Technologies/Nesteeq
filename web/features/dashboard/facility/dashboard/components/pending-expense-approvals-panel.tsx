@@ -301,8 +301,12 @@ export function PendingExpenseApprovalsPanel({
     onSuccess: async () => {
       toast.success("Maintenance expense approved")
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["expense-approvals"] }),
         queryClient.invalidateQueries({ queryKey: ["facility-dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["maintenances"] }),
         queryClient.invalidateQueries({ queryKey: ["facility-maintenance"] }),
+        queryClient.invalidateQueries({ queryKey: ["facility-maintenance-stats"] }),
+        queryClient.invalidateQueries({ queryKey: ["maintenance"] }),
       ])
     },
     onError: (error) => {
@@ -317,8 +321,12 @@ export function PendingExpenseApprovalsPanel({
     onSuccess: async () => {
       toast.success("Maintenance expense rejected")
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["expense-approvals"] }),
         queryClient.invalidateQueries({ queryKey: ["facility-dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["maintenances"] }),
         queryClient.invalidateQueries({ queryKey: ["facility-maintenance"] }),
+        queryClient.invalidateQueries({ queryKey: ["facility-maintenance-stats"] }),
+        queryClient.invalidateQueries({ queryKey: ["maintenance"] }),
       ])
     },
     onError: (error) => {

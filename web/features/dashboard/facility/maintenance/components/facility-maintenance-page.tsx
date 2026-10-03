@@ -173,7 +173,15 @@ export function FacilityMaintenancePage() {
 
   const handleSuccess = async (message?: string) => {
     toast.success(message || "Maintenance updated")
-    await queryClient.invalidateQueries({ queryKey: ["facility-maintenance"] })
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["expense-approvals"] }),
+      queryClient.invalidateQueries({ queryKey: ["facility-dashboard"] }),
+      queryClient.invalidateQueries({ queryKey: ["maintenances"] }),
+      queryClient.invalidateQueries({ queryKey: ["facility-maintenance"] }),
+      queryClient.invalidateQueries({ queryKey: ["facility-maintenance-stats"] }),
+      queryClient.invalidateQueries({ queryKey: ["maintenance-technician"] }),
+      queryClient.invalidateQueries({ queryKey: ["maintenance"] }),
+    ])
     await detailQuery.refetch()
     handleCloseDrawer()
   }

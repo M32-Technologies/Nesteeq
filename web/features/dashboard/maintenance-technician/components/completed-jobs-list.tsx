@@ -30,7 +30,7 @@ export const completedJobsQueryKeys = {
     ["maintenance-technician", "jobs", "completed", userId ?? "me"] as const,
 }
 
-const priorityStyles: Record<AssignedJob["priority"], string> = {
+const priorityStyles: Record<string, string> = {
   High: "bg-red-50 text-red-700 border-red-200",
   Medium: "bg-amber-50 text-amber-700 border-amber-200",
   Low: "bg-slate-100 text-slate-700 border-slate-200",
@@ -44,17 +44,19 @@ export default function CompletedJobsList() {
   const [openActionJobId, setOpenActionJobId] = useState<string | null>(null)
 
   const {
-    data: jobs = [],
+    data,
     isLoading,
     isError,
     error,
   } = useQuery({
     queryKey: completedJobsQueryKeys.all(session?.user?.id),
-    queryFn: () => getAssignedJobs("COMPLETED"),
+    queryFn: () => getAssignedJobs("COMPLETED", "desc", "createdAt", 1, 100),
     staleTime: 0,
     refetchOnWindowFocus: true,
     refetchOnMount: "always",
   })
+
+  const jobs = data?.jobs ?? []
 
   // Ensure only COMPLETED jobs are shown
   const completedJobs = useMemo(() => {
@@ -69,7 +71,7 @@ export default function CompletedJobsList() {
   }, [completedJobs])
 
   const filteredJobs = useMemo(() => {
-    return completedJobs.filter((job) => {
+    const list = completedJobs.filter((job) => {
       const q = search.trim().toLowerCase()
       const matchesSearch =
         q === "" ||
@@ -89,15 +91,25 @@ export default function CompletedJobsList() {
 
       return matchesSearch && matchesPriority && matchesCategory
     })
+
+    return [...list].sort((a, b) => {
+      const dateA = new Date(a.assignedDate || a.createdAt || 0).getTime()
+      const dateB = new Date(b.assignedDate || b.createdAt || 0).getTime()
+      return dateB - dateA
+    })
   }, [completedJobs, search, priorityFilter, categoryFilter])
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "-"
     try {
-      return new Intl.DateTimeFormat("en-IN", {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) return dateString
+      return date.toLocaleDateString("en-GB", {
         day: "2-digit",
         month: "short",
         year: "numeric",
-      }).format(new Date(dateString))
+        timeZone: "Asia/Kolkata",
+      })
     } catch {
       return dateString
     }

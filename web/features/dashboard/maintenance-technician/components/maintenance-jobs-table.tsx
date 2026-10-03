@@ -4,6 +4,8 @@ import Link from "next/link"
 import {
   Activity,
   Calendar,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Eye,
   Layers,
@@ -27,6 +29,9 @@ type MaintenanceJobsTableProps = {
   hasFilters: boolean
   page?: number
   pageSize?: number
+  totalPages?: number
+  onPageChange?: (page: number) => void
+  showPagination?: boolean
 }
 
 const priorityStyles: Record<AssignedJob["priority"], string> = {
@@ -97,16 +102,44 @@ export default function MaintenanceJobsTable({
   totalCount,
   isLoading,
   hasFilters,
-  page,
-  pageSize,
+  page = 1,
+  pageSize = 10,
+  totalPages,
+  onPageChange,
+  showPagination = true,
 }: MaintenanceJobsTableProps) {
-  const formatDate = (dateString: string) => {
+  const currentPage = page || 1
+  const limit = pageSize || 10
+  const pagesCount = totalPages ?? Math.max(1, Math.ceil(totalCount / limit))
+  const startItem = totalCount === 0 ? 0 : (currentPage - 1) * limit + 1
+  const endItem = Math.min(currentPage * limit, totalCount)
+
+  const getPageNumbers = () => {
+    const pageNumbers: (number | string)[] = []
+    if (pagesCount <= 5) {
+      for (let i = 1; i <= pagesCount; i++) pageNumbers.push(i)
+    } else {
+      if (currentPage <= 3) {
+        pageNumbers.push(1, 2, 3, 4, "...", pagesCount)
+      } else if (currentPage >= pagesCount - 2) {
+        pageNumbers.push(1, "...", pagesCount - 3, pagesCount - 2, pagesCount - 1, pagesCount)
+      } else {
+        pageNumbers.push(1, "...", currentPage - 1, currentPage, currentPage + 1, "...", pagesCount)
+      }
+    }
+    return pageNumbers
+  }
+  const formatJobDate = (dateString?: string) => {
+    if (!dateString) return "-"
     try {
-      return new Intl.DateTimeFormat("en-IN", {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) return dateString
+      return date.toLocaleDateString("en-GB", {
         day: "2-digit",
         month: "short",
         year: "numeric",
-      }).format(new Date(dateString))
+        timeZone: "Asia/Kolkata", // ensures midnight/early morning IST displays Oct 3, not UTC Oct 2
+      })
     } catch {
       return dateString
     }
@@ -226,8 +259,8 @@ export default function MaintenanceJobsTable({
 
                     {/* Issue / Title */}
                     <td className="px-4 py-4 align-middle">
-                      <p className="truncate text-sm font-medium text-slate-900" title={job.title}>
-                        {job.title}
+                      <p className="truncate text-sm font-medium text-slate-900" title={job.title || job.issueDetails}>
+                        {job.title || job.issueDetails}
                       </p>
                     </td>
 
@@ -274,7 +307,7 @@ export default function MaintenanceJobsTable({
                     <td className="px-4 py-4 align-middle">
                       <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
                         <Calendar size={13} className="shrink-0 text-slate-400" />
-                        <span>{formatDate(job.assignedDate)}</span>
+                        <span>{formatJobDate(job.assignedDate || job.createdAt)}</span>
                       </div>
                     </td>
 
@@ -324,12 +357,76 @@ export default function MaintenanceJobsTable({
         </table>
       </div>
 
-      {/* Footer count */}
-      <div className="border-t border-slate-200 px-5 py-3.5 sm:px-6">
-        <p className="text-xs font-medium text-slate-500">
-          Showing {jobs.length} of {totalCount} assigned job{totalCount === 1 ? "" : "s"}
-        </p>
-      </div>
+      {/* Pagination Footer */}
+      {showPagination ? (
+        <div className="flex flex-col gap-3 border-t border-slate-200 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <p className="text-xs font-medium text-slate-500">
+            Showing <span className="font-semibold text-slate-800">{startItem}</span> to{" "}
+            <span className="font-semibold text-slate-800">{endItem}</span> of{" "}
+            <span className="font-semibold text-slate-800">{totalCount}</span> jobs
+          </p>
+
+          <div className="flex items-center gap-1.5 self-end sm:self-auto">
+            <button
+              type="button"
+              disabled={currentPage <= 1 || isLoading}
+              onClick={() => onPageChange?.(currentPage - 1)}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-2xs transition hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <ChevronLeft size={14} />
+              <span>Previous</span>
+            </button>
+
+            <div className="flex items-center gap-1">
+              {getPageNumbers().map((p, idx) => {
+                if (p === "...") {
+                  return (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="px-1.5 py-1 text-xs text-slate-400 select-none"
+                    >
+                      ...
+                    </span>
+                  )
+                }
+                const isCurrent = p === currentPage
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    disabled={isLoading}
+                    onClick={() => onPageChange?.(Number(p))}
+                    className={`h-7 min-w-7 rounded-lg px-2 text-xs font-semibold transition ${
+                      isCurrent
+                        ? "bg-[#0F5F45] text-white shadow-2xs"
+                        : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                    } disabled:opacity-40`}
+                  >
+                    {p}
+                  </button>
+                )
+              })}
+            </div>
+
+            <button
+              type="button"
+              disabled={currentPage >= pagesCount || isLoading}
+              onClick={() => onPageChange?.(currentPage + 1)}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-2xs transition hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <span>Next</span>
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="border-t border-slate-200 px-5 py-3.5 sm:px-6">
+          <p className="text-xs font-medium text-slate-500">
+            Showing <span className="font-semibold text-slate-800">{jobs.length}</span> of{" "}
+            <span className="font-semibold text-slate-800">{totalCount}</span> assigned job{totalCount === 1 ? "" : "s"}
+          </p>
+        </div>
+      )}
     </div>
   )
 }
