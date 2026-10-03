@@ -60,6 +60,9 @@ export function ManualVisitorPanel({
     return "Select parking slot"
   })()
 
+  const selectedFlat = flats.find((f) => f._id === form.flatId)
+  const selectedResident = selectedFlat?.residents?.[0]
+
   return (
     <div className={panelClassName}>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -79,14 +82,34 @@ export function ManualVisitorPanel({
             disabled={flatsLoading}
           >
             <option value="">
-              {flatsLoading ? "Loading flats..." : "Select flat"}
+              {flatsLoading
+                ? "Loading flats..."
+                : flats.length === 0
+                ? "No occupied flats found"
+                : "Select flat"}
             </option>
-            {flats.map((flat) => (
-              <option key={flat._id} value={flat._id}>
-                {flat.flatNumber}
-              </option>
-            ))}
+            {flats.map((flat) => {
+              const resNames = Array.from(
+                new Set(flat.residents.map((r) => r.name?.trim()).filter(Boolean))
+              ).join(", ")
+              return (
+                <option key={flat._id} value={flat._id}>
+                  {flat.flatNumber} {resNames ? `• ${resNames}` : ""}
+                </option>
+              )
+            })}
           </select>
+          {selectedResident && selectedFlat && (
+            <p className="mt-1.5 text-xs text-slate-600">
+              Resident:{" "}
+              <span className="font-semibold text-slate-900">
+                {selectedFlat.residents.map((r) => r.name).filter(Boolean).join(", ")}
+              </span>
+              {selectedResident.phone && (
+                <span className="text-slate-500"> ({selectedResident.phone})</span>
+              )}
+            </p>
+          )}
         </div>
         <div>
           <label className="mb-2 block text-sm font-medium text-[#111111]">

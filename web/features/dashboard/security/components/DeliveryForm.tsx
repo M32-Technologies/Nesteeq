@@ -49,6 +49,10 @@ export function DeliveryForm({
 }) {
   const selectedFlat = flats.find((f) => f._id === form.flatId)
   const primaryResident = selectedFlat?.residents?.[0]
+  const residentDisplayNames = selectedFlat?.residents
+    ?.map((r) => r.name)
+    .filter(Boolean)
+    .join(", ")
 
   return (
     <div className={panelClassName}>
@@ -94,20 +98,26 @@ export function DeliveryForm({
             disabled={flatsLoading}
           >
             <option value="">
-              {flatsLoading ? "Loading flats..." : "Select flat"}
+              {flatsLoading
+                ? "Loading flats..."
+                : flats.length === 0
+                ? "No occupied flats found"
+                : "Select flat"}
             </option>
             {flats.map((flat) => {
-              const resName = flat.residents?.[0]?.name
+              const resNames = Array.from(
+                new Set(flat.residents.map((r) => r.name?.trim()).filter(Boolean))
+              ).join(", ")
               return (
                 <option key={flat._id} value={flat._id}>
-                  {flat.flatNumber} {resName ? `• ${resName}` : ""}
+                  {flat.flatNumber} {resNames ? `• ${resNames}` : ""}
                 </option>
               )
             })}
           </select>
-          {primaryResident && (
+          {primaryResident && selectedFlat && (
             <p className="mt-1.5 text-xs text-slate-600">
-              Resident: <span className="font-semibold text-slate-900">{primaryResident.name}</span>
+              Resident: <span className="font-semibold text-slate-900">{residentDisplayNames}</span>
               {primaryResident.phone && (
                 <span className="text-slate-500"> ({primaryResident.phone})</span>
               )}

@@ -12,7 +12,8 @@ export const securityDataQueryKeys = {
   activityRoot: ["security", "activity"] as const,
   activity: (params?: { limit?: number }) =>
     ["security", "activity", params] as const,
-  flats: ["security", "flats"] as const,
+  flats: (params?: { occupiedOnly?: boolean }) =>
+    ["security", "flats", params] as const,
   residents: (params: {
     search?: string
     page?: number
@@ -36,10 +37,12 @@ export const useSecurityActivity = (params?: {
   })
 }
 
-export const useSecurityFlats = () => {
+export const useSecurityFlats = (params?: {
+  occupiedOnly?: boolean
+}) => {
   return useQuery({
-    queryKey: securityDataQueryKeys.flats,
-    queryFn: getSecurityFlats,
+    queryKey: securityDataQueryKeys.flats(params),
+    queryFn: () => getSecurityFlats(params),
   })
 }
 

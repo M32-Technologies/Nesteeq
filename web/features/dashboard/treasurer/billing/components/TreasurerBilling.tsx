@@ -137,6 +137,7 @@ const toDateInput = (date: string) => {
 export default function TreasurerBilling() {
   const queryClient = useQueryClient();
   const [currentPage, setCurrentPage] = useState(1);
+  const [campaignsPage, setCampaignsPage] = useState(1);
   const [activeMainTab, setActiveMainTab] = useState<"BILLS" | "CAMPAIGNS">("BILLS");
   const [isCreateBillOpen, setIsCreateBillOpen] =
     useState(false);
@@ -493,6 +494,22 @@ export default function TreasurerBilling() {
     const start = (validCurrentPage - 1) * ITEMS_PER_PAGE;
     return filteredBills.slice(start, start + ITEMS_PER_PAGE);
   }, [filteredBills, validCurrentPage]);
+
+  const CAMPAIGNS_PER_PAGE = 6;
+  const rawCampaigns = commonBillsQuery.data ?? [];
+  const totalCampaignPages = Math.ceil(rawCampaigns.length / CAMPAIGNS_PER_PAGE) || 1;
+  const safeCampaignPage = Math.min(Math.max(1, campaignsPage), totalCampaignPages);
+
+  useEffect(() => {
+    if (campaignsPage > totalCampaignPages) {
+      setCampaignsPage(totalCampaignPages);
+    }
+  }, [campaignsPage, totalCampaignPages]);
+
+  const paginatedCampaigns = useMemo(() => {
+    const start = (safeCampaignPage - 1) * CAMPAIGNS_PER_PAGE;
+    return rawCampaigns.slice(start, start + CAMPAIGNS_PER_PAGE);
+  }, [rawCampaigns, safeCampaignPage]);
   const serverSummary = billingSummaryQuery.data;
   const billingStats = useMemo(() => {
     if (selectedCategoryFilter === "ALL" && serverSummary) {
@@ -686,117 +703,163 @@ export default function TreasurerBilling() {
                   </button>
                 </div>
               ) : (
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {commonBillsQuery.data.map((campaign) => {
-                    const tagCfg =
-                      BILL_TYPE_TAGS[campaign.billType] || BILL_TYPE_TAGS.OTHER;
-                    const stats = campaign.stats || {
-                      paidCount: 0,
-                      pendingCount: 0,
-                      overdueCount: 0,
-                      collectedAmount: 0,
-                      outstandingAmount: 0,
-                    };
-                    const totalFlats = campaign.totalFlatsCount || (stats.paidCount + stats.pendingCount + stats.overdueCount) || 1;
-                    const paidPercent = Math.min(100, Math.round((stats.paidCount / totalFlats) * 100));
-                    const overduePercent = Math.min(100 - paidPercent, Math.round((stats.overdueCount / totalFlats) * 100));
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {paginatedCampaigns.map((campaign) => {
+                      const tagCfg =
+                        BILL_TYPE_TAGS[campaign.billType] || BILL_TYPE_TAGS.OTHER;
+                      const stats = campaign.stats || {
+                        paidCount: 0,
+                        pendingCount: 0,
+                        overdueCount: 0,
+                        collectedAmount: 0,
+                        outstandingAmount: 0,
+                      };
+                      const totalFlats = campaign.totalFlatsCount || (stats.paidCount + stats.pendingCount + stats.overdueCount) || 1;
+                      const paidPercent = Math.min(100, Math.round((stats.paidCount / totalFlats) * 100));
+                      const overduePercent = Math.min(100 - paidPercent, Math.round((stats.overdueCount / totalFlats) * 100));
 
-                    return (
-                      <div
-                        key={campaign._id}
-                        className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs hover:border-slate-300 transition flex flex-col justify-between"
-                      >
-                        <div>
-                          <div className="flex items-start justify-between gap-2">
-                            <span className={`inline-flex rounded border px-2 py-0.5 text-[10px] font-semibold ${tagCfg.className}`}>
-                              {tagCfg.label}
-                            </span>
-                            <span className="text-[11px] text-slate-500 font-medium">
-                              Due: {formatDate(campaign.dueDate)}
-                            </span>
-                          </div>
-
-                          <h3 className="mt-2 text-sm font-bold text-slate-900 line-clamp-1">
-                            {campaign.title}
-                          </h3>
-                          {campaign.billingPeriod && (
-                            <p className="text-xs text-slate-500 font-medium mt-0.5">
-                              Period: <span className="font-mono">{campaign.billingPeriod}</span>
-                            </p>
-                          )}
-
-                          {/* Financial Summary */}
-                          <div className="mt-3.5 grid grid-cols-3 gap-2 rounded-lg bg-slate-50 p-2.5 text-center border border-slate-100">
-                            <div>
-                              <span className="text-[10px] font-medium text-slate-400 uppercase">Target</span>
-                              <p className="text-xs font-bold text-slate-900 mt-0.5">
-                                {formatCurrency(campaign.totalAmount)}
-                              </p>
-                            </div>
-                            <div>
-                              <span className="text-[10px] font-medium text-emerald-600 uppercase">Collected</span>
-                              <p className="text-xs font-bold text-emerald-700 mt-0.5">
-                                {formatCurrency(stats.collectedAmount)}
-                              </p>
-                            </div>
-                            <div>
-                              <span className="text-[10px] font-medium text-rose-500 uppercase">Pending</span>
-                              <p className="text-xs font-bold text-rose-600 mt-0.5">
-                                {formatCurrency(stats.outstandingAmount)}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Flats Progress Bar */}
-                          <div className="mt-3.5">
-                            <div className="flex items-center justify-between text-[11px] mb-1.5">
-                              <span className="text-slate-600 font-medium">
-                                Flats: <span className="font-bold text-emerald-700">{stats.paidCount}</span> / {totalFlats} Paid
+                      return (
+                        <div
+                          key={campaign._id}
+                          className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs hover:border-slate-300 transition flex flex-col justify-between"
+                        >
+                          <div>
+                            <div className="flex items-start justify-between gap-2">
+                              <span className={`inline-flex rounded border px-2 py-0.5 text-[10px] font-semibold ${tagCfg.className}`}>
+                                {tagCfg.label}
                               </span>
-                              <span className="text-slate-500 font-medium">
-                                {paidPercent}%
+                              <span className="text-[11px] text-slate-500 font-medium">
+                                Due: {formatDate(campaign.dueDate)}
                               </span>
                             </div>
-                            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 flex">
-                              <div
-                                style={{ width: `${paidPercent}%` }}
-                                className="bg-emerald-500 transition-all duration-300"
-                                title={`${stats.paidCount} Paid`}
-                              />
-                              <div
-                                style={{ width: `${overduePercent}%` }}
-                                className="bg-rose-500 transition-all duration-300"
-                                title={`${stats.overdueCount} Overdue`}
-                              />
-                            </div>
-                            {stats.overdueCount > 0 && (
-                              <p className="text-[10px] text-rose-600 font-medium mt-1">
-                                {stats.overdueCount} flat(s) overdue
+
+                            <h3 className="mt-2 text-sm font-bold text-slate-900 line-clamp-1">
+                              {campaign.title}
+                            </h3>
+                            {campaign.billingPeriod && (
+                              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                Period: <span className="font-mono">{campaign.billingPeriod}</span>
                               </p>
                             )}
+
+                            {/* Financial Summary */}
+                            <div className="mt-3.5 grid grid-cols-3 gap-2 rounded-lg bg-slate-50 p-2.5 text-center border border-slate-100">
+                              <div>
+                                <span className="text-[10px] font-medium text-slate-400 uppercase">Target</span>
+                                <p className="text-xs font-bold text-slate-900 mt-0.5">
+                                  {formatCurrency(campaign.totalAmount)}
+                                </p>
+                              </div>
+                              <div>
+                                <span className="text-[10px] font-medium text-emerald-600 uppercase">Collected</span>
+                                <p className="text-xs font-bold text-emerald-700 mt-0.5">
+                                  {formatCurrency(stats.collectedAmount)}
+                                </p>
+                              </div>
+                              <div>
+                                <span className="text-[10px] font-medium text-rose-500 uppercase">Pending</span>
+                                <p className="text-xs font-bold text-rose-600 mt-0.5">
+                                  {formatCurrency(stats.outstandingAmount)}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Flats Progress Bar */}
+                            <div className="mt-3.5">
+                              <div className="flex items-center justify-between text-[11px] mb-1.5">
+                                <span className="text-slate-600 font-medium">
+                                  Flats: <span className="font-bold text-emerald-700">{stats.paidCount}</span> / {totalFlats} Paid
+                                </span>
+                                <span className="text-slate-500 font-medium">
+                                  {paidPercent}%
+                                </span>
+                              </div>
+                              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 flex">
+                                <div
+                                  style={{ width: `${paidPercent}%` }}
+                                  className="bg-emerald-500 transition-all duration-300"
+                                  title={`${stats.paidCount} Paid`}
+                                />
+                                <div
+                                  style={{ width: `${overduePercent}%` }}
+                                  className="bg-rose-500 transition-all duration-300"
+                                  title={`${stats.overdueCount} Overdue`}
+                                />
+                              </div>
+                              {stats.overdueCount > 0 && (
+                                <p className="text-[10px] text-rose-600 font-medium mt-1">
+                                  {stats.overdueCount} flat(s) overdue
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                            <span className="text-slate-500 capitalize">
+                              Target: <span className="font-semibold text-slate-700">{campaign.targetType.replace(/_/g, " ").toLowerCase()}</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSearchTerm(campaign.title);
+                                setCurrentPage(1);
+                                setActiveMainTab("BILLS");
+                              }}
+                              className="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:text-emerald-800 transition cursor-pointer"
+                            >
+                              <span>View Flats</span>
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            </button>
                           </div>
                         </div>
+                      );
+                    })}
+                  </div>
 
-                        <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                          <span className="text-slate-500 capitalize">
-                            Target: <span className="font-semibold text-slate-700">{campaign.targetType.replace(/_/g, " ").toLowerCase()}</span>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSearchTerm(campaign.title);
-                              setActiveMainTab("BILLS");
-                            }}
-                            className="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:text-emerald-800 transition cursor-pointer"
-                          >
-                            <span>View Flats</span>
-                            <ChevronRight className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+                  {rawCampaigns.length > 0 && (
+                    <div className="mt-6 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between text-xs text-slate-500">
+                      <p className="font-medium">
+                        Showing{" "}
+                        <span className="font-semibold text-slate-800">
+                          {(safeCampaignPage - 1) * CAMPAIGNS_PER_PAGE + 1}
+                        </span>{" "}
+                        to{" "}
+                        <span className="font-semibold text-slate-800">
+                          {Math.min(safeCampaignPage * CAMPAIGNS_PER_PAGE, rawCampaigns.length)}
+                        </span>{" "}
+                        of{" "}
+                        <span className="font-semibold text-slate-800">
+                          {rawCampaigns.length}
+                        </span>{" "}
+                        campaigns
+                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          disabled={safeCampaignPage <= 1}
+                          onClick={() => setCampaignsPage((p) => Math.max(1, p - 1))}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                          aria-label="Previous page"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </button>
+                        <span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-[#07584F] px-2.5 text-xs font-semibold text-white shadow-2xs">
+                          {safeCampaignPage}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={safeCampaignPage >= totalCampaignPages}
+                          onClick={() => setCampaignsPage((p) => Math.min(totalCampaignPages, p + 1))}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                          aria-label="Next page"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           ) : (
@@ -1025,16 +1088,16 @@ export default function TreasurerBilling() {
               </table>
 
               {/* Standard Project Pagination */}
-              {filteredBills.length > ITEMS_PER_PAGE ? (
-                <div className="flex items-center justify-between border-t border-slate-100 pt-4 text-xs text-slate-500">
-                  <p>
+              {filteredBills.length > 0 && (
+                <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between text-xs text-slate-500">
+                  <p className="font-medium">
                     Showing{" "}
                     <span className="font-semibold text-slate-800">
-                      {(currentPage - 1) * ITEMS_PER_PAGE + 1}
+                      {(validCurrentPage - 1) * ITEMS_PER_PAGE + 1}
                     </span>{" "}
                     to{" "}
                     <span className="font-semibold text-slate-800">
-                      {Math.min(currentPage * ITEMS_PER_PAGE, filteredBills.length)}
+                      {Math.min(validCurrentPage * ITEMS_PER_PAGE, filteredBills.length)}
                     </span>{" "}
                     of{" "}
                     <span className="font-semibold text-slate-800">
@@ -1043,31 +1106,31 @@ export default function TreasurerBilling() {
                     bills
                   </p>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      disabled={currentPage === 1}
+                      disabled={validCurrentPage <= 1}
                       onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      className="rounded-md border border-slate-200 p-1.5 transition hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white cursor-pointer disabled:cursor-not-allowed"
-                      aria-label="Previous Page"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                      aria-label="Previous page"
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </button>
-                    <span className="px-2 text-xs font-semibold text-slate-700">
-                      Page {currentPage} of {totalPages}
+                    <span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-[#07584F] px-2.5 text-xs font-semibold text-white shadow-2xs">
+                      {validCurrentPage}
                     </span>
                     <button
                       type="button"
-                      disabled={currentPage === totalPages}
+                      disabled={validCurrentPage >= totalPages}
                       onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                      className="rounded-md border border-slate-200 p-1.5 transition hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white cursor-pointer disabled:cursor-not-allowed"
-                      aria-label="Next Page"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                      aria-label="Next page"
                     >
                       <ChevronRight className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
-              ) : null}
+              )}
             </>
           )}
           </div>

@@ -299,8 +299,9 @@ export function VisitorParkingActions({
                 Vehicle Number
               </label>
               <input
-                className={inputClassName}
+                className={`${inputClassName} disabled:bg-[#F7F8F5] disabled:text-[#637083] disabled:cursor-not-allowed`}
                 value={form.vehicleNumber}
+                disabled={Boolean(record.vehicleNumber || record.entryType === "PASS")}
                 onChange={(event) =>
                   setForm({
                     ...form,
@@ -309,6 +310,11 @@ export function VisitorParkingActions({
                 }
                 placeholder="Vehicle number"
               />
+              {Boolean(record.vehicleNumber || record.entryType === "PASS") && (
+                <p className="mt-1 text-xs text-[#637083]">
+                  Vehicle number set by resident pass
+                </p>
+              )}
             </div>
 
             <div>
@@ -316,8 +322,9 @@ export function VisitorParkingActions({
                 Vehicle Type
               </label>
               <select
-                className={selectClassName}
+                className={`${selectClassName} disabled:bg-[#F7F8F5] disabled:text-[#637083] disabled:cursor-not-allowed`}
                 value={form.vehicleType}
+                disabled={Boolean(record.vehicleType || record.entryType === "PASS")}
                 onChange={(event) =>
                   setForm({
                     ...form,
@@ -333,6 +340,11 @@ export function VisitorParkingActions({
                   </option>
                 ))}
               </select>
+              {Boolean(record.vehicleType || record.entryType === "PASS") && (
+                <p className="mt-1 text-xs text-[#637083]">
+                  Vehicle type set by resident pass
+                </p>
+              )}
             </div>
           </div>
 
