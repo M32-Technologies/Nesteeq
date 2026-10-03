@@ -56,13 +56,6 @@ router.get("/summary/:apartmentId", requireRole("treasurer", "property_manager")
 
 router.post("/common", requireRole("treasurer"), zodValidate(createCommonBillSchema), createCommonBill);
 router.get("/common", requireRole("treasurer", "property_manager"), zodValidate(getCommonBillsSchema), getCommonBills);
-<<<<<<< Updated upstream
-
-router.get("/:id", requireRole("treasurer", "property_manager"), zodValidate(getBillByIdSchema), getBillById);
-
-router.post("/", requireRole("treasurer"), zodValidate(createBillSchema), createBill);
-=======
->>>>>>> Stashed changes
 
 router.post("/", requireRole("treasurer"), zodValidate(createBillSchema), createBill);
 router.get("/:id", requireRole("treasurer", "property_manager"), zodValidate(getBillByIdSchema), getBillById);
