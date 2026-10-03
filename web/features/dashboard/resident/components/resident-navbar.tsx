@@ -23,6 +23,7 @@ import { signOut } from "@/lib/auth-client";
 import { NotificationDropdown } from "@/features/notifications";
 import { useResidentDashboard } from "../hooks/use-resident-dashboard";
 import { ResidentSearch } from "./resident-search";
+import { ResidentEmergencyModal } from "./resident-emergency-modal";
 
 interface ResidentNavbarProps {
   user: {
@@ -36,6 +37,7 @@ export function ResidentNavbar({ user }: ResidentNavbarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
@@ -114,11 +116,6 @@ export function ResidentNavbar({ user }: ResidentNavbarProps) {
         href: "/resident/announcements",
         icon: Bell,
       },
-      {
-        label: "Emergency SOS",
-        href: "/resident/alerts",
-        icon: ShieldAlert,
-      },
     ];
 
   const isTabActive = (href: string) => {
@@ -166,14 +163,16 @@ export function ResidentNavbar({ user }: ResidentNavbarProps) {
             </div>
 
             {/* Emergency SOS Button */}
-            <Link
-              href="/resident/alerts"
+            <button
+              type="button"
+              onClick={() => setIsEmergencyModalOpen(true)}
+              aria-label="Open Emergency SOS Alert"
               className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-red-600 px-3 text-xs font-semibold text-white shadow-xs hover:bg-red-700 transition active:scale-95 cursor-pointer"
             >
               <ShieldAlert className="size-3.5 animate-pulse text-white" />
               <span className="hidden sm:inline">Emergency SOS</span>
               <span className="sm:hidden">SOS</span>
-            </Link>
+            </button>
 
             {/* Mobile Search Button */}
             <button
@@ -335,6 +334,12 @@ export function ResidentNavbar({ user }: ResidentNavbarProps) {
           </div>
         </div>
       </div>
+
+      {/* Emergency SOS Modal */}
+      <ResidentEmergencyModal
+        isOpen={isEmergencyModalOpen}
+        onClose={() => setIsEmergencyModalOpen(false)}
+      />
     </header>
   );
 }

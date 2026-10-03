@@ -7,6 +7,7 @@ import { toast } from "sonner"
 
 import { authClient, useSession } from "@/lib/auth-client"
 import api from "@/lib/axios"
+import { uploadAvatarToS3 } from "@/lib/upload"
 import { ProfileHeader } from "@/components/profile/shared/ProfileHeader"
 import { PersonalDetails } from "@/components/profile/shared/PersonalDetails"
 import { ResidentInformation } from "@/components/profile/resident/ResidentInformation"
@@ -65,7 +66,7 @@ export function ResidentProfilePage() {
 
   const memberSince = formatMemberSince(user?.createdAt)
 
-  // Handle avatar upload via Express endpoint and Better-Auth updateUser
+  // Handle avatar upload via direct S3 presigned URL and Better-Auth updateUser
   const handleAvatarUpload = async (file: File) => {
     if (file.size > 5 * 1024 * 1024) {
       toast.error("Image file must be under 5MB")
@@ -75,18 +76,10 @@ export function ResidentProfilePage() {
     try {
       setIsUploadingAvatar(true)
 
-      const formData = new FormData()
-      formData.append("avatar", file)
-
-      const uploadRes = await api.post("/api/v1/upload/avatar", formData)
-      const imageUrl = uploadRes.data?.url
-
-      if (!imageUrl) {
-        throw new Error("Failed to get uploaded image URL")
-      }
+      const s3Key = await uploadAvatarToS3(file)
 
       const { error } = await authClient.updateUser({
-        image: imageUrl,
+        image: s3Key,
       })
 
       if (error) {

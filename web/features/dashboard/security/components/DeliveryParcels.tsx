@@ -84,7 +84,7 @@ export function DeliveryParcels() {
     packageDescription: "",
   })
 
-  const flatsQuery = useSecurityFlats()
+  const flatsQuery = useSecurityFlats({ occupiedOnly: true })
   const debouncedSearch = useDebouncedValue(search, 350)
   const deliveriesQuery = useDeliveries({
     status,

@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner"
 import { authClient } from "@/lib/auth-client"
 import api from "@/lib/axios"
+import { uploadAvatarToS3 } from "@/lib/upload"
 import {
   dashboardRoleLabels,
   type DashboardRole,
@@ -87,7 +88,7 @@ export function ProfileSettingsPanel({
     .join("")
     .toUpperCase()
 
-  // Image Upload via Express upload endpoint + Better-Auth URL
+  // Image Upload via direct S3 presigned URL + Better-Auth
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -100,20 +101,11 @@ export function ProfileSettingsPanel({
     try {
       setIsSubmitting(true)
 
-      const formData = new FormData()
-      formData.append("avatar", file)
-
-      const uploadRes = await api.post("/api/v1/upload/avatar", formData)
-      const imageUrl = uploadRes.data?.url
-
-      if (!imageUrl) {
-        throw new Error("Failed to get uploaded image URL")
-      }
-
-      setAvatarUrl(imageUrl)
+      const s3Key = await uploadAvatarToS3(file)
+      setAvatarUrl(URL.createObjectURL(file))
 
       const { error } = await authClient.updateUser({
-        image: imageUrl,
+        image: s3Key,
       })
 
       if (error) {

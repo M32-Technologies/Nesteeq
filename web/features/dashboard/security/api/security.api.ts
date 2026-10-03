@@ -28,9 +28,14 @@ export const getSecurityActivity = async (params?: {
   return response.data.data as SecurityActivityResponse
 }
 
-export const getSecurityFlats = async () => {
+export const getSecurityFlats = async (params?: {
+  occupiedOnly?: boolean
+}) => {
   const response = await axiosInstance.get(
-    "/api/security/flats"
+    "/api/security/flats",
+    {
+      params,
+    }
   )
 
   return response.data.data as { flats: SecurityFlat[] }

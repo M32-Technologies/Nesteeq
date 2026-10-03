@@ -90,7 +90,7 @@ export function SecurityVisitors() {
   const [mode, setMode] =
     useState<VisitorEntryMode>(initialMode)
 
-  const flatsQuery = useSecurityFlats()
+  const flatsQuery = useSecurityFlats({ occupiedOnly: true })
   const debouncedSearch = useDebouncedValue(search, 350)
   const visitorRecordsQuery = useVisitorRecords({
     status,

@@ -15,20 +15,20 @@ router.get("/subscription-plans", GetSubscriptionPlansHandler)
 router.get(
   "/subscriptions/current",
   protect,
-  requireRole("property_manager", "admin", "super_admin"),
+  requireRole("property_manager", "user", "resident", "admin", "super_admin"),
   GetCurrentSubscriptionHandler
 )
 router.post(
   "/subscriptions",
   protect,
-  requireRole("property_manager", "admin", "super_admin"),
+  requireRole("property_manager", "user", "resident", "admin", "super_admin"),
   zodValidate(createSubscriptionSchema),
   CreateSubscriptionHandler
 )
 router.post(
   "/subscriptions/verify",
   protect,
-  requireRole("property_manager", "admin", "super_admin"),
+  requireRole("property_manager", "user", "resident", "admin", "super_admin"),
   VerifySubscriptionPaymentHandler
 )
 

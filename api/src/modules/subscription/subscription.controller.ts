@@ -7,8 +7,7 @@ import {
   GetSubscriptionPlans,
   VerifySubscriptionPayment,
 } from "./subscription.service.js";
-
-
+import { Apartment } from "../apartment/apartment.model.js";
 
 export const GetSubscriptionPlansHandler = catchAsync(
   async (_req: Request, res: Response) => {
@@ -23,7 +22,14 @@ export const GetSubscriptionPlansHandler = catchAsync(
 
 export const GetCurrentSubscriptionHandler = catchAsync(
   async (req: Request, res: Response) => {
-    const apartmentId = req.user?.apartmentId;
+    let apartmentId = req.user?.apartmentId;
+
+    if (!apartmentId && req.user?.id) {
+      const pendingApartment = await Apartment.findOne({ managerId: req.user.id });
+      if (pendingApartment) {
+        apartmentId = pendingApartment._id.toString();
+      }
+    }
 
     if (!apartmentId) {
       return res.status(200).json({
@@ -44,8 +50,18 @@ export const GetCurrentSubscriptionHandler = catchAsync(
 export const CreateSubscriptionHandler = catchAsync(
   async (req: Request, res: Response) => {
     const { planId } = req.body;
-    const apartmentId = req.user?.apartmentId;
+    let apartmentId = req.user?.apartmentId;
     const userId = req.user?.id;
+
+    if (!apartmentId && userId) {
+      const pendingApartment = await Apartment.findOne({
+        managerId: userId,
+        status: "pending_payment",
+      });
+      if (pendingApartment) {
+        apartmentId = pendingApartment._id.toString();
+      }
+    }
 
     if (!apartmentId) {
       throw new AppError("Apartment context is required", 400);

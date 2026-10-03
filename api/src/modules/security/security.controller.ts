@@ -171,7 +171,12 @@ export const getSecurityFlats = catchAsync(
       throw new AppError("Apartment context not found", 403)
     }
 
-    const flats = await getSecurityFlatsService(apartmentId)
+    const occupiedOnly =
+      req.query.occupiedOnly === "true" ||
+      req.query.occupied === "true" ||
+      req.query.status === "occupied"
+
+    const flats = await getSecurityFlatsService(apartmentId, { occupiedOnly })
 
     res.status(200).json({
       success: true,

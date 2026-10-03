@@ -53,20 +53,26 @@ export default function Navbar() {
   const user = isMounted ? session?.user : null;
   const userName = user?.name || user?.email || "Profile";
   const userInitials = user?.name ? getInitials(user.name) : userName.charAt(0).toUpperCase();
-  const isAuthLoading = !isMounted || isPending || (!session && isRefetching);
+  const isAuthLoading = !isMounted || isPending;
 
   const userRole = normalizeDashboardRole(user?.role);
+  const normalizedUserRole = user?.role?.trim().toLowerCase();
   const roleLabel =
-    user?.role?.trim().toLowerCase() === "admin"
+    normalizedUserRole === "admin"
       ? "Administrator"
+      : normalizedUserRole === "user"
+      ? "User"
       : dashboardRoleLabels[userRole] || "Resident";
 
   const handleSignOut = async () => {
-    await signOut();
+    try {
+      await signOut();
+    } catch (err) {
+      console.error("Sign out error:", err);
+    }
     setIsProfileOpen(false);
     setIsMenuOpen(false);
-    router.push("/");
-    router.refresh();
+    window.location.href = "/";
   };
 
   useEffect(() => {

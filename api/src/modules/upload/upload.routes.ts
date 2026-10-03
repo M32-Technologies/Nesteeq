@@ -1,40 +1,51 @@
-import { Router, type Request, type Response, type NextFunction } from "express";
-import { uploadImageMiddleware } from "../../middlewares/uploadMiddleware.js";
-import { AppError } from "../../utils/AppError.js";
+import { Router } from "express";
+import { protect } from "../../middlewares/authMiddleware.js";
+import { zodValidate } from "../../middlewares/zodValidate.js";
+import {
+  getPresignedUrlSchema,
+  getBatchPresignedUrlsSchema,
+  getViewUrlSchema,
+  deleteFileSchema,
+} from "./upload.validation.js";
+import {
+  getPresignedUrlHandler,
+  getBatchPresignedUrlsHandler,
+  getViewUrlHandler,
+  deleteFileHandler,
+} from "./upload.controller.js";
 
 const router = Router();
 
+// 1. Single S3 presigned PUT URL
 router.post(
-  "/",
-  uploadImageMiddleware,
-  (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const file = req.file || (req.files && Array.isArray(req.files) ? req.files[0] : null);
+  "/presigned-url",
+  protect,
+  zodValidate(getPresignedUrlSchema),
+  getPresignedUrlHandler,
+);
 
-      if (!file) {
-        return next(new AppError("No file uploaded. Please attach an image file.", 400));
-      }
+// 2. Batch S3 presigned PUT URLs
+router.post(
+  "/presigned-urls",
+  protect,
+  zodValidate(getBatchPresignedUrlsSchema),
+  getBatchPresignedUrlsHandler,
+);
 
-      const host = req.get("host") || `localhost:${process.env.PORT || 6001}`;
-      const protocol = req.protocol || "http";
-      const fileUrl = `${protocol}://${host}/uploads/${file.filename}`;
-      const relativePath = `/uploads/${file.filename}`;
+// 3. S3 temporary GET URL for viewing private files
+router.post(
+  "/view-url",
+  protect,
+  zodValidate(getViewUrlSchema),
+  getViewUrlHandler,
+);
 
-      return res.status(200).json({
-        success: true,
-        message: "Image uploaded successfully",
-        data: {
-          url: fileUrl,
-          path: relativePath,
-          filename: file.filename,
-          size: file.size,
-          mimetype: file.mimetype,
-        },
-      });
-    } catch (error) {
-      return next(error);
-    }
-  }
+// 4. S3 file deletion
+router.delete(
+  "/file",
+  protect,
+  zodValidate(deleteFileSchema),
+  deleteFileHandler,
 );
 
 export default router;

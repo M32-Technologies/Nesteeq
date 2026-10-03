@@ -1,6 +1,6 @@
 "use client";
 
-import DashboardShowcase from "./DashboardShowcase";
+import dynamic from "next/dynamic";
 import CommunityLoop from "./CommunityLoop";
 import ProblemStatement from "./ProblemStatement";
 import FeaturesSection from "@/features/landing/home/FeaturesSection";
@@ -9,6 +9,11 @@ import AudienceSection from "@/features/landing/home/AudienceSection";
 import PricingPreview from "@/features/landing/home/PricingPreview";
 import FinalCTA from "@/features/landing/home/FinalCTA";
 import ApartmentImage from "@/public/images/home/hero-apartment.png";
+
+const DashboardShowcase = dynamic(() => import("./DashboardShowcase"), {
+  ssr: false,
+  loading: () => <div className="min-h-[360px] w-full bg-[#101211]" />,
+});
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
@@ -20,7 +25,7 @@ import { getUserDashboardHref } from "@/features/dashboard/config/sidebar-naviga
 
 export default function HomePage() {
   const [isMounted, setIsMounted] = useState(false);
-  const { data: session, isPending, isRefetching } = useSession();
+  const { data: session, isPending } = useSession();
 
   useEffect(() => {
     setIsMounted(true);
@@ -28,7 +33,7 @@ export default function HomePage() {
 
   const user = isMounted ? session?.user : null;
   const dashboardHref = getUserDashboardHref(user?.role);
-  const isAuthLoading = !isMounted || isPending || (!session && isRefetching);
+  const isAuthLoading = !isMounted || isPending;
 
   return (
     <>
@@ -36,7 +41,7 @@ export default function HomePage() {
         <section className="relative min-h-svh overflow-hidden bg-white">
           <div className="relative mx-auto grid min-h-svh max-w-[1200px] px-5 pt-16 sm:px-7 lg:grid-cols-[1.05fr_0.95fr] lg:px-10">
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
               className="relative z-20 pt-14 sm:pt-16 lg:pt-20"
@@ -95,7 +100,7 @@ export default function HomePage() {
               <div className="absolute bottom-[11%] right-[-25px] h-[68%] w-[84%] rounded-[48%_48%_18%_18%] border border-[var(--brand)]/10" />
 
               <motion.div
-                initial={{ opacity: 0, x: 45 }}
+                initial={false}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.7 }}
                 className="absolute bottom-0 right-[-35px] z-10 h-[92%] w-[105%]"
@@ -112,7 +117,7 @@ export default function HomePage() {
             </div>
 
             <motion.div
-              initial={{ opacity: 0, y: 25 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7 }}
               className="relative mt-8 h-[360px] lg:hidden"

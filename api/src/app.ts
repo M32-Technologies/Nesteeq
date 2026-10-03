@@ -52,8 +52,9 @@ app.use(cookieParser());
 app.use(express.json());
 app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")));
 
-app.use("/api/v1/upload", uploadRoutes);
-app.use("/api/upload", uploadRoutes);
+app.use("/api/v1/uploads", uploadRoutes);
+app.use("/api/uploads", uploadRoutes);
+
 
 app.use("/api/v1/admin", adminRoutes)
 
@@ -102,9 +103,6 @@ app.use("/api/security", securityRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
 
 app.use("/api/maintenance-technician", maintenanceTechnicianRoutes);
-
-app.use("/api/v1/upload", uploadRoutes);
-app.use("/api/upload", uploadRoutes);
 
 app.use("/api/v1", complaintRoutes);
 app.use("/api/v1", maintenanceRoutes);

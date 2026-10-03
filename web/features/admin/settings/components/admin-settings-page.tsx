@@ -30,6 +30,7 @@ import { toast } from "sonner"
 
 import { authClient, useSession } from "@/lib/auth-client"
 import api from "@/lib/axios"
+import { uploadAvatarToS3 } from "@/lib/upload"
 
 function formatDate(dateValue?: string | Date | null): string {
   if (!dateValue) return "—"
@@ -130,20 +131,12 @@ export default function AdminSettingsPage() {
 
     try {
       setIsUploadingPhoto(true)
-      const formData = new FormData()
-      formData.append("avatar", file)
 
-      const uploadRes = await api.post("/api/v1/upload/avatar", formData)
-      const imageUrl = uploadRes.data?.url
-
-      if (!imageUrl) {
-        throw new Error("Unable to obtain image URL from upload service.")
-      }
-
-      setAvatarUrl(imageUrl)
+      const s3Key = await uploadAvatarToS3(file)
+      setAvatarUrl(URL.createObjectURL(file))
 
       const { error } = await authClient.updateUser({
-        image: imageUrl,
+        image: s3Key,
       })
 
       if (error) {

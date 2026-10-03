@@ -54,11 +54,12 @@ router.get("/recipients", requireRole("treasurer", "property_manager"), getBillR
 router.get("/summary", requireRole("treasurer", "property_manager"), getBillingSummary);
 router.get("/summary/:apartmentId", requireRole("treasurer", "property_manager"), zodValidate(getBillingSummarySchema), getBillingSummary);
 
+router.post("/common", requireRole("treasurer"), zodValidate(createCommonBillSchema), createCommonBill);
+router.get("/common", requireRole("treasurer", "property_manager"), zodValidate(getCommonBillsSchema), getCommonBills);
+
 router.get("/:id", requireRole("treasurer", "property_manager"), zodValidate(getBillByIdSchema), getBillById);
 
 router.post("/", requireRole("treasurer"), zodValidate(createBillSchema), createBill);
-router.post("/common", requireRole("treasurer"), zodValidate(createCommonBillSchema), createCommonBill);
-router.get("/common", requireRole("treasurer", "property_manager"), zodValidate(getCommonBillsSchema), getCommonBills);
 
 router.patch("/:id", requireRole("treasurer"), zodValidate(updateBillSchema), updateBill);
 

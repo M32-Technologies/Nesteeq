@@ -8,6 +8,7 @@ import { emailService } from "../services/EmailService.js"
 import { Apartment } from "../modules/apartment/apartment.model.js"
 import { isValidObjectId } from "mongoose"
 import { emitUserForceLogout } from "../socket/socket.js"
+import { S3Service } from "../modules/upload/s3.service.js"
 
 export const auth = betterAuth({
   database: mongodbAdapter(getAuthDB(), {
@@ -142,7 +143,7 @@ export const auth = betterAuth({
       },
     }),
     admin({
-      defaultRole: "resident",
+      defaultRole: "user",
       adminRoles: ["admin"],
     }),
     customSession(async ({ user, session }) => {
@@ -152,17 +153,18 @@ export const auth = betterAuth({
 
       const rawUser = user as { role?: string; apartmentId?: string; id?: string };
       const userRole = (rawUser.role ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+      let resolvedApartmentId = rawUser.apartmentId;
+
       if (userRole !== "admin" && userRole !== "super_admin") {
-        let apartmentId = rawUser.apartmentId;
-        if (!apartmentId && userRole === "property_manager" && rawUser.id) {
+        if (!resolvedApartmentId && (userRole === "property_manager" || userRole === "user") && rawUser.id) {
           const apt = await Apartment.findOne({ managerId: rawUser.id }).select("_id status name inactiveReason");
           if (apt) {
-            apartmentId = apt._id.toString();
+            resolvedApartmentId = apt._id.toString();
           }
         }
 
-        if (apartmentId && isValidObjectId(apartmentId)) {
-          const apt = await Apartment.findById(apartmentId).select("name status inactiveReason");
+        if (resolvedApartmentId && isValidObjectId(resolvedApartmentId)) {
+          const apt = await Apartment.findById(resolvedApartmentId).select("name status inactiveReason");
           if (apt) {
             apartmentStatus = apt.status;
             inactiveReason = apt.inactiveReason ?? null;
@@ -171,9 +173,20 @@ export const auth = betterAuth({
         }
       }
 
+      let avatarUrl = user.image;
+      if (avatarUrl && !avatarUrl.startsWith("http") && !avatarUrl.startsWith("data:")) {
+        try {
+          avatarUrl = await S3Service.generatePresignedGetUrl(avatarUrl, 60 * 60 * 24);
+        } catch {
+          // Keep original avatar if S3 lookup fails
+        }
+      }
+
       return {
         user: {
           ...user,
+          image: avatarUrl,
+          apartmentId: resolvedApartmentId ?? null,
           apartmentStatus,
           inactiveReason,
           apartmentName,
@@ -190,3 +203,4 @@ export const auth = betterAuth({
     },
   },
 })
+
