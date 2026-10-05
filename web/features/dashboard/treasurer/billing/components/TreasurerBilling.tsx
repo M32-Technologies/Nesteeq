@@ -53,6 +53,7 @@ const statusLabels: Record<Bill["status"], string> = {
   PARTIALLY_PAID: "Partially Paid",
   PAID: "Paid",
   OVERDUE: "Overdue",
+  CANCELLED: "Cancelled",
 };
 
 const statusClassNames: Record<Bill["status"], string> = {
@@ -64,6 +65,8 @@ const statusClassNames: Record<Bill["status"], string> = {
     "rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700",
   OVERDUE:
     "rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700",
+  CANCELLED:
+    "rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600",
 };
 
 const BILL_TYPE_TAGS: Record<
@@ -203,11 +206,13 @@ export default function TreasurerBilling() {
         page: currentPage,
         limit: ITEMS_PER_PAGE,
       }),
+    placeholderData: (previousData) => previousData,
   });
 
   const commonBillsQuery = useQuery({
     queryKey: ["treasurer", "common-bills"],
     queryFn: () => getCommonBills(),
+    placeholderData: (previousData) => previousData,
   });
 
   const billingSummaryQuery = useQuery({
@@ -253,7 +258,7 @@ export default function TreasurerBilling() {
       reason?: string;
     }) => deleteBill(billId, reason),
     onSuccess: async () => {
-      toast.success("Bill cancelled and deleted successfully.");
+      toast.success("Bill cancelled successfully.");
       setIsDeleteModalOpen(false);
       setBillToDelete(null);
       setDeleteReason("");
@@ -502,10 +507,10 @@ export default function TreasurerBilling() {
   const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
 
   useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
+    if (billsData && totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(Math.max(1, totalPages));
     }
-  }, [currentPage, totalPages]);
+  }, [billsData, currentPage, totalPages]);
 
   const paginatedBills = bills;
 
@@ -515,10 +520,10 @@ export default function TreasurerBilling() {
   const safeCampaignPage = Math.min(Math.max(1, campaignsPage), totalCampaignPages);
 
   useEffect(() => {
-    if (campaignsPage > totalCampaignPages) {
-      setCampaignsPage(totalCampaignPages);
+    if (commonBillsQuery.data && totalCampaignPages > 0 && campaignsPage > totalCampaignPages) {
+      setCampaignsPage(Math.max(1, totalCampaignPages));
     }
-  }, [campaignsPage, totalCampaignPages]);
+  }, [commonBillsQuery.data, campaignsPage, totalCampaignPages]);
 
   const paginatedCampaigns = useMemo(() => {
     const start = (safeCampaignPage - 1) * CAMPAIGNS_PER_PAGE;
@@ -921,6 +926,7 @@ export default function TreasurerBilling() {
                 <option value="PARTIALLY_PAID">Partially Paid</option>
                 <option value="OVERDUE">Overdue</option>
                 <option value="PAID">Paid</option>
+                <option value="CANCELLED">Cancelled</option>
               </select>
             </div>
           </div>
@@ -1039,7 +1045,7 @@ export default function TreasurerBilling() {
                             <button
                               type="button"
                               onClick={() => openActionModal(bill, "edit")}
-                              disabled={bill.status === "PAID"}
+                              disabled={bill.status === "PAID" || bill.status === "CANCELLED"}
                               className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
                             >
                               Edit
@@ -1047,7 +1053,7 @@ export default function TreasurerBilling() {
                             <button
                               type="button"
                               onClick={() => openActionModal(bill, "payment")}
-                              disabled={bill.balanceAmount <= 0}
+                              disabled={bill.balanceAmount <= 0 || bill.status === "CANCELLED"}
                               className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                             >
                               Record
@@ -1057,6 +1063,7 @@ export default function TreasurerBilling() {
                               onClick={() => openActionModal(bill, "waiver")}
                               disabled={
                                 bill.status === "PAID" ||
+                                bill.status === "CANCELLED" ||
                                 bill.balanceAmount <= 0 ||
                                 bill.lateFeeAmount - bill.lateFeeWaivedAmount <=
                                 0
@@ -1079,7 +1086,7 @@ export default function TreasurerBilling() {
                                 Receipt
                               </button>
                             )}
-                            {bill.paidAmount === 0 && (
+                            {bill.paidAmount === 0 && bill.status !== "CANCELLED" && (
                               <button
                                 type="button"
                                 onClick={() => {
@@ -1087,7 +1094,7 @@ export default function TreasurerBilling() {
                                   setIsDeleteModalOpen(true);
                                 }}
                                 className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-xs font-medium text-rose-700 transition hover:bg-rose-100"
-                                title="Cancel and Delete Unpaid Bill"
+                                title="Cancel Unpaid Bill"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                                 Cancel
@@ -1382,10 +1389,10 @@ export default function TreasurerBilling() {
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-900">
-                  Cancel & Delete Bill
+                  Cancel Bill
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Permanently remove this unpaid invoice.
+                  Mark this unpaid invoice as cancelled.
                 </p>
               </div>
             </div>
@@ -1450,7 +1457,7 @@ export default function TreasurerBilling() {
                 disabled={deleteMutation.isPending}
                 className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 disabled:bg-rose-300 transition"
               >
-                {deleteMutation.isPending ? "Deleting..." : "Confirm & Delete"}
+                {deleteMutation.isPending ? "Cancelling..." : "Confirm & Cancel"}
               </button>
             </div>
           </div>

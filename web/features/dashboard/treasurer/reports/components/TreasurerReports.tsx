@@ -118,6 +118,7 @@ export default function TreasurerReports() {
         page: defaultersPage,
         limit: ITEMS_PER_PAGE,
       }),
+    placeholderData: (previousData) => previousData,
   });
 
   // 3. Expense Breakdown Report Query (Server-side category aggregation and percentages)

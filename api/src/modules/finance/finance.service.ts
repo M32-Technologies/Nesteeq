@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 
 import { Billing } from "../billing/billing.model.js";
+import { BillStatus } from "../billing/billing.interface.js";
 import { Expense } from "../expense/expense.model.js";
 import {
   calculateBillValues,
@@ -25,7 +26,7 @@ export const getFinanceSummaryService = async (
   const id = getApartmentId(apartmentId);
 
   const [bills, expenses] = await Promise.all([
-    Billing.find({ apartmentId: id }).lean(),
+    Billing.find({ apartmentId: id, status: { $ne: BillStatus.CANCELLED } }).lean(),
     Expense.aggregate([
       {
         $match: {
@@ -140,6 +141,7 @@ const buildMonthlyRow = async (
     ]),
     Billing.find({
       apartmentId,
+      status: { $ne: BillStatus.CANCELLED },
       dueDate: { $gte: start, $lt: end },
     }).lean(),
   ]);

@@ -3,6 +3,8 @@ import {
   FinanceSummary,
   GetManagerBillsParams,
   GetManagerPaymentsParams,
+  PaginatedBillsResponse,
+  PaginatedPaymentsResponse,
   Payment,
 } from "../types/payment-history";
 
@@ -109,7 +111,7 @@ export const getFinanceSummary = () =>
   request<FinanceSummary>("/api/v1/finance/summary");
 
 export const getManagerBills = (params: GetManagerBillsParams = {}) =>
-  request<Bill[]>(`/api/v1/bills${toQuery(params)}`);
+  request<Bill[] | PaginatedBillsResponse>(`/api/v1/bills${toQuery(params)}`);
 
 export const getManagerPayments = (params: GetManagerPaymentsParams = {}) =>
-  request<Payment[]>(`/api/v1/payments${toQuery(params)}`);
+  request<Payment[] | PaginatedPaymentsResponse>(`/api/v1/payments${toQuery(params)}`);

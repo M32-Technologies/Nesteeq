@@ -49,7 +49,7 @@ export default function TreasurerDashboard() {
 
   const dashboard = dashboardQuery.data;
   const isLoading = dashboardQuery.isLoading;
-  const pendingPayouts = payoutsQuery.data ?? [];
+  const pendingPayouts = (payoutsQuery.data ?? []).filter((p) => !p.isPaid);
 
   return (
     <div className="space-y-6">

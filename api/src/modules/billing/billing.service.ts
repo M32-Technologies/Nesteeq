@@ -104,6 +104,7 @@ interface BillFilters {
   search?: string;
   page?: number;
   limit?: number;
+  userRole?: string;
 }
 
 type BillingDocument = HydratedDocument<IBilling>;
@@ -231,6 +232,16 @@ const applyPaymentToBill = async (
 ) => {
   const paymentAmount = roundMoney(amount);
   const currentValues = calculateBillValues(bill);
+
+  if (
+    bill.status === BillStatus.CANCELLED ||
+    currentValues.status === BillStatus.CANCELLED
+  ) {
+    throw new AppError(
+      "Cannot record payment on a cancelled bill",
+      400
+    );
+  }
 
   if (paymentAmount <= 0) {
     throw new AppError(
@@ -570,6 +581,8 @@ export const getBillsService = async (
 
   if (filters.status) {
     query.status = filters.status;
+  } else if (filters.userRole === "property_manager") {
+    query.status = { $ne: BillStatus.CANCELLED };
   }
 
   if (filters.search) {
@@ -625,10 +638,11 @@ export const getBillsService = async (
     query.$or = searchConditions;
   }
 
-  if (filters.page) {
+  const isPm = filters.userRole === "property_manager";
+  if (filters.page || isPm) {
     const total = await Billing.countDocuments(query);
-    const page = Math.max(1, filters.page);
-    const limit = Math.max(1, filters.limit || 8);
+    const page = Math.max(1, filters.page || 1);
+    const limit = Math.max(1, filters.limit || (isPm ? 10 : 8));
     const totalPages = Math.ceil(total / limit) || 1;
 
     const bills = await Billing.find(query)
@@ -771,6 +785,13 @@ export const updateBillService = async (
       }
 
       const currentValues = calculateBillValues(bill);
+
+      if (
+        bill.status === BillStatus.CANCELLED ||
+        currentValues.status === BillStatus.CANCELLED
+      ) {
+        throw new AppError("Cancelled bill cannot be edited", 400);
+      }
 
       if (currentValues.status === BillStatus.PAID) {
         throw new AppError("Paid bill cannot be edited", 400);
@@ -923,6 +944,16 @@ export const waiveLateFeeService = async (
 
       const currentValues = calculateBillValues(bill);
 
+      if (
+        bill.status === BillStatus.CANCELLED ||
+        currentValues.status === BillStatus.CANCELLED
+      ) {
+        throw new AppError(
+          "Cannot waive late fee on a cancelled bill",
+          400
+        );
+      }
+
       if (currentValues.status === BillStatus.PAID || currentValues.balanceAmount <= 0) {
         throw new AppError(
           "Cannot waive late fee on an already paid or settled bill",
@@ -1023,6 +1054,7 @@ export const getBillingSummaryService = async (
     {
       $match: {
         apartmentId: apartmentObjectId,
+        status: { $ne: BillStatus.CANCELLED },
       },
     },
     {
@@ -1250,6 +1282,7 @@ export const getMyResidentBillsService = async (
   const bills = await Billing.find({
     apartmentId: aptObjectId,
     $or: queryConditions,
+    status: { $ne: BillStatus.CANCELLED },
   })
     .sort({ dueDate: -1, createdAt: -1 })
     .lean();
@@ -1549,6 +1582,10 @@ export const payResidentBillService = async (
   const bill = await Billing.findById(id);
   if (!bill) {
     throw new AppError("Bill not found", 404);
+  }
+
+  if (bill.status === BillStatus.CANCELLED) {
+    throw new AppError("Cannot pay a cancelled bill", 400);
   }
 
   if (user.apartmentId && bill.apartmentId.toString() !== user.apartmentId) {
@@ -2090,7 +2127,10 @@ export const getCommonBillsService = async (
 
   const commonBillIds = commonBills.map((cb) => cb._id);
   const childBills = await Billing.find(
-    { commonBillId: { $in: commonBillIds } },
+    {
+      commonBillId: { $in: commonBillIds },
+      status: { $ne: BillStatus.CANCELLED },
+    },
     "commonBillId status totalAmount paidAmount balanceAmount"
   ).lean();
 
@@ -2155,6 +2195,10 @@ export const deleteBillService = async (
         throw new AppError("Bill not found", 404);
       }
 
+      if (bill.status === BillStatus.CANCELLED) {
+        throw new AppError("Bill is already cancelled", 400);
+      }
+
       if (bill.paidAmount > 0) {
         throw new AppError(
           `Cannot cancel or delete a bill with recorded payments (Paid: ₹${bill.paidAmount}). Please adjust payments before deleting.`,
@@ -2164,7 +2208,9 @@ export const deleteBillService = async (
 
       const auditValue = getBillAuditValue(bill);
 
-      await Billing.findByIdAndDelete(id).session(session);
+      bill.status = BillStatus.CANCELLED;
+      bill.balanceAmount = 0;
+      await bill.save({ session });
 
       if (bill.commonBillId) {
         await CommonBill.findByIdAndUpdate(
@@ -2188,12 +2234,12 @@ export const deleteBillService = async (
           entityId: bill._id.toString(),
           oldValue: auditValue,
           newValue: {
-            status: "DELETED",
-            reason: reason || "Bill cancelled / deleted by treasurer",
+            status: BillStatus.CANCELLED,
+            reason: reason || "Bill cancelled by treasurer",
           },
           description: reason
-            ? `Bill ${bill._id.toString()} deleted/cancelled (Reason: ${reason})`
-            : `Bill ${bill._id.toString()} deleted/cancelled by treasurer`,
+            ? `Bill ${bill._id.toString()} cancelled (Reason: ${reason})`
+            : `Bill ${bill._id.toString()} cancelled by treasurer`,
         },
         session
       );
@@ -2202,7 +2248,7 @@ export const deleteBillService = async (
     await session.endSession();
   }
 
-  return { success: true, message: "Bill deleted successfully" };
+  return { success: true, message: "Bill cancelled successfully" };
 };
 
 export const generateReceiptFileService = async (

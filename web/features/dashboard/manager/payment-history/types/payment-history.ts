@@ -53,11 +53,30 @@ export interface FinanceSummary {
   currentBalance: number;
 }
 
+export interface CommonPagination {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface PaginatedBillsResponse {
+  bills: Bill[];
+  pagination: CommonPagination;
+}
+
+export interface PaginatedPaymentsResponse {
+  payments: Payment[];
+  pagination: CommonPagination;
+}
+
 export interface GetManagerBillsParams {
   residentId?: string;
   unitId?: string;
   status?: BillStatusFilter;
   search?: string;
+  page?: number;
+  limit?: number;
 }
 
 export interface GetManagerPaymentsParams {
@@ -66,4 +85,5 @@ export interface GetManagerPaymentsParams {
   source?: PaymentSourceFilter;
   limit?: number;
   search?: string;
+  page?: number;
 }

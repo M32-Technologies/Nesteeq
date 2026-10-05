@@ -2,7 +2,8 @@ export type BillStatus =
   | "PENDING"
   | "PARTIALLY_PAID"
   | "PAID"
-  | "OVERDUE";
+  | "OVERDUE"
+  | "CANCELLED";
 
 export type ExpenseCategory =
   | "MAINTENANCE"
@@ -723,6 +724,9 @@ export interface MaintenancePayout {
   remarks: string;
   forwardedAt: string;
   priority?: string;
+  isPaid?: boolean;
+  paymentStatus?: "PAID" | "PENDING";
+  paidAt?: string | null;
 }
 
 export function getMaintenancePayouts(params?: { search?: string }): Promise<MaintenancePayout[]>;

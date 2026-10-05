@@ -90,6 +90,7 @@ export default function TreasurerWallet() {
         page: currentPage,
         limit: ITEMS_PER_PAGE,
       }),
+    placeholderData: (previousData) => previousData,
   });
 
   const walletSummaryQuery = useQuery({
@@ -241,10 +242,10 @@ export default function TreasurerWallet() {
   const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
 
   useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
+    if (walletsData && totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(Math.max(1, totalPages));
     }
-  }, [currentPage, totalPages]);
+  }, [walletsData, currentPage, totalPages]);
 
   const paginatedWallets = wallets;
 

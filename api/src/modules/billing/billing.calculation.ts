@@ -15,7 +15,10 @@ type BillCalculationInput = Pick<
   | "paidAmount"
   | "dueDate"
   | "settledAt"
->;
+> & {
+  status?: BillStatus;
+  totalAmount?: number;
+};
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -52,6 +55,19 @@ export const getDaysOverdue = (
 export const calculateBillValues = (
   bill: BillCalculationInput
 ) => {
+  if (bill.status === BillStatus.CANCELLED) {
+    return {
+      lateFeeAmount: 0,
+      totalAmount:
+        bill.totalAmount ??
+        roundMoney(
+          bill.baseAmount + getAdditionalTotal(bill.additionalCharges)
+        ),
+      balanceAmount: 0,
+      status: BillStatus.CANCELLED,
+    };
+  }
+
   const referenceDate = bill.settledAt ?? new Date();
   const daysOverdue = getDaysOverdue(bill.dueDate, referenceDate);
   const lateFeeAmount = roundMoney(
@@ -93,6 +109,11 @@ export const calculateBillValues = (
 export const applyBillValues = (
   bill: HydratedDocument<IBilling>
 ) => {
+  if (bill.status === BillStatus.CANCELLED) {
+    bill.balanceAmount = 0;
+    return bill;
+  }
+
   const values = calculateBillValues(bill);
 
   bill.lateFeeAmount = values.lateFeeAmount;

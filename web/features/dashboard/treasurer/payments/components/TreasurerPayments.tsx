@@ -152,6 +152,7 @@ export default function TreasurerPayments() {
         page: currentPage,
         limit: ITEMS_PER_PAGE,
       }),
+    placeholderData: (previousData) => previousData,
   });
 
   const billsQuery = useQuery({
@@ -312,10 +313,10 @@ export default function TreasurerPayments() {
   const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
 
   useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
+    if (paymentsData && totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(Math.max(1, totalPages));
     }
-  }, [currentPage, totalPages]);
+  }, [paymentsData, currentPage, totalPages]);
 
   const paginatedPayments = allPayments;
 

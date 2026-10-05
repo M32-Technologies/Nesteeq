@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 
 import { Billing } from "../billing/billing.model.js";
+import { BillStatus } from "../billing/billing.interface.js";
 import { Payment } from "../payment/payment.model.js";
 import { Expense } from "../expense/expense.model.js";
 import { Flat } from "../flat/flat.model.js";
@@ -84,6 +85,7 @@ export const getTreasurerChartService = async (
 
     Billing.find({
       apartmentId: id,
+      status: { $ne: BillStatus.CANCELLED },
       dueDate: { $gte: startOfYear, $lt: endOfYear },
     }).lean(),
   ]);
@@ -153,7 +155,10 @@ export const getTreasurerDashboardService = async (
   // Run summary, chart, pending dues, and recent payments concurrently
   const [bills, expensesAgg, chart, pendingRaw, recentRaw] =
     await Promise.all([
-      Billing.find({ apartmentId: id }).lean(),
+      Billing.find({
+        apartmentId: id,
+        status: { $ne: BillStatus.CANCELLED },
+      }).lean(),
 
       Expense.aggregate<{ totalExpenses: number }>([
         {
@@ -176,6 +181,7 @@ export const getTreasurerDashboardService = async (
 
       Billing.find({
         apartmentId: id,
+        status: { $ne: BillStatus.CANCELLED },
         balanceAmount: { $gt: 0 },
       })
         .sort({ dueDate: 1 })
@@ -308,7 +314,6 @@ export const getMaintenancePayoutsService = async (
   const query: Record<string, unknown> = {
     apartment: { $in: aptValues },
     "costReview.status": "APPROVED",
-    "costReview.forwardedToRole": { $in: ["TREASURER", null] },
   };
 
   if (search && search.trim()) {
@@ -425,6 +430,8 @@ export const getMaintenancePayoutsService = async (
       ? userMap.get(job.costReview.reviewedBy.toString()) || "Facility Manager"
       : "Facility Manager";
 
+    const isPaid = job.costReview?.forwardedToRole === "SETTLED";
+
     return {
       _id: job._id.toString(),
       title: job.title,
@@ -437,6 +444,9 @@ export const getMaintenancePayoutsService = async (
       remarks: job.costReview?.remarks || "Cost verified & approved",
       forwardedAt: job.costReview?.forwardedAt || job.costReview?.reviewedAt || job.updatedAt,
       priority: job.priority,
+      isPaid,
+      paymentStatus: isPaid ? "PAID" : "PENDING",
+      paidAt: isPaid ? (job.costReview?.settledAt || job.updatedAt) : null,
     };
   });
 
@@ -479,6 +489,7 @@ export const processMaintenancePayoutService = async (
     {
       $set: {
         "costReview.forwardedToRole": "SETTLED",
+        "costReview.settledAt": new Date(),
       },
     },
     { returnDocument: "before" }
@@ -610,6 +621,7 @@ export const getDefaultersReportService = async (
 
   const bills = await Billing.find({
     apartmentId: aptId,
+    status: { $ne: BillStatus.CANCELLED },
     balanceAmount: { $gt: 0 },
     $or: [{ status: "OVERDUE" }, { dueDate: { $lt: today } }],
   } as any)

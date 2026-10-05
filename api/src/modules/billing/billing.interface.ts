@@ -8,6 +8,7 @@ export enum BillStatus {
   PARTIALLY_PAID = "PARTIALLY_PAID",
   PAID = "PAID",
   OVERDUE = "OVERDUE",
+  CANCELLED = "CANCELLED",
 }
 
 export interface IAdditionalCharge {

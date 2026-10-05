@@ -188,6 +188,7 @@ export default function TreasurerAudit() {
         page: currentPage,
         limit: ITEMS_PER_PAGE,
       }),
+    placeholderData: (previousData) => previousData,
   });
 
   const auditLogsData = auditQuery.data;
@@ -256,10 +257,10 @@ export default function TreasurerAudit() {
   const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
 
   useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
+    if (auditLogsData && totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(Math.max(1, totalPages));
     }
-  }, [currentPage, totalPages]);
+  }, [auditLogsData, currentPage, totalPages]);
 
   const paginatedLogs = auditLogs;
 

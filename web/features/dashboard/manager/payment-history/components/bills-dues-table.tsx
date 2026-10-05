@@ -1,4 +1,4 @@
-import { ChevronDown, Eye, Search } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Eye, Search } from "lucide-react";
 import { formatCurrency, formatDate } from "@/features/dashboard/treasurer/utils/format";
 import { Bill, BillStatusFilter } from "../types/payment-history";
 
@@ -34,6 +34,10 @@ interface BillsDuesTableProps {
   onViewDetails: (bill: Bill) => void;
   resolveResidentName: (id: string) => string;
   resolveFlatNumber: (id: string) => string;
+  page?: number;
+  totalPages?: number;
+  totalCount?: number;
+  onPageChange?: (page: number) => void;
 }
 
 export default function BillsDuesTable({
@@ -48,6 +52,10 @@ export default function BillsDuesTable({
   onViewDetails,
   resolveResidentName,
   resolveFlatNumber,
+  page = 1,
+  totalPages = 1,
+  totalCount,
+  onPageChange,
 }: BillsDuesTableProps) {
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -178,10 +186,46 @@ export default function BillsDuesTable({
           </table>
         )}
       </div>
-      <div className="border-t border-slate-200 px-6 py-4">
-        <p className="text-sm font-medium text-slate-500">
-          {bills.length} {statusFilter === "ALL" ? "total" : statusFilter.toLowerCase()} bills
+      <div className="flex flex-col gap-3 border-t border-slate-200 px-6 py-4 sm:flex-row sm:items-center sm:justify-between text-xs text-slate-500">
+        <p className="font-medium">
+          Showing{" "}
+          <span className="font-semibold text-slate-800">
+            {(totalCount ?? bills.length) === 0 ? 0 : (page - 1) * 10 + 1}
+          </span>{" "}
+          to{" "}
+          <span className="font-semibold text-slate-800">
+            {Math.min(page * 10, totalCount ?? bills.length)}
+          </span>{" "}
+          of{" "}
+          <span className="font-semibold text-slate-800">{totalCount ?? bills.length}</span>{" "}
+          {statusFilter === "ALL" ? "total" : statusFilter.toLowerCase()} bills
         </p>
+
+        {totalPages > 1 && onPageChange && (
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => onPageChange(page - 1)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+              aria-label="Previous page"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-[#0F5F45] px-2.5 text-xs font-semibold text-white shadow-2xs">
+              {page}
+            </span>
+            <button
+              type="button"
+              disabled={page >= totalPages}
+              onClick={() => onPageChange(page + 1)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+              aria-label="Next page"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

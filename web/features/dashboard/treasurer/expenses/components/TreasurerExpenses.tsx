@@ -129,6 +129,7 @@ export default function TreasurerExpenses() {
   // Maintenance Payouts state
   const [activeTab, setActiveTab] = useState<"society_expenses" | "maintenance_payouts">("society_expenses");
   const [selectedPayout, setSelectedPayout] = useState<MaintenancePayout | null>(null);
+  const [viewingPayout, setViewingPayout] = useState<MaintenancePayout | null>(null);
   const [payoutMethod, setPayoutMethod] = useState("UPI");
   const [payoutRef, setPayoutRef] = useState("");
   const [payoutNotes, setPayoutNotes] = useState("");
@@ -173,6 +174,7 @@ export default function TreasurerExpenses() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         if (selectedPayout) setSelectedPayout(null);
+        else if (viewingPayout) setViewingPayout(null);
         else if (payExpense) setPayExpense(null);
         else if (rejectExpense) {
           setRejectExpense(null);
@@ -186,6 +188,7 @@ export default function TreasurerExpenses() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
     selectedPayout,
+    viewingPayout,
     payExpense,
     rejectExpense,
     approveExpense,
@@ -216,6 +219,7 @@ export default function TreasurerExpenses() {
         page: currentPage,
         limit: ITEMS_PER_PAGE,
       }),
+    placeholderData: (previousData) => previousData,
   });
 
   const summaryQuery = useQuery({
@@ -385,10 +389,10 @@ export default function TreasurerExpenses() {
 
   // Keep pagination in sync when data changes
   useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
+    if (expensesData && totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(Math.max(1, totalPages));
     }
-  }, [currentPage, totalPages]);
+  }, [expensesData, currentPage, totalPages]);
 
   // Filtered & Paginated Maintenance Payouts
   const filteredMaintenancePayouts = maintenancePayouts;
@@ -552,21 +556,21 @@ export default function TreasurerExpenses() {
             >
               <Wrench className="h-4 w-4" />
               Approved Maintenance Invoices
-              {maintenancePayouts.length > 0 ? (
+              {maintenancePayouts.filter((p) => !p.isPaid).length > 0 ? (
                 <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">
-                  {maintenancePayouts.length}
+                  {maintenancePayouts.filter((p) => !p.isPaid).length}
                 </span>
               ) : null}
             </button>
           </div>
 
           {/* Pending Maintenance Invoices Announcement Banner when on society_expenses */}
-          {maintenancePayouts.length > 0 && activeTab === "society_expenses" && (
+          {maintenancePayouts.some((p) => !p.isPaid) && activeTab === "society_expenses" && (
             <div className="mx-5 mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 rounded-lg border border-amber-200 bg-amber-50/80 p-3.5 text-xs text-amber-900">
               <div className="flex items-center gap-2.5">
                 <Wrench className="h-4 w-4 text-amber-700 shrink-0" />
                 <span>
-                  <strong>{maintenancePayouts.length} maintenance invoice{maintenancePayouts.length > 1 ? "s" : ""}</strong> approved by Facility Managers awaiting treasurer payout disbursement.
+                  <strong>{maintenancePayouts.filter((p) => !p.isPaid).length} maintenance invoice{maintenancePayouts.filter((p) => !p.isPaid).length > 1 ? "s" : ""}</strong> approved by Facility Managers awaiting treasurer payout disbursement.
                 </span>
               </div>
               <button
@@ -714,7 +718,22 @@ export default function TreasurerExpenses() {
                             </span>
                           </td>
                           <td className="py-3.5 text-right">
-                            {item.amount <= 0 ? (
+                            {item.isPaid || item.paymentStatus === "PAID" ? (
+                              <div className="inline-flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  Paid
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setViewingPayout(item)}
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50 hover:text-slate-900"
+                                >
+                                  <Eye className="h-3.5 w-3.5 text-slate-500" />
+                                  View Details
+                                </button>
+                              </div>
+                            ) : item.amount <= 0 ? (
                               <span className="inline-flex rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
                                 No Payout Due
                               </span>
@@ -1594,6 +1613,125 @@ export default function TreasurerExpenses() {
                 {processPayoutMutation.isPending
                   ? "Processing..."
                   : "Confirm & Disburse Payout"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* View Details Only Modal for Settled/Paid Maintenance Invoices */}
+      {viewingPayout ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <CheckCircle2 className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Maintenance Invoice Details
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Approved by Facility Manager &bull; Payment Disbursed
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingPayout(null)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="my-4 space-y-3.5 text-xs">
+              <div className="flex items-center justify-between rounded-xl bg-emerald-50/80 px-3.5 py-2.5 border border-emerald-200 text-emerald-900">
+                <span className="font-semibold flex items-center gap-1.5">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  Payment Status:
+                </span>
+                <span className="font-bold text-xs bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">
+                  Paid & Settled
+                </span>
+              </div>
+
+              <div className="rounded-xl bg-slate-50 p-3.5 text-slate-800 space-y-2 border border-slate-200/80">
+                <div className="flex justify-between items-start">
+                  <span className="text-slate-500">Service / Job:</span>
+                  <span className="font-semibold text-slate-900 text-right">
+                    {viewingPayout.title}
+                  </span>
+                </div>
+                {viewingPayout.category ? (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Category:</span>
+                    <span className="font-medium text-slate-700">
+                      {viewingPayout.category}
+                    </span>
+                  </div>
+                ) : null}
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Location:</span>
+                  <span className="font-medium text-slate-700">
+                    {viewingPayout.flatNumber}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Technician / Vendor:</span>
+                  <span className="font-semibold text-slate-900">
+                    {viewingPayout.technicianName}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Approved by Facility:</span>
+                  <span className="text-slate-700">
+                    {viewingPayout.reviewedByName}
+                  </span>
+                </div>
+                {viewingPayout.forwardedAt ? (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Approval Date:</span>
+                    <span className="text-slate-700">
+                      {formatDate(viewingPayout.forwardedAt)}
+                    </span>
+                  </div>
+                ) : null}
+                {viewingPayout.remarks ? (
+                  <div className="rounded bg-white p-2 text-slate-600 border border-slate-200/60">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">
+                      Facility Manager Note:
+                    </span>
+                    {viewingPayout.remarks}
+                  </div>
+                ) : null}
+                {viewingPayout.description ? (
+                  <div className="rounded bg-white p-2 text-slate-600 border border-slate-200/60">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">
+                      Description:
+                    </span>
+                    {viewingPayout.description}
+                  </div>
+                ) : null}
+                <div className="flex justify-between border-t border-slate-200 pt-2 items-baseline">
+                  <span className="text-slate-700 font-semibold text-sm">
+                    Disbursed Amount:
+                  </span>
+                  <span className="font-bold text-xl text-[#07584F]">
+                    {formatCurrency(viewingPayout.amount)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end border-t border-slate-100 pt-3">
+              <button
+                type="button"
+                onClick={() => setViewingPayout(null)}
+                className="rounded-lg bg-slate-100 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+              >
+                Close
               </button>
             </div>
           </div>

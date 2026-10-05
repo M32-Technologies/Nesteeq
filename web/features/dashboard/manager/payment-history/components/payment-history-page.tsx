@@ -31,11 +31,13 @@ export default function PaymentHistoryPage() {
   const [billsSearch, setBillsSearch] = useState("");
   const [debouncedBillsSearch, setDebouncedBillsSearch] = useState("");
   const [billsStatus, setBillsStatus] = useState<BillStatusFilter>("ALL");
+  const [billsPage, setBillsPage] = useState(1);
   
   // Transactions Filters
   const [txSearch, setTxSearch] = useState("");
   const [debouncedTxSearch, setDebouncedTxSearch] = useState("");
   const [txSource, setTxSource] = useState<PaymentSourceFilter>("ALL");
+  const [txPage, setTxPage] = useState(1);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -51,6 +53,14 @@ export default function PaymentHistoryPage() {
     return () => clearTimeout(timer);
   }, [txSearch]);
 
+  useEffect(() => {
+    setBillsPage(1);
+  }, [debouncedBillsSearch, billsStatus]);
+
+  useEffect(() => {
+    setTxPage(1);
+  }, [debouncedTxSearch, txSource]);
+
   // Selection
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
@@ -64,25 +74,64 @@ export default function PaymentHistoryPage() {
   } = useFinanceSummaryQuery();
 
   const {
-    data: billsData = [],
+    data: billsData,
     isLoading: isBillsLoading,
     isError: isBillsError,
     error: billsError,
   } = useManagerBillsQuery({
     status: billsStatus === "ALL" ? undefined : billsStatus,
     search: debouncedBillsSearch.trim() || undefined,
+    page: billsPage,
+    limit: 10,
   });
 
   const {
-    data: paymentsData = [],
+    data: paymentsData,
     isLoading: isPaymentsLoading,
     isError: isPaymentsError,
     error: paymentsError,
   } = useManagerPaymentsQuery({
     source: txSource === "ALL" ? undefined : txSource,
     search: debouncedTxSearch.trim() || undefined,
-    limit: 100, // Matching the existing treasurer logic to fetch latest 100
+    page: txPage,
+    limit: 10,
   });
+
+  const bills: Bill[] = useMemo(() => {
+    if (!billsData) return [];
+    if (Array.isArray(billsData)) return billsData;
+    return billsData.bills || [];
+  }, [billsData]);
+
+  const billsTotalCount = useMemo(() => {
+    if (!billsData) return 0;
+    if (Array.isArray(billsData)) return billsData.length;
+    return billsData.pagination?.total ?? bills.length;
+  }, [billsData, bills.length]);
+
+  const billsTotalPages = useMemo(() => {
+    if (!billsData) return 1;
+    if (Array.isArray(billsData)) return Math.ceil(billsData.length / 10) || 1;
+    return billsData.pagination?.totalPages ?? 1;
+  }, [billsData]);
+
+  const payments: Payment[] = useMemo(() => {
+    if (!paymentsData) return [];
+    if (Array.isArray(paymentsData)) return paymentsData;
+    return paymentsData.payments || [];
+  }, [paymentsData]);
+
+  const paymentsTotalCount = useMemo(() => {
+    if (!paymentsData) return 0;
+    if (Array.isArray(paymentsData)) return paymentsData.length;
+    return paymentsData.pagination?.total ?? payments.length;
+  }, [paymentsData, payments.length]);
+
+  const paymentsTotalPages = useMemo(() => {
+    if (!paymentsData) return 1;
+    if (Array.isArray(paymentsData)) return Math.ceil(paymentsData.length / 10) || 1;
+    return paymentsData.pagination?.totalPages ?? 1;
+  }, [paymentsData]);
 
   // Fetch Lookups
   // Limit to 1000 for the first version to get a reasonably comprehensive map
@@ -176,7 +225,7 @@ export default function PaymentHistoryPage() {
 
       {activeTab === "bills" ? (
         <BillsDuesTable
-          bills={billsData}
+          bills={bills}
           isLoading={isBillsLoading}
           isError={isBillsError}
           error={billsError}
@@ -187,10 +236,14 @@ export default function PaymentHistoryPage() {
           onViewDetails={setSelectedBill}
           resolveResidentName={resolveResidentName}
           resolveFlatNumber={resolveFlatNumber}
+          page={billsPage}
+          totalPages={billsTotalPages}
+          totalCount={billsTotalCount}
+          onPageChange={setBillsPage}
         />
       ) : (
         <TransactionsTable
-          payments={paymentsData}
+          payments={payments}
           isLoading={isPaymentsLoading}
           isError={isPaymentsError}
           error={paymentsError}
@@ -201,6 +254,10 @@ export default function PaymentHistoryPage() {
           onViewDetails={setSelectedPayment}
           resolveResidentName={resolveResidentName}
           resolveFlatNumber={resolveFlatNumber}
+          page={txPage}
+          totalPages={paymentsTotalPages}
+          totalCount={paymentsTotalCount}
+          onPageChange={setTxPage}
         />
       )}
 

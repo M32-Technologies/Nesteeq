@@ -9,6 +9,7 @@ const billStatusSchema = z.enum([
   "PARTIALLY_PAID",
   "PAID",
   "OVERDUE",
+  "CANCELLED",
 ]);
 
 const additionalChargeSchema = z.object({

@@ -103,6 +103,7 @@ export const getBills = catchAsync(
       search: req.query.search as string | undefined,
       page: req.query.page ? Number(req.query.page) : undefined,
       limit: req.query.limit ? Number(req.query.limit) : undefined,
+      userRole: (req as any).user?.role,
     });
 
     res.status(200).json({

@@ -5,6 +5,7 @@ import { WalletTransactionType } from "./wallet.interface.js";
 import { AuditAction } from "../audit/audit.interface.js";
 import { createAuditLogService } from "../audit/audit.service.js";
 import { Billing } from "../billing/billing.model.js";
+import { BillStatus } from "../billing/billing.interface.js";
 import {
   applyBillValues,
   calculateBillValues,
@@ -504,6 +505,10 @@ export const deductWalletFundsService = async (
           "Bill not found for this resident wallet",
           404
         );
+      }
+
+      if (bill.status === BillStatus.CANCELLED) {
+        throw new AppError("Cannot pay a cancelled bill using wallet", 400);
       }
 
       const debitAmount = roundMoney(amount);

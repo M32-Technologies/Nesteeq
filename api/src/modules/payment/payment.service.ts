@@ -56,6 +56,7 @@ export interface PaymentFilters {
   includeReversed?: boolean;
   page?: number;
   limit?: number;
+  userRole?: string;
 }
 
 const toObjectId = (value: string, field: string) => {
@@ -233,10 +234,11 @@ export const getPaymentsService = async (filters: PaymentFilters) => {
     query.$or = searchConditions;
   }
 
-  if (filters.page) {
+  const isPm = filters.userRole === "property_manager";
+  if (filters.page || isPm) {
     const total = await Payment.countDocuments(query);
-    const page = Math.max(1, filters.page);
-    const limit = Math.max(1, filters.limit || 8);
+    const page = Math.max(1, filters.page || 1);
+    const limit = Math.max(1, filters.limit || (isPm ? 10 : 8));
     const totalPages = Math.ceil(total / limit) || 1;
 
     const [metricsResult, payments] = await Promise.all([
