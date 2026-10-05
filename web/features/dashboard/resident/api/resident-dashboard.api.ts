@@ -1,4 +1,5 @@
 import api from "@/lib/axios";
+import { uploadComplaintImageToS3 } from "@/lib/upload";
 import { getResidentFeed } from "@/features/announcements/api/announcements.api";
 import type { AnnouncementItem } from "@/features/announcements/types";
 
@@ -372,28 +373,11 @@ export interface CreateResidentComplaintPayload {
   attachments?: string[];
 }
 
-export async function uploadComplaintImage(file: File): Promise<string> {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const res = await api.post<{
-    success: boolean;
-    data: {
-      url: string;
-      path: string;
-      filename: string;
-    };
-  }>("/api/v1/upload", formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-  });
-
-  if (!res.data?.success || !res.data?.data?.url) {
-    throw new Error("Failed to upload image");
-  }
-
-  return res.data.data.url;
+export async function uploadComplaintImage(
+  file: File,
+  apartmentId?: string
+): Promise<string> {
+  return uploadComplaintImageToS3(file, apartmentId);
 }
 
 export async function createResidentComplaint(payload: CreateResidentComplaintPayload) {

@@ -45,6 +45,67 @@ import { Apartment } from "../apartment/apartment.model.js";
 import { Resident } from "../resident/resident.model.js";
 import { Flat } from "../flat/flat.model.js";
 import { createNotification } from "../notification/notification.service.js";
+import { S3Service } from "../upload/s3.service.js";
+
+export function extractS3Key(urlOrKey: string): string | null {
+  if (!urlOrKey || typeof urlOrKey !== "string") return null;
+  const clean = urlOrKey.trim();
+  if (!clean) return null;
+
+  // 1. Direct S3 key without protocol (e.g. "apartments/...", "users/...")
+  if (clean.startsWith("apartments/") || clean.startsWith("users/")) {
+    return clean.split("?")[0];
+  }
+
+  // 2. Full URL (e.g. https://<bucket>.s3.<region>.amazonaws.com/apartments/... or custom domain or path-style)
+  if (clean.startsWith("http://") || clean.startsWith("https://")) {
+    try {
+      const parsed = new URL(clean);
+      const pathname = decodeURIComponent(parsed.pathname.replace(/^\/+/, ""));
+
+      if (parsed.hostname.includes("amazonaws.com")) {
+        // Path-style: s3.region.amazonaws.com/bucket/key
+        if (
+          parsed.hostname.startsWith("s3.") ||
+          parsed.hostname.startsWith("s3-") ||
+          parsed.hostname === "s3.amazonaws.com"
+        ) {
+          const parts = pathname.split("/");
+          if (parts.length > 1) {
+            parts.shift(); // remove bucket name
+            return parts.join("/");
+          }
+        }
+        return pathname;
+      }
+
+      if (pathname.startsWith("apartments/") || pathname.startsWith("users/")) {
+        return pathname;
+      }
+    } catch {
+      // ignore parsing errors
+    }
+  }
+
+  return null;
+}
+
+export const resolveMediaUrl = async (urlOrKey: string): Promise<string> => {
+  if (!urlOrKey || typeof urlOrKey !== "string") return urlOrKey;
+  const trimmed = urlOrKey.trim();
+  if (!trimmed) return trimmed;
+
+  const key = extractS3Key(trimmed);
+  if (key) {
+    try {
+      return await S3Service.generatePresignedGetUrl(key, 60 * 60 * 24);
+    } catch {
+      return trimmed;
+    }
+  }
+
+  return trimmed;
+};
 
 const getAuthUsersFilter = (userIds: string[]) => {
   const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
@@ -478,68 +539,80 @@ export const enrichComplaints = async (complaints: any[]): Promise<any[]> => {
     }
   }
 
-  return plainComplaints.map((c: any) => {
-    const resId = c.residentId || c.resident;
-    const resKey = resId
-      ? typeof resId === "object"
-        ? resId._id?.toString() || resId.id?.toString()
-        : String(resId).trim()
-      : null;
-    const residentUser = resKey ? residentUserMap.get(resKey) || residentUserMap.get(resKey.toLowerCase()) : null;
+  return Promise.all(
+    plainComplaints.map(async (c: any) => {
+      const resId = c.residentId || c.resident;
+      const resKey = resId
+        ? typeof resId === "object"
+          ? resId._id?.toString() || resId.id?.toString()
+          : String(resId).trim()
+        : null;
+      const residentUser = resKey ? residentUserMap.get(resKey) || residentUserMap.get(resKey.toLowerCase()) : null;
 
-    const aptId =
-      c.apartmentId ??
-      (c.apartment
-        ? typeof c.apartment === "object"
-          ? c.apartment._id?.toString() || c.apartment.toString()
-          : c.apartment.toString()
-        : undefined);
+      const aptId =
+        c.apartmentId ??
+        (c.apartment
+          ? typeof c.apartment === "object"
+            ? c.apartment._id?.toString() || c.apartment.toString()
+            : c.apartment.toString()
+          : undefined);
 
-    const rawStaffKey = extractStaffId(c.assignedStaff) || extractStaffId(c.assignedTo);
-    const staffObj = rawStaffKey
-      ? technicianMap.get(rawStaffKey) || technicianMap.get(rawStaffKey.toLowerCase()) || null
-      : null;
+      const rawStaffKey = extractStaffId(c.assignedStaff) || extractStaffId(c.assignedTo);
+      const staffObj = rawStaffKey
+        ? technicianMap.get(rawStaffKey) || technicianMap.get(rawStaffKey.toLowerCase()) || null
+        : null;
 
-    const assignedStaff =
-      staffObj ??
-      (typeof c.assignedStaff === "object" && c.assignedStaff !== null
-        ? {
-            ...c.assignedStaff,
-            name: c.assignedStaff.name || c.assignedStaff.fullName,
-            fullName: c.assignedStaff.fullName || c.assignedStaff.name,
-          }
-        : null);
+      const assignedStaff =
+        staffObj ??
+        (typeof c.assignedStaff === "object" && c.assignedStaff !== null
+          ? {
+              ...c.assignedStaff,
+              name: c.assignedStaff.name || c.assignedStaff.fullName,
+              fullName: c.assignedStaff.fullName || c.assignedStaff.name,
+            }
+          : null);
 
-    const assignedTo =
-      staffObj ??
-      (typeof c.assignedTo === "object" && c.assignedTo !== null
-        ? {
-            ...c.assignedTo,
-            name: c.assignedTo.name || c.assignedTo.fullName,
-            fullName: c.assignedTo.fullName || c.assignedTo.name,
-          }
-        : null);
+      const assignedTo =
+        staffObj ??
+        (typeof c.assignedTo === "object" && c.assignedTo !== null
+          ? {
+              ...c.assignedTo,
+              name: c.assignedTo.name || c.assignedTo.fullName,
+              fullName: c.assignedTo.fullName || c.assignedTo.name,
+            }
+          : null);
 
-    const assignedTechnicianName =
-      assignedStaff?.name ||
-      assignedStaff?.fullName ||
-      assignedTo?.name ||
-      assignedTo?.fullName ||
-      undefined;
+      const assignedTechnicianName =
+        assignedStaff?.name ||
+        assignedStaff?.fullName ||
+        assignedTo?.name ||
+        assignedTo?.fullName ||
+        undefined;
 
-    return {
-      ...c,
-      apartment: c.apartment ?? aptId,
-      apartmentId: aptId,
-      resident: c.resident ?? resId,
-      residentId: residentUser ?? (typeof resId === "object" ? resId : resId),
-      flat: c.flat,
-      flatId: c.flatId ?? c.flat,
-      assignedStaff: assignedStaff ?? (c.assignedStaff ? c.assignedStaff : null),
-      assignedTo: assignedTo ?? (c.assignedTo ? c.assignedTo : null),
-      assignedTechnicianName,
-    };
-  });
+      const rawImages: string[] = Array.isArray(c.images) ? c.images : [];
+      const rawAttachments: string[] = Array.isArray(c.attachments) ? c.attachments : [];
+
+      const [resolvedImages, resolvedAttachments] = await Promise.all([
+        Promise.all(rawImages.filter(Boolean).map(resolveMediaUrl)),
+        Promise.all(rawAttachments.filter(Boolean).map(resolveMediaUrl)),
+      ]);
+
+      return {
+        ...c,
+        apartment: c.apartment ?? aptId,
+        apartmentId: aptId,
+        resident: c.resident ?? resId,
+        residentId: residentUser ?? (typeof resId === "object" ? resId : resId),
+        flat: c.flat,
+        flatId: c.flatId ?? c.flat,
+        assignedStaff: assignedStaff ?? (c.assignedStaff ? c.assignedStaff : null),
+        assignedTo: assignedTo ?? (c.assignedTo ? c.assignedTo : null),
+        assignedTechnicianName,
+        images: resolvedImages,
+        attachments: resolvedAttachments,
+      };
+    })
+  );
 };
 
 const updateComplaintDocument = async (
@@ -977,10 +1050,10 @@ export const createComplaint = async (
     ? new Types.ObjectId(flat)
     : undefined;
 
-  const rawImages = (data as any).images || (data as any).attachments || [];
-  const images = Array.isArray(rawImages) ? rawImages : rawImages ? [rawImages] : [];
-  const rawAttachments = (data as any).attachments || images;
-  const attachments = Array.isArray(rawAttachments) ? rawAttachments : rawAttachments ? [rawAttachments] : [];
+  const rawImages = (data as any).images || [];
+  const images = (Array.isArray(rawImages) ? rawImages : rawImages ? [rawImages] : []).filter(Boolean);
+  const rawAttachments = (data as any).attachments || [];
+  const attachments = (Array.isArray(rawAttachments) ? rawAttachments : rawAttachments ? [rawAttachments] : []).filter(Boolean);
 
   const complaint = await Complaint.create({
     resident: user.id,
@@ -1086,9 +1159,8 @@ export const getComplaintById = async (
   const complaint = await getComplaintOrThrow(complaintId);
   assertCanAccessComplaint(user, complaint);
 
-  return complaint;
   const [enriched] = await enrichComplaints([complaint]);
-  return enriched;
+  return enriched || complaint;
 };
 
 export const updateComplaint = async (
@@ -1255,9 +1327,8 @@ export const updateComplaintStatus = async (
   const nextStatus = data.status;
 
   if (currentStatus === nextStatus) {
-    return complaint;
     const [enriched] = await enrichComplaints([complaint]);
-    return enriched;
+    return enriched || complaint;
   }
 
   assertNotTerminal(complaint);

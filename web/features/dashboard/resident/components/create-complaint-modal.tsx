@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useSession } from "@/lib/auth-client";
 import {
   createResidentComplaint,
   uploadComplaintImage,
@@ -79,6 +80,7 @@ export function CreateComplaintModal({
   onSuccess,
 }: CreateComplaintModalProps) {
   const queryClient = useQueryClient();
+  const { data: session } = useSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
@@ -146,19 +148,17 @@ export function CreateComplaintModal({
       let uploadedImageUrl: string | null = null;
       if (selectedFile) {
         try {
-          uploadedImageUrl = await uploadComplaintImage(selectedFile);
+          const userApartmentId = (session?.user as { apartmentId?: string })?.apartmentId;
+          uploadedImageUrl = await uploadComplaintImage(selectedFile, userApartmentId);
         } catch (uploadErr) {
           console.error("Image upload failed:", uploadErr);
-          toast.error("Failed to upload the attached photo. Please try again.");
+          toast.error("Failed to upload the attached photo to storage. Please try again.");
           return;
         }
       }
 
-      const locationPrefix = `[Location: ${values.location}]\n\n`;
-      let fullDescription = `${locationPrefix}${values.description.trim()}`;
-      if (selectedFile) {
-        fullDescription += `\n\n[Attached Photo Reference: ${selectedFile.name} (${(selectedFile.size / 1024).toFixed(1)} KB)]`;
-      }
+      const locationPrefix = values.location ? `[Location: ${values.location}]\n\n` : "";
+      const fullDescription = `${locationPrefix}${values.description.trim()}`;
 
       await createResidentComplaint({
         title: values.title.trim(),
@@ -166,7 +166,7 @@ export function CreateComplaintModal({
         category: values.category as CreateResidentComplaintPayload["category"],
         priority: values.priority as CreateResidentComplaintPayload["priority"],
         images: uploadedImageUrl ? [uploadedImageUrl] : [],
-        attachments: uploadedImageUrl ? [uploadedImageUrl] : [],
+        attachments: [],
       });
 
       toast.success("Complaint registered successfully! The facility team will review it.");
