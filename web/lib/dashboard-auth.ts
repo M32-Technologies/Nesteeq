@@ -46,13 +46,14 @@ export type AdminSession = {
 }
 
 function getAuthBaseUrl() {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL
+  const baseUrl =
+    process.env.BACKEND_URL ||
+    process.env.BACKEND_INTERNAL_URL ||
+    (process.env.NODE_ENV === "production"
+      ? "https://nesteeq.onrender.com"
+      : process.env.NEXT_PUBLIC_API_URL || "http://localhost:6001");
 
-  if (!baseUrl) {
-    throw new Error("NEXT_PUBLIC_API_URL is not configured")
-  }
-
-  return baseUrl.replace(/\/$/, "")
+  return baseUrl.replace(/\/$/, "");
 }
 
 export function getDashboardHomePath(role: DashboardRole) {

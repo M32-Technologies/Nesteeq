@@ -14,7 +14,14 @@ type AuthSessionResponse = {
 } | null;
 
 function getAuthBaseUrl() {
-  return process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? null;
+  const url =
+    process.env.BACKEND_URL ||
+    process.env.BACKEND_INTERNAL_URL ||
+    (process.env.NODE_ENV === "production"
+      ? "https://nesteeq.onrender.com"
+      : process.env.NEXT_PUBLIC_API_URL || "http://localhost:6001");
+
+  return url.replace(/\/$/, "");
 }
 
 async function getCurrentUserSession(request: NextRequest) {

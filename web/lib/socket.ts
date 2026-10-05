@@ -10,7 +10,11 @@ export interface SocketAuthData {
 
 export function getSocket(authData?: SocketAuthData): Socket {
   const serverUrl =
-    process.env.NEXT_PUBLIC_API_URL || "http://localhost:6001";
+    process.env.NEXT_PUBLIC_SOCKET_URL ||
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    (process.env.NODE_ENV === "production"
+      ? "https://nesteeq.onrender.com"
+      : process.env.NEXT_PUBLIC_API_URL || "http://localhost:6001");
 
   if (!socket) {
     socket = io(serverUrl, {

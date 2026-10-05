@@ -3,7 +3,7 @@ import { emailOTPClient, inferAdditionalFields , adminClient} from "better-auth/
 
 
 export const authClient = createAuthClient({
-    baseURL : process.env.NEXT_PUBLIC_API_URL,
+    baseURL: process.env.NEXT_PUBLIC_AUTH_URL || process.env.NEXT_PUBLIC_API_URL || undefined,
     plugins: [
         emailOTPClient(),
         inferAdditionalFields({

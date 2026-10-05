@@ -61,7 +61,9 @@ export const updateCurrentApartmentHandler = catchAsync(
 
 export const getApartmentStatusHandler = catchAsync(
     async (req: Request, res: Response) => {
+
         let apartmentId = req.user?.apartmentId ?? undefined;
+
         if (!apartmentId && req.user?.role === "property_manager" && req.user?.id) {
             const apt = await Apartment.findOne({ managerId: req.user.id }).select("_id");
             if (apt) apartmentId = apt._id.toString();
