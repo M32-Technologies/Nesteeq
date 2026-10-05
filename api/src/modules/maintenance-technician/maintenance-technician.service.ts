@@ -851,9 +851,7 @@ export const getJobById = async (
         status: mappedStatus,
         createdAt: new Date(createdDateVal).toISOString(),
         complaintImage:
-          complaintObj?.image ||
-          maintDoc.image ||
-          "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&auto=format&fit=crop&q=80",
+          complaintObj?.image
       },
       locationInfo: {
         block: loc.displayBlock,
@@ -922,8 +920,7 @@ export const getJobById = async (
         status: mappedStatus,
         createdAt: new Date(createdDateVal).toISOString(),
         complaintImage:
-          complaintDoc.image ||
-          "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&auto=format&fit=crop&q=80",
+          complaintDoc.image 
       },
       locationInfo: {
         block: loc.displayBlock,

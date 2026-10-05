@@ -44,8 +44,8 @@ function getMediaUrl(url: string) {
   if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("blob:")) {
     return url
   }
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:6001"
-  return `${baseUrl.replace(/\/$/, "")}/${url.replace(/^\//, "")}`
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || ""
+  return baseUrl ? `${baseUrl.replace(/\/$/, "")}/${url.replace(/^\//, "")}` : `/${url.replace(/^\//, "")}`
 }
 
 export type ComplaintDrawerMode = "details" | "assign" | "edit" | "status"

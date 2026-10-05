@@ -9,13 +9,8 @@ import {
 } from "../types/payment-history";
 
 const getApiBaseUrl = () => {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-
-  if (!apiUrl) {
-    throw new Error("NEXT_PUBLIC_API_URL is not configured");
-  }
-
-  return apiUrl.replace(/\/$/, "");
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+  return apiUrl ? apiUrl.replace(/\/$/, "") : "";
 };
 
 const getErrorMessage = async (response: Response) => {

@@ -91,8 +91,8 @@ function getMediaUrl(url: string) {
   ) {
     return url;
   }
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:6001";
-  return `${baseUrl.replace(/\/$/, "")}/${url.replace(/^\//, "")}`;
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
+  return baseUrl ? `${baseUrl.replace(/\/$/, "")}/${url.replace(/^\//, "")}` : `/${url.replace(/^\//, "")}`;
 }
 
 export function ResidentComplaintDetailsDrawer({
